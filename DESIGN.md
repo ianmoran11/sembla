@@ -1,0 +1,445 @@
+# Sembla: Design Document
+
+**Status:** Draft v1 — converged through an adversarial design review, 2026-07-12.
+**Scope:** Semantics, architecture, and v0.1 definition for a compositional simulation
+framework with a Lean 4 frontend and a Rust execution backend.
+
+---
+
+## 1. Project identity
+
+Sembla is a **semantics-first simulation framework** for large-scale stochastic
+systems, with public-policy microsimulation (e.g., an Australian synthetic
+population) as the driving use case. Its distinguishing commitments, in priority
+order:
+
+1. **Composition with a real semantics.** Models are built from systems that
+   compose (nest, wire, product), and composition has a mathematical meaning that
+   refactoring cannot silently change.
+2. **Reproducibility as a first-class semantic property**, not a runtime flag —
+   with explicitly tiered guarantees trading strictness against speed.
+3. **GPU-shaped by construction.** The semantics is restricted, deliberately, to
+   operations whose parallel execution is order-free or canonically ordered, so
+   GPU acceleration and bitwise replication are the *same* problem.
+4. **A frontend (Lean 4) that doubles as the formal home of the semantics**, so
+   compiler optimizations correspond to provable equivalences.
+
+The project is explicitly *not*, in v1: a proof-verified compiler, a
+differentiable simulator, or a general discrete-event engine — though the design
+keeps doors open to each (see §10).
+
+### The one-sentence thesis
+
+> **A synchronous relational machine:** state is a typed columnar database, a
+> timestep is a query, composition is wiring boxes that exchange tables, and
+> randomness is a pure function of coordinates.
+
+---
+
+## 2. Architecture overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Lean 4 frontend                                         │
+│  • surface DSL: "systems with states and hazard         │
+│    transitions" (Poly-flavored syntax)                  │
+│  • elaborates to the IR (deep embedding)                │
+│  • denotational semantics defined here (ground truth)   │
+│  • infoview structure widgets (state diagrams, wiring   │
+│    views, prior plots)                                  │
+└──────────────────────────┬──────────────────────────────┘
+                           │  IR (serialized, versioned)
+┌──────────────────────────▼──────────────────────────────┐
+│ Rust backend                                            │
+│  • CPU reference interpreter = executable semantics     │
+│    oracle (v0.1)                                        │
+│  • GPU backend, differentially tested against the       │
+│    oracle (v0.2+)                                       │
+│  • per-box scheduler choice: tau-leaped parallel,       │
+│    exact sequential (Gillespie/DES), ODE sub-stepper    │
+└─────────────────────────────────────────────────────────┘
+```
+
+The IR is the contract: **seed + IR + determinism level ⇒ reproducible results.**
+The IR is frontend-agnostic by design; Lean is the intended frontend, but nothing
+in the backend depends on it.
+
+---
+
+## 3. Why Lean (and what Lean is *not* for)
+
+This was the most contested question in the design review. The settled position:
+
+**Lean is chosen for two reasons, ranked:**
+
+1. **The infoview modeling workflow.** Lean's editor integration renders
+   context-dependent, interactive output for the syntactic node under the cursor,
+   driven by elaborator state. No Julia or Python environment has an equivalent
+   (Pluto.jl is cell-granular and notebook-shaped, not source-file /
+   cursor-granular). This enables **structure widgets** — rendered from the
+   elaborated model with zero runtime cost:
+   - state-machine diagram of a system's states and transitions;
+   - wiring/composition diagrams of how boxes connect;
+   - rendered prior distributions (plots, not just parameter text).
+2. **Semantic ground truth.** The DSL's denotational semantics is *defined in
+   Lean* as a mathematical object (a deep embedding with a meaning function).
+   This makes compiler transformations — operator fusion, the group-by lumping
+   rewrite (§7), coarse-grainings, eventually symbolic gradients — into
+   *statable theorems*. Proofs are deferred (and expected to get cheaper as
+   AI-assisted proving matures), but the specification cost is paid in v1,
+   because it cannot be retrofitted.
+
+**Honest accounting (constraints accepted during review):**
+
+- **Behavior widgets** (sliders → run simulation → posterior/prior-predictive
+  plots) are an aspiration whose feasibility is owned by *runtime latency*, not
+  by the frontend. Structure widgets are v0.1; behavior widgets are gated on the
+  runtime being fast enough for an interactive loop.
+- Prior *predictive* checks require running the simulation; only prior
+  *marginals* are analytic. The widget taxonomy (structure vs. behavior) keeps
+  this distinction explicit.
+- Any formal guarantee (e.g., a verified gradient) is a theorem **about the
+  ℝ-semantics** and **stops at the IR boundary**: the Rust/GPU compiler is
+  trusted, not verified, and floating-point execution is not covered. Marketing
+  language must respect this.
+- Gradients/HMC do **not** constrain the v1 IR. They apply only to the
+  differentiable fragment (ODE-like blocks, not discrete-state agents) and are
+  option value, not requirements.
+- Toolchain risk (widget API churn, VS Code coupling) is accepted; the
+  frontend-agnostic IR is the hedge.
+
+---
+
+## 4. Semantics
+
+Four layers. One design rule governs all of them: **the semantics may only use
+operations whose parallel execution is order-free or has a canonical order.**
+
+### 4.1 State: ACSets, taken seriously
+
+Each box's state is an **ACSet** (attributed C-set): a schema of entity tables
+(`Person`, `Employer`, `Household`), foreign-key columns
+(`employer : Person → Employer`), and typed attribute columns
+(`health : Person → {S,I,R}`, `wealth : Person → ℝ`, fixed-size vectors allowed).
+
+- Struct-of-arrays / columnar layout **is the semantics**, not an implementation
+  trick beneath it. The "indexed columnar format for performance" and the formal
+  data model are the same object.
+- Grids for PDE/cellular-automata models are tables whose foreign keys encode the
+  lattice; compartmental (SIR-style) models are one-row tables; networks are edge
+  tables. One data model, no special cases.
+- **An individual is not a system; a population is.** Individuals are rows.
+  The surface DSL still reads "an Individual is a system with states and
+  reactions" — Poly at the surface, relational at the IR. (See §8 for why the
+  pure everything-is-a-wired-system picture was rejected at individual
+  granularity.)
+
+### 4.2 Dynamics: a tick is a bulk relational kernel
+
+Per tick, each box computes `(new state, output tables)` from
+`(old state, input tables)`. **Double-buffered, read-old/write-new, no
+exceptions** — including within a box. This uniformity is what makes box
+boundaries semantically invisible (§4.4).
+
+The kernel language is a deliberately closed fragment:
+
+- **map** over a table — per-entity logic in a first-order, allocation-free
+  expression language (the part that compiles to SPMD kernels);
+- **filter**; **join on declared keys only**; **group-by/aggregate** where the
+  aggregation is a commutative monoid;
+- **birth/death** as stream compaction, with entity IDs allocated
+  deterministically as a function of `(tick, parent, slot)`;
+- **randomness** via counter-based Philox keyed by
+  `(seed, tick, rule-id, entity-id)` — a *pure function of coordinates*, no
+  stateful streams. Randomness is therefore order-independent by construction;
+  reproducibility reduces entirely to floating-point reduction order, which the
+  commutative-monoid restriction lets the scheduler canonicalize.
+
+### 4.3 Time and stochastics: hazard rates and racing clocks
+
+Transitions declare **hazard rates** (e.g., `hazard 0.02 / year`), not per-tick
+probabilities (`with prob p` remains as sugar, desugaring via
+`λ = −ln(1−p)/Δt`). Hazard rates are the native statistical dialect of policy
+microsimulation (survival/duration models), and they induce the semantics:
+
+- **Ideal meaning:** a continuous-time Markov chain (CTMC). Every enabled
+  transition runs an exponential clock; the earliest firing wins.
+- **Executed meaning:** **tau-leaping.** Rates are frozen at tick start; all
+  transitions whose sampled firing time lands inside the tick window Δt fire;
+  conflicts are resolved by argmin (§5); losers re-race next tick (no
+  within-tick cascades). Discretization error is O(Δt²); **Δt is a semantic
+  parameter, not just a performance knob**, and is documented as such.
+- **Exact path:** sequential Gillespie/discrete-event execution is available as
+  a per-box slow path (§6), used both for small subsystems (courts) and as a
+  validator for the tau-leaped approximation.
+- **Non-exponential durations** (needed for realistic service/processing
+  times): (a) phase-type approximations (chained exponential stages — stays
+  purely CTMC), and (b) **scheduled clocks**: sample a full duration from any
+  distribution at stage entry (Philox at entry coordinates), store the firing
+  date as an attribute, fire when reached, **re-check the guard at firing** (a
+  case that settles early simply never fires its hearing — cancellation for
+  free). Scheduled clocks are a generalized semi-Markov process; easier on the
+  runtime than races (no staleness), weaker theory at the edges.
+
+Sequential-random-order updating (NetLogo/Mesa style) is understood as a
+discrete-time shadow of independent racing clocks; Sembla treats the CTMC as
+ground truth rather than replicating legacy update orders.
+
+**Kurtz's theorem** connects the layers: the mean-field limit of the population
+CTMC is an ODE system. "26M racing agents" and "SIR differential equations" are
+the same object at two resolutions, and the agent→ODE passage is a
+coarse-graining *theorem*, not an analogy.
+
+### 4.4 Composition: an operad with tables on the wires
+
+- Boxes are Moore machines with **table-typed interfaces**:
+  `S × Tbl(I) → S × Tbl(O)`, composed by wiring diagrams (operad-style: boxes
+  nest within boxes; a composed system is itself a box).
+- **Wires carry streams of finite tables** — not just scalars. Interface types
+  are relation schemas; each tick a box emits a (possibly empty) message table;
+  the receiver joins it against its own state. Individual-granular interaction
+  *across* boundaries is expressible without state sharing.
+- **Uniform one-tick delay everywhere** — across wires and within boxes alike
+  (read-old/write-new). Consequence: **moving a box boundary never changes
+  observable semantics.** Refactoring-invariance is a theorem candidate, not a
+  README lie.
+- Boxes may run **different schedulers on different hardware**: a 26M-person
+  population box tau-leaped on GPU, a 30k-case court box run exactly
+  (sequential DES) on CPU, an ODE macro block sub-stepping internally (RK4)
+  and exposing sampled values per tick. The composition layer is what makes
+  heterogeneous-fidelity hybrids principled.
+- **No global variables.** Global-looking quantities (policy parameters, time)
+  are inputs wired in; the only sanctioned global is the synchronous tick.
+
+### 4.5 Meaning: the Lean layer
+
+A box denotes a coalgebra (a Poly-flavored lens whose positions are
+table-valued); composition is an operad-algebra structure; the ideal semantics
+is over ℝ; determinism levels (§5.2) and tau-leaping are *documented deviations*
+from the ideal. The IR is a deep embedding in Lean with a meaning function into
+this semantics.
+
+---
+
+## 5. Conflicts, determinism, and reproducibility
+
+### 5.1 Conflict resolution: contested resources and racing clocks
+
+Synchronous parallel semantics means multiple transitions can claim the same
+entity/slot in one tick (two employers hire the same worker; infection and death
+touch the same person). Order-free writes make "last writer wins" unavailable —
+by design. Instead:
+
+- Transitions **declare the resources they contest** as part of their signature
+  (checked at elaboration time — an interface-typing obligation, and where
+  dependent types earn their keep: a transition's claimed resources must cover
+  its writes).
+- Each contested resource resolves by **argmin over sampled firing times**, with
+  a deterministic lexicographic tie-break `(time, rule-id, entity-id)` (floats
+  can tie even when reals wouldn't).
+- The resolution key is pluggable: **queue disciplines are ordering keys.**
+  FIFO = argmin by arrival time; priority = (severity, arrival); random
+  service = a Philox draw. Capacity-c resources (c judges, c beds) generalize
+  argmin to **top-k selection** — still a commutative merge, still
+  deterministic.
+- Losers defer to the next tick. The runtime **counts deferred losers per
+  contested resource and warns on saturation** — turning the tau-leap
+  throughput bias (one event per resource per tick) from a silent error into a
+  visible diagnostic.
+
+### 5.2 Determinism levels
+
+Same IR, three schedulers:
+
+| Level | Guarantee | Mechanism | Cost |
+|---|---|---|---|
+| **A — audit** | Bitwise, same binary + same GPU model | Fixed-shape reduction trees, sorted scatters, Philox-by-coordinate | Moderate |
+| **B — portable** | Bitwise across hardware | Software-pinned FP, no FMA/fast-math, fixed order everywhere | High; for published results |
+| **C — fast** | Same random draws; FP summation-order jitter only | Atomics allowed | Cheapest |
+
+Because randomness is a pure function of coordinates, *which* random events
+happen never varies across levels — only floating-point accumulation order does.
+
+### 5.3 Common random numbers: the counterfactual feature
+
+Philox-by-coordinate gives **exact common random numbers across scenarios for
+free**: two runs differing only in policy design share identical draws for
+identical `(seed, tick, rule, entity)` coordinates. The same simulated person
+experiences the same shocks under both court designs / tax schedules —
+perfectly paired counterfactuals at individual level, with large variance
+reduction. For policy comparison work this may be the headline feature; it is a
+corollary of the reproducibility design, not an add-on.
+
+---
+
+## 6. Worked domain checks
+
+Stress tests the semantics passed during review, with the extensions they
+forced (all folded into §4–§5 above):
+
+- **Epidemic ABM** (driving v0.1 case): hazard transitions, employer-mediated
+  contact via group-by, racing-clock conflicts.
+- **Queueing / courts** (people flowing through court designs): CTMCs are
+  queueing theory's native formalism; queue disciplines = conflict ordering
+  keys; capacity = top-k; scheduled clocks + guard-recheck for non-exponential
+  and calendar-driven durations; the small-scale court box runs the *exact*
+  scheduler while the population box runs tau-leaped — the hybrid the operad
+  layer exists for. Required diagnostic: contested-resource saturation warning.
+- **Compartmental models (SIR)**: one-row tables; also reachable as the Kurtz
+  mean-field limit of the agent model.
+- **ODE/PDE blocks**: ODE boxes sub-step internally; PDE stencils are joins
+  along lattice foreign keys. (Not in v0.1.)
+
+**Known expressiveness cliff** (deliberate exclusions from the fast path):
+unbounded match patterns, negative application conditions beyond anti-joins,
+recursion within a tick (transitive closure, unbounded market renegotiation) —
+approximated across ticks, or opted into a slow path. A model requiring these
+in one tick is a design smell to be caught at elaboration.
+
+---
+
+## 7. The optimization story: compiler rewrites = certified equivalences
+
+The pattern, established with one concrete example that is also the first
+theorem target:
+
+> `infect`: a person's infection probability depends only on the **count** of
+> infectious coworkers. Naive compilation is a self-join on `employer`
+> (quadratic in workplace size). The optimized plan — group-by employer,
+> aggregate infectious counts, broadcast — is linear, and produces an
+> **identical distribution**. This rewrite is an *exact lumping* (the same
+> mathematics — lumpability/bisimulation — as macro-level coarse-graining),
+> and its correctness is a statable theorem against the Lean semantics.
+
+Planned members of the same family: operator fusion; DBSP-style incremental
+recomputation (only touch agents whose inputs changed); agent→compartment
+lumping when transition rates factor through a partition; Kurtz-limit
+replacement of large sub-populations by ODE blocks. **Every optimization the
+backend performs should correspond to an equivalence the theory can state** —
+this is the thesis that makes the Lean/semantics investment pay rent.
+
+### Theorem targets (deferred proofs, specified now)
+
+1. Group-by lumping rewrite correctness (§7 example).
+2. Refactoring invariance: re-drawing box boundaries preserves semantics
+   (consequence of uniform one-tick delay).
+3. Composition laws: the operad-algebra axioms for box wiring.
+4. Kurtz mean-field limit for the compartmentalizable fragment.
+5. (Later, if the differentiable fragment materializes) symbolic gradient
+   correctness over ℝ, SciLean-style.
+
+---
+
+## 8. Rejected alternatives (and why)
+
+- **Pure polynomial-functor wiring at individual granularity** ("every person
+  is a box with wires"). Rejected: interaction topology is dynamic
+  (contacts change, people change employers, are born, die), and wiring
+  diagrams fix who-talks-to-whom before the semantics runs. Any fix (router
+  systems, mode-dependent interfaces) either reintroduces a global in disguise
+  or lives at the research frontier. Poly survives at the **macro** level
+  (boxes = populations/modules) and in the **surface syntax**.
+- **General graph rewriting** (AlgebraicRewriting/AlgebraicABMs-style DPO on
+  ACSets). Adopted for the *data model* (ACSets) and as the conceptual ancestor
+  for birth/death/rewiring — but general subgraph pattern matching is the
+  anti-GPU workload. Sembla restricts to the relational kernel fragment (§4.2)
+  that compiles to columnar kernels.
+- **Sequential random-order updating as the native mode** (Mesa/NetLogo
+  compatibility). Rejected in favor of CTMC ground truth; sequential updating
+  is recoverable as an approximation, and exact DES is available per box.
+- **Julia/Python frontend.** Rejected on two grounds that survived adversarial
+  review: no infoview-equivalent (cursor-granular, elaborator-driven rendering
+  in source files), and no capacity to host the formal semantics that makes
+  §7 possible. The costs (toolchain churn, audience, batch latency) are
+  accepted and hedged by the frontend-agnostic IR.
+- **"Guaranteed gradients" as a v1 requirement.** Deferred: applies only to
+  the differentiable fragment; discrete-state transitions have no useful
+  gradients without relaxation machinery that is its own research field.
+
+---
+
+## 9. v0.1 definition
+
+**Identity check passed during review:** the one cut the project refuses is
+*composition* — confirming this is a semantics project, not a runtime project.
+The corresponding trade: **the GPU backend moves out of v0.1**, replaced by the
+CPU oracle (needed anyway for differential testing) plus a standalone
+performance spike.
+
+### In
+
+- Surface DSL in Lean 4 for systems/states/hazard transitions, elaborating to
+  a deep-embedded IR with a defined ℝ-semantics.
+- Rust **CPU reference interpreter** — the executable semantics oracle.
+  Level A determinism (bitwise, same binary/machine).
+- Hazard-rate transitions, racing-clock (tau-leaped) execution, contested
+  resources with argmin resolution and the saturation diagnostic.
+- **Composition in minimal viable form: exactly two boxes and one feedback
+  wire** — e.g., an SIR population box (~1M synthetic people, static employer
+  assignment) wired to a small policy box that reads aggregate infections and
+  feeds back a contact-rate modifier. This exercises table-typed ports,
+  one-tick delay, traced/feedback structure, and "a composed system is a
+  system." Composition is proven in v0.1, generalized later.
+- Two **structure widgets**: state-machine diagram; prior-marginal plot.
+- **GPU spike (throwaway, 1–2 weeks):** raw kernels only — 26M-row map +
+  segmented argmin + Philox draws — to measure ticks/sec and validate the
+  performance thesis before the real backend is built.
+
+### Out (deliberately, each deferred not forgotten)
+
+General wiring-diagram language and box nesting UI · GPU backend (v0.2,
+differentially tested against the oracle) · ODE/PDE blocks · birth/death ·
+courts/queueing extensions (scheduled clocks, top-k capacity) · determinism
+Levels B/C · calibration/inference · behavior widgets (slider→simulate→plot) ·
+any proofs (theorem *statements* only) · synthetic population realism.
+
+### Success criteria
+
+1. A model written in the Lean DSL compiles to IR and runs end-to-end.
+2. Same seed + same IR ⇒ bitwise-identical results, run after run.
+3. The two-box feedback loop produces correct, boundary-invariant results
+   (verified by merging the boxes by hand and comparing bitwise).
+4. The GPU spike reports a credible ticks/sec at 26M rows.
+5. The state-diagram widget renders from the elaborated model with no runtime.
+
+---
+
+## 10. Open questions (flagged, not resolved)
+
+1. **Conflict-scope declaration syntax** — how a transition's contested
+   resources are written and checked; how coverage of writes is enforced.
+2. **Δt discipline** — guidance/diagnostics for choosing tick size per box;
+   automatic detection of tau-leap bias beyond the saturation counter.
+3. **Level B feasibility** — how expensive portable-bitwise FP really is on
+   modern GPUs; whether it's practical or aspirational.
+4. **Calibration/inference architecture** — ABC vs. gradient-based (the latter
+   would constrain the IR); where the prior-predictive workflow lives; this
+   decision constrains the IR more than anything else deferred.
+5. **Synthetic population initialization** — census/HILDA-style microdata,
+   privacy, validation. Historically >50% of the effort in policy
+   microsimulation; unaddressed by the architecture and must not be forgotten.
+6. **Behavior-widget latency budget** — what interactive loop is achievable
+   once the GPU backend exists (scenario caching? surrogate models?).
+7. **Cross-boundary tick-delay ergonomics** — one-tick message delay is
+   uniform and honest, but modelers must be taught to see it.
+
+---
+
+## 11. Key references
+
+- Harry Goldstein, *The Best New Programming Language is a Proof Assistant*
+  (DC Systems 006) — Lean-as-PL and widgets motivation.
+- Lean 4 widgets / ProofWidgets4 — infoview architecture.
+- Spivak & Niu, *Polynomial Functors: A Mathematical Theory of Interaction*;
+  Spivak's wiring-diagram operads — macro-level composition semantics.
+- Kris Brown et al., Topos Institute: *Agent-Based Modeling via Graph
+  Rewriting* (2023); AlgebraicJulia (ACSets, AlgebraicRewriting.jl,
+  AlgebraicABMs.jl) — data model and conceptual ancestor of the dynamics.
+- DBSP / differential dataflow — incremental relational computation theory.
+- Gillespie (SSA), tau-leaping literature — stochastic execution semantics.
+- Kurtz — mean-field limits of density-dependent Markov chains.
+- Salmon et al., *Parallel Random Numbers: As Easy as 1, 2, 3* — Philox
+  counter-based RNG.
+- SciLean (Tomáš Skřivan) — verified symbolic differentiation in Lean
+  (deferred gradient path).
+- Futhark / DEX — the per-entity expression-language compilation model.
