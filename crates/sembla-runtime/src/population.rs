@@ -202,11 +202,14 @@ impl SyntheticPopulation {
         })
     }
 
-    /// Converts this population to the checked-in SIR model's table initializers.
-    pub fn sir_table_initializers(&self) -> Vec<TableInit> {
+    /// Converts this population to SIR table initializers in `box_name`.
+    ///
+    /// Both the standalone PRD 0008 model (`sir`) and the composed PRD 0009
+    /// model (`population`) use the same local `person`/`employer` schema.
+    pub fn sir_table_initializers_for_box(&self, box_name: &str) -> Vec<TableInit> {
         vec![
             TableInit::new(
-                "sir",
+                box_name,
                 "person",
                 self.health.len(),
                 vec![
@@ -214,8 +217,31 @@ impl SyntheticPopulation {
                     ColumnInit::new("employer", ColumnData::Ref(self.employer.clone())),
                 ],
             ),
-            TableInit::new("sir", "employer", self.employer_count, vec![]),
+            TableInit::new(box_name, "employer", self.employer_count, vec![]),
         ]
+    }
+
+    /// Converts this population to the standalone checked-in SIR model.
+    pub fn sir_table_initializers(&self) -> Vec<TableInit> {
+        self.sir_table_initializers_for_box("sir")
+    }
+
+    /// Converts this population to the checked-in SIR + policy model.
+    ///
+    /// The policy controller is the one non-population row in that model and
+    /// starts in `Open` (enum index 0) with its contact modifier at `1.0`.
+    pub fn sir_policy_table_initializers(&self) -> Vec<TableInit> {
+        let mut initial = self.sir_table_initializers_for_box("population");
+        initial.push(TableInit::new(
+            "policy",
+            "controller",
+            1,
+            vec![
+                ColumnInit::new("mode", ColumnData::Enum(vec![0])),
+                ColumnInit::new("modifier", ColumnData::Real(vec![1.0])),
+            ],
+        ));
+        initial
     }
 }
 

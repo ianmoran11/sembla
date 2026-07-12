@@ -27,7 +27,10 @@ The flagship [`examples/sir.json`](examples/sir.json) model uses the
 frequency-dependent workplace hazard `beta * I_workplace / N_workplace` and
 recovery hazard `gamma`. See [`docs/examples/sir.md`](docs/examples/sir.md)
 for deterministic population generation, the versioned population format,
-CSV runs, parameter and `dt` overrides, and hash-based verification.
+CSV runs, parameter and `dt` overrides, and hash-based verification. The
+[`examples/sir_policy.json`](examples/sir_policy.json) two-box feedback demo
+and common-random-numbers `sembla compare` workflow are documented in
+[`docs/examples/sir_policy.md`](docs/examples/sir_policy.md).
 
 ## Workspace layout
 

@@ -163,3 +163,120 @@ fn million_agent_ten_tick_performance_floor() {
         "performance floor exceeded: {seconds_per_tick:.3}s/tick"
     );
 }
+
+mod policy_feedback {
+    use std::path::Path;
+
+    use sembla_ir::ValidatedModel;
+    use sembla_runtime::eval::ParamEnv;
+    use sembla_runtime::executor;
+    use sembla_runtime::population::SyntheticPopulation;
+    use sembla_runtime::state::{ColumnData, StateStore};
+
+    fn load(example: &str) -> ValidatedModel {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/{example}"));
+        let source = std::fs::read_to_string(path).unwrap();
+        sembla_ir::validate(sembla_ir::parse_json(&source).unwrap()).unwrap()
+    }
+
+    fn baseline_state(model: &ValidatedModel, population: &SyntheticPopulation) -> StateStore {
+        StateStore::new(model, population.sir_table_initializers()).unwrap()
+    }
+
+    fn policy_state(model: &ValidatedModel, population: &SyntheticPopulation) -> StateStore {
+        StateStore::new(model, population.sir_policy_table_initializers()).unwrap()
+    }
+
+    fn infected(state: &StateStore, box_name: &str) -> usize {
+        state
+            .snapshot()
+            .enum_values(box_name, "person", "health")
+            .unwrap()
+            .iter()
+            .filter(|value| **value == 1)
+            .count()
+    }
+
+    fn policy_mode(state: &StateStore) -> u16 {
+        state
+            .snapshot()
+            .enum_values("policy", "controller", "mode")
+            .unwrap()[0]
+    }
+
+    fn effective_modifier_at_tick_start(state: &StateStore) -> f64 {
+        let snapshot = state.snapshot();
+        let input = snapshot
+            .input_table("population", "restriction_modifier")
+            .unwrap();
+        let offset = match &input.columns[0] {
+            ColumnData::Real(values) => values.iter().copied().sum::<f64>(),
+            other => panic!("unexpected modifier input column: {other:?}"),
+        };
+        1.0 + offset
+    }
+
+    #[test]
+    fn policy_restricts_lowers_peak_has_hysteresis_and_exact_one_tick_feedback_delay() {
+        // Fixed paired CRN scenario: 100k people, 500 workplaces, I0=100,
+        // population seed 12, run seed 55, beta=0.8, gamma=0.1, dt=0.25.
+        // The on threshold is 500 and off threshold is 150. In this frozen
+        // scenario restriction must engage during ticks 10..=20. Across 200
+        // ticks hysteresis permits at most two changes (restrict, maybe reopen).
+        let baseline_model = load("sir.json");
+        let policy_model = load("sir_policy.json");
+        let population = SyntheticPopulation::generate(100_000, 500, 100, 12).unwrap();
+        let mut baseline = baseline_state(&baseline_model, &population);
+        let mut policy = policy_state(&policy_model, &population);
+        let baseline_params = ParamEnv::defaults(&baseline_model);
+        let policy_params = ParamEnv::defaults(&policy_model);
+
+        let mut baseline_peak = infected(&baseline, "sir");
+        let mut policy_peak = infected(&policy, "population");
+        let mut previous_mode = policy_mode(&policy);
+        let mut mode_changes = 0;
+        let mut restrict_tick = None;
+        let mut first_restricted_hazard_tick = None;
+
+        for tick in 0..200 {
+            let effective_modifier = effective_modifier_at_tick_start(&policy);
+            if effective_modifier == 0.4 && first_restricted_hazard_tick.is_none() {
+                first_restricted_hazard_tick = Some(tick);
+            }
+            executor::run_tick(&baseline_model, &mut baseline, &baseline_params, 55, tick).unwrap();
+            let report =
+                executor::run_tick(&policy_model, &mut policy, &policy_params, 55, tick).unwrap();
+            baseline_peak = baseline_peak.max(infected(&baseline, "sir"));
+            policy_peak = policy_peak.max(infected(&policy, "population"));
+
+            let mode = policy_mode(&policy);
+            if mode != previous_mode {
+                mode_changes += 1;
+                previous_mode = mode;
+            }
+            if report.fired[2].1 == 1 {
+                assert_eq!(mode, 1, "restrict transition must install Restricted mode");
+                restrict_tick = Some(tick);
+            }
+        }
+
+        let restrict_tick = restrict_tick.expect("policy never switched to Restricted");
+        assert!(
+            (10..=20).contains(&restrict_tick),
+            "restriction fired outside documented range: {restrict_tick}"
+        );
+        assert!(
+            policy_peak < baseline_peak,
+            "paired policy peak {policy_peak} must be below baseline peak {baseline_peak}"
+        );
+        assert!(
+            mode_changes <= 2,
+            "hysteresis changed mode {mode_changes} times (documented maximum is 2)"
+        );
+        assert_eq!(
+            first_restricted_hazard_tick,
+            Some(restrict_tick + 1),
+            "the modifier output produced by a policy firing must first affect the next tick"
+        );
+    }
+}

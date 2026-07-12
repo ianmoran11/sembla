@@ -228,6 +228,201 @@ fn parameter_override_errors_name_the_parameter() {
     std::fs::remove_dir_all(temp).unwrap();
 }
 
+fn synth_population(temp: &Path, persons: &str, employers: &str) -> PathBuf {
+    let population = temp.join("population.bin");
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("synth-pop")
+        .args([
+            "--persons",
+            persons,
+            "--employers",
+            employers,
+            "--initial-infected",
+            "100",
+            "--seed",
+            "12",
+            "--out",
+        ])
+        .arg(&population)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    population
+}
+
+fn csv_data(path: &Path) -> Vec<Vec<String>> {
+    std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .skip(1)
+        .map(|line| line.split(',').map(ToOwned::to_owned).collect())
+        .collect()
+}
+
+#[test]
+fn model_compare_is_byte_deterministic_and_baseline_columns_match_standalone() {
+    let temp = temp_dir("sir-policy-model-compare");
+    let population = synth_population(&temp, "5000", "100");
+    let standalone = temp.join("standalone.csv");
+    let first = temp.join("compare-first.csv");
+    let second = temp.join("compare-second.csv");
+
+    let standalone_output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(repository_path("examples/sir.json"))
+        .arg("--population")
+        .arg(&population)
+        .args(["--seed", "55", "--ticks", "40", "--out"])
+        .arg(&standalone)
+        .output()
+        .unwrap();
+    assert!(standalone_output.status.success());
+
+    for out in [&first, &second] {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("compare")
+            .arg(repository_path("examples/sir.json"))
+            .arg(repository_path("examples/sir_policy.json"))
+            .arg("--population")
+            .arg(&population)
+            .args(["--seed", "55", "--ticks", "40", "--out"])
+            .arg(out)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    assert_eq!(
+        std::fs::read(&first).unwrap(),
+        std::fs::read(&second).unwrap()
+    );
+
+    let standalone_rows = csv_data(&standalone);
+    let compare_rows = csv_data(&first);
+    assert_eq!(standalone_rows.len(), compare_rows.len());
+    for (standalone, comparison) in standalone_rows.iter().zip(&compare_rows) {
+        // Standalone: tick,S,I,R,fired_infect,fired_recover,deferred_total.
+        // Comparison arm A keeps those exact per-tick values at columns
+        // tick, S_a, I_a, R_a, fired_infect_a, fired_recover_a, deferred_a.
+        let arm_a = [
+            comparison[0].as_str(),
+            comparison[1].as_str(),
+            comparison[2].as_str(),
+            comparison[3].as_str(),
+            comparison[10].as_str(),
+            comparison[11].as_str(),
+            comparison[12].as_str(),
+        ];
+        assert_eq!(
+            standalone.iter().map(String::as_str).collect::<Vec<_>>(),
+            arm_a
+        );
+    }
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn parameter_compare_is_deterministic_and_lower_beta_lowers_final_attack_rate() {
+    let temp = temp_dir("sir-policy-parameter-compare");
+    let population = synth_population(&temp, "20000", "200");
+    let params_a = temp.join("params-a.json");
+    let params_b = temp.join("params-b.json");
+    std::fs::write(&params_a, r#"{"beta":0.8,"gamma":0.1}"#).unwrap();
+    std::fs::write(&params_b, r#"{"beta":0.4,"gamma":0.1}"#).unwrap();
+    let first = temp.join("compare-first.csv");
+    let second = temp.join("compare-second.csv");
+    for out in [&first, &second] {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("compare")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args(["--seed", "55", "--ticks", "100", "--params-a"])
+            .arg(&params_a)
+            .arg("--params-b")
+            .arg(&params_b)
+            .arg("--out")
+            .arg(out)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    assert_eq!(
+        std::fs::read(&first).unwrap(),
+        std::fs::read(&second).unwrap()
+    );
+    let rows = csv_data(&first);
+    let final_row = rows.last().unwrap();
+    let susceptible_a: usize = final_row[1].parse().unwrap();
+    let susceptible_b: usize = final_row[4].parse().unwrap();
+    let attack_a = 20_000 - susceptible_a;
+    let attack_b = 20_000 - susceptible_b;
+    assert!(
+        attack_b < attack_a,
+        "lower beta arm B attack rate {attack_b} must be below arm A {attack_a}"
+    );
+    let header = std::fs::read_to_string(&first).unwrap();
+    assert!(header.contains("# arm_a_params={\"beta\":0.8,\"gamma\":0.1}"));
+    assert!(header.contains("# arm_b_params={\"beta\":0.4,\"gamma\":0.1}"));
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn compare_rejects_ambiguous_shapes_and_duplicate_flags() {
+    let temp = temp_dir("compare-errors");
+    let population = synth_population(&temp, "100", "5");
+    let model = repository_path("examples/sir.json");
+    let cases = [
+        vec![
+            "compare".to_owned(),
+            model.display().to_string(),
+            "--population".to_owned(),
+            population.display().to_string(),
+            "--seed".to_owned(),
+            "1".to_owned(),
+            "--ticks".to_owned(),
+            "1".to_owned(),
+            "--out".to_owned(),
+            temp.join("x.csv").display().to_string(),
+        ],
+        vec![
+            "compare".to_owned(),
+            model.display().to_string(),
+            model.display().to_string(),
+            "--population".to_owned(),
+            population.display().to_string(),
+            "--seed".to_owned(),
+            "1".to_owned(),
+            "--seed".to_owned(),
+            "2".to_owned(),
+            "--ticks".to_owned(),
+            "1".to_owned(),
+            "--out".to_owned(),
+            temp.join("y.csv").display().to_string(),
+        ],
+    ];
+    for arguments in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+    }
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
 #[test]
 fn run_rejects_missing_duplicate_and_malformed_flags_with_usage_exit() {
     let path = repository_path("examples/two_state.json");

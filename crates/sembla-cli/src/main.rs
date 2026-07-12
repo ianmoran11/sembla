@@ -8,7 +8,7 @@ use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json]";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -45,6 +45,7 @@ fn run(arguments: &[String]) -> i32 {
             };
             run_file(path, options)
         }
+        [command, arguments @ ..] if command == "compare" => compare_command(arguments),
         _ => {
             eprintln!("{USAGE}");
             2
@@ -106,6 +107,97 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
         out,
         dt,
         params,
+    })
+}
+
+#[derive(Clone, Debug)]
+struct CompareOptions {
+    models: Vec<String>,
+    population: String,
+    seed: u64,
+    ticks: u32,
+    out: String,
+    params_a: Option<String>,
+    params_b: Option<String>,
+}
+
+fn compare_command(arguments: &[String]) -> i32 {
+    let options = match parse_compare_options(arguments) {
+        Ok(options) => options,
+        Err(message) => {
+            eprintln!("{message}\n{USAGE}");
+            return 2;
+        }
+    };
+    match compare_result(options) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String> {
+    let positional_count = arguments
+        .iter()
+        .position(|argument| argument.starts_with("--"))
+        .unwrap_or(arguments.len());
+    if !(1..=2).contains(&positional_count) {
+        return Err(
+            "compare requires one model (parameter contrast) or two models (model contrast)"
+                .to_owned(),
+        );
+    }
+    let models = arguments[..positional_count].to_vec();
+    let flags = &arguments[positional_count..];
+    if flags.len() % 2 != 0 {
+        return Err(format!(
+            "missing value for '{}'",
+            flags.last().expect("odd flag list is nonempty")
+        ));
+    }
+    let mut population = None;
+    let mut seed = None;
+    let mut ticks = None;
+    let mut out = None;
+    let mut params_a = None;
+    let mut params_b = None;
+    for pair in flags.chunks_exact(2) {
+        let flag = pair[0].as_str();
+        let value = pair[1].clone();
+        match flag {
+            "--population" => {
+                if !Path::new(&value).is_file() {
+                    return Err(format!("population file '{value}' does not exist"));
+                }
+                set_once(&mut population, value, flag)?;
+            }
+            "--seed" => set_once(&mut seed, parse_number(&value, flag)?, flag)?,
+            "--ticks" => set_once(&mut ticks, parse_number(&value, flag)?, flag)?,
+            "--out" => set_once(&mut out, value, flag)?,
+            "--params-a" => set_once(&mut params_a, value, flag)?,
+            "--params-b" => set_once(&mut params_b, value, flag)?,
+            _ => return Err(format!("unknown compare flag '{flag}'")),
+        }
+    }
+    match models.len() {
+        1 if params_a.is_none() || params_b.is_none() => {
+            return Err("parameter contrast requires both '--params-a' and '--params-b'".to_owned())
+        }
+        2 if params_a.is_some() || params_b.is_some() => {
+            return Err("model contrast does not accept '--params-a' or '--params-b'".to_owned())
+        }
+        _ => {}
+    }
+    Ok(CompareOptions {
+        models,
+        population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
+        seed: seed.ok_or_else(|| "missing required flag '--seed'".to_owned())?,
+        ticks: ticks.ok_or_else(|| "missing required flag '--ticks'".to_owned())?,
+        out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
+        params_a,
+        params_b,
     })
 }
 
@@ -227,9 +319,10 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     let model = sembla_ir::validate(raw_model).map_err(|error| format!("{path}: {error}"))?;
     let initial = match options.population.parse::<usize>() {
         Ok(population) => initialize_population(&model, population),
-        Err(_) => SyntheticPopulation::read(&options.population)
-            .map_err(|error| error.to_string())?
-            .sir_table_initializers(),
+        Err(_) => initializers_from_population(
+            &model,
+            &SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?,
+        )?,
     };
     let mut state = StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
     let params = resolve_params(&model, options.params.as_deref())?;
@@ -306,7 +399,7 @@ fn run_results(
     ticks: u32,
     out: &str,
 ) -> Result<(), String> {
-    validate_sir_shape(model)?;
+    let sir_box = sir_box_name(model)?.to_owned();
     let mut csv = String::new();
     csv.push_str("# params=");
     csv.push_str(&canonical_params(params)?);
@@ -316,7 +409,7 @@ fn run_results(
     for tick in 0..ticks {
         let report = executor::run_tick(model, state, params, seed, tick)
             .map_err(|error| format!("tick {tick}: {error}"))?;
-        let counts = sir_counts(state)?;
+        let counts = sir_counts(state, &sir_box)?;
         let fired_infect = report.fired.first().map_or(0, |entry| entry.1);
         let fired_recover = report.fired.get(1).map_or(0, |entry| entry.1);
         let deferred_total: usize = report
@@ -339,33 +432,36 @@ fn run_results(
     Ok(())
 }
 
-fn validate_sir_shape(model: &sembla_ir::ValidatedModel) -> Result<(), String> {
-    let model_box = model
+fn sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<&str, String> {
+    let matches = model
         .model()
         .boxes
         .iter()
-        .find(|model_box| model_box.name == "sir")
-        .ok_or_else(|| "--out CSV currently requires the SIR box named 'sir'".to_owned())?;
-    let person = model_box
-        .tables
-        .iter()
-        .find(|table| table.name == "person")
-        .ok_or_else(|| "--out CSV requires table 'sir.person'".to_owned())?;
-    let health = person
-        .attrs
-        .iter()
-        .find(|attr| attr.name == "health")
-        .ok_or_else(|| "--out CSV requires column 'sir.person.health'".to_owned())?;
-    match &health.ty {
-        AttrType::Enum { variants } if variants == &["S", "I", "R"] => Ok(()),
-        _ => Err("--out CSV requires health Enum variants [S,I,R]".to_owned()),
+        .filter(|model_box| {
+            model_box.tables.iter().any(|table| {
+                table.name == "person"
+                    && table.attrs.iter().any(|attr| {
+                        attr.name == "health"
+                            && matches!(&attr.ty, AttrType::Enum { variants } if variants == &["S", "I", "R"])
+                    })
+                    && table.attrs.iter().any(|attr| {
+                        attr.name == "employer"
+                            && matches!(&attr.ty, AttrType::Ref { table } if table == "employer")
+                    })
+            }) && model_box.tables.iter().any(|table| table.name == "employer")
+        })
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [model_box] => Ok(&model_box.name),
+        [] => Err("CSV output requires exactly one SIR person/employer box".to_owned()),
+        _ => Err("CSV output found more than one SIR person/employer box".to_owned()),
     }
 }
 
-fn sir_counts(state: &StateStore) -> Result<[usize; 3], String> {
+fn sir_counts(state: &StateStore, box_name: &str) -> Result<[usize; 3], String> {
     let snapshot = state.snapshot();
     let health = snapshot
-        .enum_values("sir", "person", "health")
+        .enum_values(box_name, "person", "health")
         .map_err(|error| error.to_string())?;
     let mut counts = [0_usize; 3];
     for value in health {
@@ -375,6 +471,164 @@ fn sir_counts(state: &StateStore) -> Result<[usize; 3], String> {
         *slot += 1;
     }
     Ok(counts)
+}
+
+fn initializers_from_population(
+    model: &sembla_ir::ValidatedModel,
+    population: &SyntheticPopulation,
+) -> Result<Vec<TableInit>, String> {
+    let sir_box = sir_box_name(model)?.to_owned();
+    let is_sir_policy = sir_box == "population"
+        && model.model().boxes.iter().any(|model_box| {
+            model_box.name == "policy"
+                && model_box.tables.iter().any(|table| {
+                    table.name == "controller"
+                        && table.size_hint == 1
+                        && table.attrs.iter().any(|attr| attr.name == "mode")
+                        && table.attrs.iter().any(|attr| attr.name == "modifier")
+                })
+        });
+    let mut initial = if is_sir_policy {
+        population.sir_policy_table_initializers()
+    } else {
+        population.sir_table_initializers_for_box(&sir_box)
+    };
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            if (model_box.name == sir_box && (table.name == "person" || table.name == "employer"))
+                || (is_sir_policy && model_box.name == "policy" && table.name == "controller")
+            {
+                continue;
+            }
+            let row_count = usize::try_from(table.size_hint).map_err(|_| {
+                format!("{}.{} size_hint exceeds usize", model_box.name, table.name)
+            })?;
+            let columns = table
+                .attrs
+                .iter()
+                .map(|attr| {
+                    let data = match &attr.ty {
+                        AttrType::Real => ColumnData::Real(vec![0.0; row_count]),
+                        AttrType::Int => ColumnData::Int(vec![0; row_count]),
+                        AttrType::Enum { .. } => ColumnData::Enum(vec![0; row_count]),
+                        AttrType::Ref { .. } => ColumnData::Ref(vec![0; row_count]),
+                    };
+                    ColumnInit::new(&attr.name, data)
+                })
+                .collect();
+            initial.push(TableInit::new(
+                &model_box.name,
+                &table.name,
+                row_count,
+                columns,
+            ));
+        }
+    }
+    Ok(initial)
+}
+
+#[derive(Clone, Debug)]
+struct CompareTick {
+    counts: [usize; 3],
+    fired_infect: usize,
+    fired_recover: usize,
+    deferred_total: usize,
+}
+
+fn compare_result(options: CompareOptions) -> Result<(), String> {
+    let path_a = &options.models[0];
+    let path_b = options.models.get(1).unwrap_or(path_a);
+    let model_a = read_validated(path_a)?;
+    let model_b = read_validated(path_b)?;
+    let params_a = resolve_params(&model_a, options.params_a.as_deref())?;
+    let params_b = resolve_params(&model_b, options.params_b.as_deref())?;
+    let population =
+        SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?;
+    let ticks_a = compare_arm(
+        &model_a,
+        &params_a,
+        &population,
+        options.seed,
+        options.ticks,
+    )?;
+    let ticks_b = compare_arm(
+        &model_b,
+        &params_b,
+        &population,
+        options.seed,
+        options.ticks,
+    )?;
+
+    let mut csv = String::new();
+    csv.push_str("# arm_a_model=");
+    csv.push_str(path_a);
+    csv.push('\n');
+    csv.push_str("# arm_b_model=");
+    csv.push_str(path_b);
+    csv.push('\n');
+    csv.push_str("# arm_a_params=");
+    csv.push_str(&canonical_params(&params_a)?);
+    csv.push('\n');
+    csv.push_str("# arm_b_params=");
+    csv.push_str(&canonical_params(&params_b)?);
+    csv.push('\n');
+    csv.push_str(&format!("# seed={}\n", options.seed));
+    csv.push_str(&format!("# dt_a={}\n", model_a.model().dt));
+    csv.push_str(&format!("# dt_b={}\n", model_b.model().dt));
+    csv.push_str("tick,S_a,I_a,R_a,S_b,I_b,R_b,dS,dI,dR,fired_infect_a,fired_recover_a,deferred_a,fired_infect_b,fired_recover_b,deferred_b\n");
+    for (tick, (arm_a, arm_b)) in ticks_a.iter().zip(&ticks_b).enumerate() {
+        let difference = |a: usize, b: usize| b as i128 - a as i128;
+        csv.push_str(&format!(
+            "{tick},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+            arm_a.counts[0],
+            arm_a.counts[1],
+            arm_a.counts[2],
+            arm_b.counts[0],
+            arm_b.counts[1],
+            arm_b.counts[2],
+            difference(arm_a.counts[0], arm_b.counts[0]),
+            difference(arm_a.counts[1], arm_b.counts[1]),
+            difference(arm_a.counts[2], arm_b.counts[2]),
+            arm_a.fired_infect,
+            arm_a.fired_recover,
+            arm_a.deferred_total,
+            arm_b.fired_infect,
+            arm_b.fired_recover,
+            arm_b.deferred_total,
+        ));
+    }
+    std::fs::write(&options.out, csv.as_bytes())
+        .map_err(|error| format!("{}: {error}", options.out))?;
+    println!("compare_sha256={}", hex(&Sha256::digest(csv.as_bytes())));
+    Ok(())
+}
+
+fn compare_arm(
+    model: &sembla_ir::ValidatedModel,
+    params: &ParamEnv,
+    population: &SyntheticPopulation,
+    seed: u64,
+    ticks: u32,
+) -> Result<Vec<CompareTick>, String> {
+    let sir_box = sir_box_name(model)?.to_owned();
+    let initial = initializers_from_population(model, population)?;
+    let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
+    let mut rows = Vec::with_capacity(ticks as usize);
+    for tick in 0..ticks {
+        let report = executor::run_tick(model, &mut state, params, seed, tick)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        rows.push(CompareTick {
+            counts: sir_counts(&state, &sir_box)?,
+            fired_infect: report.fired.first().map_or(0, |entry| entry.1),
+            fired_recover: report.fired.get(1).map_or(0, |entry| entry.1),
+            deferred_total: report
+                .deferred_per_resource_table
+                .iter()
+                .map(|(_, count)| count)
+                .sum(),
+        });
+    }
+    Ok(rows)
 }
 
 fn canonical_params(params: &ParamEnv) -> Result<String, String> {
