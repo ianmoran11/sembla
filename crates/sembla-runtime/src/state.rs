@@ -276,6 +276,11 @@ impl StateStore {
         self.write_prepared = true;
         Ok(())
     }
+
+    /// Abandons an executor-prepared next buffer after a staged write fails.
+    pub(crate) fn discard_writes(&mut self) {
+        self.write_prepared = false;
+    }
 }
 
 /// A read-only view of one committed tick-start state.

@@ -3,7 +3,8 @@ use sembla_ir::{
     ParamValue, PortDecl, Table,
 };
 use sembla_runtime::eval::{
-    eval_column, eval_ref_column, AggCache, EvalTable, ParamEnv, ParamOverride, ValueColumn,
+    eval_column, eval_ref_column, eval_typed_ref_column, AggCache, EvalTable, ParamEnv,
+    ParamOverride, ValueColumn,
 };
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
@@ -247,6 +248,16 @@ fn every_expression_form_and_parameter_resolution_are_evaluated() {
         .unwrap(),
         vec![0, 1, 0]
     );
+    let typed_ref = eval_typed_ref_column(
+        &self_attr("employer"),
+        EvalTable::new(&model, "world", "Person").unwrap(),
+        &snapshot,
+        &defaults,
+        &mut cache,
+    )
+    .unwrap();
+    assert_eq!(typed_ref.target_table, "Employer");
+    assert_eq!(typed_ref.values, vec![0, 1, 0]);
     let equal_but_distinct_params = defaults.clone();
     assert!(eval_column(
         &Expr::Real { value: 1.0 },

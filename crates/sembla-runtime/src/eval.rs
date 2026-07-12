@@ -24,6 +24,16 @@ pub enum ValueColumn {
     Enum(Vec<u16>),
 }
 
+/// A Ref expression result together with its validator-established target table.
+///
+/// Ref metadata is kept separate so [`ValueColumn`] retains its frozen four-variant
+/// public contract.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RefColumn {
+    pub target_table: String,
+    pub values: Vec<u32>,
+}
+
 impl ValueColumn {
     /// Number of query rows represented by this column.
     pub fn len(&self) -> usize {
@@ -660,14 +670,25 @@ pub fn eval_ref_column(
     params: &ParamEnv,
     agg_cache: &mut AggCache<'_, '_>,
 ) -> Result<Vec<u32>, EvalError> {
+    Ok(eval_typed_ref_column(expr, table, snapshot, params, agg_cache)?.values)
+}
+
+/// Evaluates a Ref-typed root expression and preserves its target-table type.
+pub fn eval_typed_ref_column(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+    agg_cache: &mut AggCache<'_, '_>,
+) -> Result<RefColumn, EvalError> {
     agg_cache.validate_scope(table, snapshot, params)?;
     let inferred = infer_root_type(expr, table)?;
-    if !matches!(inferred, RuntimeType::Ref(_)) {
+    let RuntimeType::Ref(target_table) = &inferred else {
         return Err(EvalError::new(format!(
             "expected Ref expression, found {}",
             inferred.name()
         )));
-    }
+    };
     match eval_expr(
         expr,
         table,
@@ -677,7 +698,10 @@ pub fn eval_ref_column(
         agg_cache,
         Some(&inferred),
     )? {
-        InternalColumn::Ref(values) => Ok(values),
+        InternalColumn::Ref(values) => Ok(RefColumn {
+            target_table: target_table.clone(),
+            values,
+        }),
         _ => Err(EvalError::new(
             "Ref-typed expression did not evaluate to Ref values",
         )),

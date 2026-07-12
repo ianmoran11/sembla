@@ -1,6 +1,7 @@
 //! Deterministic runtime for Sembla simulations.
 
 pub mod eval;
+pub mod executor;
 pub mod rng;
 pub mod state;
 
