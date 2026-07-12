@@ -1,0 +1,13 @@
+# Rust
+/target/
+
+# Lean
+/.lake/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

@@ -1,0 +1,12 @@
+[package]
+name = "sembla-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "sembla"
+path = "src/main.rs"
+
+[dependencies]
+sembla-ir = { path = "../sembla-ir" }
+sembla-runtime = { path = "../sembla-runtime" }

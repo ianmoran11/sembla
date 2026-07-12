@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "crates/sembla-cli",
+    "crates/sembla-ir",
+    "crates/sembla-runtime",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
