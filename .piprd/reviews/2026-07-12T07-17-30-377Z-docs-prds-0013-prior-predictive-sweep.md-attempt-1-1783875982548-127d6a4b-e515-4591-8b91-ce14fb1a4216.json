@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T17:06:22.548Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0013-prior-predictive-sweep.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0013-prior-predictive-sweep.md",
+  "attempt": 1,
+  "text": "## Assessment: REVISE\n\n### Blocking issue\n\n`crates/sembla-runtime/tests/prior.rs` tests statistical moments but does not freeze exact sampler outputs. Changing the Box–Muller branch or counter/lane ordering could pass all current tests.\n\nAdd hard-coded `f64::to_bits()` vectors for Uniform, Normal, and LogNormal at fixed seed/draw/parameter coordinates.\n\nAll other acceptance criteria pass, including the exact 100k-person, K=20, T=50 integration test.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"The documented Box-Muller branch and sampler coordinate/lane ordering are not frozen by hard-coded golden outputs; moment tests alone would not detect a deterministic mapping change. Add fixed to_bits vectors for Uniform, Normal, and LogNormal.\"],\"summary\":\"All CLI, namespace, statistical, reproducibility, CRN, pinning, 100k K=20/T=50, summary, and documentation requirements otherwise pass.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "The documented Box-Muller branch and sampler coordinate/lane ordering are not frozen by hard-coded golden outputs; moment tests alone would not detect a deterministic mapping change. Add fixed to_bits vectors for Uniform, Normal, and LogNormal."
+    ],
+    "summary": "All CLI, namespace, statistical, reproducibility, CRN, pinning, 100k K=20/T=50, summary, and documentation requirements otherwise pass.",
+    "raw": "## Assessment: REVISE\n\n### Blocking issue\n\n`crates/sembla-runtime/tests/prior.rs` tests statistical moments but does not freeze exact sampler outputs. Changing the Box–Muller branch or counter/lane ordering could pass all current tests.\n\nAdd hard-coded `f64::to_bits()` vectors for Uniform, Normal, and LogNormal at fixed seed/draw/parameter coordinates.\n\nAll other acceptance criteria pass, including the exact 100k-person, K=20, T=50 integration test.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"The documented Box-Muller branch and sampler coordinate/lane ordering are not frozen by hard-coded golden outputs; moment tests alone would not detect a deterministic mapping change. Add fixed to_bits vectors for Uniform, Normal, and LogNormal.\"],\"summary\":\"All CLI, namespace, statistical, reproducibility, CRN, pinning, 100k K=20/T=50, summary, and documentation requirements otherwise pass.\"}\n```",
+    "source": "json"
+  }
+}

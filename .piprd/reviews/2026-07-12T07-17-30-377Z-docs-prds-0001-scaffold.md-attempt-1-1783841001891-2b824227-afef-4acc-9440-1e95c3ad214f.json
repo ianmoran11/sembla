@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T07:23:21.891Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0001-scaffold.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0001-scaffold.md",
+  "attempt": 1,
+  "text": "## Review: APPROVED\n\nNo blocking issues.\n\n1. **Build:** Clean `cargo build --workspace` passed for all three crates.\n2. **Tests:** `cargo test --workspace` passed 3 tests—one per crate.\n3. **Checks:** `scripts/check.sh` is executable, runs all required commands, and uses `set -euo pipefail`.\n4. **CLI:** Version command prints `sembla 0.1.0`.\n5. **Hygiene/docs:** `README.md` links `DESIGN.md`; `.gitignore` excludes `target/`, `.lake/`, and editor noise.\n6. **Scope:** No Lean, CI workflow, IR, or runtime logic was added.\n\nReview artifacts:\n- `.piprd/reviews/0001-scaffold/attempt-1-review.md`\n- `.piprd/reviews/0001-scaffold/attempt-1-review.json`\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All acceptance criteria pass: clean workspace build, one passing test per crate, successful fail-fast check script, correct CLI version output, and required documentation, ignore rules, and pinned toolchain. No non-goal implementation was added.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All acceptance criteria pass: clean workspace build, one passing test per crate, successful fail-fast check script, correct CLI version output, and required documentation, ignore rules, and pinned toolchain. No non-goal implementation was added.",
+    "raw": "## Review: APPROVED\n\nNo blocking issues.\n\n1. **Build:** Clean `cargo build --workspace` passed for all three crates.\n2. **Tests:** `cargo test --workspace` passed 3 tests—one per crate.\n3. **Checks:** `scripts/check.sh` is executable, runs all required commands, and uses `set -euo pipefail`.\n4. **CLI:** Version command prints `sembla 0.1.0`.\n5. **Hygiene/docs:** `README.md` links `DESIGN.md`; `.gitignore` excludes `target/`, `.lake/`, and editor noise.\n6. **Scope:** No Lean, CI workflow, IR, or runtime logic was added.\n\nReview artifacts:\n- `.piprd/reviews/0001-scaffold/attempt-1-review.md`\n- `.piprd/reviews/0001-scaffold/attempt-1-review.json`\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All acceptance criteria pass: clean workspace build, one passing test per crate, successful fail-fast check script, correct CLI version output, and required documentation, ignore rules, and pinned toolchain. No non-goal implementation was added.\"}\n```",
+    "source": "json"
+  }
+}

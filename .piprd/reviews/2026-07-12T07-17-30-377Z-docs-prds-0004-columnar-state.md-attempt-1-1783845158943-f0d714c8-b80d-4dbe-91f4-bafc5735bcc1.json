@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T08:32:38.943Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0004-columnar-state.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0004-columnar-state.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n1. **Workspace tests:** Pass, including formatting, Clippy, rustdoc, and diff checks.\n2. **Initialization:** `two_state.json` initializes 100 rows; invalid Enum/Ref values report box, table, column, and row.\n3. **Double buffering:** Snapshots retain old values until `commit()` swaps buffers.\n4. **Golden hash:** Hardcoded SHA-256 covers fixed 100-row data.\n5. **Sensitivity:** Identical rebuilds match; every golden cell and all four physical types affect the hash.\n6. **Rustdoc:** Fully specifies ordering, framing, type tags, and little-endian encodings.\n\nNo blocking issues found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0004 criteria pass: fixed typed declaration-ordered columns, validated initialization, isolated double buffering, frozen documented SHA-256 serialization, hardcoded golden digest, and comprehensive determinism and sensitivity tests.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0004 criteria pass: fixed typed declaration-ordered columns, validated initialization, isolated double buffering, frozen documented SHA-256 serialization, hardcoded golden digest, and comprehensive determinism and sensitivity tests.",
+    "raw": "## Assessment: APPROVED\n\n1. **Workspace tests:** Pass, including formatting, Clippy, rustdoc, and diff checks.\n2. **Initialization:** `two_state.json` initializes 100 rows; invalid Enum/Ref values report box, table, column, and row.\n3. **Double buffering:** Snapshots retain old values until `commit()` swaps buffers.\n4. **Golden hash:** Hardcoded SHA-256 covers fixed 100-row data.\n5. **Sensitivity:** Identical rebuilds match; every golden cell and all four physical types affect the hash.\n6. **Rustdoc:** Fully specifies ordering, framing, type tags, and little-endian encodings.\n\nNo blocking issues found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0004 criteria pass: fixed typed declaration-ordered columns, validated initialization, isolated double buffering, frozen documented SHA-256 serialization, hardcoded golden digest, and comprehensive determinism and sensitivity tests.\"}\n```",
+    "source": "json"
+  }
+}

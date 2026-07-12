@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T15:29:28.172Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0011-widgets.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0011-widgets.md",
+  "attempt": 2,
+  "text": "## Assessment: APPROVED\n\nAll five acceptance criteria pass:\n\n- ProofWidgets is pinned and the frontend builds.\n- PRD-0010 parity remains intact.\n- Exact graph JSON and numerical curve tests pass.\n- Directed arrowheads remain visible.\n- Pure builders contain no simulation or IO.\n- Cursor registration and manual instructions are complete.\n- Root and frontend dependency documentation is consistent.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0011 criteria pass: ProofWidgets is pinned, both pure widgets are registered on declaration tokens, exact graph JSON and numerical curve tests pass, directed arrows remain visible, PRD-0010 parity is preserved, and dependency/manual documentation is consistent.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0011 criteria pass: ProofWidgets is pinned, both pure widgets are registered on declaration tokens, exact graph JSON and numerical curve tests pass, directed arrows remain visible, PRD-0010 parity is preserved, and dependency/manual documentation is consistent.",
+    "raw": "## Assessment: APPROVED\n\nAll five acceptance criteria pass:\n\n- ProofWidgets is pinned and the frontend builds.\n- PRD-0010 parity remains intact.\n- Exact graph JSON and numerical curve tests pass.\n- Directed arrowheads remain visible.\n- Pure builders contain no simulation or IO.\n- Cursor registration and manual instructions are complete.\n- Root and frontend dependency documentation is consistent.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0011 criteria pass: ProofWidgets is pinned, both pure widgets are registered on declaration tokens, exact graph JSON and numerical curve tests pass, directed arrows remain visible, PRD-0010 parity is preserved, and dependency/manual documentation is consistent.\"}\n```",
+    "source": "json"
+  }
+}

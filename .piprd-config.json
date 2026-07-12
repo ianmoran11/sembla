@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "stages": {
+    "implement": {
+      "model": "openai-codex/gpt-5.6-sol",
+      "effort": "high"
+    },
+    "review": {
+      "model": "openai-codex/gpt-5.6-sol",
+      "effort": "xhigh"
+    },
+    "advise": {
+      "model": "openai-codex/gpt-5.6-sol",
+      "effort": "xhigh"
+    },
+    "revise": {
+      "model": "openai-codex/gpt-5.6-sol",
+      "effort": "xhigh"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "assessment": "REVISE",
+  "blockingIssues": [
+    "crates/sembla-ir/src/validate.rs does not enforce contested-resource coverage: a transition can write a Ref-typed attribute with contests: [] and validate; add path-bearing missing-claim validation and a focused test in crates/sembla-ir/tests/validation.rs."
+  ],
+  "summary": "Acceptance criteria 1-7 otherwise pass, including workspace tests, CLI fixture exit behavior, canonical byte stability, the infect Agg test, declaration-order rule IDs, parameter validation, and required rustdoc. Revision is required for the explicit DESIGN §5.1/PRD contest-coverage obligation."
+}

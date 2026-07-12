@@ -1,0 +1,20 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T09:36:53.320Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0006-tick-executor.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0006-tick-executor.md",
+  "attempt": 1,
+  "text": "## Assessment: REVISE\n\nExisting workspace tests pass, but PRD 0006 is not implemented.\n\nBlocking evidence:\n\n- `crates/sembla-runtime/src/lib.rs` has no executor module.\n- No `run_tick`, `run`, `TickReport`, conflict resolution, double-write backstop, or saturation diagnostic exists.\n- Runtime tests cover only evaluator, RNG, and state behavior; acceptance criteria 2–7 have no tests.\n- `crates/sembla-cli/src/main.rs` supports only `--version` and `validate`, not `sembla run`.\n- The untracked `plan.md` is a proposed implementation plan, not executable code.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"crates/sembla-runtime has no executor module, run_tick/run APIs, TickReport, race sampling, conflict resolution, effect application, double-write backstop, or saturation diagnostics.\",\"Acceptance tests 2-7 are absent: no analytic hazard, 50-tick determinism, RaceTime/Key conflict, tie-break, double-write, or saturation-warning coverage exists.\",\"crates/sembla-cli/src/main.rs supports only validate/--version; the required sembla run command and CLI integration test are absent.\"],\"summary\":\"Existing workspace tests pass, but they cover only PRDs through 0005. PRD 0006 is represented only by an untracked plan.md; no executor implementation or required runtime/CLI tests exist.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "crates/sembla-runtime has no executor module, run_tick/run APIs, TickReport, race sampling, conflict resolution, effect application, double-write backstop, or saturation diagnostics.",
+      "Acceptance tests 2-7 are absent: no analytic hazard, 50-tick determinism, RaceTime/Key conflict, tie-break, double-write, or saturation-warning coverage exists.",
+      "crates/sembla-cli/src/main.rs supports only validate/--version; the required sembla run command and CLI integration test are absent."
+    ],
+    "summary": "Existing workspace tests pass, but they cover only PRDs through 0005. PRD 0006 is represented only by an untracked plan.md; no executor implementation or required runtime/CLI tests exist.",
+    "raw": "## Assessment: REVISE\n\nExisting workspace tests pass, but PRD 0006 is not implemented.\n\nBlocking evidence:\n\n- `crates/sembla-runtime/src/lib.rs` has no executor module.\n- No `run_tick`, `run`, `TickReport`, conflict resolution, double-write backstop, or saturation diagnostic exists.\n- Runtime tests cover only evaluator, RNG, and state behavior; acceptance criteria 2–7 have no tests.\n- `crates/sembla-cli/src/main.rs` supports only `--version` and `validate`, not `sembla run`.\n- The untracked `plan.md` is a proposed implementation plan, not executable code.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"crates/sembla-runtime has no executor module, run_tick/run APIs, TickReport, race sampling, conflict resolution, effect application, double-write backstop, or saturation diagnostics.\",\"Acceptance tests 2-7 are absent: no analytic hazard, 50-tick determinism, RaceTime/Key conflict, tie-break, double-write, or saturation-warning coverage exists.\",\"crates/sembla-cli/src/main.rs supports only validate/--version; the required sembla run command and CLI integration test are absent.\"],\"summary\":\"Existing workspace tests pass, but they cover only PRDs through 0005. PRD 0006 is represented only by an untracked plan.md; no executor implementation or required runtime/CLI tests exist.\"}\n```",
+    "source": "json"
+  }
+}

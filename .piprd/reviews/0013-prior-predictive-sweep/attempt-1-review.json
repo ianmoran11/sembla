@@ -1,0 +1,7 @@
+{
+  "assessment": "REVISE",
+  "blockingIssues": [
+    "The documented Box-Muller branch and sampler coordinate/lane ordering are not frozen by hard-coded golden outputs; moment tests alone would not detect a deterministic mapping change. Add fixed to_bits vectors for Uniform, Normal, and LogNormal."
+  ],
+  "summary": "All CLI, namespace, statistical, reproducibility, CRN, pinning, 100k K=20/T=50, summary, and documentation requirements otherwise pass."
+}

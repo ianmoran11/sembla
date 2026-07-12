@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T07:51:01.233Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0002-ir-schema.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0002-ir-schema.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nNo blocking issues remain.\n\n1. `./scripts/check.sh` passed formatting, clippy, and all 15 tests.\n2. Valid CLI fixture exits 0; six invalid fixtures exit 1 with path-bearing stderr.\n3. Golden and canonical idempotence tests pass.\n4. Infect-pattern `Agg` validation passes.\n5. Global declaration-order `rule_id` tests pass.\n6. Parameter resolution, duplicate, and prior validation pass.\n7. Required rustdoc builds with warnings denied.\n8. Contest coverage now handles missing, matching, mismatched, and duplicate claims.\n9. `git diff --check` passes; non-goals remain untouched.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0002 requirements pass. The prior contest-coverage blocker is resolved with structural claim matching, path-bearing errors, focused tests, and documentation; formatting, clippy, 15 tests, rustdoc, CLI fixtures, and diff hygiene all pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0002 requirements pass. The prior contest-coverage blocker is resolved with structural claim matching, path-bearing errors, focused tests, and documentation; formatting, clippy, 15 tests, rustdoc, CLI fixtures, and diff hygiene all pass.",
+    "raw": "## Assessment: APPROVED\n\nNo blocking issues remain.\n\n1. `./scripts/check.sh` passed formatting, clippy, and all 15 tests.\n2. Valid CLI fixture exits 0; six invalid fixtures exit 1 with path-bearing stderr.\n3. Golden and canonical idempotence tests pass.\n4. Infect-pattern `Agg` validation passes.\n5. Global declaration-order `rule_id` tests pass.\n6. Parameter resolution, duplicate, and prior validation pass.\n7. Required rustdoc builds with warnings denied.\n8. Contest coverage now handles missing, matching, mismatched, and duplicate claims.\n9. `git diff --check` passes; non-goals remain untouched.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0002 requirements pass. The prior contest-coverage blocker is resolved with structural claim matching, path-bearing errors, focused tests, and documentation; formatting, clippy, 15 tests, rustdoc, CLI fixtures, and diff hygiene all pass.\"}\n```",
+    "source": "json"
+  }
+}

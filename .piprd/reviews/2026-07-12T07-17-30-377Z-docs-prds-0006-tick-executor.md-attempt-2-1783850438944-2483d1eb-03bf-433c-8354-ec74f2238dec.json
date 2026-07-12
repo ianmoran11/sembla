@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T10:00:38.944Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0006-tick-executor.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0006-tick-executor.md",
+  "attempt": 2,
+  "text": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n1. Workspace tests and quality checks pass.\n2. The 100,000-row analytic hazard and survival tests satisfy 3σ bounds.\n3. Two independent 50-tick runs produce identical reports and state hashes.\n4. RaceTime conflicts and both deterministic tie-break levels are covered.\n5. Key ordering wins independently of sampled race time.\n6. Double writes identify both transitions without mutating committed state.\n7. Deferred diagnostics and strict >10% warnings are implemented and tested.\n8. The compiled CLI runs the two-state example and prints deterministic counts.\n\nThe executor uses one frozen snapshot, exact RNG coordinates, canonical sorted conflict resolution, all-claims-win semantics, staged effects, and transactional commit behavior. No blockers remain.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All eight PRD 0006 criteria pass. The executor implements snapshot-isolated tau-leaping, exact coordinate RNG sampling, canonical RaceTime/Key conflict resolution with all-claims-win semantics, transactional effects and double-write protection, saturation diagnostics, and the CLI run path; all focused and workspace checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All eight PRD 0006 criteria pass. The executor implements snapshot-isolated tau-leaping, exact coordinate RNG sampling, canonical RaceTime/Key conflict resolution with all-claims-win semantics, transactional effects and double-write protection, saturation diagnostics, and the CLI run path; all focused and workspace checks pass.",
+    "raw": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n1. Workspace tests and quality checks pass.\n2. The 100,000-row analytic hazard and survival tests satisfy 3σ bounds.\n3. Two independent 50-tick runs produce identical reports and state hashes.\n4. RaceTime conflicts and both deterministic tie-break levels are covered.\n5. Key ordering wins independently of sampled race time.\n6. Double writes identify both transitions without mutating committed state.\n7. Deferred diagnostics and strict >10% warnings are implemented and tested.\n8. The compiled CLI runs the two-state example and prints deterministic counts.\n\nThe executor uses one frozen snapshot, exact RNG coordinates, canonical sorted conflict resolution, all-claims-win semantics, staged effects, and transactional commit behavior. No blockers remain.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All eight PRD 0006 criteria pass. The executor implements snapshot-isolated tau-leaping, exact coordinate RNG sampling, canonical RaceTime/Key conflict resolution with all-claims-win semantics, transactional effects and double-write protection, saturation diagnostics, and the CLI run path; all focused and workspace checks pass.\"}\n```",
+    "source": "json"
+  }
+}
