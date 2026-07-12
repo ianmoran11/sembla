@@ -60,7 +60,9 @@ keeps doors open to each (see §10).
 └─────────────────────────────────────────────────────────┘
 ```
 
-The IR is the contract: **seed + IR + determinism level ⇒ reproducible results.**
+The IR is the contract: **seed + IR + parameter vector θ + determinism level ⇒
+reproducible results.** Parameters are supplied per run, so calibration sweeps,
+prior-predictive checks, and sliders all run the *same* IR under many θ.
 The IR is frontend-agnostic by design; Lean is the intended frontend, but nothing
 in the backend depends on it.
 
@@ -133,6 +135,17 @@ Each box's state is an **ACSet** (attributed C-set): a schema of entity tables
   reactions" — Poly at the surface, relational at the IR. (See §8 for why the
   pure everything-is-a-wired-system picture was rejected at individual
   granularity.)
+- **Parameters are first-class and per-run constant.** The trichotomy: a
+  *parameter* is fixed for a run, read-only, and supplied as a vector θ
+  alongside the seed — it is the unit of calibration, priors, sweeps, and
+  sliders; a *state* evolves during execution; an *input* arrives on a wire.
+  The IR declares parameters (name, type, default, optional **prior**
+  metadata) and expressions reference them symbolically (`Param`), never as
+  inlined literals — running one IR under many θ is the operational shape of
+  every inference workflow. Parameters do not violate the no-globals
+  principle (§4.4): nothing can write them during execution. The slider
+  workflow (§3) edits θ in run configuration; it never mutates the IR or
+  live state.
 
 ### 4.2 Dynamics: a tick is a bulk relational kernel
 
@@ -208,8 +221,9 @@ coarse-graining *theorem*, not an analogy.
   (sequential DES) on CPU, an ODE macro block sub-stepping internally (RK4)
   and exposing sampled values per tick. The composition layer is what makes
   heterogeneous-fidelity hybrids principled.
-- **No global variables.** Global-looking quantities (policy parameters, time)
-  are inputs wired in; the only sanctioned global is the synchronous tick.
+- **No global variables.** Global-looking *mutable* quantities are inputs
+  wired in; per-run constants are parameters (§4.1) — read-only, hence not
+  globals. The only sanctioned globals are the synchronous tick and θ.
 
 ### 4.5 Meaning: the Lean layer
 
@@ -267,8 +281,11 @@ free**: two runs differing only in policy design share identical draws for
 identical `(seed, tick, rule, entity)` coordinates. The same simulated person
 experiences the same shocks under both court designs / tax schedules —
 perfectly paired counterfactuals at individual level, with large variance
-reduction. For policy comparison work this may be the headline feature; it is a
-corollary of the reproducibility design, not an add-on.
+reduction. The same mechanism applies across **parameter vectors**: comparing
+one model under θ₁ vs θ₂ with a shared seed gives paired sensitivity and
+prior-predictive contrasts. For policy comparison work this may be the
+headline feature; it is a corollary of the reproducibility design, not an
+add-on.
 
 ---
 
@@ -370,6 +387,11 @@ performance spike.
 
 - Surface DSL in Lean 4 for systems/states/hazard transitions, elaborating to
   a deep-embedded IR with a defined ℝ-semantics.
+- **First-class parameters with declared priors** (§4.1): symbolic `Param`
+  references in the IR, per-run θ supplied at the CLI, and a
+  **prior-predictive sweep runner** (`sembla sweep`) that samples θ from the
+  declared priors via a reserved Philox namespace and runs the same IR per
+  draw — reproducible end to end from one seed.
 - Rust **CPU reference interpreter** — the executable semantics oracle.
   Level A determinism (bitwise, same binary/machine).
 - Hazard-rate transitions, racing-clock (tau-leaped) execution, contested
@@ -396,7 +418,8 @@ any proofs (theorem *statements* only) · synthetic population realism.
 ### Success criteria
 
 1. A model written in the Lean DSL compiles to IR and runs end-to-end.
-2. Same seed + same IR ⇒ bitwise-identical results, run after run.
+2. Same seed + same IR + same θ ⇒ bitwise-identical results, run after run;
+   a changed θ changes results without touching the IR.
 3. The two-box feedback loop produces correct, boundary-invariant results
    (verified by merging the boxes by hand and comparing bitwise).
 4. The GPU spike reports a credible ticks/sec at 26M rows.
@@ -412,9 +435,13 @@ any proofs (theorem *statements* only) · synthetic population realism.
    automatic detection of tau-leap bias beyond the saturation counter.
 3. **Level B feasibility** — how expensive portable-bitwise FP really is on
    modern GPUs; whether it's practical or aspirational.
-4. **Calibration/inference architecture** — ABC vs. gradient-based (the latter
-   would constrain the IR); where the prior-predictive workflow lives; this
-   decision constrains the IR more than anything else deferred.
+4. **Calibration/inference architecture** — the *method* choice (ABC /
+   simulation-based inference vs. gradient-based) remains open, but first-class
+   parameters plus the sweep runner (§9) already provide everything black-box
+   methods need; only gradient-based calibration would reach into the IR, and
+   that path stays deliberately deferred (§3). What remains genuinely open:
+   where the posterior workflow lives and what summary-statistic /
+   distance machinery the framework should standardize.
 5. **Synthetic population initialization** — census/HILDA-style microdata,
    privacy, validation. Historically >50% of the effort in policy
    microsimulation; unaddressed by the architecture and must not be forgotten.

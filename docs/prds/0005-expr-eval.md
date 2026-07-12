@@ -18,8 +18,12 @@ every row of a table in one pass, deterministically.
 
 ## Specification
 
-- `fn eval_column(expr, table, snapshot, agg_cache) -> ValueColumn` where
-  `ValueColumn` is `Vec<f64> | Vec<i64> | Vec<bool> | Vec<u16>`.
+- `fn eval_column(expr, table, snapshot, params, agg_cache) -> ValueColumn`
+  where `ValueColumn` is `Vec<f64> | Vec<i64> | Vec<bool> | Vec<u16>` and
+  `params` is a resolved `ParamEnv` (θ): declared defaults overlaid with any
+  per-run overrides, resolved once before tick 0 — `Expr::Param` evaluates
+  as a constant from it (`DESIGN.md` §4.1; values are never inlined into
+  the IR).
 - Per-row forms (literals, `SelfAttr`, arithmetic, comparisons, boolean ops,
   `EnumIs`) evaluate rowwise with f64 IEEE semantics, no fast-math, no
   reassociation — evaluation order is the expression tree order (Level A
@@ -47,7 +51,10 @@ add rayon; deterministic parallelism is a later concern), transition firing
 
 1. `cargo test --workspace` passes.
 2. Unit tests cover every `Expr` variant, including nested arithmetic over
-   `SelfAttr` and `EnumIs` inside `filter`.
+   `SelfAttr` and `EnumIs` inside `filter`, and `Param` resolution: the same
+   expression evaluated under two different `ParamEnv`s yields the
+   correspondingly different columns, with defaults applying when no
+   override is given.
 3. **Lumping equivalence test** (the §7 example, load-bearing): on a
    ~1000-row two-table fixture (Person→Employer Ref, random-ish but hardcoded
    data), a naive O(n²) reference implementation of the `Agg` count (written

@@ -18,7 +18,9 @@ acceptance tests.
 
 - `examples/sir.json`: one box; tables `person` (attrs: `health:
   Enum{S,I,R}`, `employer: Ref{employer}`) and `employer` (may be
-  attribute-less). Transitions: `infect` — table `person`, guard
+  attribute-less). Params: `beta` and `gamma`, declared with priors
+  (e.g. `LogNormal`), referenced via `Expr::Param` — never inlined
+  (`DESIGN.md` §4.1). Transitions: `infect` — table `person`, guard
   `health = S`, hazard `β × count(person sharing employer where health = I)
   / workplace_size_normalizer` (implementer picks the standard
   frequency-dependent form; document the chosen formula in the file and
@@ -37,6 +39,10 @@ acceptance tests.
   fired_recover, deferred_total`, plus a final line to stdout with the
   SHA-256 of the results file and of the final state.
 - A `--dt` override flag (dt is semantic — §4.3 — so it must be visible).
+- `--params <file.json>` flag on `sembla run`: a JSON object of
+  `name → value` overriding declared defaults; unknown names or
+  type-mismatched values are errors naming the parameter. The resolved θ is
+  echoed into the results-file header so a results file is self-describing.
 
 ## Non-goals
 
@@ -49,7 +55,9 @@ population — §9), calibration, plotting, birth/death, multi-box (PRD 0009).
 2. **End-to-end determinism (v0.1 success criterion #2)**: an integration
    test generates a 100k-person population and runs 100 ticks twice from
    scratch; results-file hashes and final state hashes are identical. A
-   *different seed* produces a different hash.
+   *different seed* produces a different hash, and a *different θ* (via
+   `--params`) produces a different hash under the same seed and the same
+   IR file — the run contract is seed + IR + θ (`DESIGN.md` §2).
 3. **Epidemic sanity**: at parameters with basic reproduction clearly > 1
    (documented calculation in the test), starting from I₀ = 100 of 100k:
    S is monotonically non-increasing, R monotonically non-decreasing,

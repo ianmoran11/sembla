@@ -21,8 +21,16 @@ Serde-derived Rust types in `sembla-ir`, JSON as the wire format (tagged
 enums; exact tag spelling is the implementer's choice but is frozen by the
 golden fixtures once checked in). The model structure:
 
-- `Model { name, dt: f64, boxes: Vec<Box>, wires: Vec<Wire> }` — `dt` is the
-  tick width in model-time units (§4.3: a semantic parameter).
+- `Model { name, dt: f64, params: Vec<ParamDecl>, boxes: Vec<Box>,
+  wires: Vec<Wire> }` — `dt` is the tick width in model-time units (§4.3: a
+  semantic parameter).
+- `ParamDecl { name, ty: Real | Int, default, prior: Option<Prior> }` —
+  parameters are first-class and per-run constant (`DESIGN.md` §4.1): the
+  run contract is **seed + IR + θ + level**, so parameter values are NEVER
+  inlined into expressions. `Prior { family: Normal | LogNormal | Uniform,
+  args: Vec<f64> }` is declarative metadata in this PRD (arity-validated:
+  2 args each; Uniform requires lo < hi); it is sampled by PRD 0013 and
+  rendered by PRD 0011.
 - `Box { name, tables: Vec<Table>, transitions: Vec<Transition>,
   inputs: Vec<PortDecl>, outputs: Vec<OutputDecl> }`
 - `Table { name, size_hint: u64, attrs: Vec<Attr> }`;
@@ -40,7 +48,8 @@ golden fixtures once checked in). The model structure:
   (§5.1). `RaceTime` resolves by sampled firing time; `Key` by the given
   expression, ascending.
 - `Expr` (typed, first-order, allocation-free — §4.2): literals (real, int,
-  bool, enum variant); `SelfAttr(name)`; arithmetic `(+ − × ÷)`, comparison,
+  bool, enum variant); `Param(name)` (resolves to the declared parameter's
+  type); `SelfAttr(name)`; arithmetic `(+ − × ÷)`, comparison,
   boolean ops; `EnumIs { attr, variant }`; `Input { port, agg }` (aggregate
   over this tick's received input table — used from PRD 0007);
   `Agg { op: Count | Sum, table, on: (fk_attr must equal self's fk_attr),
@@ -55,7 +64,9 @@ golden fixtures once checked in). The model structure:
 
 Validation (error messages must name the offending path):
 
-- All name references resolve (tables, attrs, enum variants, boxes, ports).
+- All name references resolve (tables, attrs, enum variants, boxes, ports,
+  params); duplicate param names rejected; prior arity/argument rules
+  enforced.
 - Expression type-checking per the rules above.
 - Wire schema compatibility (output schema == input schema).
 - `contests` coverage: transitions whose `resource` refers to a Ref attr must
@@ -68,7 +79,9 @@ Validation (error messages must name the offending path):
 - Types, parser, validator, and canonical serializer in `sembla-ir`.
 - `examples/two_state.json`: a valid minimal model — one box, one `Person`
   table (enum attr `mood: {Calm, Agitated}`), two hazard transitions between
-  the states, no wires. Used by all later runtime PRDs.
+  the states whose rates are declared params (one with a `LogNormal` prior,
+  one prior-less) referenced via `Param`, no wires. Used by all later
+  runtime PRDs.
 - `examples/invalid/*.json`: at least 5 fixtures each triggering a distinct
   validator error.
 - Golden tests: parse → validate → serialize → byte-compare for the valid
@@ -93,5 +106,11 @@ Level B/C determinism.
    "count rows in my table sharing my `employer` Ref where `health` is `I`"
    and it type-checks.
 5. `rule_id` assignment is by declaration order and covered by a unit test.
-6. Rustdoc on `Model`, `Transition`, `Expr`, and `ResourceClaim` explains
-   semantics with references to `DESIGN.md` sections (§4.2, §4.3, §5.1).
+6. Params: `Param` references type-check against declarations; an unresolved
+   param name, a duplicate declaration, and a bad prior arity each produce a
+   named validator error (invalid fixtures cover at least one of these);
+   the valid golden fixture contains a params block with a prior.
+7. Rustdoc on `Model`, `ParamDecl`, `Transition`, `Expr`, and
+   `ResourceClaim` explains semantics with references to `DESIGN.md`
+   sections (§4.1, §4.2, §4.3, §5.1), including the rule that parameter
+   values are never inlined into the IR.

@@ -26,13 +26,16 @@ widgets render (pixels are verified by documented manual steps).
   ProofWidgets' HTML/SVG components (a simple layered/circular layout is
   fine; do not add a JS graph library unless ProofWidgets already vendors
   one).
-- **Widget 2 — hazard panel**: with the cursor on a `transition`, show its
-  guard and hazard pretty-printed, the model `param` values it references,
-  and an inline SVG plot of the implied per-tick firing probability
-  `p(dt) = 1 − exp(−λ·dt)` as a function of dt over a sensible range, for
-  the current param values (evaluable only when the hazard is a closed
-  expression over params — otherwise show the expression and skip the plot,
-  stating why).
+- **Widget 2 — parameter & hazard panel**: with the cursor on a
+  `transition`, show its guard and hazard pretty-printed, and for each
+  `param` it references: the default value and — when a prior is declared —
+  an inline SVG plot of the **prior density** (Normal / LogNormal / Uniform
+  closed-form curves; this is the "rendered priors" feature of `DESIGN.md`
+  §3). Below that, an inline SVG plot of the implied per-tick firing
+  probability `p(dt) = 1 − exp(−λ·dt)` as a function of dt over a sensible
+  range, at the param defaults (evaluable only when the hazard is a closed
+  expression over params — otherwise show the expression and skip that plot,
+  stating why; the prior plots render regardless).
 - Architecture requirement: each widget is a pure function
   `elaborated model data → widget props (JSON)`, with the RPC/display layer
   kept thin. The pure functions are what the automated tests target.
@@ -54,9 +57,13 @@ otherwise defer), any Rust changes.
    JSON contains exactly nodes `{S, I, R}` and edges
    `infect: S→I`, `recover: I→R` with their hazard strings.
 3. Automated: a test asserts widget 2's props for `recover` include γ's
-   value and a plot polyline with > 10 points whose first point is ≈ (0, 0)
-   and which is monotone increasing; and that for `infect` (hazard depends
-   on an aggregate) the props carry the no-plot explanation instead.
+   default value and a p(dt) polyline with > 10 points whose first point is
+   ≈ (0, 0) and which is monotone increasing; that for `infect` (hazard
+   depends on an aggregate) the props carry the no-plot explanation for the
+   p(dt) curve while still carrying β's **prior density polyline** (checked
+   against the closed-form LogNormal density at 3 sampled x-values); and
+   that a prior-less param yields default-value-only props with no density
+   curve.
 4. The widget code path contains no simulation execution and no IO beyond
    the widget RPC layer (verified by inspection in review; the pure
    prop-builders are IO-free by type).

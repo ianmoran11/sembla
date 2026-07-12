@@ -48,9 +48,15 @@ and that matches the checked-in fixtures semantically.
     param γ := 0.1
   ```
 
-  `param` binds model-level constants substituted into expressions at
-  elaboration (the IR has no parameter table in v0.1 — literals are inlined;
-  record each param's name/value in a JSON `meta` field for tooling).
+  `param` declarations elaborate to the IR's first-class `params` block
+  (`DESIGN.md` §4.1, PRD 0002) and expression references elaborate to
+  `Expr::Param` — values are **never inlined**: the same exported IR runs
+  under any θ. Priors are declared in the DSL and carried through:
+
+  ```
+  param β : Real := 0.3 prior LogNormal(-1.2, 0.4)
+  param γ : Real := 0.1
+  ```
 - Elaboration errors must be positioned: referencing an undeclared state
   or attribute is an error *at that token*, not a panic at export.
 - `lake exe sembla-export <module-or-model-name> <out.json>` writes the IR.
@@ -81,10 +87,14 @@ the two fixtures.
 4. End-to-end: running the *exported* SIR JSON through `sembla run` at a
    fixed seed produces the same results hash as running the fixture
    (scripted in a test or documented runnable commands executed in review).
-5. Negative elaboration tests: at least 3 ill-formed DSL snippets (unknown
-   state, type-mismatched guard, unknown ref target) fail with positioned
-   Lean errors (as `#guard_msgs` tests or equivalent).
-6. `frontend/README.md` documents setup (elan/toolchain), the DSL forms, and
+5. Negative elaboration tests: at least 4 ill-formed DSL snippets (unknown
+   state, type-mismatched guard, unknown ref target, reference to an
+   undeclared param) fail with positioned Lean errors (as `#guard_msgs`
+   tests or equivalent).
+6. The exported SIR IR contains the `params` block with `beta`/`gamma`
+   priors and no inlined parameter literals (asserted by the parity check
+   against the fixture, which declares them as params).
+7. `frontend/README.md` documents setup (elan/toolchain), the DSL forms, and
    the export/parity workflow.
-7. `./scripts/check.sh` passes with Lean present, and still passes (with the
+8. `./scripts/check.sh` passes with Lean present, and still passes (with the
    skip warning) when `lake` is absent.

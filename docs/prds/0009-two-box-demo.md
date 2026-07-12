@@ -31,10 +31,15 @@ utility, and documentation that walks a reader through both.
   `Immediate` hazard convenience added to the IR with
   `t = 0` race time — implementer's choice; if the IR gains `Immediate`,
   update PRD-0002 golden fixtures and validator tests accordingly).
-- `sembla compare <modelA.json> <modelB.json> --population ... --seed ...
-  --ticks ... --out compare.csv`: runs both models under the **same seed**
-  (CRN — identical coordinates ⇒ identical draws) and emits per-tick
-  side-by-side aggregates and their differences.
+- `sembla compare --population ... --seed ... --ticks ... --out compare.csv`
+  supporting two contrast shapes under the **same seed** (CRN — identical
+  coordinates ⇒ identical draws, `DESIGN.md` §5.3):
+  - **model contrast**: `sembla compare <modelA.json> <modelB.json> ...`
+  - **parameter contrast**: `sembla compare <model.json> --params-a a.json
+    --params-b b.json ...` — same IR, two θ vectors (paired sensitivity /
+    prior-predictive contrasts).
+  Both emit per-tick side-by-side aggregates and their differences, with the
+  resolved θ of each arm echoed in the header.
 - `docs/examples/sir_policy.md`: what the feedback loop does, the one-tick
   delay caveat (§10.7), and a CRN comparison of the policy model vs. the
   no-policy PRD-0008 model, with the interpretation (differences are
@@ -61,4 +66,8 @@ statistical analysis of the comparison beyond the CSV.
    baseline is unaffected by being run alongside a variant).
 5. One-tick delay is asserted: the tick the policy fires and the first tick
    the population's effective hazard changes differ by exactly one (test).
-6. `docs/examples/sir_policy.md` exists with runnable commands.
+6. Parameter-contrast test: `sembla compare` on the PRD-0008 SIR model with
+   `beta` lowered in arm B (same seed) shows a strictly lower final attack
+   rate in arm B, and repeat invocations are byte-identical.
+7. `docs/examples/sir_policy.md` exists with runnable commands, including
+   one parameter-contrast example.

@@ -12,9 +12,11 @@ randomness through the PRD-0003 coordinate API; all reads from the PRD-0004
 
 ## Goal
 
-`run_tick(model, state, seed, tick) -> TickReport` executing one
+`run_tick(model, state, params, seed, tick) -> TickReport` executing one
 single-box tick end-to-end, bitwise-deterministically, plus a `run(model,
-state, seed, n_ticks)` driver and the saturation diagnostic.
+state, params, seed, n_ticks)` driver and the saturation diagnostic —
+where `params` is the resolved θ (`ParamEnv`, PRD 0005), fixed for the whole
+run.
 
 ## Specification
 

@@ -26,6 +26,7 @@ implementation notes and follow DESIGN.md.
 | 0010 | Lean frontend DSL → IR | frontend |
 | 0011 | Lean structure widgets | frontend |
 | 0012 | GPU throughput spike (throwaway) | spike |
+| 0013 | Prior-predictive sweep runner | model |
 
 ## Global conventions (binding on all PRDs)
 
@@ -43,6 +44,12 @@ implementation notes and follow DESIGN.md.
 - **Identifiers:** `rule_id` = declaration order of transitions within a
   model (u32, model-wide, assigned by the IR validator). Table and box names
   are unique snake_case strings.
+- **Parameters:** the run contract is **seed + IR + θ + level**. Parameter
+  values are never inlined into the IR (`Expr::Param` only); θ is resolved
+  once before tick 0 from declared defaults plus per-run overrides.
+  Reserved RNG namespaces: `rule_id = u32::MAX` for prior/parameter draws
+  (PRD 0013); synthetic-population generation uses its own documented
+  reserved namespace (PRD 0008).
 - **State hash:** `sembla-runtime` exposes a canonical SHA-256 over state
   (defined in PRD 0004) used by determinism tests throughout.
 - **Testing:** every PRD lands with `cargo test --workspace` green. Tests
