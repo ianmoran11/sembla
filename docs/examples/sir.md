@@ -76,3 +76,39 @@ cargo run --release -p sembla-cli -- run examples/sir.json --population pop.bin 
 Changing `--seed` or a value in `params.json` changes the results and final
 state hashes. The automated integration test performs this check at 100,000
 people for 100 ticks.
+
+## Prior-predictive sweep
+
+Draw 20 parameter vectors from the priors declared in `examples/sir.json`
+and run the same population for 50 ticks under each vector:
+
+```sh
+cargo run --release -p sembla-cli -- sweep examples/sir.json \
+  --population pop.bin --seed 99 --draws 20 --ticks 50 --out sweep/
+```
+
+The directory contains `manifest.csv` (theta for each draw), one standard
+`draw_<k>.csv` result per draw, and `summary.csv`. The summary reports the
+nearest-index 5/25/50/75/95 percentiles for S, I, R, transition firings, and
+deferred events at every tick. Stdout prints SHA-256 digests for the manifest
+and summary.
+
+Pin any subset of parameters with the ordinary override format. Pinned values
+are marked in the manifest header and are not sampled:
+
+```sh
+printf '{"gamma":0.1}\n' > pinned.json
+cargo run --release -p sembla-cli -- sweep examples/sir.json \
+  --population pop.bin --seed 99 --draws 20 --ticks 50 \
+  --params pinned.json --out sweep-pinned/
+```
+
+Normal priors use the frozen cosine branch of Box--Muller; LogNormal draws are
+the exponential of that Normal draw. Parameter coordinates reserve
+`rule_id = 0xffffffff`, use the draw index as `tick`, and the parameter's
+declaration index as `entity_id`, so extending K never changes an earlier
+draw. Every simulation run deliberately reuses seed 99 and therefore the same
+simulation coordinates (**common random numbers**). This makes output
+variation attributable to theta, but the draw results are paired rather than
+independent simulation-noise replicates; use different sweep seeds when
+independent shocks are required.

@@ -53,9 +53,10 @@ implementation notes and follow DESIGN.md.
 - **Parameters:** the run contract is **seed + IR + θ + level**. Parameter
   values are never inlined into the IR (`Expr::Param` only); θ is resolved
   once before tick 0 from declared defaults plus per-run overrides.
-  Reserved RNG namespaces: `rule_id = u32::MAX` for prior/parameter draws
-  (PRD 0013); synthetic-population generation uses its own documented
-  reserved namespace (PRD 0008).
+  Reserved RNG namespaces: prior/parameter draws use `rule_id = u32::MAX`,
+  `tick = draw index`, `entity_id = parameter declaration index`, and
+  `draw_idx = sampler-internal counter` (PRD 0013); synthetic-population
+  generation uses its own documented reserved namespace (PRD 0008).
 - **State hash:** `sembla-runtime` exposes a canonical SHA-256 over state
   (defined in PRD 0004) used by determinism tests throughout.
 - **Testing:** every PRD lands with `cargo test --workspace` green. Tests

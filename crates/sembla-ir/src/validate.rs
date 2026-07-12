@@ -177,6 +177,12 @@ fn validate_param(param: &ParamDecl, index: usize) -> Result<(), ValidationError
     }
 
     if let Some(prior) = &param.prior {
+        if param.ty == ParamType::Int {
+            return Err(error(
+                format!("{base}.prior"),
+                format!("integer parameter '{}' cannot declare a prior", param.name),
+            ));
+        }
         if prior.args.len() != 2 {
             return Err(error(
                 format!("{base}.prior.args"),

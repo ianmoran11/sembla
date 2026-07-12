@@ -1,7 +1,7 @@
 use sembla_ir::{
     validate, AggJoin, AggOp, Aggregate, Attr, AttrType, Box as ModelBox, ClaimOrdering, Effect,
-    Expr, Model, OutputBuilder, OutputDecl, OutputField, PortDecl, ResourceClaim, Table,
-    Transition, Wire, WireEndpoint,
+    Expr, Model, OutputBuilder, OutputDecl, OutputField, ParamDecl, ParamType, ParamValue,
+    PortDecl, Prior, PriorFamily, ResourceClaim, Table, Transition, Wire, WireEndpoint,
 };
 
 fn transition(name: &str) -> Transition {
@@ -81,6 +81,28 @@ fn ref_write_model(value: Expr, contests: Vec<ResourceClaim>) -> Model {
         }],
         wires: vec![],
     }
+}
+
+#[test]
+fn int_parameter_priors_are_rejected_at_the_declaration_path() {
+    let model = Model {
+        name: "int-prior".into(),
+        dt: 1.0,
+        params: vec![ParamDecl {
+            name: "count".into(),
+            ty: ParamType::Int,
+            default: ParamValue::Int { value: 1 },
+            prior: Some(Prior {
+                family: PriorFamily::Uniform,
+                args: vec![0.0, 2.0],
+            }),
+        }],
+        boxes: vec![simple_box("box", vec![])],
+        wires: vec![],
+    };
+    let error = validate(model).unwrap_err().to_string();
+    assert!(error.contains("$.params[0].prior"), "{error}");
+    assert!(error.contains("integer parameter 'count'"), "{error}");
 }
 
 #[test]

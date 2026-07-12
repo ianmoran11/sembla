@@ -4,11 +4,12 @@ use sembla_ir::{AttrType, ParamType, ParamValue};
 use sembla_runtime::eval::{ParamEnv, ParamOverride};
 use sembla_runtime::executor;
 use sembla_runtime::population::SyntheticPopulation;
+use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S --draws K --ticks T --out dir [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -45,6 +46,16 @@ fn run(arguments: &[String]) -> i32 {
                 }
             };
             run_file(path, options)
+        }
+        [command, path, flags @ ..] if command == "sweep" => {
+            let options = match parse_sweep_options(flags) {
+                Ok(options) => options,
+                Err(message) => {
+                    eprintln!("{message}\n{USAGE}");
+                    return 2;
+                }
+            };
+            sweep_file(path, options)
         }
         [command, arguments @ ..] if command == "compare" => compare_command(arguments),
         _ => {
@@ -107,6 +118,61 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
         population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
         out,
         dt,
+        params,
+    })
+}
+
+#[derive(Clone, Debug)]
+struct SweepOptions {
+    seed: u64,
+    draws: u32,
+    ticks: u32,
+    population: String,
+    out: String,
+    params: Option<String>,
+}
+
+fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
+    let mut seed = None;
+    let mut draws = None;
+    let mut ticks = None;
+    let mut population = None;
+    let mut out = None;
+    let mut params = None;
+    let mut index = 0;
+    while index < flags.len() {
+        let flag = flags[index].as_str();
+        let value = flags
+            .get(index + 1)
+            .ok_or_else(|| format!("missing value for '{flag}'"))?;
+        match flag {
+            "--seed" => set_once(&mut seed, parse_number(value, flag)?, flag)?,
+            "--draws" => set_once(&mut draws, parse_number(value, flag)?, flag)?,
+            "--ticks" => set_once(&mut ticks, parse_number(value, flag)?, flag)?,
+            "--population" => {
+                if value.parse::<usize>().is_err() && !Path::new(value).is_file() {
+                    return Err(format!(
+                        "invalid numeric value or population file '{value}' for '{flag}'"
+                    ));
+                }
+                set_once(&mut population, value.clone(), flag)?;
+            }
+            "--out" => set_once(&mut out, value.clone(), flag)?,
+            "--params" => set_once(&mut params, value.clone(), flag)?,
+            _ => return Err(format!("unknown sweep flag '{flag}'")),
+        }
+        index += 2;
+    }
+    let draws = draws.ok_or_else(|| "missing required flag '--draws'".to_owned())?;
+    if draws == 0 {
+        return Err("'--draws' must be greater than zero".to_owned());
+    }
+    Ok(SweepOptions {
+        seed: seed.ok_or_else(|| "missing required flag '--seed'".to_owned())?,
+        draws,
+        ticks: ticks.ok_or_else(|| "missing required flag '--ticks'".to_owned())?,
+        population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
+        out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
         params,
     })
 }
@@ -380,6 +446,159 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     }
 }
 
+fn sweep_file(path: &str, options: SweepOptions) -> i32 {
+    match sweep_file_result(path, options) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
+    let model = read_validated(path)?;
+    let pinned = match options.params.as_deref() {
+        Some(params_path) => read_param_overrides(&model, params_path)?,
+        None => Vec::new(),
+    };
+    let population = options.population.parse::<usize>().ok();
+    let population_file = if population.is_none() {
+        Some(SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?)
+    } else {
+        None
+    };
+    let out = Path::new(&options.out);
+    std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
+    remove_previous_sweep_outputs(out)?;
+
+    let mut manifest = String::from("# parameter_status");
+    for declaration in &model.model().params {
+        let status = if pinned.iter().any(|pin| pin.name == declaration.name) {
+            "pinned"
+        } else if declaration.prior.is_some() {
+            "sampled"
+        } else {
+            "default"
+        };
+        manifest.push_str(&format!(",{}={status}", declaration.name));
+    }
+    manifest.push_str("\nk");
+    for declaration in &model.model().params {
+        manifest.push(',');
+        manifest.push_str(&declaration.name);
+    }
+    manifest.push('\n');
+
+    let mut all_series = Vec::with_capacity(options.draws as usize);
+    // Deliberately sequential: declaration order within each k, then k order.
+    for draw in 0..options.draws {
+        let params = sample_parameters_for_draw(&model, options.seed, draw, &pinned)
+            .map_err(|error| format!("draw {draw}: {error}"))?;
+        manifest.push_str(&draw.to_string());
+        for (_, value) in params.values() {
+            manifest.push(',');
+            manifest.push_str(&param_value_csv(value));
+        }
+        manifest.push('\n');
+
+        let initial = match (&population, &population_file) {
+            (Some(row_count), None) => initialize_population(&model, *row_count),
+            (None, Some(population)) => initializers_from_population(&model, population)?,
+            _ => return Err("invalid sweep population source".to_owned()),
+        };
+        let mut state =
+            StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
+        // The simulation seed is intentionally identical across k: this is
+        // common random numbers, so only theta varies between unpinned draws.
+        let (csv, series) =
+            run_results_csv(&model, &mut state, &params, options.seed, options.ticks)?;
+        let draw_path = out.join(format!("draw_{draw}.csv"));
+        std::fs::write(&draw_path, csv.as_bytes())
+            .map_err(|error| format!("{}: {error}", draw_path.display()))?;
+        all_series.push(series);
+    }
+
+    let summary = summary_csv(&all_series, options.ticks);
+    let manifest_path = out.join("manifest.csv");
+    let summary_path = out.join("summary.csv");
+    std::fs::write(&manifest_path, manifest.as_bytes())
+        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
+    std::fs::write(&summary_path, summary.as_bytes())
+        .map_err(|error| format!("{}: {error}", summary_path.display()))?;
+    println!(
+        "manifest_sha256={} summary_sha256={}",
+        hex(&Sha256::digest(manifest.as_bytes())),
+        hex(&Sha256::digest(summary.as_bytes()))
+    );
+    Ok(())
+}
+
+fn remove_previous_sweep_outputs(directory: &Path) -> Result<(), String> {
+    for entry in
+        std::fs::read_dir(directory).map_err(|error| format!("{}: {error}", directory.display()))?
+    {
+        let path = entry
+            .map_err(|error| format!("{}: {error}", directory.display()))?
+            .path();
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
+        if name == "manifest.csv"
+            || name == "summary.csv"
+            || (name.starts_with("draw_") && name.ends_with(".csv"))
+        {
+            std::fs::remove_file(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+fn param_value_csv(value: &ParamValue) -> String {
+    match value {
+        ParamValue::Real { value } => value.to_string(),
+        ParamValue::Int { value } => value.to_string(),
+    }
+}
+
+fn summary_csv(all_series: &[Vec<[usize; 6]>], ticks: u32) -> String {
+    const NAMES: [&str; 6] = [
+        "S",
+        "I",
+        "R",
+        "fired_infect",
+        "fired_recover",
+        "deferred_total",
+    ];
+    const PERCENTILES: [usize; 5] = [5, 25, 50, 75, 95];
+    let mut csv = String::from("tick");
+    for name in NAMES {
+        for percentile in PERCENTILES {
+            csv.push_str(&format!(",{name}_p{percentile:02}"));
+        }
+    }
+    csv.push('\n');
+    for tick in 0..ticks as usize {
+        csv.push_str(&tick.to_string());
+        for column in 0..NAMES.len() {
+            let mut values = all_series
+                .iter()
+                .map(|series| series[tick][column])
+                .collect::<Vec<_>>();
+            values.sort_unstable();
+            for percentile in PERCENTILES {
+                // Deterministic nearest index to p * (n - 1).
+                let index = ((values.len() - 1) * percentile + 50) / 100;
+                csv.push(',');
+                csv.push_str(&values[index].to_string());
+            }
+        }
+        csv.push('\n');
+    }
+    csv
+}
+
 fn resolve_params(
     model: &sembla_ir::ValidatedModel,
     path: Option<&str>,
@@ -387,6 +606,14 @@ fn resolve_params(
     let Some(path) = path else {
         return Ok(ParamEnv::defaults(model));
     };
+    let overrides = read_param_overrides(model, path)?;
+    ParamEnv::resolve(model, &overrides).map_err(|error| format!("{path}: {error}"))
+}
+
+fn read_param_overrides(
+    model: &sembla_ir::ValidatedModel,
+    path: &str,
+) -> Result<Vec<ParamOverride>, String> {
     let source = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
     let value: serde_json::Value =
         serde_json::from_str(&source).map_err(|error| format!("{path}: {error}"))?;
@@ -415,7 +642,8 @@ fn resolve_params(
         };
         overrides.push(ParamOverride::new(name, value));
     }
-    ParamEnv::resolve(model, &overrides).map_err(|error| format!("{path}: {error}"))
+    ParamEnv::resolve(model, &overrides).map_err(|error| format!("{path}: {error}"))?;
+    Ok(overrides)
 }
 
 fn run_results(
@@ -426,8 +654,27 @@ fn run_results(
     ticks: u32,
     out: &str,
 ) -> Result<(), String> {
+    let (csv, _) = run_results_csv(model, state, params, seed, ticks)?;
+    std::fs::write(out, csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
+    let results_hash = Sha256::digest(csv.as_bytes());
+    println!(
+        "results_sha256={} final_state_sha256={}",
+        hex(&results_hash),
+        hex(&state.state_hash())
+    );
+    Ok(())
+}
+
+fn run_results_csv(
+    model: &sembla_ir::ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+) -> Result<(String, Vec<[usize; 6]>), String> {
     let sir_box = sir_box_name(model)?.to_owned();
     let mut csv = String::new();
+    let mut series = Vec::with_capacity(ticks as usize);
     csv.push_str("# params=");
     csv.push_str(&canonical_params(params)?);
     csv.push('\n');
@@ -444,19 +691,21 @@ fn run_results(
             .iter()
             .map(|(_, count)| count)
             .sum();
+        let row = [
+            counts[0],
+            counts[1],
+            counts[2],
+            fired_infect,
+            fired_recover,
+            deferred_total,
+        ];
+        series.push(row);
         csv.push_str(&format!(
-            "{tick},{},{},{},{fired_infect},{fired_recover},{deferred_total}\n",
-            counts[0], counts[1], counts[2]
+            "{tick},{},{},{},{},{},{}\n",
+            row[0], row[1], row[2], row[3], row[4], row[5]
         ));
     }
-    std::fs::write(out, csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
-    let results_hash = Sha256::digest(csv.as_bytes());
-    println!(
-        "results_sha256={} final_state_sha256={}",
-        hex(&results_hash),
-        hex(&state.state_hash())
-    );
-    Ok(())
+    Ok((csv, series))
 }
 
 fn sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<&str, String> {

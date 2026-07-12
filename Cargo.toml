@@ -9,3 +9,8 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+
+# PRD 0013 exercises 100 million row-ticks in an integration test. Keep the
+# test oracle single-threaded, but compile it sufficiently to finish in CI.
+[profile.test]
+opt-level = 2

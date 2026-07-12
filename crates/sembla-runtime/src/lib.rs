@@ -3,6 +3,7 @@
 pub mod eval;
 pub mod executor;
 pub mod population;
+pub mod prior;
 pub mod rng;
 pub mod state;
 
