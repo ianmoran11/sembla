@@ -1,0 +1,1 @@
+{"name":"bad_prior_arity","dt":0.1,"params":[{"name":"rate","ty":"real","default":{"kind":"real","value":0.2},"prior":{"family":"normal","args":[0.1]}}],"boxes":[{"name":"population","tables":[{"name":"Person","size_hint":10,"attrs":[{"name":"mood","ty":{"kind":"enum","variants":["Calm","Agitated"]}}]}],"transitions":[],"inputs":[],"outputs":[]}],"wires":[]}
