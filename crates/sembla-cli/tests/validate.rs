@@ -42,3 +42,50 @@ fn validate_subcommand_rejects_every_invalid_fixture() {
         assert!(stderr.contains(offending_path), "{fixture}: {stderr}");
     }
 }
+
+#[test]
+fn diff_ir_compares_validated_canonical_models() {
+    let fixture = repository_path("examples/sir.json");
+    let normalized_copy = std::env::temp_dir().join(format!(
+        "sembla-diff-ir-{}-{}.json",
+        std::process::id(),
+        std::thread::current().name().unwrap_or("test")
+    ));
+    let source = std::fs::read_to_string(&fixture).unwrap();
+    std::fs::write(&normalized_copy, format!("\n  {source}\n")).unwrap();
+
+    let identical = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .args(["diff-ir"])
+        .arg(&fixture)
+        .arg(&normalized_copy)
+        .output()
+        .unwrap();
+    assert!(identical.status.success());
+    assert!(String::from_utf8(identical.stdout)
+        .unwrap()
+        .contains("semantically identical"));
+
+    let different = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .args(["diff-ir"])
+        .arg(&fixture)
+        .arg(repository_path("examples/sir_policy.json"))
+        .output()
+        .unwrap();
+    assert_eq!(different.status.code(), Some(1));
+    assert!(String::from_utf8(different.stderr)
+        .unwrap()
+        .contains("canonical normalization"));
+
+    let invalid = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .args(["diff-ir"])
+        .arg(repository_path("examples/invalid/wrong_guard_type.json"))
+        .arg(&fixture)
+        .output()
+        .unwrap();
+    assert_eq!(invalid.status.code(), Some(1));
+    assert!(String::from_utf8(invalid.stderr)
+        .unwrap()
+        .contains("transitions[0].guard"));
+
+    std::fs::remove_file(normalized_copy).unwrap();
+}

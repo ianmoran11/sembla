@@ -3,6 +3,7 @@
 
 # Lean
 /.lake/
+/frontend/.lake/
 
 # Editors and operating systems
 .DS_Store

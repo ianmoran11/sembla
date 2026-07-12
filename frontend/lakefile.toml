@@ -1,0 +1,10 @@
+name = "sembla_frontend"
+version = "0.1.0"
+defaultTargets = ["Sembla", "sembla-export"]
+
+[[lean_lib]]
+name = "Sembla"
+
+[[lean_exe]]
+name = "sembla-export"
+root = "Main"

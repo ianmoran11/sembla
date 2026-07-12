@@ -5,6 +5,8 @@ cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 
+bash scripts/check-lean.sh
+
 # Philox remains local: Cargo-resolved dependency identities prevent aliases,
 # target tables, optional features, or workspace inheritance from bypassing
 # the approved direct-dependency policy.

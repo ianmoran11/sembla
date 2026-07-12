@@ -8,7 +8,7 @@ use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -25,6 +25,7 @@ fn run(arguments: &[String]) -> i32 {
             0
         }
         [command, path] if command == "validate" => validate_file(path),
+        [command, left, right] if command == "diff-ir" => diff_ir(left, right),
         [command, flags @ ..] if command == "synth-pop" => {
             let options = match parse_synth_options(flags) {
                 Ok(options) => options,
@@ -271,6 +272,32 @@ fn read_validated(path: &str) -> Result<sembla_ir::ValidatedModel, String> {
 fn validate_file(path: &str) -> i32 {
     match read_validated(path) {
         Ok(_) => 0,
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn diff_ir(left: &str, right: &str) -> i32 {
+    let compare = || -> Result<bool, String> {
+        let left_model = read_validated(left)?;
+        let right_model = read_validated(right)?;
+        let left_json = sembla_ir::to_canonical_json(left_model.model())
+            .map_err(|error| format!("{left}: canonical serialization failed: {error}"))?;
+        let right_json = sembla_ir::to_canonical_json(right_model.model())
+            .map_err(|error| format!("{right}: canonical serialization failed: {error}"))?;
+        Ok(left_json == right_json)
+    };
+    match compare() {
+        Ok(true) => {
+            println!("IR models are semantically identical");
+            0
+        }
+        Ok(false) => {
+            eprintln!("IR models differ after canonical normalization: '{left}' != '{right}'");
+            1
+        }
         Err(error) => {
             eprintln!("{error}");
             1
