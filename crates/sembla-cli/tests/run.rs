@@ -24,12 +24,36 @@ fn run_two_state_prints_deterministic_per_rule_counts() {
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
         concat!(
-            "tick=0 rule_id=0 fired=16\n",
-            "tick=0 rule_id=1 fired=0\n",
-            "tick=1 rule_id=0 fired=20\n",
-            "tick=1 rule_id=1 fired=0\n",
-            "tick=2 rule_id=0 fired=13\n",
-            "tick=2 rule_id=1 fired=1\n",
+            "tick=0 box=population rule_id=0 fired=16\n",
+            "tick=0 box=population rule_id=1 fired=0\n",
+            "tick=1 box=population rule_id=0 fired=20\n",
+            "tick=1 box=population rule_id=1 fired=0\n",
+            "tick=2 box=population rule_id=0 fired=13\n",
+            "tick=2 box=population rule_id=1 fired=1\n",
+        )
+    );
+}
+
+#[test]
+fn run_multi_box_reports_counts_per_box() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(repository_path("examples/two_box.json"))
+        .args(["--seed", "9", "--ticks", "2", "--population", "16"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        concat!(
+            "tick=0 box=population rule_id=0 fired=0\n",
+            "tick=0 box=controller rule_id=1 fired=1\n",
+            "tick=1 box=population rule_id=0 fired=16\n",
+            "tick=1 box=controller rule_id=1 fired=0\n",
         )
     );
 }

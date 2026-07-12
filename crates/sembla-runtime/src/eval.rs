@@ -10,10 +10,10 @@ use std::error::Error;
 use std::fmt;
 
 use sembla_ir::{
-    AggJoin, AggOp, Attr, AttrType, Expr, ParamType, ParamValue, Table, ValidatedModel,
+    AggJoin, AggOp, Aggregate, Attr, AttrType, Expr, ParamType, ParamValue, Table, ValidatedModel,
 };
 
-use crate::state::{Snapshot, StateError};
+use crate::state::{ColumnData, InputTable, Snapshot, StateError};
 
 /// A typed expression result in query-row order.
 #[derive(Clone, Debug, PartialEq)]
@@ -897,14 +897,15 @@ fn eval_expr(
             Ok(InternalColumn::Bool(values))
         }
         Expr::Input { port, agg } => {
-            let input = table
+            let declaration = table
                 .model_box()
                 .inputs
                 .iter()
                 .find(|input| input.name == *port)
                 .ok_or_else(|| EvalError::new("validated input port disappeared"))?;
-            let result_type = infer_agg_type(&agg.op, table, &input.schema)?;
-            zero_column(&result_type, row_count)
+            let result_type = infer_agg_type(&agg.op, table, &declaration.schema)?;
+            let input = snapshot.input_table(table.box_name(), port)?;
+            eval_input_aggregate(input, agg, params, row_count, &result_type)
         }
         Expr::Agg {
             op,
@@ -913,6 +914,266 @@ fn eval_expr(
             filter,
         } => eval_aggregate(op, target, on, filter, table, snapshot, params, cache),
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum InputScalar {
+    Real(f64),
+    Int(i64),
+    Bool(bool),
+    Enum(u16),
+    Ref(u32),
+}
+
+fn eval_input_aggregate(
+    input: &InputTable,
+    agg: &Aggregate,
+    params: &ParamEnv,
+    result_rows: usize,
+    result_type: &RuntimeType,
+) -> Result<InternalColumn, EvalError> {
+    let mut selected = Vec::with_capacity(input.row_count);
+    for row in 0..input.row_count {
+        let keep = match &agg.filter {
+            Some(filter) => match eval_input_scalar(filter, input, row, params)? {
+                InputScalar::Bool(value) => value,
+                _ => return Err(EvalError::new("input aggregate filter is not Bool")),
+            },
+            None => true,
+        };
+        selected.push(keep);
+    }
+    match &agg.op {
+        AggOp::Count => {
+            let count = selected.iter().filter(|value| **value).count();
+            let count = i64::try_from(count)
+                .map_err(|_| EvalError::new("input aggregate count exceeds i64"))?;
+            Ok(InternalColumn::Int(vec![count; result_rows]))
+        }
+        AggOp::Sum { value } => {
+            let mut int_sum = 0_i64;
+            let mut real_sum = 0.0;
+            let mut real = matches!(result_type, RuntimeType::Real);
+            for (row, keep) in selected.into_iter().enumerate() {
+                if !keep {
+                    continue;
+                }
+                match eval_input_scalar(value, input, row, params)? {
+                    InputScalar::Int(value) if !real => {
+                        int_sum = int_sum.checked_add(value).ok_or_else(|| {
+                            EvalError::new(format!("input aggregate integer overflow at row {row}"))
+                        })?;
+                    }
+                    InputScalar::Int(value) => real_sum += value as f64,
+                    InputScalar::Real(value) => {
+                        if !real {
+                            real_sum = int_sum as f64;
+                            real = true;
+                        }
+                        real_sum += value;
+                    }
+                    _ => return Err(EvalError::new("input aggregate Sum value is not numeric")),
+                }
+            }
+            match result_type {
+                RuntimeType::Real => Ok(InternalColumn::Real(vec![real_sum; result_rows])),
+                RuntimeType::Int => Ok(InternalColumn::Int(vec![int_sum; result_rows])),
+                _ => Err(EvalError::new("input aggregate Sum has non-numeric type")),
+            }
+        }
+    }
+}
+
+fn eval_input_scalar(
+    expr: &Expr,
+    input: &InputTable,
+    row: usize,
+    params: &ParamEnv,
+) -> Result<InputScalar, EvalError> {
+    match expr {
+        Expr::Real { value } => Ok(InputScalar::Real(*value)),
+        Expr::Int { value } => Ok(InputScalar::Int(*value)),
+        Expr::Bool { value } => Ok(InputScalar::Bool(*value)),
+        Expr::Param { name } => match params.get(name)? {
+            ParamValue::Real { value } => Ok(InputScalar::Real(*value)),
+            ParamValue::Int { value } => Ok(InputScalar::Int(*value)),
+        },
+        Expr::SelfAttr { name } => input_scalar_attr(input, name, row),
+        Expr::EnumIs { attr, variant } => {
+            let declaration = find_attr(&input.schema, attr)?;
+            let AttrType::Enum { variants } = &declaration.ty else {
+                return Err(EvalError::new(format!(
+                    "EnumIs attribute '{attr}' is not Enum-typed"
+                )));
+            };
+            let expected = variants
+                .iter()
+                .position(|candidate| candidate == variant)
+                .ok_or_else(|| EvalError::new(format!("unknown enum variant '{variant}'")))?;
+            match input_scalar_attr(input, attr, row)? {
+                InputScalar::Enum(value) => Ok(InputScalar::Bool(usize::from(value) == expected)),
+                _ => unreachable!("schema and input column type disagree"),
+            }
+        }
+        Expr::Add { lhs, rhs }
+        | Expr::Sub { lhs, rhs }
+        | Expr::Mul { lhs, rhs }
+        | Expr::Div { lhs, rhs } => {
+            let lhs = eval_input_scalar(lhs, input, row, params)?;
+            let rhs = eval_input_scalar(rhs, input, row, params)?;
+            input_arithmetic(expr, lhs, rhs, row)
+        }
+        Expr::Eq { lhs, rhs } | Expr::Ne { lhs, rhs } => {
+            let (lhs_value, rhs_value) = match (lhs.as_ref(), rhs.as_ref()) {
+                (Expr::Enum { variant }, _) => (
+                    input_enum_literal(input, rhs, variant)?,
+                    eval_input_scalar(rhs, input, row, params)?,
+                ),
+                (_, Expr::Enum { variant }) => (
+                    eval_input_scalar(lhs, input, row, params)?,
+                    input_enum_literal(input, lhs, variant)?,
+                ),
+                _ => (
+                    eval_input_scalar(lhs, input, row, params)?,
+                    eval_input_scalar(rhs, input, row, params)?,
+                ),
+            };
+            let equal = match (lhs_value, rhs_value) {
+                (InputScalar::Real(lhs), InputScalar::Real(rhs)) => lhs == rhs,
+                (InputScalar::Real(lhs), InputScalar::Int(rhs)) => lhs == rhs as f64,
+                (InputScalar::Int(lhs), InputScalar::Real(rhs)) => lhs as f64 == rhs,
+                (InputScalar::Int(lhs), InputScalar::Int(rhs)) => lhs == rhs,
+                (InputScalar::Bool(lhs), InputScalar::Bool(rhs)) => lhs == rhs,
+                (InputScalar::Enum(lhs), InputScalar::Enum(rhs)) => lhs == rhs,
+                (InputScalar::Ref(lhs), InputScalar::Ref(rhs)) => lhs == rhs,
+                _ => {
+                    return Err(EvalError::new(
+                        "input equality operands have incompatible types",
+                    ))
+                }
+            };
+            Ok(InputScalar::Bool(if matches!(expr, Expr::Ne { .. }) {
+                !equal
+            } else {
+                equal
+            }))
+        }
+        Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs } => {
+            let lhs = input_number(eval_input_scalar(lhs, input, row, params)?)?;
+            let rhs = input_number(eval_input_scalar(rhs, input, row, params)?)?;
+            let value = match expr {
+                Expr::Lt { .. } => lhs < rhs,
+                Expr::Le { .. } => lhs <= rhs,
+                Expr::Gt { .. } => lhs > rhs,
+                Expr::Ge { .. } => lhs >= rhs,
+                _ => unreachable!(),
+            };
+            Ok(InputScalar::Bool(value))
+        }
+        Expr::And { lhs, rhs } | Expr::Or { lhs, rhs } => {
+            let InputScalar::Bool(lhs) = eval_input_scalar(lhs, input, row, params)? else {
+                return Err(EvalError::new("input boolean lhs is not Bool"));
+            };
+            let InputScalar::Bool(rhs) = eval_input_scalar(rhs, input, row, params)? else {
+                return Err(EvalError::new("input boolean rhs is not Bool"));
+            };
+            Ok(InputScalar::Bool(if matches!(expr, Expr::And { .. }) {
+                lhs && rhs
+            } else {
+                lhs || rhs
+            }))
+        }
+        Expr::Not { expr } => match eval_input_scalar(expr, input, row, params)? {
+            InputScalar::Bool(value) => Ok(InputScalar::Bool(!value)),
+            _ => Err(EvalError::new("input Not operand is not Bool")),
+        },
+        Expr::Enum { .. } => Err(EvalError::new(
+            "bare enum literals are not supported in input aggregates; use EnumIs",
+        )),
+        Expr::Input { .. } | Expr::Agg { .. } => Err(EvalError::new(
+            "nested aggregates are not supported inside input table aggregates",
+        )),
+    }
+}
+
+fn input_enum_literal(
+    input: &InputTable,
+    context: &Expr,
+    variant: &str,
+) -> Result<InputScalar, EvalError> {
+    let Expr::SelfAttr { name } = context else {
+        return Err(EvalError::new(
+            "input enum literal requires a direct Enum attribute context",
+        ));
+    };
+    let declaration = find_attr(&input.schema, name)?;
+    let AttrType::Enum { variants } = &declaration.ty else {
+        return Err(EvalError::new("input enum literal context is not Enum"));
+    };
+    let index = variants
+        .iter()
+        .position(|candidate| candidate == variant)
+        .ok_or_else(|| EvalError::new(format!("unknown enum variant '{variant}'")))?;
+    Ok(InputScalar::Enum(u16::try_from(index).map_err(|_| {
+        EvalError::new("input enum variant index exceeds u16")
+    })?))
+}
+
+fn input_scalar_attr(input: &InputTable, name: &str, row: usize) -> Result<InputScalar, EvalError> {
+    match input
+        .column(name)
+        .ok_or_else(|| EvalError::new(format!("input table has no column '{name}'")))?
+    {
+        ColumnData::Real(values) => values.get(row).copied().map(InputScalar::Real),
+        ColumnData::Int(values) => values.get(row).copied().map(InputScalar::Int),
+        ColumnData::Enum(values) => values.get(row).copied().map(InputScalar::Enum),
+        ColumnData::Ref(values) => values.get(row).copied().map(InputScalar::Ref),
+    }
+    .ok_or_else(|| EvalError::new(format!("input column '{name}' has no row {row}")))
+}
+
+fn input_number(value: InputScalar) -> Result<f64, EvalError> {
+    match value {
+        InputScalar::Real(value) => Ok(value),
+        InputScalar::Int(value) => Ok(value as f64),
+        _ => Err(EvalError::new("input ordered operand is not numeric")),
+    }
+}
+
+fn input_arithmetic(
+    expr: &Expr,
+    lhs: InputScalar,
+    rhs: InputScalar,
+    row: usize,
+) -> Result<InputScalar, EvalError> {
+    if matches!(expr, Expr::Div { .. })
+        || matches!(lhs, InputScalar::Real(_))
+        || matches!(rhs, InputScalar::Real(_))
+    {
+        let lhs = input_number(lhs)?;
+        let rhs = input_number(rhs)?;
+        return Ok(InputScalar::Real(match expr {
+            Expr::Add { .. } => lhs + rhs,
+            Expr::Sub { .. } => lhs - rhs,
+            Expr::Mul { .. } => lhs * rhs,
+            Expr::Div { .. } => lhs / rhs,
+            _ => unreachable!(),
+        }));
+    }
+    let (InputScalar::Int(lhs), InputScalar::Int(rhs)) = (lhs, rhs) else {
+        return Err(EvalError::new("input arithmetic operands are not numeric"));
+    };
+    let value = match expr {
+        Expr::Add { .. } => lhs.checked_add(rhs),
+        Expr::Sub { .. } => lhs.checked_sub(rhs),
+        Expr::Mul { .. } => lhs.checked_mul(rhs),
+        _ => unreachable!(),
+    }
+    .ok_or_else(|| EvalError::new(format!("input integer arithmetic overflow at row {row}")))?;
+    Ok(InputScalar::Int(value))
 }
 
 fn eval_self_attr(
@@ -1499,14 +1760,6 @@ fn require_type(actual: &RuntimeType, expected: &RuntimeType) -> Result<(), Eval
     }
 }
 
-fn zero_column(result_type: &RuntimeType, row_count: usize) -> Result<InternalColumn, EvalError> {
-    match result_type {
-        RuntimeType::Real => Ok(InternalColumn::Real(vec![0.0; row_count])),
-        RuntimeType::Int => Ok(InternalColumn::Int(vec![0; row_count])),
-        _ => Err(EvalError::new("empty input aggregate is not numeric")),
-    }
-}
-
 fn find_attr<'a>(attrs: &'a [Attr], name: &str) -> Result<&'a Attr, EvalError> {
     attrs
         .iter()
@@ -1519,4 +1772,54 @@ fn parameter_value_matches(parameter_type: ParamType, value: &ParamValue) -> boo
         (parameter_type, value),
         (ParamType::Real, ParamValue::Real { .. }) | (ParamType::Int, ParamValue::Int { .. })
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sembla_ir::{validate, Box as ModelBox, Model};
+
+    #[test]
+    fn input_enum_equality_accepts_literal_on_the_left() {
+        let model = validate(Model {
+            name: "input-enum".to_owned(),
+            dt: 1.0,
+            params: Vec::new(),
+            boxes: vec![ModelBox {
+                name: "box".to_owned(),
+                tables: Vec::new(),
+                transitions: Vec::new(),
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+            }],
+            wires: Vec::new(),
+        })
+        .unwrap();
+        let params = ParamEnv::defaults(&model);
+        let input = InputTable {
+            box_name: "box".to_owned(),
+            port_name: "events".to_owned(),
+            schema: vec![Attr {
+                name: "status".to_owned(),
+                ty: AttrType::Enum {
+                    variants: vec!["Off".to_owned(), "On".to_owned()],
+                },
+            }],
+            row_count: 1,
+            columns: vec![ColumnData::Enum(vec![1])],
+        };
+        let expression = Expr::Eq {
+            lhs: Box::new(Expr::Enum {
+                variant: "On".to_owned(),
+            }),
+            rhs: Box::new(Expr::SelfAttr {
+                name: "status".to_owned(),
+            }),
+        };
+
+        assert!(matches!(
+            eval_input_scalar(&expression, &input, 0, &params),
+            Ok(InputScalar::Bool(true))
+        ));
+    }
 }

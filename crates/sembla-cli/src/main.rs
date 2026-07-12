@@ -126,8 +126,13 @@ fn run_file(path: &str, options: RunOptions) -> i32 {
         }
     };
     for tick in report.ticks {
-        for (rule_id, fired) in tick.fired {
-            println!("tick={} rule_id={} fired={}", tick.tick, rule_id, fired);
+        for (box_name, rules) in tick.fired_per_box {
+            for (rule_id, fired) in rules {
+                println!(
+                    "tick={} box={} rule_id={} fired={}",
+                    tick.tick, box_name, rule_id, fired
+                );
+            }
         }
     }
     0
@@ -135,17 +140,23 @@ fn run_file(path: &str, options: RunOptions) -> i32 {
 
 fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -> Vec<TableInit> {
     let mut initial = Vec::new();
+    let composed = model.model().boxes.len() > 1 || !model.model().wires.is_empty();
     for model_box in &model.model().boxes {
         for table in &model_box.tables {
+            let row_count = if composed && table.size_hint != 0 {
+                usize::try_from(table.size_hint).expect("table size_hint exceeds usize")
+            } else {
+                population
+            };
             let columns = table
                 .attrs
                 .iter()
                 .map(|attr| {
                     let data = match attr.ty {
-                        AttrType::Real => ColumnData::Real(vec![0.0; population]),
-                        AttrType::Int => ColumnData::Int(vec![0; population]),
-                        AttrType::Enum { .. } => ColumnData::Enum(vec![0; population]),
-                        AttrType::Ref { .. } => ColumnData::Ref(vec![0; population]),
+                        AttrType::Real => ColumnData::Real(vec![0.0; row_count]),
+                        AttrType::Int => ColumnData::Int(vec![0; row_count]),
+                        AttrType::Enum { .. } => ColumnData::Enum(vec![0; row_count]),
+                        AttrType::Ref { .. } => ColumnData::Ref(vec![0; row_count]),
                     };
                     ColumnInit::new(&attr.name, data)
                 })
@@ -153,7 +164,7 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
             initial.push(TableInit::new(
                 &model_box.name,
                 &table.name,
-                population,
+                row_count,
                 columns,
             ));
         }

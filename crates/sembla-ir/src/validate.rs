@@ -137,6 +137,18 @@ fn validate_model(model: &Model) -> Result<(), ValidationError> {
         validate_box(model, model_box, index)?;
     }
     for (index, wire) in model.wires.iter().enumerate() {
+        if model.wires[..index]
+            .iter()
+            .any(|previous| previous.to.r#box == wire.to.r#box && previous.to.port == wire.to.port)
+        {
+            return Err(error(
+                format!("$.wires[{index}].to"),
+                format!(
+                    "multiple wires target input '{}.{}'",
+                    wire.to.r#box, wire.to.port
+                ),
+            ));
+        }
         validate_wire(model, wire, index)?;
     }
 
@@ -556,6 +568,38 @@ fn validate_wire(model: &Model, wire: &Wire, index: usize) -> Result<(), Validat
     Ok(())
 }
 
+fn validate_input_row_expr(expr: &Expr, path: &str) -> Result<(), ValidationError> {
+    match expr {
+        Expr::Input { .. } | Expr::Agg { .. } => Err(error(
+            path,
+            "nested aggregates are not supported inside input table aggregates",
+        )),
+        Expr::Add { lhs, rhs }
+        | Expr::Sub { lhs, rhs }
+        | Expr::Mul { lhs, rhs }
+        | Expr::Div { lhs, rhs }
+        | Expr::Eq { lhs, rhs }
+        | Expr::Ne { lhs, rhs }
+        | Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs }
+        | Expr::And { lhs, rhs }
+        | Expr::Or { lhs, rhs } => {
+            validate_input_row_expr(lhs, &format!("{path}.lhs"))?;
+            validate_input_row_expr(rhs, &format!("{path}.rhs"))
+        }
+        Expr::Not { expr } => validate_input_row_expr(expr, &format!("{path}.expr")),
+        Expr::Real { .. }
+        | Expr::Int { .. }
+        | Expr::Bool { .. }
+        | Expr::Enum { .. }
+        | Expr::Param { .. }
+        | Expr::SelfAttr { .. }
+        | Expr::EnumIs { .. } => Ok(()),
+    }
+}
+
 fn infer_expr(
     expr: &Expr,
     model: &Model,
@@ -710,6 +754,7 @@ fn infer_expr(
                     )
                 })?;
             if let Some(filter) = &agg.filter {
+                validate_input_row_expr(filter, &format!("{path}.agg.filter"))?;
                 let filter_type = infer_expr(
                     filter,
                     model,
@@ -723,6 +768,9 @@ fn infer_expr(
                     &ValueType::Bool,
                     &format!("{path}.agg.filter"),
                 )?;
+            }
+            if let AggOp::Sum { value } = &agg.op {
+                validate_input_row_expr(value, &format!("{path}.agg.op.value"))?;
             }
             infer_agg_op(
                 &agg.op,

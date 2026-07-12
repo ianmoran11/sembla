@@ -1,6 +1,7 @@
 use sembla_ir::{
-    validate, AggJoin, AggOp, Attr, AttrType, Box as ModelBox, ClaimOrdering, Effect, Expr, Model,
-    ResourceClaim, Table, Transition,
+    validate, AggJoin, AggOp, Aggregate, Attr, AttrType, Box as ModelBox, ClaimOrdering, Effect,
+    Expr, Model, OutputBuilder, OutputDecl, OutputField, PortDecl, ResourceClaim, Table,
+    Transition, Wire, WireEndpoint,
 };
 
 fn transition(name: &str) -> Transition {
@@ -176,6 +177,117 @@ fn ref_write_without_a_matching_claim_is_rejected() {
     assert_eq!(error.path, "$.boxes[0].transitions[0].effects[0].value");
     assert!(error.message.contains("Ref attribute 'employer'"));
     assert!(error.message.contains("matching resource claim"));
+}
+
+#[test]
+fn duplicate_wire_destinations_are_rejected_at_the_second_wire() {
+    let schema = vec![Attr {
+        name: "count".into(),
+        ty: AttrType::Int,
+    }];
+    let source = |name: &str| ModelBox {
+        name: name.into(),
+        tables: vec![Table {
+            name: "Person".into(),
+            size_hint: 1,
+            attrs: vec![],
+        }],
+        transitions: vec![],
+        inputs: vec![],
+        outputs: vec![OutputDecl {
+            name: "out".into(),
+            schema: schema.clone(),
+            builder: OutputBuilder::PerTable {
+                table: "Person".into(),
+                fields: vec![OutputField {
+                    name: "count".into(),
+                    op: AggOp::Count,
+                    filter: None,
+                }],
+            },
+        }],
+    };
+    let destination = ModelBox {
+        name: "destination".into(),
+        tables: vec![Table {
+            name: "Person".into(),
+            size_hint: 1,
+            attrs: vec![],
+        }],
+        transitions: vec![],
+        inputs: vec![PortDecl {
+            name: "in".into(),
+            schema: schema.clone(),
+        }],
+        outputs: vec![],
+    };
+    let endpoint = WireEndpoint {
+        r#box: "destination".into(),
+        port: "in".into(),
+    };
+    let model = Model {
+        name: "duplicate-wire".into(),
+        dt: 1.0,
+        params: vec![],
+        boxes: vec![source("first"), source("second"), destination],
+        wires: vec![
+            Wire {
+                from: WireEndpoint {
+                    r#box: "first".into(),
+                    port: "out".into(),
+                },
+                to: endpoint.clone(),
+            },
+            Wire {
+                from: WireEndpoint {
+                    r#box: "second".into(),
+                    port: "out".into(),
+                },
+                to: endpoint,
+            },
+        ],
+    };
+
+    let error = validate(model).unwrap_err();
+    assert_eq!(error.path, "$.wires[1].to");
+    assert!(error.message.contains("multiple wires target"));
+}
+
+#[test]
+fn nested_aggregate_in_input_row_expression_is_rejected() {
+    let mut model_box = simple_box(
+        "box",
+        vec![Transition {
+            guard: Expr::Input {
+                port: "events".into(),
+                agg: Aggregate {
+                    op: AggOp::Count,
+                    filter: Some(std::boxed::Box::new(Expr::Input {
+                        port: "events".into(),
+                        agg: Aggregate {
+                            op: AggOp::Count,
+                            filter: None,
+                        },
+                    })),
+                },
+            },
+            ..transition("nested")
+        }],
+    );
+    model_box.inputs.push(PortDecl {
+        name: "events".into(),
+        schema: vec![],
+    });
+    let error = validate(Model {
+        name: "nested-input".into(),
+        dt: 1.0,
+        params: vec![],
+        boxes: vec![model_box],
+        wires: vec![],
+    })
+    .unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].transitions[0].guard.agg.filter");
+    assert!(error.message.contains("nested aggregates"));
 }
 
 #[test]

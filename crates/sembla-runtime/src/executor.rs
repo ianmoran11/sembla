@@ -1,22 +1,25 @@
-//! Deterministic, snapshot-isolated single-box tick execution.
+//! Deterministic, snapshot-isolated synchronous box composition.
 
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
 
-use sembla_ir::{AttrType, ClaimOrdering, Effect, Expr, ValidatedModel};
+use sembla_ir::{AggOp, AttrType, ClaimOrdering, Effect, Expr, OutputBuilder, ValidatedModel};
 
 use crate::eval::{
     eval_column, eval_typed_ref_column, AggCache, EvalError, EvalTable, ParamEnv, ValueColumn,
 };
 use crate::rng::exp_f64;
-use crate::state::{StateError, StateStore};
+use crate::state::{ColumnData, InputTable, Snapshot, StateError, StateStore};
 
 /// Observable result of one committed tick.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickReport {
     pub tick: u32,
+    /// Model-global rule counts, retained for single-box API compatibility.
     pub fired: Vec<(u32, usize)>,
+    /// Counts grouped in box declaration order for composed-model reporting.
+    pub fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
     pub deferred_per_resource_table: Vec<(String, usize)>,
 }
 
@@ -163,6 +166,7 @@ enum PendingValue {
 
 #[derive(Clone, Debug)]
 struct PendingWrite {
+    box_index: usize,
     table_index: usize,
     attr_index: usize,
     row: usize,
@@ -173,6 +177,13 @@ struct PendingWrite {
 
 struct TickOutcome {
     report: TickReport,
+    fired_per_resource_table: Vec<(String, usize)>,
+}
+
+struct BoxOutcome {
+    pending: Vec<PendingWrite>,
+    fired: Vec<(u32, usize)>,
+    deferred: Vec<usize>,
     fired_per_resource_table: Vec<usize>,
 }
 
@@ -201,29 +212,20 @@ pub fn run(
     seed: u64,
     n_ticks: u32,
 ) -> Result<RunReport, TickError> {
-    ensure_single_box(model)?;
     let mut ticks = Vec::with_capacity(n_ticks as usize);
     let mut warnings = Vec::new();
     for tick in 0..n_ticks {
         let outcome = execute_tick(model, state, params, seed, tick)?;
-        for (table_index, (_, deferred_count)) in outcome
-            .report
-            .deferred_per_resource_table
-            .iter()
-            .enumerate()
-        {
-            // The report omits zero entries, so resolve by name rather than by vector position.
-            let table_name = &outcome.report.deferred_per_resource_table[table_index].0;
-            let declaration_index = model.model().boxes[0]
-                .tables
+        for (table, deferred_count) in &outcome.report.deferred_per_resource_table {
+            let fired_count = outcome
+                .fired_per_resource_table
                 .iter()
-                .position(|table| table.name == *table_name)
-                .expect("reported table came from the validated model");
-            let fired_count = outcome.fired_per_resource_table[declaration_index];
+                .find(|(name, _)| name == table)
+                .map_or(0, |(_, count)| *count);
             if exceeds_saturation_threshold(*deferred_count, fired_count) {
                 let warning = SaturationWarning {
                     tick,
-                    table: table_name.clone(),
+                    table: table.clone(),
                     deferred_count: *deferred_count,
                     fired_count,
                 };
@@ -243,15 +245,6 @@ fn exceeds_saturation_threshold(deferred: usize, fired: usize) -> bool {
     (deferred as u128) * 10 > fired as u128
 }
 
-fn ensure_single_box(model: &ValidatedModel) -> Result<(), TickError> {
-    let found = model.model().boxes.len();
-    if found == 1 {
-        Ok(())
-    } else {
-        Err(TickError::UnsupportedBoxCount { found })
-    }
-}
-
 fn execute_tick(
     model: &ValidatedModel,
     state: &mut StateStore,
@@ -259,13 +252,124 @@ fn execute_tick(
     seed: u64,
     tick: u32,
 ) -> Result<TickOutcome, TickError> {
-    ensure_single_box(model)?;
-    let model_box = &model.model().boxes[0];
     let snapshot = state.snapshot();
-    let mut cache = AggCache::new(model, &snapshot, params);
-    let mut candidates = Vec::new();
+    let mut box_outcomes = Vec::with_capacity(model.model().boxes.len());
+    for box_index in 0..model.model().boxes.len() {
+        box_outcomes.push(stage_box(model, box_index, &snapshot, params, seed, tick)?);
+    }
 
-    for validated in model.transitions() {
+    let pending: Vec<_> = box_outcomes
+        .iter_mut()
+        .flat_map(|outcome| std::mem::take(&mut outcome.pending))
+        .collect();
+    detect_double_writes(&pending, model)?;
+    let apply_result = {
+        let mut writes = state.write_buffer()?;
+        pending.iter().try_for_each(|write| {
+            let model_box = &model.model().boxes[write.box_index];
+            let table = &model_box.tables[write.table_index];
+            let attr = &table.attrs[write.attr_index];
+            match &write.value {
+                PendingValue::Real(value) => {
+                    writes.set_real(&model_box.name, &table.name, &attr.name, write.row, *value)
+                }
+                PendingValue::Int(value) => {
+                    writes.set_int(&model_box.name, &table.name, &attr.name, write.row, *value)
+                }
+                PendingValue::Enum(value) => {
+                    writes.set_enum(&model_box.name, &table.name, &attr.name, write.row, *value)
+                }
+                PendingValue::Ref(value) => {
+                    writes.set_ref(&model_box.name, &table.name, &attr.name, write.row, *value)
+                }
+            }
+        })
+    };
+    if let Err(error) = apply_result {
+        state.discard_writes();
+        return Err(error.into());
+    }
+    // Moore-machine outputs observe the prospective new state, but output
+    // construction is fallible. Build every delivered table before commit so
+    // an overflow or evaluation error leaves both old state and old inputs
+    // unchanged.
+    let next_inputs = match state
+        .prepared_snapshot()
+        .map_err(TickError::from)
+        .and_then(|prepared| build_next_inputs(model, &prepared, params))
+    {
+        Ok(inputs) => inputs,
+        Err(error) => {
+            state.discard_writes();
+            return Err(error);
+        }
+    };
+    if let Err(error) = state.commit() {
+        state.discard_writes();
+        return Err(error.into());
+    }
+    state.replace_inputs(next_inputs);
+
+    let mut fired = model
+        .transitions()
+        .iter()
+        .map(|transition| (transition.rule_id, 0))
+        .collect::<Vec<_>>();
+    let mut fired_per_box = Vec::with_capacity(box_outcomes.len());
+    let mut deferred_per_resource_table = Vec::new();
+    let mut fired_per_resource_table = Vec::new();
+    let qualify = model.model().boxes.len() > 1;
+    for (box_index, outcome) in box_outcomes.into_iter().enumerate() {
+        let model_box = &model.model().boxes[box_index];
+        for (rule_id, count) in &outcome.fired {
+            fired[*rule_id as usize].1 = *count;
+        }
+        fired_per_box.push((model_box.name.clone(), outcome.fired));
+        for (table_index, count) in outcome.deferred.into_iter().enumerate() {
+            let name = report_table_name(model_box, table_index, qualify);
+            if count != 0 {
+                deferred_per_resource_table.push((name.clone(), count));
+            }
+            fired_per_resource_table.push((name, outcome.fired_per_resource_table[table_index]));
+        }
+    }
+
+    Ok(TickOutcome {
+        report: TickReport {
+            tick,
+            fired,
+            fired_per_box,
+            deferred_per_resource_table,
+        },
+        fired_per_resource_table,
+    })
+}
+
+fn report_table_name(model_box: &sembla_ir::Box, table_index: usize, qualify: bool) -> String {
+    if qualify {
+        format!("{}.{}", model_box.name, model_box.tables[table_index].name)
+    } else {
+        model_box.tables[table_index].name.clone()
+    }
+}
+
+fn stage_box(
+    model: &ValidatedModel,
+    box_index: usize,
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+    seed: u64,
+    tick: u32,
+) -> Result<BoxOutcome, TickError> {
+    let model_box = &model.model().boxes[box_index];
+    let transitions: Vec<_> = model
+        .transitions()
+        .iter()
+        .filter(|transition| transition.box_index == box_index)
+        .collect();
+    let mut cache = AggCache::new(model, snapshot, params);
+    let mut candidates = Vec::new();
+    for validated in &transitions {
         let transition = &model_box.transitions[validated.transition_index];
         let table_index = model_box
             .tables
@@ -273,19 +377,18 @@ fn execute_tick(
             .position(|table| table.name == transition.table)
             .expect("validated transition table disappeared");
         let table = EvalTable::new(model, &model_box.name, &transition.table)?;
-        let guards = match eval_column(&transition.guard, table, &snapshot, params, &mut cache)? {
+        let guards = match eval_column(&transition.guard, table, snapshot, params, &mut cache)? {
             ValueColumn::Bool(values) => values,
             other => return Err(runtime_type("transition guard", &other)),
         };
-        let hazards = match eval_column(&transition.hazard, table, &snapshot, params, &mut cache)? {
+        let hazards = match eval_column(&transition.hazard, table, snapshot, params, &mut cache)? {
             ValueColumn::Real(values) => values,
             other => return Err(runtime_type("transition hazard", &other)),
         };
-
         let mut claim_columns = Vec::with_capacity(transition.contests.len());
         for claim in &transition.contests {
             let resources =
-                eval_typed_ref_column(&claim.resource, table, &snapshot, params, &mut cache)?;
+                eval_typed_ref_column(&claim.resource, table, snapshot, params, &mut cache)?;
             let resource_table_index = model_box
                 .tables
                 .iter()
@@ -294,12 +397,11 @@ fn execute_tick(
             let ordering = match &claim.ordering {
                 ClaimOrdering::RaceTime => None,
                 ClaimOrdering::Key { expr } => {
-                    Some(eval_column(expr, table, &snapshot, params, &mut cache)?)
+                    Some(eval_column(expr, table, snapshot, params, &mut cache)?)
                 }
             };
             claim_columns.push((resource_table_index, resources.values, ordering, claim));
         }
-
         for (row, (guard, lambda)) in guards.into_iter().zip(hazards).enumerate() {
             if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
                 continue;
@@ -336,19 +438,16 @@ fn execute_tick(
             });
         }
     }
-
     let resolution = resolve_claims(&candidates, model_box.tables.len(), model_box)?;
-    let fires = resolution.fires;
-    let deferred = resolution.deferred;
-    let fired_per_resource_table = resolution.fired_per_resource_table;
     let mut pending = Vec::new();
-
-    for validated in model.transitions() {
+    for validated in &transitions {
         let transition = &model_box.transitions[validated.transition_index];
         let winner_indices: Vec<usize> = candidates
             .iter()
             .enumerate()
-            .filter(|(index, candidate)| candidate.rule_id == validated.rule_id && fires[*index])
+            .filter(|(index, candidate)| {
+                candidate.rule_id == validated.rule_id && resolution.fires[*index]
+            })
             .map(|(index, _)| index)
             .collect();
         if winner_indices.is_empty() {
@@ -368,12 +467,12 @@ fn execute_tick(
             let destination = &schema.attrs[attr_index];
             let value = match &destination.ty {
                 AttrType::Ref { .. } => PendingColumn::Ref(
-                    eval_typed_ref_column(value, table, &snapshot, params, &mut cache)?.values,
+                    eval_typed_ref_column(value, table, snapshot, params, &mut cache)?.values,
                 ),
                 _ => PendingColumn::Value(eval_column(
                     value,
                     table.with_expected_attr(attr)?,
-                    &snapshot,
+                    snapshot,
                     params,
                     &mut cache,
                 )?),
@@ -384,6 +483,7 @@ fn execute_tick(
             let candidate = &candidates[candidate_index];
             for (attr_index, values) in &effect_columns {
                 pending.push(PendingWrite {
+                    box_index,
                     table_index,
                     attr_index: *attr_index,
                     row: candidate.row,
@@ -394,63 +494,128 @@ fn execute_tick(
             }
         }
     }
-
-    detect_double_writes(&pending, model_box)?;
-    drop(cache);
-
-    let apply_result = {
-        let mut writes = state.write_buffer()?;
-        pending.iter().try_for_each(|write| {
-            let table = &model_box.tables[write.table_index];
-            let attr = &table.attrs[write.attr_index];
-            match &write.value {
-                PendingValue::Real(value) => {
-                    writes.set_real(&model_box.name, &table.name, &attr.name, write.row, *value)
-                }
-                PendingValue::Int(value) => {
-                    writes.set_int(&model_box.name, &table.name, &attr.name, write.row, *value)
-                }
-                PendingValue::Enum(value) => {
-                    writes.set_enum(&model_box.name, &table.name, &attr.name, write.row, *value)
-                }
-                PendingValue::Ref(value) => {
-                    writes.set_ref(&model_box.name, &table.name, &attr.name, write.row, *value)
-                }
-            }
-        })
-    };
-    if let Err(error) = apply_result {
-        state.discard_writes();
-        return Err(error.into());
-    }
-    if let Err(error) = state.commit() {
-        state.discard_writes();
-        return Err(error.into());
-    }
-
-    let mut fired = vec![(0, 0); model.transitions().len()];
-    for validated in model.transitions() {
-        fired[validated.rule_id as usize].0 = validated.rule_id;
-    }
-    for (candidate, fire) in candidates.iter().zip(&fires) {
+    let mut fired = transitions
+        .iter()
+        .map(|transition| (transition.rule_id, 0))
+        .collect::<Vec<_>>();
+    for (candidate, fire) in candidates.iter().zip(&resolution.fires) {
         if *fire {
-            fired[candidate.rule_id as usize].1 += 1;
+            let entry = fired
+                .iter_mut()
+                .find(|(rule_id, _)| *rule_id == candidate.rule_id)
+                .expect("candidate has validated transition");
+            entry.1 += 1;
         }
     }
-    let deferred_per_resource_table = deferred
-        .into_iter()
-        .enumerate()
-        .filter(|(_, count)| *count != 0)
-        .map(|(table_index, count)| (model_box.tables[table_index].name.clone(), count))
-        .collect();
+    Ok(BoxOutcome {
+        pending,
+        fired,
+        deferred: resolution.deferred,
+        fired_per_resource_table: resolution.fired_per_resource_table,
+    })
+}
 
-    Ok(TickOutcome {
-        report: TickReport {
-            tick,
-            fired,
-            deferred_per_resource_table,
-        },
-        fired_per_resource_table,
+fn build_next_inputs(
+    model: &ValidatedModel,
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+) -> Result<Vec<InputTable>, TickError> {
+    let mut inputs = model
+        .model()
+        .boxes
+        .iter()
+        .flat_map(|model_box| {
+            model_box
+                .inputs
+                .iter()
+                .map(|input| InputTable::empty(&model_box.name, &input.name, &input.schema))
+        })
+        .collect::<Vec<_>>();
+    for wire in &model.model().wires {
+        let source_box = model
+            .model()
+            .boxes
+            .iter()
+            .find(|model_box| model_box.name == wire.from.r#box)
+            .expect("validated wire source box disappeared");
+        let output = source_box
+            .outputs
+            .iter()
+            .find(|output| output.name == wire.from.port)
+            .expect("validated wire source port disappeared");
+        let built = build_output(model, snapshot, params, source_box, output)?;
+        let destination = inputs
+            .iter_mut()
+            .find(|input| input.box_name == wire.to.r#box && input.port_name == wire.to.port)
+            .expect("validated wire destination disappeared");
+        destination.row_count = built.row_count;
+        destination.columns = built.columns;
+    }
+    Ok(inputs)
+}
+
+fn build_output(
+    model: &ValidatedModel,
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+    model_box: &sembla_ir::Box,
+    output: &sembla_ir::OutputDecl,
+) -> Result<InputTable, TickError> {
+    let OutputBuilder::PerTable { table, fields } = &output.builder;
+    let eval_table = EvalTable::new(model, &model_box.name, table)?;
+    let rows = snapshot.row_count(&model_box.name, table)?;
+    let mut cache = AggCache::new(model, snapshot, params);
+    let mut columns = Vec::with_capacity(fields.len());
+    for field in fields {
+        let selected = match &field.filter {
+            Some(filter) => match eval_column(filter, eval_table, snapshot, params, &mut cache)? {
+                ValueColumn::Bool(values) => values,
+                other => return Err(runtime_type("output filter", &other)),
+            },
+            None => vec![true; rows],
+        };
+        let column = match &field.op {
+            AggOp::Count => {
+                let count = selected.iter().filter(|value| **value).count();
+                ColumnData::Int(vec![i64::try_from(count).map_err(|_| {
+                    TickError::Evaluation("output count exceeds i64".to_owned())
+                })?])
+            }
+            AggOp::Sum { value } => {
+                match eval_column(value, eval_table, snapshot, params, &mut cache)? {
+                    ValueColumn::Real(values) => ColumnData::Real(vec![values
+                        .into_iter()
+                        .zip(&selected)
+                        .filter(|(_, selected)| **selected)
+                        .map(|(value, _)| value)
+                        .fold(0.0, |sum, value| sum + value)]),
+                    ValueColumn::Int(values) => {
+                        let mut sum = 0_i64;
+                        for (row, (value, selected)) in
+                            values.into_iter().zip(&selected).enumerate()
+                        {
+                            if *selected {
+                                sum = sum.checked_add(value).ok_or_else(|| {
+                                    TickError::Evaluation(format!(
+                                        "output integer sum overflow at row {row}"
+                                    ))
+                                })?;
+                            }
+                        }
+                        ColumnData::Int(vec![sum])
+                    }
+                    other => return Err(runtime_type("output Sum", &other)),
+                }
+            }
+        };
+        columns.push(column);
+    }
+    Ok(InputTable {
+        box_name: model_box.name.clone(),
+        port_name: output.name.clone(),
+        schema: output.schema.clone(),
+        row_count: 1,
+        columns,
     })
 }
 
@@ -674,21 +839,32 @@ impl PendingColumn {
     }
 }
 
-fn detect_double_writes(
-    pending: &[PendingWrite],
-    model_box: &sembla_ir::Box,
-) -> Result<(), TickError> {
+fn detect_double_writes(pending: &[PendingWrite], model: &ValidatedModel) -> Result<(), TickError> {
     let mut order: Vec<usize> = (0..pending.len()).collect();
     order.sort_by_key(|index| {
         let write = &pending[*index];
-        (write.table_index, write.attr_index, write.row)
+        (
+            write.box_index,
+            write.table_index,
+            write.attr_index,
+            write.row,
+        )
     });
     for pair in order.windows(2) {
         let first = &pending[pair[0]];
         let second = &pending[pair[1]];
-        if (first.table_index, first.attr_index, first.row)
-            == (second.table_index, second.attr_index, second.row)
-        {
+        if (
+            first.box_index,
+            first.table_index,
+            first.attr_index,
+            first.row,
+        ) == (
+            second.box_index,
+            second.table_index,
+            second.attr_index,
+            second.row,
+        ) {
+            let model_box = &model.model().boxes[first.box_index];
             return Err(TickError::DoubleWrite {
                 box_name: model_box.name.clone().into_boxed_str(),
                 table: model_box.tables[first.table_index]

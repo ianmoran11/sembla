@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt;
 
-use sembla_ir::{AttrType, ValidatedModel};
+use sembla_ir::{Attr, AttrType, ValidatedModel};
 use sha2::{Digest, Sha256};
 
 /// Initial values for one typed attribute column.
@@ -153,6 +153,47 @@ impl ColumnState {
     }
 }
 
+/// One owned table delivered to a box input port for the current tick.
+///
+/// Values are copied when wires are delivered; no column aliases model state or
+/// another port.
+#[derive(Clone, Debug, PartialEq)]
+pub struct InputTable {
+    pub box_name: String,
+    pub port_name: String,
+    pub schema: Vec<Attr>,
+    pub row_count: usize,
+    pub columns: Vec<ColumnData>,
+}
+
+impl InputTable {
+    pub(crate) fn empty(box_name: &str, port_name: &str, schema: &[Attr]) -> Self {
+        Self {
+            box_name: box_name.to_owned(),
+            port_name: port_name.to_owned(),
+            schema: schema.to_vec(),
+            row_count: 0,
+            columns: schema.iter().map(|attr| empty_column(&attr.ty)).collect(),
+        }
+    }
+
+    pub fn column(&self, name: &str) -> Option<&ColumnData> {
+        self.schema
+            .iter()
+            .position(|attr| attr.name == name)
+            .and_then(|index| self.columns.get(index))
+    }
+}
+
+fn empty_column(ty: &AttrType) -> ColumnData {
+    match ty {
+        AttrType::Real => ColumnData::Real(Vec::new()),
+        AttrType::Int => ColumnData::Int(Vec::new()),
+        AttrType::Enum { .. } => ColumnData::Enum(Vec::new()),
+        AttrType::Ref { .. } => ColumnData::Ref(Vec::new()),
+    }
+}
+
 /// A fixed-population, double-buffered state store.
 ///
 /// Tables are retained in box-major IR declaration order and columns in
@@ -163,6 +204,7 @@ impl ColumnState {
 pub struct StateStore {
     current: StateData,
     next: StateData,
+    inputs: Vec<InputTable>,
     write_prepared: bool,
 }
 
@@ -211,9 +253,21 @@ impl StateStore {
         }
 
         let current = StateData { tables };
+        let inputs = model
+            .model()
+            .boxes
+            .iter()
+            .flat_map(|model_box| {
+                model_box
+                    .inputs
+                    .iter()
+                    .map(|input| InputTable::empty(&model_box.name, &input.name, &input.schema))
+            })
+            .collect();
         Ok(Self {
             next: current.clone(),
             current,
+            inputs,
             write_prepared: false,
         })
     }
@@ -222,6 +276,7 @@ impl StateStore {
     pub fn snapshot(&self) -> Snapshot<'_> {
         Snapshot {
             state: &self.current,
+            inputs: &self.inputs,
         }
     }
 
@@ -234,6 +289,7 @@ impl StateStore {
         Ok((
             Snapshot {
                 state: &self.current,
+                inputs: &self.inputs,
             },
             WriteBuffer {
                 state: &mut self.next,
@@ -249,6 +305,22 @@ impl StateStore {
         })
     }
 
+    /// Returns a read-only view of the fully prepared prospective state.
+    ///
+    /// Executors use this to build fallible Moore-machine outputs before making
+    /// either state writes or newly delivered inputs observable.
+    pub(crate) fn prepared_snapshot(&self) -> Result<Snapshot<'_>, StateError> {
+        if !self.write_prepared {
+            return Err(StateError::new(
+                "cannot snapshot prepared state: no write buffer has been prepared",
+            ));
+        }
+        Ok(Snapshot {
+            state: &self.next,
+            inputs: &self.inputs,
+        })
+    }
+
     /// Makes the prepared write buffer the next committed snapshot.
     pub fn commit(&mut self) -> Result<(), StateError> {
         if !self.write_prepared {
@@ -261,9 +333,13 @@ impl StateStore {
         Ok(())
     }
 
-    /// Returns the canonical hash of the currently committed state.
+    /// Returns the canonical hash of committed state and in-flight input tables.
     pub fn state_hash(&self) -> [u8; 32] {
         self.snapshot().state_hash()
+    }
+
+    pub(crate) fn replace_inputs(&mut self, inputs: Vec<InputTable>) {
+        self.inputs = inputs;
     }
 
     fn prepare_next(&mut self) -> Result<(), StateError> {
@@ -287,9 +363,19 @@ impl StateStore {
 #[derive(Clone, Copy, Debug)]
 pub struct Snapshot<'a> {
     state: &'a StateData,
+    inputs: &'a [InputTable],
 }
 
 impl Snapshot<'_> {
+    /// Returns the table delivered to `box_name.port_name` for this tick.
+    /// Every declared input exists; all have zero rows at tick 0.
+    pub fn input_table(&self, box_name: &str, port_name: &str) -> Result<&InputTable, StateError> {
+        self.inputs
+            .iter()
+            .find(|table| table.box_name == box_name && table.port_name == port_name)
+            .ok_or_else(|| StateError::new(format!("unknown input port '{box_name}.{port_name}'")))
+    }
+
     pub fn row_count(&self, box_name: &str, table_name: &str) -> Result<usize, StateError> {
         Ok(find_table(self.state, box_name, table_name)?.row_count)
     }
@@ -352,7 +438,7 @@ impl Snapshot<'_> {
 
     /// Computes SHA-256 over the canonical state byte layout.
     ///
-    /// The frozen serialization is, in order:
+    /// Models without input ports retain PRD 0004's frozen serialization, in order:
     ///
     /// 1. the domain bytes `SEMBLA_STATE_V1\0`;
     /// 2. the table count as `u64` little-endian;
@@ -371,53 +457,48 @@ impl Snapshot<'_> {
     /// Names are unnormalized UTF-8. Lengths, counts, names, type tags, and box
     /// qualification make the byte stream unambiguous. Pending same-tick writes
     /// are excluded because a snapshot always refers to committed old state.
+    ///
+    /// Composition uses domain `SEMBLA_STATE_V2\0`, followed by the same
+    /// box-major state encoding and then input tables in box/port declaration
+    /// order. Each input encodes its box and port names, row and column counts,
+    /// then named typed columns in schema order. Zero-row tick-0 inputs are
+    /// therefore explicit and in-flight wire values affect the digest.
     pub fn state_hash(&self) -> [u8; 32] {
         let mut hash = Sha256::new();
-        hash.update(b"SEMBLA_STATE_V1\0");
-        update_u64(&mut hash, self.state.tables.len());
-
-        for table in &self.state.tables {
-            update_string(&mut hash, &table.box_name);
-            update_string(&mut hash, &table.name);
-            update_u64(&mut hash, table.row_count);
-            update_u64(&mut hash, table.columns.len());
-
-            for column in &table.columns {
-                update_string(&mut hash, column.name());
-                match column {
-                    ColumnState::Real { values, .. } => {
-                        hash.update([0]);
-                        update_u64(&mut hash, values.len());
-                        for value in values {
-                            hash.update(value.to_bits().to_le_bytes());
-                        }
-                    }
-                    ColumnState::Int { values, .. } => {
-                        hash.update([1]);
-                        update_u64(&mut hash, values.len());
-                        for value in values {
-                            hash.update(value.to_le_bytes());
-                        }
-                    }
-                    ColumnState::Enum { values, .. } => {
-                        hash.update([2]);
-                        update_u64(&mut hash, values.len());
-                        for value in values {
-                            hash.update(value.to_le_bytes());
-                        }
-                    }
-                    ColumnState::Ref { values, .. } => {
-                        hash.update([3]);
-                        update_u64(&mut hash, values.len());
-                        for value in values {
-                            hash.update(value.to_le_bytes());
-                        }
-                    }
+        if self.inputs.is_empty() {
+            // Preserve PRD 0004's frozen digest for models without composition.
+            hash.update(b"SEMBLA_STATE_V1\0");
+            update_state_tables(&mut hash, &self.state.tables, true);
+        } else {
+            hash.update(b"SEMBLA_STATE_V2\0");
+            update_state_tables(&mut hash, &self.state.tables, true);
+            update_u64(&mut hash, self.inputs.len());
+            for input in self.inputs {
+                update_string(&mut hash, &input.box_name);
+                update_string(&mut hash, &input.port_name);
+                update_u64(&mut hash, input.row_count);
+                update_u64(&mut hash, input.schema.len());
+                for (attr, column) in input.schema.iter().zip(&input.columns) {
+                    update_string(&mut hash, &attr.name);
+                    update_column_data(&mut hash, column);
                 }
             }
         }
-
         hash.finalize().into()
+    }
+
+    /// Canonical hash of one table's values, independent of its containing box.
+    pub fn table_hash(&self, box_name: &str, table_name: &str) -> Result<[u8; 32], StateError> {
+        let table = find_table(self.state, box_name, table_name)?;
+        let mut hash = Sha256::new();
+        hash.update(b"SEMBLA_TABLE_V1\0");
+        update_string(&mut hash, &table.name);
+        update_u64(&mut hash, table.row_count);
+        update_u64(&mut hash, table.columns.len());
+        for column in &table.columns {
+            update_state_column(&mut hash, column);
+        }
+        Ok(hash.finalize().into())
     }
 }
 
@@ -834,6 +915,72 @@ fn attr_type_name(attr_type: &AttrType) -> &'static str {
         AttrType::Int => "Int",
         AttrType::Enum { .. } => "Enum",
         AttrType::Ref { .. } => "Ref",
+    }
+}
+
+fn update_state_tables(hash: &mut Sha256, tables: &[TableState], include_box: bool) {
+    update_u64(hash, tables.len());
+    for table in tables {
+        if include_box {
+            update_string(hash, &table.box_name);
+        }
+        update_string(hash, &table.name);
+        update_u64(hash, table.row_count);
+        update_u64(hash, table.columns.len());
+        for column in &table.columns {
+            update_state_column(hash, column);
+        }
+    }
+}
+
+fn update_state_column(hash: &mut Sha256, column: &ColumnState) {
+    update_string(hash, column.name());
+    match column {
+        ColumnState::Real { values, .. } => {
+            update_column_data(hash, &ColumnData::Real(values.clone()))
+        }
+        ColumnState::Int { values, .. } => {
+            update_column_data(hash, &ColumnData::Int(values.clone()))
+        }
+        ColumnState::Enum { values, .. } => {
+            update_column_data(hash, &ColumnData::Enum(values.clone()))
+        }
+        ColumnState::Ref { values, .. } => {
+            update_column_data(hash, &ColumnData::Ref(values.clone()))
+        }
+    }
+}
+
+fn update_column_data(hash: &mut Sha256, column: &ColumnData) {
+    match column {
+        ColumnData::Real(values) => {
+            hash.update([0]);
+            update_u64(hash, values.len());
+            for value in values {
+                hash.update(value.to_bits().to_le_bytes());
+            }
+        }
+        ColumnData::Int(values) => {
+            hash.update([1]);
+            update_u64(hash, values.len());
+            for value in values {
+                hash.update(value.to_le_bytes());
+            }
+        }
+        ColumnData::Enum(values) => {
+            hash.update([2]);
+            update_u64(hash, values.len());
+            for value in values {
+                hash.update(value.to_le_bytes());
+            }
+        }
+        ColumnData::Ref(values) => {
+            hash.update([3]);
+            update_u64(hash, values.len());
+            for value in values {
+                hash.update(value.to_le_bytes());
+            }
+        }
     }
 }
 
