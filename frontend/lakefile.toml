@@ -2,6 +2,11 @@ name = "sembla_frontend"
 version = "0.1.0"
 defaultTargets = ["Sembla", "sembla-export"]
 
+[[require]]
+name = "proofwidgets"
+git = "https://github.com/leanprover-community/ProofWidgets4"
+rev = "v0.0.44"
+
 [[lean_lib]]
 name = "Sembla"
 

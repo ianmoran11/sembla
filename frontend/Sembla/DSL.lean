@@ -1,8 +1,9 @@
 import Lean.Elab.Term
 import Sembla.IR
+import Sembla.WidgetDisplay
 
 namespace Sembla.DSL
-open Lean Elab Term Sembla.IR
+open Lean Elab Term Sembla.IR Sembla.Widgets Sembla.WidgetDisplay
 
 inductive SurfaceTy where
   | real | int | bool
@@ -545,6 +546,12 @@ private def schemasMatch (leftBox : SurfaceBox) (left : List SurfaceAttr)
   left.length == right.length && (left.zip right).all fun (a, b) =>
     a.name == b.name && resolvedTy leftBox a.ty == resolvedTy rightBox b.ty
 
+private unsafe def evalModelUnsafe (expr : Lean.Expr) : TermElabM Model :=
+  Meta.evalExpr Model (mkConst ``Model) expr
+
+@[implemented_by evalModelUnsafe]
+private opaque evalModel (expr : Lean.Expr) : TermElabM Model
+
 elab "model%" name:str "step" "(" dt:term ")" "where"
     "params" "[" paramDecls:semblaParam,* "]"
     "boxes" "[" boxDecls:semblaBox,* "]"
@@ -635,6 +642,23 @@ elab "model%" name:str "step" "(" dt:term ")" "where"
       (WireEndpoint.mk $(Lean.quote toBoxName) $(Lean.quote toPortName))))
 
   let result ← `(Model.mk $name $dt [$paramTerms,*] [$boxTerms,*] [$wireTerms,*])
-  elabTerm result none
+  let elaborated ← elabTerm result none
+  synthesizeSyntheticMVarsNoPostponing
+  let modelValue ← evalModel elaborated
+
+  -- Attach thin ProofWidgets panels to the original declaration-name ranges.
+  -- The displayed JSON props come only from the pure IR builders.
+  for boxCtx in boxCtxs do
+    for selected in boxCtx.systems do
+      if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
+        saveStateDiagram props selected.token
+    for transitionDecl in boxCtx.transitions do
+      if let some selected := boxCtx.systems.find? (·.logicalName == identText transitionDecl.system) then
+        if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
+          saveStateDiagram props transitionDecl.token
+      if let some props := hazardPanelProps? modelValue boxCtx.name transitionDecl.name then
+        saveHazardPanel props transitionDecl.token
+
+  pure elaborated
 
 end Sembla.DSL

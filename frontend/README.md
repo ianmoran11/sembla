@@ -1,8 +1,8 @@
 # Sembla Lean frontend
 
-This dependency-free Lean 4 package contains Sembla's pure deep IR, a small
-surface DSL, and the two v0.1 example models. It deliberately does not depend
-on mathlib. `lean-toolchain` pins Lean 4.13.0, so an `elan` installation selects
+This Lean 4 package contains Sembla's pure deep IR, a small surface DSL, and
+the two v0.1 example models. It deliberately does not depend on mathlib.
+`lean-toolchain` pins Lean 4.13.0, so an `elan` installation selects
 the same compiler automatically.
 
 ## Setup and build
@@ -14,8 +14,9 @@ cd frontend
 lake build
 ```
 
-Lake resolves only Lean's standard library; the package has no external Lake
-dependencies.
+Lake resolves Lean's standard library plus pinned ProofWidgets4, the package's
+only direct external dependency. ProofWidgets inherits Batteries transitively;
+both revisions are recorded in `lake-manifest.json`.
 
 ## DSL
 
@@ -107,3 +108,34 @@ exported SIR model with seed 55 for 20 ticks, asserting identical result and
 final-state hashes and identical CSV bytes. The repository `scripts/check.sh`
 runs the same workflow whenever `lake` is available and prints a skip warning
 on Rust-only hosts.
+
+## Widgets
+
+The frontend pins ProofWidgets4 `v0.0.44` (the Lean 4.13 release). The two
+structure widgets consume only the already-elaborated `Model`: pure functions
+in `Sembla.Widgets` build JSON-encodable props, while
+`Sembla.WidgetDisplay` only turns those props into HTML/SVG and registers the
+infoview panels. Neither path invokes the Rust runtime or performs simulation.
+
+To verify the widgets manually:
+
+1. Run `cd frontend && lake build`, then open the repository in VS Code with
+   the Lean 4 extension and open the Lean infoview.
+2. Open `frontend/Sembla/Models.lean` and put the cursor directly on `Person`
+   in line 15 (`system Person ...`). Expect a **State diagram — person** SVG
+   with exactly the nodes `S`, `I`, `R` and labelled arrows `infect: S → I`
+   and `recover: I → R`; each arrow label also contains its hazard expression.
+3. Put the cursor on `infect` in line 21. Expect the same state diagram plus a
+   **Hazard — infect** panel showing `health = S`, the aggregate-dependent
+   hazard, beta's default, and an inline LogNormal prior-density curve. The
+   panel must state that the per-tick probability plot is unavailable because
+   the hazard depends on row state or aggregates.
+4. Put the cursor on `recover` in line 25. Expect the state diagram plus a
+   **Hazard — recover** panel showing `health = I`, hazard `gamma`, gamma's
+   default and LogNormal prior density, and an inline monotone
+   `p(dt) = 1 - exp(-lambda * dt)` curve beginning at `(0, 0)`.
+
+The automated data-level assertions are in `Sembla/WidgetTests.lean`; they
+check exact graph props, JSON encoding, probability monotonicity, three
+closed-form LogNormal density samples, the aggregate no-plot explanation,
+and the no-prior case. Pixel/layout verification is intentionally manual.

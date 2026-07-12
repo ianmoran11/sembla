@@ -37,4 +37,4 @@ and common-random-numbers `sembla compare` workflow are documented in
 - `crates/sembla-ir`: shared simulation IR types.
 - `crates/sembla-runtime`: deterministic CPU interpreter.
 - `crates/sembla-cli`: `sembla` command-line binary, including normalized `diff-ir`.
-- [`frontend/`](frontend/README.md): dependency-free Lean DSL and IR exporter.
+- [`frontend/`](frontend/README.md): minimal-dependency Lean DSL, IR exporter, and ProofWidgets structure panels (no mathlib).
