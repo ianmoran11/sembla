@@ -1,5 +1,7 @@
 //! Deterministic runtime for Sembla simulations.
 
+pub mod rng;
+
 /// The version of the Sembla runtime crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
