@@ -1,0 +1,13 @@
+[package]
+name = "sembla-gpu-throughput-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Deliberately detach this throwaway spike from the repository workspace.
+[workspace]
+
+[dependencies]
+bytemuck = { version = "1.16", features = ["derive"] }
+pollster = "0.3"
+wgpu = "0.20"

@@ -35,7 +35,13 @@ implementation notes and follow DESIGN.md.
   (introduced in PRD 0010). The GPU spike lives in `spikes/gpu-throughput/`
   and is never depended on by the workspace.
 - **Numerics:** all real-valued attributes and hazard arithmetic are `f64`.
-  Entity IDs are `u32` row indices, stable within a run.
+  Entity IDs are `u32` row indices, stable within a run. **PRD 0012-only
+  exception:** when the selected portable WGSL adapter does not expose shader
+  `f64`, the throwaway throughput spike may measure an `f32` hazard/race
+  kernel skeleton. Its results must record the precision and adapter capability,
+  treat the rate only as directional kernel-shape evidence, and explicitly
+  leave production-`f64` throughput unanswered. This exception does not apply
+  to the IR, CPU runtime, or any production GPU backend.
 - **Determinism (Level A):** same IR + same seed ⇒ byte-identical outputs on
   the same binary/machine. No `HashMap` iteration order may reach any output
   or any random-draw coordinate; use `BTreeMap`/`IndexMap` or sorted vectors

@@ -23,6 +23,12 @@ and records measured throughput in `spikes/gpu-throughput/RESULTS.md`.
 
 - Own `Cargo.toml` (NOT a workspace member; add an explicit `[workspace]`
   empty table or exclude it so the root workspace ignores it).
+- **Precision exception for this throwaway spike:** if the selected portable
+  WGSL adapter does not expose shader `f64`, the benchmark may use `f32` for
+  hazard/race arithmetic. Record the adapter capability and precision, treat
+  the measured rate only as directional kernel-shape evidence, and mark
+  production-`f64` throughput unanswered. This does not relax the production
+  numeric contract.
 - Workload per simulated tick, on GPU end to end (26M `person` rows, 1.3M
   `employer` groups, data resident on device; sized down automatically if
   the adapter's memory requires — record actual sizes):
