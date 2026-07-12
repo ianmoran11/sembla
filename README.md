@@ -21,6 +21,14 @@ cargo run -p sembla-cli -- validate examples/two_state.json
 
 IR enums use snake-case `kind` tags, declarations retain source order, and the canonical serializer emits compact JSON with one trailing newline. Validation assigns zero-based `rule_id` values to transitions in declaration order across all boxes; IDs are derived metadata on `ValidatedModel` and are not serialized into the wire format. Parameter expressions always retain symbolic names rather than inlining per-run values.
 
+## SIR end-to-end example
+
+The flagship [`examples/sir.json`](examples/sir.json) model uses the
+frequency-dependent workplace hazard `beta * I_workplace / N_workplace` and
+recovery hazard `gamma`. See [`docs/examples/sir.md`](docs/examples/sir.md)
+for deterministic population generation, the versioned population format,
+CSV runs, parameter and `dt` overrides, and hash-based verification.
+
 ## Workspace layout
 
 - `crates/sembla-ir`: shared simulation IR types.

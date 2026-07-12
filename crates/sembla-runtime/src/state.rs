@@ -422,6 +422,29 @@ impl Snapshot<'_> {
         }
     }
 
+    /// Borrows a complete Enum column in canonical row order.
+    pub fn enum_values(
+        &self,
+        box_name: &str,
+        table_name: &str,
+        column_name: &str,
+    ) -> Result<&[u16], StateError> {
+        let table = find_table(self.state, box_name, table_name)?;
+        let column = table
+            .columns
+            .iter()
+            .find(|column| column.name() == column_name)
+            .ok_or_else(|| {
+                StateError::new(format!(
+                    "box '{box_name}', table '{table_name}': unknown column '{column_name}'"
+                ))
+            })?;
+        match column {
+            ColumnState::Enum { values, .. } => Ok(values),
+            _ => Err(wrong_column_type(table, column, "Enum")),
+        }
+    }
+
     pub fn reference(
         &self,
         box_name: &str,

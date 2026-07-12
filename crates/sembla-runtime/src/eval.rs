@@ -163,6 +163,13 @@ impl ParamEnv {
         Ok(env)
     }
 
+    /// Resolved values in parameter declaration order.
+    pub fn values(&self) -> impl Iterator<Item = (&str, &ParamValue)> {
+        self.values
+            .iter()
+            .map(|(name, value)| (name.as_str(), value))
+    }
+
     fn get(&self, name: &str) -> Result<&ParamValue, EvalError> {
         self.values
             .iter()

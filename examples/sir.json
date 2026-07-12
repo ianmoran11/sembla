@@ -1,0 +1,79 @@
+{
+  "name": "sir_workplace_frequency_dependent",
+  "dt": 0.25,
+  "params": [
+    {
+      "name": "beta",
+      "ty": "real",
+      "default": { "kind": "real", "value": 0.8 },
+      "prior": { "family": "log_normal", "args": [-0.2231435513142097, 0.25] }
+    },
+    {
+      "name": "gamma",
+      "ty": "real",
+      "default": { "kind": "real", "value": 0.1 },
+      "prior": { "family": "log_normal", "args": [-2.302585092994046, 0.25] }
+    }
+  ],
+  "boxes": [
+    {
+      "name": "sir",
+      "tables": [
+        {
+          "name": "person",
+          "size_hint": 1000000,
+          "attrs": [
+            { "name": "health", "ty": { "kind": "enum", "variants": ["S", "I", "R"] } },
+            { "name": "employer", "ty": { "kind": "ref", "table": "employer" } }
+          ]
+        },
+        { "name": "employer", "size_hint": 50000, "attrs": [] }
+      ],
+      "transitions": [
+        {
+          "name": "infect",
+          "table": "person",
+          "guard": { "kind": "enum_is", "attr": "health", "variant": "S" },
+          "hazard": {
+            "kind": "mul",
+            "lhs": { "kind": "param", "name": "beta" },
+            "rhs": {
+              "kind": "div",
+              "lhs": {
+                "kind": "agg",
+                "op": { "kind": "count" },
+                "table": "person",
+                "on": { "fk_attr": "employer", "self_fk_attr": "employer" },
+                "filter": { "kind": "enum_is", "attr": "health", "variant": "I" }
+              },
+              "rhs": {
+                "kind": "agg",
+                "op": { "kind": "count" },
+                "table": "person",
+                "on": { "fk_attr": "employer", "self_fk_attr": "employer" },
+                "filter": { "kind": "bool", "value": true }
+              }
+            }
+          },
+          "effects": [
+            { "kind": "set_attr", "attr": "health", "value": { "kind": "enum", "variant": "I" } }
+          ],
+          "contests": []
+        },
+        {
+          "name": "recover",
+          "table": "person",
+          "guard": { "kind": "enum_is", "attr": "health", "variant": "I" },
+          "hazard": { "kind": "param", "name": "gamma" },
+          "effects": [
+            { "kind": "set_attr", "attr": "health", "value": { "kind": "enum", "variant": "R" } }
+          ],
+          "contests": []
+        }
+      ],
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "wires": []
+}

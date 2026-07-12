@@ -21,6 +21,9 @@ pub struct TickReport {
     /// Counts grouped in box declaration order for composed-model reporting.
     pub fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
     pub deferred_per_resource_table: Vec<(String, usize)>,
+    /// PRD 0005 group-by accumulators built across all boxes for this tick.
+    /// A cached aggregate contributes once regardless of querying row count.
+    pub aggregate_builds: usize,
 }
 
 /// A structured saturation warning produced by [`run`].
@@ -185,6 +188,7 @@ struct BoxOutcome {
     fired: Vec<(u32, usize)>,
     deferred: Vec<usize>,
     fired_per_resource_table: Vec<usize>,
+    aggregate_builds: usize,
 }
 
 struct Resolution {
@@ -318,6 +322,7 @@ fn execute_tick(
     let mut fired_per_box = Vec::with_capacity(box_outcomes.len());
     let mut deferred_per_resource_table = Vec::new();
     let mut fired_per_resource_table = Vec::new();
+    let mut aggregate_builds = 0;
     let qualify = model.model().boxes.len() > 1;
     for (box_index, outcome) in box_outcomes.into_iter().enumerate() {
         let model_box = &model.model().boxes[box_index];
@@ -325,6 +330,7 @@ fn execute_tick(
             fired[*rule_id as usize].1 = *count;
         }
         fired_per_box.push((model_box.name.clone(), outcome.fired));
+        aggregate_builds += outcome.aggregate_builds;
         for (table_index, count) in outcome.deferred.into_iter().enumerate() {
             let name = report_table_name(model_box, table_index, qualify);
             if count != 0 {
@@ -340,6 +346,7 @@ fn execute_tick(
             fired,
             fired_per_box,
             deferred_per_resource_table,
+            aggregate_builds,
         },
         fired_per_resource_table,
     })
@@ -512,6 +519,7 @@ fn stage_box(
         fired,
         deferred: resolution.deferred,
         fired_per_resource_table: resolution.fired_per_resource_table,
+        aggregate_builds: cache.build_count(),
     })
 }
 

@@ -98,6 +98,8 @@ version = "0.1.0"
 dependencies = [
  "sembla-ir",
  "sembla-runtime",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
