@@ -5,3 +5,7 @@ edition.workspace = true
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+sembla-ir = { path = "../sembla-ir" }
+sha2 = "0.10"
