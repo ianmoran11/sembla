@@ -4,6 +4,11 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+[package.metadata.sembla-strict-metal]
+wgpu-hal-version = "0.21.1"
+upstream-revision = "14a7698d16f0f5bcdf8cd6d515952441d4bd2585"
+crates-io-checksum = "172e490a87295564f3fcc0f165798d87386f6231b04d4548bca458cbbfd63222"
+
 # Deliberately detach this spike from the repository workspace. Cargo treats
 # this manifest as the root of its own workspace rather than inheriting the
 # repository's workspace.
@@ -13,3 +18,9 @@ publish = false
 bytemuck = { version = "1.16", features = ["derive"] }
 pollster = "0.3"
 wgpu = "0.20"
+
+# wgpu 0.20 exposes no public strict-math control. This exact published
+# wgpu-hal 0.21.1 source is vendored and minimally patched so Metal compiles the
+# PRD-0002 double-single shader with fast math disabled.
+[patch.crates-io]
+wgpu-hal = { path = "vendor/wgpu-hal" }

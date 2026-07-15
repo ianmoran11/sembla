@@ -81,3 +81,24 @@ correct, documented implementation.
    the documented thresholds.
 5. Fast-math / FMA-contraction status of the compiled shader is recorded (it
    determines whether `df64` is trustworthy on this adapter).
+
+## Implementation notes
+
+- Both strategies use a deterministic two-pass reduction: two ascending-row
+  partials per employer, then an ordered partial-0/partial-1 merge. No floating
+  atomics are used.
+- The 1M-row accuracy guard fixes seed `0x0123456789abcdfc`, tick 7, and `dt=100`.
+  That seed includes a copied Philox near-tie whose 24-bit uniforms tie but whose
+  53-bit uniforms do not. The double-single guards are max relative reduction
+  error `<= 1e-10`, max/mean error each `<= 1%` of f32, and a strictly lower
+  winner-mismatch rate.
+- Apple M2 Pro / Metal results: f32 max/mean reduction error
+  `1.394316e-7` / `3.214444e-8`, 1/50,000 winner mismatches; double-single
+  `9.292057e-15` / `1.205181e-15`, 0/50,000 mismatches.
+- wgpu 0.20 exposes no public fast-math control. The spike pins the published
+  `wgpu-hal 0.21.1` source (upstream commit
+  `14a7698d16f0f5bcdf8cd6d515952441d4bd2585`) and minimally patches its Metal
+  compiler options with `set_fast_math_enabled(false)`. The WGSL has no atomic
+  rounding fences. Trust requires strict mode to be requested on Metal, no
+  observed contraction or reassociation, and preserved two-sum/Dekker-product
+  residuals; unsupported backends are not assumed strict.

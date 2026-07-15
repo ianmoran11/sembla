@@ -1,9 +1,9 @@
-//! Precision-spike scaffold: stable workload, CPU oracle, and adapter sizing.
+//! Precision spike: stable workload/oracle plus portable precision kernels.
 //!
-//! This PRD intentionally performs no GPU compute dispatch. `wgpu` is used only
-//! to select and describe an adapter and to resolve a workload that fits its
-//! portable buffer limits.
+//! PRD 0002 adds reusable `f32` and double-single WGSL dispatch paths while the
+//! sizing/probe API remains shared by later precision strategies.
 
+pub mod gpu;
 pub mod oracle;
 pub mod workload;
 
