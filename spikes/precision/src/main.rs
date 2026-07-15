@@ -1,4 +1,7 @@
-use sembla_precision_spike::{probe_default_adapter, DEFAULT_GROUPS, DEFAULT_ROWS};
+use sembla_precision_spike::{
+    cuda::cuda_status, native_f64::probe_native_f64, probe_default_adapter, DEFAULT_GROUPS,
+    DEFAULT_ROWS,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -34,5 +37,7 @@ fn run() -> Result<(), String> {
             .as_deref()
             .unwrap_or("none; the full requested workload fits the sizing limits")
     );
+    println!("{}", pollster::block_on(probe_native_f64()));
+    println!("{}", cuda_status());
     Ok(())
 }

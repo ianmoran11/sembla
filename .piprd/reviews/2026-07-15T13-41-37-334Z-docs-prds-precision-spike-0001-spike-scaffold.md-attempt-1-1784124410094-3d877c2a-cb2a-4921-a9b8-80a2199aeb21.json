@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-15T14:06:50.094Z",
+  "runId": "2026-07-15T13-41-37-334Z",
+  "prdPath": "docs/prds-precision-spike/0001-spike-scaffold.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-precision-spike/0001-spike-scaffold.md",
+  "attempt": 1,
+  "text": "## Review\n\nNo blocking issues found.\n\n### Acceptance criteria\n\n1. **PASS** — `cargo build` and `cargo test` pass in `spikes/precision/`; all 7 tests pass. Root workspace metadata contains only `sembla-cli`, `sembla-ir`, and `sembla-runtime`. Isolation is documented in `docs/prds-precision-spike/0001-spike-scaffold.md:99-105`.\n2. **PASS** — Small-scale sizing, downscaling, and contiguous 10k/500 group layout are tested in `spikes/precision/src/lib.rs:297-335` and `src/workload.rs:274-294`.\n3. **PASS** — Fixed-seed oracle runs compare byte-identical sums, winners, and fired flags in `src/oracle.rs:164-181`.\n4. **PASS** — Reverse-order results and per-group flags are validated; the test reported 108 order-sensitive groups at 10k/500 scale (`src/oracle.rs:184-205`).\n5. **PASS** — Live probe printed Apple M2 Pro/Metal, `SHADER_F64: unsupported`, safe `(26,000,000, 1,300,000)`, and downscale status (`src/main.rs:10-36`).\n\nThe crate has only the permitted dependencies, implements the documented Philox workload and scalar oracle, and contains no GPU compute dispatch or `sembla-*` integration.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All specification items and all five acceptance criteria are satisfied; builds, tests, workspace exclusion, and the live adapter probe were verified.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All specification items and all five acceptance criteria are satisfied; builds, tests, workspace exclusion, and the live adapter probe were verified.",
+    "raw": "## Review\n\nNo blocking issues found.\n\n### Acceptance criteria\n\n1. **PASS** — `cargo build` and `cargo test` pass in `spikes/precision/`; all 7 tests pass. Root workspace metadata contains only `sembla-cli`, `sembla-ir`, and `sembla-runtime`. Isolation is documented in `docs/prds-precision-spike/0001-spike-scaffold.md:99-105`.\n2. **PASS** — Small-scale sizing, downscaling, and contiguous 10k/500 group layout are tested in `spikes/precision/src/lib.rs:297-335` and `src/workload.rs:274-294`.\n3. **PASS** — Fixed-seed oracle runs compare byte-identical sums, winners, and fired flags in `src/oracle.rs:164-181`.\n4. **PASS** — Reverse-order results and per-group flags are validated; the test reported 108 order-sensitive groups at 10k/500 scale (`src/oracle.rs:184-205`).\n5. **PASS** — Live probe printed Apple M2 Pro/Metal, `SHADER_F64: unsupported`, safe `(26,000,000, 1,300,000)`, and downscale status (`src/main.rs:10-36`).\n\nThe crate has only the permitted dependencies, implements the documented Philox workload and scalar oracle, and contains no GPU compute dispatch or `sembla-*` integration.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All specification items and all five acceptance criteria are satisfied; builds, tests, workspace exclusion, and the live adapter probe were verified.\"}\n```",
+    "source": "json"
+  }
+}

@@ -692,6 +692,7 @@ name = "sembla-precision-spike"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "naga",
  "pollster",
  "wgpu",
 ]

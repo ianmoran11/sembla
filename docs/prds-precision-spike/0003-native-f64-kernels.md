@@ -84,3 +84,25 @@ across two different NVIDIA models (noted as future work, not measured here).
    rate-limited number as full-rate.
 5. The Rust `f64` mirrors of the kernel arithmetic are unit-tested and pass on
    the dev machine.
+
+## Implementation notes
+
+- Native WGSL is kept in a separate module and is never created unless the
+  selected adapter is Vulkan and exposes `SHADER_F64`; the requested device
+  explicitly enables that feature. Naga validates the f64 source locally with
+  its `FLOAT64` capability even when Metal cannot run it.
+- WGSL, CUDA, and the Rust mirror use two ascending half-group partials followed
+  by an ordered merge. Accuracy reporting separately counts oracle differences
+  attributable to this tree and differences unexplained by the mirror. Winner
+  and fired-flag mismatches must be zero.
+- `--features cuda` asks `build.rs` to locate `nvcc` and compile
+  `src/cuda/f64_native.cu` without fast math. Missing `nvcc` leaves all CUDA FFI
+  unlinked and reports `cuda: toolkit-absent`; a detected but broken toolkit is
+  a real build error.
+- CUDA's `cudaDevAttrSingleToDoublePrecisionPerfRatio` is authoritative. wgpu
+  uses a documented model fallback for A100/V100/H100-family full-rate devices
+  and T4/L4/A10/RTX-family rate-limited devices. Unknown models are
+  conservatively rate-limited. Output always records the device, ratio/evidence,
+  class, and whether full-rate extrapolation is allowed.
+- The Apple M2 Pro development run reports native WGSL f64 unsupported on Metal,
+  and `cargo test --features cuda` reports toolkit absent without failing.

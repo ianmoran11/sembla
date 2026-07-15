@@ -14,10 +14,19 @@ crates-io-checksum = "172e490a87295564f3fcc0f165798d87386f6231b04d4548bca458cbbf
 # repository's workspace.
 [workspace]
 
+[features]
+default = []
+cuda = []
+
 [dependencies]
 bytemuck = { version = "1.16", features = ["derive"] }
 pollster = "0.3"
 wgpu = "0.20"
+
+[dev-dependencies]
+# Parses/validates the separately gated f64 WGSL on machines where Metal cannot
+# create an SHADER_F64 device. This is the same Naga version used by wgpu 0.20.
+naga = { version = "0.20", features = ["wgsl-in"] }
 
 # wgpu 0.20 exposes no public strict-math control. This exact published
 # wgpu-hal 0.21.1 source is vendored and minimally patched so Metal compiles the

@@ -2,7 +2,8 @@
 
 Standalone throwaway crate for choosing the v0.2 GPU precision strategy. PRD
 0001 provides the stable real-valued workload, adapter sizing probe, and scalar
-CPU `f64` oracle. PRD 0002 adds portable WGSL `f32` and double-single GPU paths.
+CPU `f64` oracle. PRD 0002 adds portable WGSL `f32` and double-single GPU paths;
+PRD 0003 adds capability-gated native WGSL/Vulkan and optional CUDA `f64` paths.
 
 ## Workspace isolation
 
@@ -98,3 +99,59 @@ Knuth-two-sum and Dekker-product residuals. Double-single is marked trustworthy
 only when strict compilation was requested on the supported Metal backend and
 all probes pass. Other backends are reported unsupported rather than assumed to
 honor a strict mode they do not expose.
+
+## Native f64 strategies
+
+`src/wgsl/f64_native.wgsl` is a separate shader module. It is created only when
+the selected adapter is Vulkan and advertises `Features::SHADER_F64`; device
+creation explicitly requests that feature. Metal therefore reports
+`native_f64: unsupported` without parsing or compiling the f64 source. A local
+Naga test still parses and validates the source with the `FLOAT64` capability,
+so shader syntax is checked without suitable hardware.
+
+The WGSL path uses `f64` weights, partials, sums, race times, `beta`, and `dt`.
+Its reduction is the same two ascending halves plus ordered merge used by the
+CUDA reference and `f64_mirror.rs`. Because all race times are non-negative,
+numeric f64 ordering is identical to ordering the IEEE `t_bits`; rule and entity
+IDs complete the lexicographic tie-break. `NativeF64Runner` exposes retained
+reduction-only, map/argmin-only, full-tick, and correctness-readback dispatches.
+The accuracy report distinguishes oracle sum differences explained by the fixed
+reduction tree from unexplained GPU/mirror differences and requires exactly zero
+winner and fired-flag mismatches.
+
+### fp64 throughput class
+
+Every supported result includes the exact device name, an fp64:fp32 ratio when
+known, `full-rate` or `rate-limited`, evidence, and a full-rate extrapolation
+guard. CUDA uses the authoritative
+`cudaDevAttrSingleToDoublePrecisionPerfRatio`. The wgpu fallback recognizes
+NVIDIA A100/V100/H100/H200/GH200 as approximately 1:2 full-rate, T4 as
+approximately 1:32, and L4/A10/A10G/RTX/GTX/GeForce as conservatively 1:64.
+Unknown models are also conservatively rate-limited with an unknown ratio.
+Only the full-rate class permits full-rate extrapolation; all other output says
+`full-rate-extrapolation=refused`.
+
+The model table follows NVIDIA's published device specifications and exists only
+because wgpu exposes no throughput-ratio property. CUDA's runtime attribute
+overrides the name lookup, including when it contradicts a familiar model name.
+
+### Optional CUDA reference
+
+`src/cuda/f64_native.cu` implements Philox, the fixed two-pass reduction,
+double-precision map/race, and exact `(t_bits, rule_id, entity_id)` argmin. Its C
+ABI copies the same Rust workload to device memory and returns sums, winners,
+and fired flags for host-side oracle scoring. The build intentionally omits
+fast math and passes `--fmad=false`, `--prec-div=true`, and `--prec-sqrt=true`.
+
+```console
+cargo test                         # Metal: native_f64 unsupported; CUDA disabled
+cargo test --features cuda         # no nvcc: cuda: toolkit-absent, successful no-op
+WGPU_BACKEND=vulkan cargo test native_f64 -- --nocapture
+cargo test --features cuda -- --nocapture
+```
+
+`build.rs` probes `NVCC`, then `$CUDA_HOME/bin/nvcc`, then `nvcc` on `PATH`.
+When the feature is enabled but none executes, no CUDA symbols or libraries are
+linked. A detected but broken toolkit fails the build rather than being
+misreported as absent. Finding `nvcc` does not imply a CUDA device is available;
+that runtime case is separately reported as `cuda: device-unavailable`.

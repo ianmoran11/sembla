@@ -1,0 +1,30 @@
+{
+  "runId": "2026-07-15T13-41-37-334Z",
+  "startedAt": "2026-07-15T13:41:37.334Z",
+  "updatedAt": "2026-07-15T15:06:51.485Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-precision-spike",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-precision-spike/0001-spike-scaffold.md",
+    "/Users/ian/projects/sembla/docs/prds-precision-spike/0002-portable-precision-kernels.md",
+    "/Users/ian/projects/sembla/docs/prds-precision-spike/0003-native-f64-kernels.md",
+    "/Users/ian/projects/sembla/docs/prds-precision-spike/0004-terraform-gpu-infra.md",
+    "/Users/ian/projects/sembla/docs/prds-precision-spike/0005-benchmark-and-results.md",
+    "/Users/ian/projects/sembla/docs/prds-precision-spike/0006-decision-report.md"
+  ],
+  "currentIndex": 2,
+  "approved": [
+    "docs/prds-precision-spike/0001-spike-scaffold.md",
+    "docs/prds-precision-spike/0002-portable-precision-kernels.md"
+  ],
+  "commits": [
+    "8f83381",
+    "0638e00"
+  ],
+  "total": 6,
+  "status": "running",
+  "stage": "implement",
+  "attempt": 1,
+  "adviseEnabled": true
+}
