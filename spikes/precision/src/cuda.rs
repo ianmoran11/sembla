@@ -6,15 +6,20 @@
 
 use std::{error::Error, fmt};
 
-use crate::{fp64::Fp64Throughput, native_f64::NativeF64AccuracyReport};
+use crate::{
+    fp64::Fp64Throughput,
+    native_f64::{NativeF64AccuracyReport, NativeF64TickResult},
+    timing::StageTiming,
+    workload::Workload,
+};
 
 #[cfg(all(feature = "cuda", sembla_cuda_toolkit))]
 use crate::{
     f64_mirror::run_f64_mirror,
     gpu::{accuracy_workload_config, ACCURACY_TICK},
-    native_f64::{score_native, NativeF64Device, NativeF64TickResult},
+    native_f64::{score_native, NativeF64Device},
     oracle::run_oracle,
-    workload::Workload,
+    timing::{self, TimingMethod, BENCHMARK_TICK, MEASURED_TICKS, WARMUP_TICKS},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -75,6 +80,21 @@ impl fmt::Display for CudaF64Outcome {
             Self::Executed(report) => write!(formatter, "cuda {report}"),
         }
     }
+}
+
+/// Steady-state CUDA measurement and the final measured tick readback.
+#[allow(dead_code)]
+pub(crate) struct CudaBenchmarkResult {
+    pub profile: Fp64Throughput,
+    pub timing: StageTiming,
+    pub output: NativeF64TickResult,
+}
+
+/// CUDA absence remains an ordinary benchmark row rather than an error.
+#[allow(dead_code)]
+pub(crate) enum CudaBenchmarkOutcome {
+    Unavailable(CudaStatus),
+    Executed(CudaBenchmarkResult),
 }
 
 #[must_use]
@@ -138,6 +158,55 @@ fn run_available(_profile: Fp64Throughput) -> Result<CudaF64Outcome, CudaError> 
     unreachable!("CUDA cannot be available without a compiled toolkit")
 }
 
+/// Benchmarks a retained CUDA workload and returns one final tick for scoring.
+///
+/// The C++ wrapper allocates and uploads once, executes exactly the shared
+/// warmup/measured counts, records CUDA events around the three stage
+/// boundaries, and performs one readback after timing.
+#[allow(dead_code)]
+pub(crate) fn run_cuda_f64_benchmark(
+    workload: &Workload,
+) -> Result<CudaBenchmarkOutcome, CudaError> {
+    let status = cuda_status();
+    let CudaStatus::Available(profile) = status else {
+        return Ok(CudaBenchmarkOutcome::Unavailable(status));
+    };
+    benchmark_available(profile, workload)
+}
+
+#[cfg(all(feature = "cuda", sembla_cuda_toolkit))]
+fn benchmark_available(
+    profile: Fp64Throughput,
+    workload: &Workload,
+) -> Result<CudaBenchmarkOutcome, CudaError> {
+    let (mut total_samples, mut reduce_samples, mut argmin_samples, output) =
+        ffi::benchmark(workload)?;
+    let timing = timing::summarize(
+        workload.config.rows,
+        WARMUP_TICKS,
+        MEASURED_TICKS,
+        TimingMethod::GpuTimestampQueries,
+        &mut total_samples,
+        &mut reduce_samples,
+        &mut argmin_samples,
+    )
+    .map_err(|error| CudaError::new(format!("invalid CUDA timing samples: {error}")))?;
+    Ok(CudaBenchmarkOutcome::Executed(CudaBenchmarkResult {
+        profile,
+        timing,
+        output,
+    }))
+}
+
+#[cfg(not(all(feature = "cuda", sembla_cuda_toolkit)))]
+#[allow(dead_code)]
+fn benchmark_available(
+    _profile: Fp64Throughput,
+    _workload: &Workload,
+) -> Result<CudaBenchmarkOutcome, CudaError> {
+    unreachable!("CUDA cannot be available without a compiled toolkit")
+}
+
 #[cfg(all(feature = "cuda", sembla_cuda_toolkit))]
 mod ffi {
     use std::{ffi::CStr, os::raw::c_char};
@@ -162,6 +231,26 @@ mod ffi {
             employers: *const u32,
             health: *const u32,
             weights: *const f64,
+            sums: *mut f64,
+            winners: *mut u32,
+            fired: *mut u32,
+        ) -> i32;
+        fn sembla_cuda_f64_benchmark(
+            rows: u32,
+            groups: u32,
+            seed: u64,
+            beta: f64,
+            dt: f64,
+            tick: u32,
+            warmup_ticks: u32,
+            measured_ticks: u32,
+            offsets: *const u32,
+            employers: *const u32,
+            health: *const u32,
+            weights: *const f64,
+            total_ms: *mut f32,
+            reduce_ms: *mut f32,
+            argmin_ms: *mut f32,
             sums: *mut f64,
             winners: *mut u32,
             fired: *mut u32,
@@ -226,6 +315,57 @@ mod ffi {
         })
     }
 
+    type BenchmarkSamples = (Vec<f64>, Vec<f64>, Vec<f64>, NativeF64TickResult);
+
+    pub(super) fn benchmark(workload: &Workload) -> Result<BenchmarkSamples, CudaError> {
+        let mut total_ms = vec![0.0_f32; MEASURED_TICKS];
+        let mut reduce_ms = vec![0.0_f32; MEASURED_TICKS];
+        let mut argmin_ms = vec![0.0_f32; MEASURED_TICKS];
+        let mut segmented_sums = vec![0.0_f64; workload.config.groups as usize];
+        let mut winner_entity_ids = vec![u32::MAX; workload.config.groups as usize];
+        let mut fired_flags = vec![0_u32; workload.config.rows as usize];
+        // SAFETY: all input/output slices remain alive for the call and have the
+        // exact rows/groups/sample lengths communicated to the C wrapper.
+        let code = unsafe {
+            sembla_cuda_f64_benchmark(
+                workload.config.rows,
+                workload.config.groups,
+                workload.config.seed,
+                workload.config.beta,
+                workload.config.dt,
+                BENCHMARK_TICK,
+                WARMUP_TICKS as u32,
+                MEASURED_TICKS as u32,
+                workload.group_offsets.as_ptr(),
+                workload.employer.as_ptr(),
+                workload.health.as_ptr(),
+                workload.weight.as_ptr(),
+                total_ms.as_mut_ptr(),
+                reduce_ms.as_mut_ptr(),
+                argmin_ms.as_mut_ptr(),
+                segmented_sums.as_mut_ptr(),
+                winner_entity_ids.as_mut_ptr(),
+                fired_flags.as_mut_ptr(),
+            )
+        };
+        if code != 0 {
+            return Err(CudaError::new(format!(
+                "CUDA native f64 benchmark failed: {}",
+                error_message(code)
+            )));
+        }
+        Ok((
+            total_ms.into_iter().map(f64::from).collect(),
+            reduce_ms.into_iter().map(f64::from).collect(),
+            argmin_ms.into_iter().map(f64::from).collect(),
+            NativeF64TickResult {
+                segmented_sums,
+                winner_entity_ids,
+                fired_flags,
+            },
+        ))
+    }
+
     fn error_message(code: i32) -> String {
         // SAFETY: CUDA returns a process-lifetime string for every error code.
         let pointer = unsafe { sembla_cuda_f64_error_string(code) };
@@ -252,5 +392,16 @@ mod tests {
             CudaF64Outcome::Unavailable(unavailable) => assert!(!unavailable.is_available()),
             CudaF64Outcome::Executed(report) => report.assert_expected().unwrap(),
         }
+    }
+
+    #[test]
+    fn benchmark_absence_is_a_reported_no_op() {
+        if cuda_status().is_available() {
+            return;
+        }
+        let workload =
+            Workload::generate(crate::workload::WorkloadConfig::with_size(1_000, 50)).unwrap();
+        let outcome = run_cuda_f64_benchmark(&workload).unwrap();
+        assert!(matches!(outcome, CudaBenchmarkOutcome::Unavailable(_)));
     }
 }

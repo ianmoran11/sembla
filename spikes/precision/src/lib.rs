@@ -3,12 +3,15 @@
 //! PRD 0002 adds reusable `f32` and double-single WGSL dispatch paths while the
 //! sizing/probe API remains shared by later precision strategies.
 
+pub mod benchmark;
 pub mod cuda;
 pub mod f64_mirror;
 pub mod fp64;
 pub mod gpu;
 pub mod native_f64;
 pub mod oracle;
+pub mod results;
+pub mod timing;
 pub mod workload;
 
 use std::{error::Error, fmt};

@@ -161,21 +161,30 @@ The bootstrap log is `/var/log/sembla-bootstrap.log`. It installs build tools,
 ensures NVIDIA/CUDA and Rust stable are available, clones `repository_ref`, and
 creates `/home/ubuntu/run-spike.sh`.
 
-### 4. Run the spike
+### 4. Seed the Mac result, then run the spike
 
-On the instance:
+First run `cargo run --release` in local `spikes/precision/`. The generated Mac
+artifact must be present in the cloud checkout before the NVIDIA run; otherwise
+there is no development state for the merger to preserve. If it was not already
+committed in `repository_ref`, copy it from this module directory:
 
 ```bash
-/home/ubuntu/run-spike.sh
+scp -i /path/to/private-key.pem ../RESULTS.md \
+  ubuntu@$(terraform output -raw public_ip):/home/ubuntu/sembla/spikes/precision/RESULTS.md
+ssh -i /path/to/private-key.pem ubuntu@$(terraform output -raw public_ip) \
+  /home/ubuntu/run-spike.sh
 ```
 
-The script sets Vulkan, runs `cargo build --release --features cuda` followed by
-`cargo run --release --features cuda`, and writes
-`/home/ubuntu/sembla/spikes/precision/RESULTS.md`. Its header records
-`gpu_class`, `fp64-class`, ratio, extrapolation permission, AWS region,
-requested and actual AMI IDs, instance type, repository commit, and actual
-`nvidia-smi` device. PRD 0005's benchmark output is
-captured by the same command when that benchmark is added to the spike binary.
+The script gathers IMDS, repository, Terraform profile, and `nvidia-smi`
+metadata before execution, exports it under `SEMBLA_INFRA_*`, sets Vulkan, then
+runs `cargo build --release --features cuda` and
+`cargo run --release --features cuda`. The Rust runner—not the shell
+wrapper—owns `/home/ubuntu/sembla/spikes/precision/RESULTS.md`: it parses the Mac
+state, runs the accuracy guard, collects 10 warmup and 100 measured ticks, and
+atomically writes the merged artifact. GPU timestamp queries (CUDA events for
+the CUDA row) are used where supported; synchronized wall-clock fallback is
+labeled explicitly. All four strategy rows remain present, with unavailable
+paths marked `unanswered on this adapter`.
 
 ### 5. Fetch `RESULTS.md`
 
@@ -187,9 +196,12 @@ scp -i /path/to/private-key.pem \
   ../RESULTS.md
 ```
 
-Confirm the fetched file's `fp64-class` matches the chosen Terraform
-`gpu_class`. A rate-limited result must not be presented or extrapolated as
-full-rate.
+Confirm the fetched file contains both **Development machine** and **NVIDIA
+machine** metadata sections. The merged matrix prefers the Mac's portable rows
+and NVIDIA native-f64 rows, and records each row's source and timing method.
+Check each source workload because safe `(N, G)` may differ. Confirm the fetched
+file's `fp64-class` matches the chosen Terraform `gpu_class`; a rate-limited
+result must not be presented or extrapolated as full-rate.
 
 ### 6. Destroy immediately
 

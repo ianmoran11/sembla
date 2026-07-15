@@ -4,7 +4,7 @@
 //! `SHADER_F64`. A capable Vulkan device gets a separate device requested with
 //! exactly that feature, so PRD-0002's portable module remains unaffected.
 
-use std::{borrow::Cow, error::Error, fmt, sync::mpsc};
+use std::{borrow::Cow, error::Error, fmt, sync::mpsc, time::Instant};
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
@@ -14,6 +14,7 @@ use crate::{
     fp64::Fp64Throughput,
     gpu::{accuracy_workload_config, ACCURACY_TICK},
     oracle::{run_oracle, OracleResult},
+    timing::{self, StageTiming, TimingMethod, BENCHMARK_TICK, MEASURED_TICKS, WARMUP_TICKS},
     workload::Workload,
 };
 
@@ -220,6 +221,7 @@ pub struct NativeF64Runner {
     device: wgpu::Device,
     queue: wgpu::Queue,
     profile: NativeF64Device,
+    timestamp_supported: bool,
     rows: u32,
     groups: u32,
     map_dispatch: (u32, u32),
@@ -262,6 +264,8 @@ impl NativeF64Runner {
             return Ok(NativeF64RunnerInit::Unsupported(status));
         };
 
+        let adapter_features = adapter.features();
+        let timestamp_supported = adapter_features.contains(wgpu::Features::TIMESTAMP_QUERY);
         let limits = adapter.limits();
         if limits.max_storage_buffers_per_shader_stage < 6 {
             return Err(NativeF64Error::new(format!(
@@ -306,7 +310,12 @@ impl NativeF64Runner {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: Some("Sembla native f64 kernels"),
-                    required_features: wgpu::Features::SHADER_F64,
+                    required_features: wgpu::Features::SHADER_F64
+                        | if timestamp_supported {
+                            wgpu::Features::TIMESTAMP_QUERY
+                        } else {
+                            wgpu::Features::empty()
+                        },
                     required_limits,
                 },
                 None,
@@ -414,6 +423,7 @@ impl NativeF64Runner {
             device,
             queue,
             profile,
+            timestamp_supported,
             rows: workload.config.rows,
             groups: workload.config.groups,
             map_dispatch: (map_x, map_y),
@@ -439,7 +449,29 @@ impl NativeF64Runner {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("native f64 reduction"),
             });
-        self.encode_reduction(&mut encoder);
+        self.encode_reduction(&mut encoder, None);
+        self.queue.submit(Some(encoder.finish()));
+    }
+
+    pub fn dispatch_map_only(&self, tick: u32) {
+        self.write_tick(tick);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("native f64 map"),
+            });
+        self.encode_map(&mut encoder, None);
+        self.queue.submit(Some(encoder.finish()));
+    }
+
+    pub fn dispatch_argmin_only(&self, tick: u32) {
+        self.write_tick(tick);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("native f64 argmin"),
+            });
+        self.encode_argmin(&mut encoder, None);
         self.queue.submit(Some(encoder.finish()));
     }
 
@@ -450,7 +482,8 @@ impl NativeF64Runner {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("native f64 map argmin"),
             });
-        self.encode_map_argmin(&mut encoder);
+        self.encode_map(&mut encoder, None);
+        self.encode_argmin(&mut encoder, None);
         self.queue.submit(Some(encoder.finish()));
     }
 
@@ -461,8 +494,9 @@ impl NativeF64Runner {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("native f64 tick"),
             });
-        self.encode_reduction(&mut encoder);
-        self.encode_map_argmin(&mut encoder);
+        self.encode_reduction(&mut encoder, None);
+        self.encode_map(&mut encoder, None);
+        self.encode_argmin(&mut encoder, None);
         self.queue.submit(Some(encoder.finish()));
     }
 
@@ -475,6 +509,180 @@ impl NativeF64Runner {
         self.device.poll(wgpu::Maintain::Wait);
     }
 
+    /// Measures steady-state full ticks and the reduction/argmin hot stages.
+    pub fn benchmark(&self) -> Result<StageTiming, NativeF64Error> {
+        if self.timestamp_supported {
+            // The timestamp path performs one preflight before warmups. A
+            // later failure is an error rather than a reason to rerun samples.
+            self.benchmark_timestamps()
+        } else {
+            self.benchmark_wall_clock()
+        }
+    }
+
+    fn benchmark_timestamps(&self) -> Result<StageTiming, NativeF64Error> {
+        const QUERY_COUNT: u32 = 6;
+        const QUERY_BYTES: u64 = QUERY_COUNT as u64 * std::mem::size_of::<u64>() as u64;
+        let query_set = self.device.create_query_set(&wgpu::QuerySetDescriptor {
+            label: Some("native f64 stage timestamps"),
+            ty: wgpu::QueryType::Timestamp,
+            count: QUERY_COUNT,
+        });
+        let resolve = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("native f64 timestamp resolve"),
+            size: QUERY_BYTES,
+            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("native f64 timestamp readback"),
+            size: QUERY_BYTES,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let period_ms = f64::from(self.queue.get_timestamp_period()) / 1_000_000.0;
+        // Probe the advertised query implementation before the benchmark's
+        // exactly 10 warmups. If a backend cannot return all three pass pairs,
+        // choose the synchronized fallback before collecting any samples.
+        if self
+            .timestamp_sample(&query_set, &resolve, &readback, period_ms)?
+            .is_none()
+        {
+            return self.benchmark_wall_clock();
+        }
+
+        for _ in 0..WARMUP_TICKS {
+            self.dispatch_tick_only(BENCHMARK_TICK);
+            self.wait();
+        }
+
+        let mut totals = Vec::with_capacity(MEASURED_TICKS);
+        let mut reductions = Vec::with_capacity(MEASURED_TICKS);
+        let mut argmins = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            let Some((total, reduce, argmin)) =
+                self.timestamp_sample(&query_set, &resolve, &readback, period_ms)?
+            else {
+                return Err(NativeF64Error::new(
+                    "native f64 GPU timestamp queries became incomplete after a successful preflight",
+                ));
+            };
+            totals.push(total);
+            reductions.push(reduce);
+            argmins.push(argmin);
+        }
+
+        timing::summarize(
+            self.rows,
+            WARMUP_TICKS,
+            MEASURED_TICKS,
+            TimingMethod::GpuTimestampQueries,
+            &mut totals,
+            &mut reductions,
+            &mut argmins,
+        )
+        .map_err(NativeF64Error::new)
+    }
+
+    fn timestamp_sample(
+        &self,
+        query_set: &wgpu::QuerySet,
+        resolve: &wgpu::Buffer,
+        readback: &wgpu::Buffer,
+        period_ms: f64,
+    ) -> Result<Option<(f64, f64, f64)>, NativeF64Error> {
+        const QUERY_COUNT: u32 = 6;
+        const QUERY_BYTES: u64 = QUERY_COUNT as u64 * std::mem::size_of::<u64>() as u64;
+        self.write_tick(BENCHMARK_TICK);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("native f64 timestamped tick"),
+            });
+        self.encode_reduction(&mut encoder, Some((query_set, 0, 1)));
+        self.encode_map(&mut encoder, Some((query_set, 2, 3)));
+        self.encode_argmin(&mut encoder, Some((query_set, 4, 5)));
+        encoder.resolve_query_set(query_set, 0..QUERY_COUNT, resolve, 0);
+        encoder.copy_buffer_to_buffer(resolve, 0, readback, 0, QUERY_BYTES);
+        self.queue.submit(Some(encoder.finish()));
+        self.wait();
+
+        let timestamps = read_timestamp_buffer(&self.device, readback)?;
+        let reduce = timestamp_delta(timestamps[0], timestamps[1], period_ms);
+        let map = timestamp_delta(timestamps[2], timestamps[3], period_ms);
+        let argmin = timestamp_delta(timestamps[4], timestamps[5], period_ms);
+        let total = timestamp_delta(timestamps[0], timestamps[5], period_ms);
+        let (Some(total), Some(reduce), Some(map), Some(argmin)) = (total, reduce, map, argmin)
+        else {
+            return Ok(None);
+        };
+        if total < (reduce + map + argmin) * 0.99 {
+            return Ok(None);
+        }
+        Ok(Some((total, reduce, argmin)))
+    }
+
+    fn benchmark_wall_clock(&self) -> Result<StageTiming, NativeF64Error> {
+        for _ in 0..WARMUP_TICKS {
+            self.dispatch_tick_only(BENCHMARK_TICK);
+            self.wait();
+        }
+        let mut totals = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            let start = Instant::now();
+            self.dispatch_tick_only(BENCHMARK_TICK);
+            self.wait();
+            totals.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        for _ in 0..WARMUP_TICKS {
+            self.dispatch_reduction_only(BENCHMARK_TICK);
+            self.wait();
+        }
+        let mut reductions = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            let start = Instant::now();
+            self.dispatch_reduction_only(BENCHMARK_TICK);
+            self.wait();
+            reductions.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        for _ in 0..WARMUP_TICKS {
+            self.prepare_argmin();
+            let start = Instant::now();
+            self.dispatch_argmin_only(BENCHMARK_TICK);
+            self.wait();
+            let _ = start.elapsed();
+        }
+        let mut argmins = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            self.prepare_argmin();
+            let start = Instant::now();
+            self.dispatch_argmin_only(BENCHMARK_TICK);
+            self.wait();
+            argmins.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        timing::summarize(
+            self.rows,
+            WARMUP_TICKS,
+            MEASURED_TICKS,
+            TimingMethod::SynchronizedWallClockFallback,
+            &mut totals,
+            &mut reductions,
+            &mut argmins,
+        )
+        .map_err(NativeF64Error::new)
+    }
+
+    fn prepare_argmin(&self) {
+        self.dispatch_reduction_only(BENCHMARK_TICK);
+        self.wait();
+        self.dispatch_map_only(BENCHMARK_TICK);
+        self.wait();
+    }
+
     fn write_tick(&self, tick: u32) {
         let mut config = self.config_template;
         config.tick = tick;
@@ -482,10 +690,20 @@ impl NativeF64Runner {
             .write_buffer(&self.config, 0, bytemuck::bytes_of(&config));
     }
 
-    fn encode_reduction(&self, encoder: &mut wgpu::CommandEncoder) {
+    fn encode_reduction(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        timestamps: Option<(&wgpu::QuerySet, u32, u32)>,
+    ) {
+        let timestamp_writes =
+            timestamps.map(|(query_set, begin, end)| wgpu::ComputePassTimestampWrites {
+                query_set,
+                beginning_of_pass_write_index: Some(begin),
+                end_of_pass_write_index: Some(end),
+            });
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("native f64 reduction passes"),
-            timestamp_writes: None,
+            timestamp_writes,
         });
         pass.set_pipeline(&self.pipelines.partial);
         pass.set_bind_group(0, &self.bindings.partial, &[]);
@@ -499,14 +717,41 @@ impl NativeF64Runner {
         pass.dispatch_workgroups(self.groups.div_ceil(REDUCE_WORKGROUP_SIZE), 1, 1);
     }
 
-    fn encode_map_argmin(&self, encoder: &mut wgpu::CommandEncoder) {
+    fn encode_map(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        timestamps: Option<(&wgpu::QuerySet, u32, u32)>,
+    ) {
+        let timestamp_writes =
+            timestamps.map(|(query_set, begin, end)| wgpu::ComputePassTimestampWrites {
+                query_set,
+                beginning_of_pass_write_index: Some(begin),
+                end_of_pass_write_index: Some(end),
+            });
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("native f64 map and argmin"),
-            timestamp_writes: None,
+            label: Some("native f64 map"),
+            timestamp_writes,
         });
         pass.set_pipeline(&self.pipelines.map);
         pass.set_bind_group(0, &self.bindings.map, &[]);
         pass.dispatch_workgroups(self.map_dispatch.0, self.map_dispatch.1, 1);
+    }
+
+    fn encode_argmin(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        timestamps: Option<(&wgpu::QuerySet, u32, u32)>,
+    ) {
+        let timestamp_writes =
+            timestamps.map(|(query_set, begin, end)| wgpu::ComputePassTimestampWrites {
+                query_set,
+                beginning_of_pass_write_index: Some(begin),
+                end_of_pass_write_index: Some(end),
+            });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("native f64 argmin"),
+            timestamp_writes,
+        });
         pass.set_pipeline(&self.pipelines.argmin);
         pass.set_bind_group(0, &self.bindings.argmin, &[]);
         pass.dispatch_workgroups(self.groups.div_ceil(REDUCE_WORKGROUP_SIZE), 1, 1);
@@ -816,6 +1061,28 @@ fn map_buffer(device: &wgpu::Device, buffer: &wgpu::Buffer) -> Result<(), Native
         .recv()
         .map_err(|error| NativeF64Error::new(format!("native readback channel failed: {error}")))?
         .map_err(|error| NativeF64Error::new(format!("native buffer mapping failed: {error}")))
+}
+
+fn read_timestamp_buffer(
+    device: &wgpu::Device,
+    buffer: &wgpu::Buffer,
+) -> Result<[u64; 6], NativeF64Error> {
+    map_buffer(device, buffer)?;
+    let mapped = buffer.slice(..).get_mapped_range();
+    let values: &[u64] = bytemuck::cast_slice(&mapped);
+    let timestamps: [u64; 6] = values
+        .try_into()
+        .map_err(|_| NativeF64Error::new("native timestamp readback did not contain six values"))?;
+    drop(mapped);
+    buffer.unmap();
+    Ok(timestamps)
+}
+
+fn timestamp_delta(begin: u64, end: u64, period_ms: f64) -> Option<f64> {
+    // Timestamp values are relative to an implementation-defined epoch, so a
+    // valid first sample may begin at zero. Only the positive delta matters.
+    let elapsed = end.checked_sub(begin)? as f64 * period_ms;
+    (elapsed.is_finite() && elapsed > 0.0).then_some(elapsed)
 }
 
 #[cfg(test)]

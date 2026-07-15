@@ -1,43 +1,23 @@
-use sembla_precision_spike::{
-    cuda::cuda_status, native_f64::probe_native_f64, probe_default_adapter, DEFAULT_GROUPS,
-    DEFAULT_ROWS,
-};
+use std::path::PathBuf;
+
+use sembla_precision_spike::{benchmark, results};
 
 fn main() {
-    if let Err(error) = run() {
-        eprintln!("precision spike adapter probe failed: {error}");
+    if let Err(error) = pollster::block_on(run()) {
+        eprintln!("precision benchmark failed: {error}");
         std::process::exit(1);
     }
 }
 
-fn run() -> Result<(), String> {
-    let probe = pollster::block_on(probe_default_adapter(DEFAULT_ROWS, DEFAULT_GROUPS))
-        .map_err(|error| error.to_string())?;
-    println!(
-        "adapter: {} (backend: {}, device type: {})",
-        probe.name, probe.backend, probe.device_type
-    );
-    println!(
-        "SHADER_F64: {}",
-        if probe.shader_f64 {
-            "supported"
-        } else {
-            "unsupported"
-        }
-    );
-    println!(
-        "safe workload: N={} person rows, G={} employer groups (estimated resident columns: {} bytes)",
-        probe.sizing.rows, probe.sizing.groups, probe.sizing.estimated_resident_bytes
-    );
-    println!(
-        "downscale reason: {}",
-        probe
-            .sizing
-            .downscale_reason
-            .as_deref()
-            .unwrap_or("none; the full requested workload fits the sizing limits")
-    );
-    println!("{}", pollster::block_on(probe_native_f64()));
-    println!("{}", cuda_status());
+async fn run() -> Result<(), String> {
+    println!("Running one-tick accuracy regression guard for every available strategy...");
+    benchmark::run_regression_guard().await?;
+    println!("Accuracy guard passed; running 10 warmup + 100 measured ticks per strategy...");
+    let run = benchmark::run_benchmark().await?;
+    let path = std::env::var_os("SEMBLA_RESULTS_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("RESULTS.md"));
+    results::update_results(&path, run)?;
+    println!("Wrote {}", path.display());
     Ok(())
 }

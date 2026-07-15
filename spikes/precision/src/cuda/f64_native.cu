@@ -4,6 +4,7 @@
 
 #include <cuda_runtime.h>
 #include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -17,6 +18,7 @@ constexpr uint32_t kPhiloxM0 = 0xd2511f53u;
 constexpr uint32_t kPhiloxM1 = 0xcd9e8d57u;
 constexpr uint32_t kPhiloxW0 = 0x9e3779b9u;
 constexpr uint32_t kPhiloxW1 = 0xbb67ae85u;
+constexpr uint32_t kThreads = 256u;
 
 struct Words4 {
   uint32_t x, y, z, w;
@@ -124,6 +126,177 @@ __global__ void argmin_kernel(uint32_t groups, double dt,
   if (best_entity != kNoWinner) fired[best_entity] = 1u;
 }
 
+struct TickConfig {
+  uint32_t rows;
+  uint32_t groups;
+  uint64_t seed;
+  double beta;
+  double dt;
+  uint32_t tick;
+};
+
+struct DeviceBuffers {
+  uint32_t* offsets;
+  uint32_t* employers;
+  uint32_t* health;
+  uint32_t* winners;
+  uint32_t* fired;
+  double* weights;
+  double* partials;
+  double* sums;
+  double* races;
+};
+
+cudaError_t allocate_and_upload(
+    const TickConfig& config, const uint32_t* host_offsets,
+    const uint32_t* host_employers, const uint32_t* host_health,
+    const double* host_weights, DeviceBuffers* buffers) {
+  cudaError_t error = cudaSuccess;
+  if (config.rows == 0u || config.groups == 0u || config.groups > config.rows ||
+      config.groups > UINT32_MAX / 2u || host_offsets == nullptr ||
+      host_employers == nullptr || host_health == nullptr ||
+      host_weights == nullptr || buffers == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+#define CUDA_ALLOC(pointer, bytes) do { \
+  if (error == cudaSuccess) { \
+    error = cudaMalloc(reinterpret_cast<void**>(&(pointer)), (bytes)); \
+  } \
+} while (0)
+  CUDA_ALLOC(buffers->offsets,
+             (static_cast<size_t>(config.groups) + 1u) * sizeof(uint32_t));
+  CUDA_ALLOC(buffers->employers,
+             static_cast<size_t>(config.rows) * sizeof(uint32_t));
+  CUDA_ALLOC(buffers->health,
+             static_cast<size_t>(config.rows) * sizeof(uint32_t));
+  CUDA_ALLOC(buffers->weights,
+             static_cast<size_t>(config.rows) * sizeof(double));
+  CUDA_ALLOC(buffers->partials,
+             static_cast<size_t>(config.groups) * 2u * sizeof(double));
+  CUDA_ALLOC(buffers->sums,
+             static_cast<size_t>(config.groups) * sizeof(double));
+  CUDA_ALLOC(buffers->races,
+             static_cast<size_t>(config.rows) * sizeof(double));
+  CUDA_ALLOC(buffers->winners,
+             static_cast<size_t>(config.groups) * sizeof(uint32_t));
+  CUDA_ALLOC(buffers->fired,
+             static_cast<size_t>(config.rows) * sizeof(uint32_t));
+#undef CUDA_ALLOC
+#define CUDA_COPY(destination, source, bytes) do { \
+  if (error == cudaSuccess) { \
+    error = cudaMemcpy((destination), (source), (bytes), cudaMemcpyHostToDevice); \
+  } \
+} while (0)
+  CUDA_COPY(buffers->offsets, host_offsets,
+            (static_cast<size_t>(config.groups) + 1u) * sizeof(uint32_t));
+  CUDA_COPY(buffers->employers, host_employers,
+            static_cast<size_t>(config.rows) * sizeof(uint32_t));
+  CUDA_COPY(buffers->health, host_health,
+            static_cast<size_t>(config.rows) * sizeof(uint32_t));
+  CUDA_COPY(buffers->weights, host_weights,
+            static_cast<size_t>(config.rows) * sizeof(double));
+#undef CUDA_COPY
+  return error;
+}
+
+cudaError_t release_buffers(DeviceBuffers* buffers) {
+  if (buffers == nullptr) return cudaSuccess;
+  cudaError_t first = cudaSuccess;
+#define CUDA_FREE(pointer) do { \
+  if ((pointer) != nullptr) { \
+    const cudaError_t free_error = cudaFree(pointer); \
+    if (first == cudaSuccess && free_error != cudaSuccess) first = free_error; \
+    (pointer) = nullptr; \
+  } \
+} while (0)
+  CUDA_FREE(buffers->fired);
+  CUDA_FREE(buffers->winners);
+  CUDA_FREE(buffers->races);
+  CUDA_FREE(buffers->sums);
+  CUDA_FREE(buffers->partials);
+  CUDA_FREE(buffers->weights);
+  CUDA_FREE(buffers->health);
+  CUDA_FREE(buffers->employers);
+  CUDA_FREE(buffers->offsets);
+#undef CUDA_FREE
+  return first;
+}
+
+cudaError_t launch_reduction(const TickConfig& config,
+                             const DeviceBuffers& buffers) {
+  reduce_partial_kernel<<<(config.groups * 2u + kThreads - 1u) / kThreads,
+                            kThreads>>>(config.groups, buffers.offsets,
+                                       buffers.health, buffers.weights,
+                                       buffers.partials);
+  cudaError_t error = cudaGetLastError();
+  if (error != cudaSuccess) return error;
+  reduce_finish_kernel<<<(config.groups + kThreads - 1u) / kThreads,
+                           kThreads>>>(config.groups, buffers.partials,
+                                      buffers.sums);
+  return cudaGetLastError();
+}
+
+cudaError_t launch_map(const TickConfig& config,
+                       const DeviceBuffers& buffers) {
+  map_kernel<<<(config.rows + kThreads - 1u) / kThreads, kThreads>>>(
+      config.rows, config.tick, static_cast<uint32_t>(config.seed),
+      static_cast<uint32_t>(config.seed >> 32), config.beta, config.dt,
+      buffers.offsets, buffers.employers, buffers.health, buffers.sums,
+      buffers.races, buffers.fired);
+  return cudaGetLastError();
+}
+
+cudaError_t launch_argmin(const TickConfig& config,
+                          const DeviceBuffers& buffers) {
+  argmin_kernel<<<(config.groups + kThreads - 1u) / kThreads, kThreads>>>(
+      config.groups, config.dt, buffers.offsets, buffers.races,
+      buffers.winners, buffers.fired);
+  return cudaGetLastError();
+}
+
+cudaError_t launch_tick(const TickConfig& config,
+                        const DeviceBuffers& buffers) {
+  cudaError_t error = launch_reduction(config, buffers);
+  if (error == cudaSuccess) error = launch_map(config, buffers);
+  if (error == cudaSuccess) error = launch_argmin(config, buffers);
+  return error;
+}
+
+cudaError_t copy_outputs(const TickConfig& config,
+                         const DeviceBuffers& buffers, double* host_sums,
+                         uint32_t* host_winners, uint32_t* host_fired) {
+  if (host_sums == nullptr || host_winners == nullptr || host_fired == nullptr) {
+    return cudaErrorInvalidValue;
+  }
+  cudaError_t error = cudaMemcpy(
+      host_sums, buffers.sums,
+      static_cast<size_t>(config.groups) * sizeof(double),
+      cudaMemcpyDeviceToHost);
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(host_winners, buffers.winners,
+                       static_cast<size_t>(config.groups) * sizeof(uint32_t),
+                       cudaMemcpyDeviceToHost);
+  }
+  if (error == cudaSuccess) {
+    error = cudaMemcpy(host_fired, buffers.fired,
+                       static_cast<size_t>(config.rows) * sizeof(uint32_t),
+                       cudaMemcpyDeviceToHost);
+  }
+  return error;
+}
+
+cudaError_t destroy_events(cudaEvent_t events[4]) {
+  cudaError_t first = cudaSuccess;
+  for (uint32_t index = 0; index < 4u; ++index) {
+    if (events[index] != nullptr) {
+      const cudaError_t error = cudaEventDestroy(events[index]);
+      if (first == cudaSuccess && error != cudaSuccess) first = error;
+      events[index] = nullptr;
+    }
+  }
+  return first;
+}
+
 }  // namespace
 
 extern "C" int sembla_cuda_f64_probe(char* name, uint32_t name_capacity,
@@ -159,56 +332,77 @@ extern "C" int sembla_cuda_f64_run_tick(
     const uint32_t* host_employers, const uint32_t* host_health,
     const double* host_weights, double* host_sums, uint32_t* host_winners,
     uint32_t* host_fired) {
-  cudaError_t error = cudaSuccess;
-  uint32_t *offsets = nullptr, *employers = nullptr, *health = nullptr;
-  uint32_t *winners = nullptr, *fired = nullptr;
-  double *weights = nullptr, *partials = nullptr, *sums = nullptr, *races = nullptr;
-
-#define CUDA_TRY(expression) do { error = (expression); if (error != cudaSuccess) goto cleanup; } while (0)
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&offsets), (groups + 1ull) * sizeof(uint32_t)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&employers), rows * sizeof(uint32_t)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&health), rows * sizeof(uint32_t)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&weights), rows * sizeof(double)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&partials), groups * 2ull * sizeof(double)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&sums), groups * sizeof(double)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&races), rows * sizeof(double)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&winners), groups * sizeof(uint32_t)));
-  CUDA_TRY(cudaMalloc(reinterpret_cast<void**>(&fired), rows * sizeof(uint32_t)));
-  CUDA_TRY(cudaMemcpy(offsets, host_offsets, (groups + 1ull) * sizeof(uint32_t), cudaMemcpyHostToDevice));
-  CUDA_TRY(cudaMemcpy(employers, host_employers, rows * sizeof(uint32_t), cudaMemcpyHostToDevice));
-  CUDA_TRY(cudaMemcpy(health, host_health, rows * sizeof(uint32_t), cudaMemcpyHostToDevice));
-  CUDA_TRY(cudaMemcpy(weights, host_weights, rows * sizeof(double), cudaMemcpyHostToDevice));
-
-  {
-    constexpr uint32_t threads = 256u;
-    reduce_partial_kernel<<<(groups * 2u + threads - 1u) / threads, threads>>>(
-        groups, offsets, health, weights, partials);
-    CUDA_TRY(cudaGetLastError());
-    reduce_finish_kernel<<<(groups + threads - 1u) / threads, threads>>>(groups, partials, sums);
-    CUDA_TRY(cudaGetLastError());
-    map_kernel<<<(rows + threads - 1u) / threads, threads>>>(
-        rows, tick, static_cast<uint32_t>(seed), static_cast<uint32_t>(seed >> 32),
-        beta, dt, offsets, employers, health, sums, races, fired);
-    CUDA_TRY(cudaGetLastError());
-    argmin_kernel<<<(groups + threads - 1u) / threads, threads>>>(
-        groups, dt, offsets, races, winners, fired);
-    CUDA_TRY(cudaGetLastError());
+  const TickConfig config{rows, groups, seed, beta, dt, tick};
+  DeviceBuffers buffers{};
+  cudaError_t error = allocate_and_upload(config, host_offsets, host_employers,
+                                           host_health, host_weights, &buffers);
+  if (error == cudaSuccess) error = launch_tick(config, buffers);
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+  if (error == cudaSuccess) {
+    error = copy_outputs(config, buffers, host_sums, host_winners, host_fired);
   }
-  CUDA_TRY(cudaDeviceSynchronize());
-  CUDA_TRY(cudaMemcpy(host_sums, sums, groups * sizeof(double), cudaMemcpyDeviceToHost));
-  CUDA_TRY(cudaMemcpy(host_winners, winners, groups * sizeof(uint32_t), cudaMemcpyDeviceToHost));
-  CUDA_TRY(cudaMemcpy(host_fired, fired, rows * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+  const cudaError_t cleanup_error = release_buffers(&buffers);
+  if (error == cudaSuccess) error = cleanup_error;
+  return static_cast<int>(error);
+}
 
-cleanup:
-  if (fired != nullptr) (void)cudaFree(fired);
-  if (winners != nullptr) (void)cudaFree(winners);
-  if (races != nullptr) (void)cudaFree(races);
-  if (sums != nullptr) (void)cudaFree(sums);
-  if (partials != nullptr) (void)cudaFree(partials);
-  if (weights != nullptr) (void)cudaFree(weights);
-  if (health != nullptr) (void)cudaFree(health);
-  if (employers != nullptr) (void)cudaFree(employers);
-  if (offsets != nullptr) (void)cudaFree(offsets);
-#undef CUDA_TRY
+extern "C" int sembla_cuda_f64_benchmark(
+    uint32_t rows, uint32_t groups, uint64_t seed, double beta, double dt,
+    uint32_t tick, uint32_t warmup_ticks, uint32_t measured_ticks,
+    const uint32_t* host_offsets, const uint32_t* host_employers,
+    const uint32_t* host_health, const double* host_weights,
+    float* host_total_ms, float* host_reduce_ms, float* host_argmin_ms,
+    double* host_sums, uint32_t* host_winners, uint32_t* host_fired) {
+  if (warmup_ticks != 10u || measured_ticks != 100u ||
+      host_total_ms == nullptr || host_reduce_ms == nullptr ||
+      host_argmin_ms == nullptr) {
+    return static_cast<int>(cudaErrorInvalidValue);
+  }
+
+  const TickConfig config{rows, groups, seed, beta, dt, tick};
+  DeviceBuffers buffers{};
+  cudaEvent_t events[4] = {nullptr, nullptr, nullptr, nullptr};
+  cudaError_t error = allocate_and_upload(config, host_offsets, host_employers,
+                                           host_health, host_weights, &buffers);
+  for (uint32_t index = 0; index < 4u && error == cudaSuccess; ++index) {
+    error = cudaEventCreate(&events[index]);
+  }
+
+  // Immutable workload inputs and device allocations are retained across all
+  // warmup and measured ticks. A single synchronization drains the warmups.
+  for (uint32_t sample = 0; sample < warmup_ticks && error == cudaSuccess;
+       ++sample) {
+    error = launch_tick(config, buffers);
+  }
+  if (error == cudaSuccess) error = cudaDeviceSynchronize();
+
+  for (uint32_t sample = 0; sample < measured_ticks && error == cudaSuccess;
+       ++sample) {
+    error = cudaEventRecord(events[0]);
+    if (error == cudaSuccess) error = launch_reduction(config, buffers);
+    if (error == cudaSuccess) error = cudaEventRecord(events[1]);
+    if (error == cudaSuccess) error = launch_map(config, buffers);
+    if (error == cudaSuccess) error = cudaEventRecord(events[2]);
+    if (error == cudaSuccess) error = launch_argmin(config, buffers);
+    if (error == cudaSuccess) error = cudaEventRecord(events[3]);
+    if (error == cudaSuccess) error = cudaEventSynchronize(events[3]);
+    if (error == cudaSuccess) {
+      error = cudaEventElapsedTime(&host_total_ms[sample], events[0], events[3]);
+    }
+    if (error == cudaSuccess) {
+      error = cudaEventElapsedTime(&host_reduce_ms[sample], events[0], events[1]);
+    }
+    if (error == cudaSuccess) {
+      error = cudaEventElapsedTime(&host_argmin_ms[sample], events[2], events[3]);
+    }
+  }
+
+  if (error == cudaSuccess) {
+    error = copy_outputs(config, buffers, host_sums, host_winners, host_fired);
+  }
+  const cudaError_t event_cleanup_error = destroy_events(events);
+  const cudaError_t buffer_cleanup_error = release_buffers(&buffers);
+  if (error == cudaSuccess) error = event_cleanup_error;
+  if (error == cudaSuccess) error = buffer_cleanup_error;
   return static_cast<int>(error);
 }

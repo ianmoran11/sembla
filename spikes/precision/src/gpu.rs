@@ -5,13 +5,14 @@
 //! partials per employer followed by an ordered merge. No floating-point
 //! atomics are used, so both variants have a stable reduction tree.
 
-use std::{borrow::Cow, error::Error, fmt, sync::mpsc};
+use std::{borrow::Cow, error::Error, fmt, sync::mpsc, time::Instant};
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
 use crate::{
     oracle::{run_oracle, OracleResult},
+    timing::{self, StageTiming, TimingMethod, BENCHMARK_TICK, MEASURED_TICKS, WARMUP_TICKS},
     workload::{Workload, WorkloadConfig},
 };
 
@@ -125,14 +126,12 @@ pub struct AccuracyReport {
 }
 
 impl AccuracyReport {
-    /// Enforces the documented PRD-0002 accuracy thresholds.
-    pub fn assert_thresholds(&self) -> Result<(), String> {
-        if !self.fast_math.trustworthy_on_adapter {
-            return Err(format!(
-                "double-single arithmetic behavior is not trustworthy: {}",
-                self.fast_math
-            ));
-        }
+    /// Enforces the numerical PRD-0002 thresholds on every backend.
+    ///
+    /// This deliberately does not treat the absence of a backend strict-math
+    /// switch as a numerical waiver: a silently broken double-single kernel
+    /// must fail the PRD-0005 regression guard on Vulkan as well as Metal.
+    pub fn assert_numerical_thresholds(&self) -> Result<(), String> {
         if self.df64.reduction_relative_error.max > DF64_MAX_REDUCTION_RELATIVE_ERROR {
             return Err(format!(
                 "df64 max reduction error {} exceeds {}",
@@ -157,6 +156,19 @@ impl AccuracyReport {
             return Err(format!(
                 "df64 winner mismatch rate {} is not strictly below f32 {}",
                 self.df64.winner_mismatch_rate, self.f32.winner_mismatch_rate
+            ));
+        }
+        Ok(())
+    }
+
+    /// Enforces numerical thresholds plus the Metal strict-compilation trust
+    /// contract used by PRD 0002's development-machine evidence.
+    pub fn assert_thresholds(&self) -> Result<(), String> {
+        self.assert_numerical_thresholds()?;
+        if !self.fast_math.trustworthy_on_adapter {
+            return Err(format!(
+                "double-single arithmetic behavior is not trustworthy: {}",
+                self.fast_math
             ));
         }
         Ok(())
@@ -298,6 +310,7 @@ pub struct PortableRunner {
     adapter_name: String,
     backend: String,
     strict_math_backend_supported: bool,
+    timestamp_supported: bool,
     rows: u32,
     groups: u32,
     map_dispatch: (u32, u32),
@@ -338,6 +351,8 @@ impl PortableRunner {
         };
         let adapter_info = adapter.get_info();
         let strict_math_backend_supported = adapter_info.backend == wgpu::Backend::Metal;
+        let adapter_features = adapter.features();
+        let timestamp_supported = adapter_features.contains(wgpu::Features::TIMESTAMP_QUERY);
         let adapter_limits = adapter.limits();
         if adapter_limits.max_storage_buffers_per_shader_stage < 6 {
             return Err(GpuError::new(format!(
@@ -365,7 +380,11 @@ impl PortableRunner {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: Some("Sembla portable precision kernels"),
-                    required_features: wgpu::Features::empty(),
+                    required_features: if timestamp_supported {
+                        wgpu::Features::TIMESTAMP_QUERY
+                    } else {
+                        wgpu::Features::empty()
+                    },
                     required_limits,
                 },
                 None,
@@ -522,6 +541,7 @@ impl PortableRunner {
             adapter_name: adapter_info.name,
             backend: format!("{:?}", adapter_info.backend),
             strict_math_backend_supported,
+            timestamp_supported,
             rows: workload.config.rows,
             groups: workload.config.groups,
             map_dispatch: (map_x, map_y),
@@ -551,7 +571,31 @@ impl PortableRunner {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("portable reduction dispatch"),
             });
-        self.encode_reduction(&mut encoder, strategy);
+        self.encode_reduction(&mut encoder, strategy, None);
+        self.queue.submit(Some(encoder.finish()));
+    }
+
+    /// Dispatches only the row map using the currently resident segmented sums.
+    pub fn dispatch_map_only(&self, strategy: PortableStrategy, tick: u32) {
+        self.write_tick(tick);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("portable map dispatch"),
+            });
+        self.encode_map(&mut encoder, strategy, None);
+        self.queue.submit(Some(encoder.finish()));
+    }
+
+    /// Dispatches only segmented argmin using the currently resident race times.
+    pub fn dispatch_argmin_only(&self, strategy: PortableStrategy, tick: u32) {
+        self.write_tick(tick);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("portable argmin dispatch"),
+            });
+        self.encode_argmin(&mut encoder, strategy, None);
         self.queue.submit(Some(encoder.finish()));
     }
 
@@ -563,7 +607,8 @@ impl PortableRunner {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("portable map + argmin dispatch"),
             });
-        self.encode_map_argmin(&mut encoder, strategy);
+        self.encode_map(&mut encoder, strategy, None);
+        self.encode_argmin(&mut encoder, strategy, None);
         self.queue.submit(Some(encoder.finish()));
     }
 
@@ -575,8 +620,9 @@ impl PortableRunner {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("portable full tick dispatch"),
             });
-        self.encode_reduction(&mut encoder, strategy);
-        self.encode_map_argmin(&mut encoder, strategy);
+        self.encode_reduction(&mut encoder, strategy, None);
+        self.encode_map(&mut encoder, strategy, None);
+        self.encode_argmin(&mut encoder, strategy, None);
         self.queue.submit(Some(encoder.finish()));
     }
 
@@ -599,6 +645,182 @@ impl PortableRunner {
 
     pub fn wait(&self) {
         self.device.poll(wgpu::Maintain::Wait);
+    }
+
+    /// Measures steady-state full ticks and the reduction/argmin hot stages.
+    pub fn benchmark(&self, strategy: PortableStrategy) -> Result<StageTiming, GpuError> {
+        if self.timestamp_supported {
+            // The timestamp path performs one preflight before warmups. A
+            // later failure is an error rather than a reason to rerun samples.
+            self.benchmark_timestamps(strategy)
+        } else {
+            self.benchmark_wall_clock(strategy)
+        }
+    }
+
+    fn benchmark_timestamps(&self, strategy: PortableStrategy) -> Result<StageTiming, GpuError> {
+        const QUERY_COUNT: u32 = 6;
+        const QUERY_BYTES: u64 = QUERY_COUNT as u64 * std::mem::size_of::<u64>() as u64;
+        let query_set = self.device.create_query_set(&wgpu::QuerySetDescriptor {
+            label: Some("portable precision stage timestamps"),
+            ty: wgpu::QueryType::Timestamp,
+            count: QUERY_COUNT,
+        });
+        let resolve = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("portable timestamp resolve"),
+            size: QUERY_BYTES,
+            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("portable timestamp readback"),
+            size: QUERY_BYTES,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        let period_ms = f64::from(self.queue.get_timestamp_period()) / 1_000_000.0;
+        // Some wgpu 0.20 Metal devices advertise TIMESTAMP_QUERY but return
+        // zeroes for a later compute pass. Probe once before the benchmark's
+        // exactly 10 warmups; an unusable query implementation selects the
+        // synchronized fallback without discarding measured samples.
+        if self
+            .timestamp_sample(strategy, &query_set, &resolve, &readback, period_ms)?
+            .is_none()
+        {
+            return self.benchmark_wall_clock(strategy);
+        }
+
+        for _ in 0..WARMUP_TICKS {
+            self.dispatch_tick_only(strategy, BENCHMARK_TICK);
+            self.wait();
+        }
+
+        let mut totals = Vec::with_capacity(MEASURED_TICKS);
+        let mut reductions = Vec::with_capacity(MEASURED_TICKS);
+        let mut argmins = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            let Some((total, reduce, argmin)) =
+                self.timestamp_sample(strategy, &query_set, &resolve, &readback, period_ms)?
+            else {
+                return Err(GpuError::new(
+                    "GPU timestamp queries became incomplete after a successful preflight",
+                ));
+            };
+            totals.push(total);
+            reductions.push(reduce);
+            argmins.push(argmin);
+        }
+
+        timing::summarize(
+            self.rows,
+            WARMUP_TICKS,
+            MEASURED_TICKS,
+            TimingMethod::GpuTimestampQueries,
+            &mut totals,
+            &mut reductions,
+            &mut argmins,
+        )
+        .map_err(GpuError::new)
+    }
+
+    fn timestamp_sample(
+        &self,
+        strategy: PortableStrategy,
+        query_set: &wgpu::QuerySet,
+        resolve: &wgpu::Buffer,
+        readback: &wgpu::Buffer,
+        period_ms: f64,
+    ) -> Result<Option<(f64, f64, f64)>, GpuError> {
+        const QUERY_COUNT: u32 = 6;
+        const QUERY_BYTES: u64 = QUERY_COUNT as u64 * std::mem::size_of::<u64>() as u64;
+        self.write_tick(BENCHMARK_TICK);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("portable timestamped tick"),
+            });
+        self.encode_reduction(&mut encoder, strategy, Some((query_set, 0, 1)));
+        self.encode_map(&mut encoder, strategy, Some((query_set, 2, 3)));
+        self.encode_argmin(&mut encoder, strategy, Some((query_set, 4, 5)));
+        encoder.resolve_query_set(query_set, 0..QUERY_COUNT, resolve, 0);
+        encoder.copy_buffer_to_buffer(resolve, 0, readback, 0, QUERY_BYTES);
+        self.queue.submit(Some(encoder.finish()));
+        self.wait();
+
+        let timestamps = read_timestamp_buffer(&self.device, readback)?;
+        let reduce = timestamp_delta(timestamps[0], timestamps[1], period_ms);
+        let map = timestamp_delta(timestamps[2], timestamps[3], period_ms);
+        let argmin = timestamp_delta(timestamps[4], timestamps[5], period_ms);
+        let total = timestamp_delta(timestamps[0], timestamps[5], period_ms);
+        let (Some(total), Some(reduce), Some(map), Some(argmin)) = (total, reduce, map, argmin)
+        else {
+            return Ok(None);
+        };
+        if total < (reduce + map + argmin) * 0.99 {
+            return Ok(None);
+        }
+        Ok(Some((total, reduce, argmin)))
+    }
+
+    fn benchmark_wall_clock(&self, strategy: PortableStrategy) -> Result<StageTiming, GpuError> {
+        for _ in 0..WARMUP_TICKS {
+            self.dispatch_tick_only(strategy, BENCHMARK_TICK);
+            self.wait();
+        }
+        let mut totals = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            let start = Instant::now();
+            self.dispatch_tick_only(strategy, BENCHMARK_TICK);
+            self.wait();
+            totals.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        for _ in 0..WARMUP_TICKS {
+            self.dispatch_reduction_only(strategy, BENCHMARK_TICK);
+            self.wait();
+        }
+        let mut reductions = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            let start = Instant::now();
+            self.dispatch_reduction_only(strategy, BENCHMARK_TICK);
+            self.wait();
+            reductions.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        for _ in 0..WARMUP_TICKS {
+            self.prepare_argmin(strategy);
+            let start = Instant::now();
+            self.dispatch_argmin_only(strategy, BENCHMARK_TICK);
+            self.wait();
+            let _ = start.elapsed();
+        }
+        let mut argmins = Vec::with_capacity(MEASURED_TICKS);
+        for _ in 0..MEASURED_TICKS {
+            self.prepare_argmin(strategy);
+            let start = Instant::now();
+            self.dispatch_argmin_only(strategy, BENCHMARK_TICK);
+            self.wait();
+            argmins.push(start.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        timing::summarize(
+            self.rows,
+            WARMUP_TICKS,
+            MEASURED_TICKS,
+            TimingMethod::SynchronizedWallClockFallback,
+            &mut totals,
+            &mut reductions,
+            &mut argmins,
+        )
+        .map_err(GpuError::new)
+    }
+
+    fn prepare_argmin(&self, strategy: PortableStrategy) {
+        self.dispatch_reduction_only(strategy, BENCHMARK_TICK);
+        self.wait();
+        self.dispatch_map_only(strategy, BENCHMARK_TICK);
+        self.wait();
     }
 
     /// Runs the WGSL Philox implementation over all four frozen vectors.
@@ -745,11 +967,22 @@ impl PortableRunner {
             .write_buffer(&self.config, 0, bytemuck::bytes_of(&config));
     }
 
-    fn encode_reduction(&self, encoder: &mut wgpu::CommandEncoder, strategy: PortableStrategy) {
+    fn encode_reduction(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        strategy: PortableStrategy,
+        timestamps: Option<(&wgpu::QuerySet, u32, u32)>,
+    ) {
         let gpu = self.strategy(strategy);
+        let timestamp_writes =
+            timestamps.map(|(query_set, begin, end)| wgpu::ComputePassTimestampWrites {
+                query_set,
+                beginning_of_pass_write_index: Some(begin),
+                end_of_pass_write_index: Some(end),
+            });
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("two-pass segmented reduction"),
-            timestamp_writes: None,
+            timestamp_writes,
         });
         pass.set_pipeline(&gpu.pipelines.partial);
         pass.set_bind_group(0, &gpu.bindings.partial, &[]);
@@ -763,15 +996,45 @@ impl PortableRunner {
         pass.dispatch_workgroups(self.groups.div_ceil(REDUCE_WORKGROUP_SIZE), 1, 1);
     }
 
-    fn encode_map_argmin(&self, encoder: &mut wgpu::CommandEncoder, strategy: PortableStrategy) {
+    fn encode_map(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        strategy: PortableStrategy,
+        timestamps: Option<(&wgpu::QuerySet, u32, u32)>,
+    ) {
         let gpu = self.strategy(strategy);
+        let timestamp_writes =
+            timestamps.map(|(query_set, begin, end)| wgpu::ComputePassTimestampWrites {
+                query_set,
+                beginning_of_pass_write_index: Some(begin),
+                end_of_pass_write_index: Some(end),
+            });
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("map + segmented argmin"),
-            timestamp_writes: None,
+            label: Some("hazard/race map"),
+            timestamp_writes,
         });
         pass.set_pipeline(&gpu.pipelines.map);
         pass.set_bind_group(0, &gpu.bindings.map, &[]);
         pass.dispatch_workgroups(self.map_dispatch.0, self.map_dispatch.1, 1);
+    }
+
+    fn encode_argmin(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        strategy: PortableStrategy,
+        timestamps: Option<(&wgpu::QuerySet, u32, u32)>,
+    ) {
+        let gpu = self.strategy(strategy);
+        let timestamp_writes =
+            timestamps.map(|(query_set, begin, end)| wgpu::ComputePassTimestampWrites {
+                query_set,
+                beginning_of_pass_write_index: Some(begin),
+                end_of_pass_write_index: Some(end),
+            });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("segmented argmin"),
+            timestamp_writes,
+        });
         pass.set_pipeline(&gpu.pipelines.argmin);
         pass.set_bind_group(0, &gpu.bindings.argmin, &[]);
         pass.dispatch_workgroups(self.groups.div_ceil(REDUCE_WORKGROUP_SIZE), 1, 1);
@@ -1088,6 +1351,28 @@ fn map_buffer(device: &wgpu::Device, buffer: &wgpu::Buffer) -> Result<(), GpuErr
         .map_err(|error| GpuError::new(format!("buffer mapping failed: {error}")))
 }
 
+fn read_timestamp_buffer(
+    device: &wgpu::Device,
+    buffer: &wgpu::Buffer,
+) -> Result<[u64; 6], GpuError> {
+    map_buffer(device, buffer)?;
+    let mapped = buffer.slice(..).get_mapped_range();
+    let values: &[u64] = bytemuck::cast_slice(&mapped);
+    let timestamps: [u64; 6] = values
+        .try_into()
+        .map_err(|_| GpuError::new("timestamp readback did not contain six values"))?;
+    drop(mapped);
+    buffer.unmap();
+    Ok(timestamps)
+}
+
+fn timestamp_delta(begin: u64, end: u64, period_ms: f64) -> Option<f64> {
+    // Timestamp values are relative to an implementation-defined epoch, so a
+    // valid first sample may begin at zero. Only the positive delta matters.
+    let elapsed = end.checked_sub(begin)? as f64 * period_ms;
+    (elapsed.is_finite() && elapsed > 0.0).then_some(elapsed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1111,13 +1396,18 @@ mod tests {
         pollster::block_on(async {
             let report = run_accuracy_smoke().await.unwrap();
             println!("{report}");
-            report.assert_thresholds().unwrap();
-            assert!(report.fast_math.strict_math_requested);
-            assert!(report.fast_math.strict_math_backend_supported);
-            assert!(!report.fast_math.fma_contraction_observed);
-            assert!(!report.fast_math.reassociation_observed);
-            assert!(report.fast_math.df64_residuals_preserved);
-            assert!(report.fast_math.trustworthy_on_adapter);
+            report.assert_numerical_thresholds().unwrap();
+            if report.fast_math.strict_math_backend_supported {
+                report.assert_thresholds().unwrap();
+                assert!(report.fast_math.strict_math_requested);
+                assert!(!report.fast_math.fma_contraction_observed);
+                assert!(!report.fast_math.reassociation_observed);
+                assert!(report.fast_math.df64_residuals_preserved);
+                assert!(report.fast_math.trustworthy_on_adapter);
+            } else {
+                assert!(!report.fast_math.strict_math_requested);
+                assert!(!report.fast_math.trustworthy_on_adapter);
+            }
             assert!(
                 report.df64.reduction_relative_error.max < report.f32.reduction_relative_error.max
             );

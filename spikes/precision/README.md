@@ -34,18 +34,27 @@ Static weights reserve Philox coordinates
 `(tick, rule_id=0, entity_id, draw_idx=0)`. The key is `(seed_lo, seed_hi)` and
 counter words are `(tick, rule_id, entity_id, draw_idx)`.
 
-## Probe and sizing
+## Unified benchmark and sizing
 
 ```console
-cargo run
+cargo run --release
 ```
 
-The probe prints adapter name/backend/device type, `SHADER_F64`, safe `(N, G)`,
-and any downscale reason. The sizing model checks the largest 8-byte storage
-binding and a documented resident footprint of 32 bytes/person plus 12
-bytes/employer. Because wgpu exposes no portable heap-budget query, aggregate
-resident bytes are conservatively bounded by `min(max_buffer_size, 1 GiB)`.
-Software adapters additionally use a 200,000-row functional safety cap.
+The command first runs the committed one-tick accuracy guard, then resolves a
+safe `(N, G)`, computes the CPU `f64` oracle once, and measures every available
+strategy with 10 warmup and 100 measured ticks. GPU timestamp queries provide
+total, segmented-reduce, and segmented-argmin medians where supported;
+otherwise each interval uses a synchronized wall-clock fallback and is labeled
+as such. The generated `RESULTS.md` always has exactly four rows: `f32`,
+`double-single`, native `f64` via wgpu, and native `f64` via CUDA. Missing
+capabilities, toolkit, or device support are recorded as `unanswered on this
+adapter`, never as zeroes.
+
+The sizing model checks the largest 8-byte storage binding and a documented
+resident footprint of 32 bytes/person plus 12 bytes/employer. Because wgpu
+exposes no portable heap-budget query, aggregate resident bytes are
+conservatively bounded by `min(max_buffer_size, 1 GiB)`. Software adapters
+additionally use a 200,000-row functional safety cap.
 
 ## Portable precision kernels
 
@@ -155,3 +164,25 @@ When the feature is enabled but none executes, no CUDA symbols or libraries are
 linked. A detected but broken toolkit fails the build rather than being
 misreported as absent. Finding `nvcc` does not imply a CUDA device is available;
 that runtime case is separately reported as `cuda: device-unavailable`.
+
+## Mac + NVIDIA result assembly
+
+`RESULTS.md` contains versioned JSON state under stable markers and is replaced
+atomically only after the guard, benchmark, existing-state parse, and render all
+succeed. To produce the durable merged artifact:
+
+1. On the Mac, run `cargo run --release` and keep the generated `RESULTS.md`.
+2. Make that exact file present in the PRD-0004 NVIDIA checkout before the GPU
+   run—commit it with the implementation or copy it to
+   `spikes/precision/RESULTS.md` on the box.
+3. On the NVIDIA box, run the provisioned `/home/ubuntu/run-spike.sh` (equivalent
+   to `cargo run --release --features cuda` with metadata exports).
+4. Copy the resulting file back. It retains both complete machine metadata
+   blocks, prefers Mac rows for portable strategies, and prefers NVIDIA rows for
+   native `f64`.
+
+A rerun replaces only the current machine key (`development` or `nvidia`) and
+preserves the other machine. The merged matrix records row provenance and warns
+when machine-specific safe sizing produced different workloads. To write a
+custom artifact path, set `SEMBLA_RESULTS_PATH`; the cloud wrapper also accepts
+`SPIKE_RESULTS_PATH` and forwards it.

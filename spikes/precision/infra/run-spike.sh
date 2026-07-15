@@ -17,18 +17,14 @@ export WGPU_BACKEND=vulkan
 cd "$SPIKE_DIR/spikes/precision"
 RESULTS_PATH="${SPIKE_RESULTS_PATH:-$PWD/RESULTS.md}"
 TRANSCRIPT_PATH="$(mktemp)"
-REPORT_PATH="$(mktemp)"
-trap 'rm -f "$TRANSCRIPT_PATH" "$REPORT_PATH"' EXIT
+trap 'rm -f "$TRANSCRIPT_PATH"' EXIT
 
 command -v cargo >/dev/null
 command -v nvcc >/dev/null
-nvidia-smi >/dev/null
+command -v nvidia-smi >/dev/null
 
-# Build first, then let the PRD-0005 runner own RESULTS.md. Capturing stdout to a
-# separate transcript avoids concurrently truncating the benchmark artifact.
-cargo build --release --features cuda
-cargo run --release --features cuda 2>&1 | tee "$TRANSCRIPT_PATH"
-
+# Collect infrastructure provenance before the Rust runner atomically updates
+# RESULTS.md, so the NVIDIA machine block owns all metadata and benchmark rows.
 IMDS_TOKEN="$(curl --fail --silent --show-error --request PUT \
   --header 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
   http://169.254.169.254/latest/api/token || true)"
@@ -39,45 +35,27 @@ if [ -n "$IMDS_TOKEN" ]; then
     http://169.254.169.254/latest/meta-data/ami-id || true)"
   ACTUAL_AMI_ID="${ACTUAL_AMI_ID:-unavailable}"
 fi
+NVIDIA_DEVICE="$(nvidia-smi --query-gpu=name,driver_version,pci.bus_id --format=csv,noheader)"
 
-{
-  echo "# Precision spike GPU run"
-  echo
-  echo "## PRD 0004 infrastructure metadata"
-  echo
-  echo "- generated-at-utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "- repository-commit: $(git -C "$SPIKE_DIR" rev-parse HEAD)"
-  echo "- aws-region: $AWS_REGION"
-  echo "- requested-ami: $AMI_REQUEST"
-  echo "- actual-ami-id: $ACTUAL_AMI_ID"
-  echo "- gpu-class: $GPU_CLASS"
-  echo "- fp64-class: $FP64_CLASS"
-  echo "- fp64-fp32-ratio: $FP64_FP32_RATIO"
-  echo "- full-rate-extrapolation: $FULL_RATE_EXTRAPOLATION"
-  echo "- expected-gpu: $GPU_MODEL"
-  echo "- instance-type: $INSTANCE_TYPE"
-  echo
-  echo "### NVIDIA device"
-  echo
-  echo '```text'
-  nvidia-smi --query-gpu=name,driver_version,pci.bus_id --format=csv,noheader
-  echo '```'
-  echo
+export SEMBLA_MACHINE_KIND=nvidia
+export SEMBLA_RESULTS_PATH="$RESULTS_PATH"
+export SEMBLA_INFRA_GENERATED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+export SEMBLA_INFRA_REPOSITORY_COMMIT="$(git -C "$SPIKE_DIR" rev-parse HEAD)"
+export SEMBLA_INFRA_AWS_REGION="$AWS_REGION"
+export SEMBLA_INFRA_REQUESTED_AMI="$AMI_REQUEST"
+export SEMBLA_INFRA_ACTUAL_AMI_ID="$ACTUAL_AMI_ID"
+export SEMBLA_INFRA_GPU_CLASS="$GPU_CLASS"
+export SEMBLA_INFRA_FP64_CLASS="$FP64_CLASS"
+export SEMBLA_INFRA_FP64_FP32_RATIO="$FP64_FP32_RATIO"
+export SEMBLA_INFRA_FULL_RATE_EXTRAPOLATION="$FULL_RATE_EXTRAPOLATION"
+export SEMBLA_INFRA_EXPECTED_GPU="$GPU_MODEL"
+export SEMBLA_INFRA_NVIDIA_DEVICE="$NVIDIA_DEVICE"
+export SEMBLA_INFRA_INSTANCE_TYPE="$INSTANCE_TYPE"
 
-  if [ -s "$RESULTS_PATH" ]; then
-    echo "## Benchmark artifact"
-    echo
-    cat "$RESULTS_PATH"
-  else
-    # Before PRD 0005 lands, the current runner prints its result rather than
-    # creating RESULTS.md. Preserve that output as an explicit fallback.
-    echo "## Spike command transcript"
-    echo
-    echo '```text'
-    cat "$TRANSCRIPT_PATH"
-    echo '```'
-  fi
-} >"$REPORT_PATH"
-
-mv "$REPORT_PATH" "$RESULTS_PATH"
+# RESULTS.md must already contain the Mac state if this run is intended to
+# assemble both machines. The Rust process reads, merges, and atomically replaces
+# that artifact; tee captures diagnostics without wrapping or truncating it.
+cargo build --release --features cuda
+cargo run --release --features cuda 2>&1 | tee "$TRANSCRIPT_PATH"
+test -s "$RESULTS_PATH"
 echo "Wrote $RESULTS_PATH"
