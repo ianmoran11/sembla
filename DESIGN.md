@@ -274,6 +274,23 @@ Same IR, three schedulers:
 Because randomness is a pure function of coordinates, *which* random events
 happen never varies across levels — only floating-point accumulation order does.
 
+**v0.2 GPU precision is measured but pending full-rate confirmation.** The CPU
+`f64` interpreter remains the semantics oracle and the numeric contract is
+unchanged. The production GPU representation must be selected by the
+full-rate-NVIDIA gate in [ADR 0001](docs/decisions/0001-gpu-precision.md). Select
+qualifying native `f64` when double-single does not qualify, or when both qualify
+and the named native production path is at least 20% faster. Otherwise select
+qualifying double-single. Consider a tiered `f32`/mixed path only when neither
+precise candidate qualifies and an explicit reduced-precision contract passes.
+No `f32` or double-single result is to be called native-`f64` equivalence.
+
+For either precise candidate, fixed-order two-pass reductions make Level A
+plausible on the same binary and GPU model. Double-single additionally requires
+a strict-arithmetic compilation path. Level B remains unproven pending
+cross-hardware bitwise tests. A tiered path has Level C as its baseline; fixed
+ordering can strengthen reproducibility only for its explicitly reduced
+contract, not for the unchanged `f64` contract.
+
 ### 5.3 Common random numbers: the counterfactual feature
 
 Philox-by-coordinate gives **exact common random numbers across scenarios for

@@ -45,7 +45,7 @@ roadmap must retire first, and it shapes v0.2.
 
 | Version | Theme | Retires / unlocks | Headline decision |
 |---|---|---|---|
-| **v0.2** | Real GPU backend | Throughput thesis, for real | GPU precision strategy (the `f64` fork) |
+| **v0.2** | Real GPU backend | Throughput thesis, for real | [Precision measured; pending full-rate gate](decisions/0001-gpu-precision.md) |
 | **v0.3** | Expressiveness I: dynamic populations | Birth/death, general composition, ODE + Kurtz | How far to push the wiring-diagram language |
 | **v0.4** | Inference & behavior widgets | Calibration; interactive slider→simulate→plot | Black-box (ABC/SBI) vs. gradient-based |
 | **v0.5** | Policy-domain realism | Courts/queueing; synthetic population | Where population initialization lives |
@@ -69,40 +69,46 @@ pay rent.
   group-by-monoid / segmented argmin / Philox draws, resident on device across
   ticks.
 - Differential test harness: the oracle is ground truth; every example model
-  runs on both paths in CI and the state hashes are compared.
-- Determinism **Level C** on GPU (same draws, FP summation-order jitter only —
-  atomics allowed). Level A GPU (fixed-shape reduction trees, sorted scatters)
-  is the stretch target inside this milestone.
+  runs on both paths in CI and outputs are compared under the selected numeric
+  contract. State hashes must match only when the declared level promises
+  bitwise equality; tolerance-based paths compare values, winner/fired flags,
+  and contract diagnostics instead.
+- Precision and determinism follow the full-rate gate in
+  [ADR 0001](decisions/0001-gpu-precision.md): Level A is the target for a
+  qualifying native-`f64` or strict double-single path; Level C is permitted only
+  with an explicit reduced-precision contract.
 - Backend-selection plumbing in the CLI and per-box scheduler dispatch.
 
-**⚠ Decision point — GPU precision strategy (gates everything below).**
-The spike proved the *kernel shape* is fast but left `f64` open. This is a real
-fork, not a detail:
+**⚠ Decision point — GPU precision strategy: measured, pending full-rate
+confirmation.** [ADR 0001](decisions/0001-gpu-precision.md) records the evidence
+and binding decision rule. On Apple M2 Pro, double-single retained 77.2% of
+`f32` throughput, reduced max relative error from `1.714669e-7` to
+`1.096998e-14`, and had zero observed winner mismatches. Native wgpu `f64` was
+unsupported and CUDA was not run; no NVIDIA fp64 class or native timing was
+measured.
 
-- **A. Native `f64` on capable hardware** (CUDA / Vulkan with `shaderFloat64`).
-  Cleanest semantics; abandons Apple/portable-WGSL dev machines and narrows the
-  hardware story.
-- **B. Double-single (compensated `f32`-pair) emulation.** Portable; ~3–4×
-  arithmetic cost; needs careful error analysis on the argmin keys and monoid
-  reductions.
-- **C. Tiered precision by contract.** `f64` CPU oracle stays ground truth;
-  GPU fast path is `f32`/mixed and its determinism level is *defined* to permit
-  it, with `f64` where it provably matters (accumulation, contested-resource
-  keys). This reframes rather than solves the problem — but it may be the honest
-  v0.2 answer.
+Before precision-dependent backend work, run the complete matrix and the ADR's
+supplemental guard diagnostics three times on one verified PRD-0004 `full_rate`
+NVIDIA instance. The gate uses each preserved file's NVIDIA-local embedded rows,
+not the rendered cross-machine matrix; distinct result paths are required because
+a rerun replaces the fixed NVIDIA entry.
 
-The choice determines whether Level A/B are reachable on GPU at all, so it must
-be made **before** the backend is built, not discovered during it. Recommend a
-1-week precision spike (double-single vs. native-`f64`-on-CUDA microbenchmark on
-the argmin + segmented-reduce hot path) to decide.
+Select qualifying native `f64` when double-single does not qualify, or when both
+qualify and the named native production path is at least 20% faster. Otherwise
+select qualifying double-single. Tiered precision is available only when neither
+precise candidate qualifies and an explicit reduced contract passes. Until then
+the CPU `f64` oracle and the existing numeric contract remain authoritative, and
+Level B remains unproven.
 
 **Exit criteria.**
-1. Every checked-in example runs GPU + CPU with matching state hashes at the
-   declared level.
-2. Measured `f64`-compliant (or contract-defined) ticks/sec at 26M rows —
-   the number the spike could not produce.
-3. The precision decision is written down as a semantics amendment to DESIGN.md
-   §5.2, not left implicit in code.
+1. Every checked-in example runs GPU + CPU and passes the selected equality or
+   tolerance contract; state hashes match for levels that promise bitwise
+   equality.
+2. The full-rate gate in [ADR 0001](decisions/0001-gpu-precision.md) is run at
+   26M rows, and the selected `f64`-compliant or explicitly contract-defined
+   path has measured ticks/sec on its qualifying hardware.
+3. ADR 0001 is updated from pending to the selected strategy and DESIGN.md §5.2
+   states that strategy, tolerance, and determinism consequence.
 
 ---
 
