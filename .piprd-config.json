@@ -3,19 +3,23 @@
   "stages": {
     "implement": {
       "model": "openai-codex/gpt-5.6-sol",
-      "effort": "high"
+      "effort": "high",
+      "fast": true
     },
     "review": {
       "model": "openai-codex/gpt-5.6-sol",
-      "effort": "xhigh"
+      "effort": "xhigh",
+      "fast": true
     },
     "advise": {
       "model": "openai-codex/gpt-5.6-sol",
-      "effort": "xhigh"
+      "effort": "xhigh",
+      "fast": true
     },
     "revise": {
       "model": "openai-codex/gpt-5.6-sol",
-      "effort": "xhigh"
+      "effort": "xhigh",
+      "fast": true
     }
   }
 }

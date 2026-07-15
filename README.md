@@ -32,6 +32,17 @@ CSV runs, parameter and `dt` overrides, and hash-based verification. The
 and common-random-numbers `sembla compare` workflow are documented in
 [`docs/examples/sir_policy.md`](docs/examples/sir_policy.md).
 
+## Canonical finite-state examples
+
+Five additional Lean-authored models cover a reversible two-state CTMC, a
+radioactive decay chain, SIS with importation, SEIRS with waning immunity, and
+mean-field noisy voter dynamics. Each checked-in JSON model validates and runs
+from numeric `--population` initialization using deterministic generic
+state-count/firing CSV output. See
+[`docs/examples/canonical-models.md`](docs/examples/canonical-models.md) for
+the formulas, commands, output schema, initialization semantics, and honest
+expressiveness limits.
+
 ## Workspace layout
 
 - `crates/sembla-ir`: shared simulation IR types.

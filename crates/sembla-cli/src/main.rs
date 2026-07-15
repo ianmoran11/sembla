@@ -458,6 +458,12 @@ fn sweep_file(path: &str, options: SweepOptions) -> i32 {
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let model = read_validated(path)?;
+    if optional_sir_box_name(&model)?.is_none() {
+        return Err(
+            "sweep summary currently requires exactly one SIR person/employer box; use sembla run for generic models"
+                .to_owned(),
+        );
+    }
     let pinned = match options.params.as_deref() {
         Some(params_path) => read_param_overrides(&model, params_path)?,
         None => Vec::new(),
@@ -512,7 +518,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         // The simulation seed is intentionally identical across k: this is
         // common random numbers, so only theta varies between unpinned draws.
         let (csv, series) =
-            run_results_csv(&model, &mut state, &params, options.seed, options.ticks)?;
+            run_sir_results_csv(&model, &mut state, &params, options.seed, options.ticks)?;
         let draw_path = out.join(format!("draw_{draw}.csv"));
         std::fs::write(&draw_path, csv.as_bytes())
             .map_err(|error| format!("{}: {error}", draw_path.display()))?;
@@ -654,7 +660,10 @@ fn run_results(
     ticks: u32,
     out: &str,
 ) -> Result<(), String> {
-    let (csv, _) = run_results_csv(model, state, params, seed, ticks)?;
+    let csv = match optional_sir_box_name(model)? {
+        Some(_) => run_sir_results_csv(model, state, params, seed, ticks)?.0,
+        None => run_generic_results_csv(model, state, params, seed, ticks)?.0,
+    };
     std::fs::write(out, csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
     let results_hash = Sha256::digest(csv.as_bytes());
     println!(
@@ -665,7 +674,8 @@ fn run_results(
     Ok(())
 }
 
-fn run_results_csv(
+/// Preserve the original SIR CSV and fixed six-column sweep series byte-for-byte.
+fn run_sir_results_csv(
     model: &sembla_ir::ValidatedModel,
     state: &mut StateStore,
     params: &ParamEnv,
@@ -708,7 +718,172 @@ fn run_results_csv(
     Ok((csv, series))
 }
 
-fn sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<&str, String> {
+#[derive(Debug)]
+struct EnumCountDescriptor {
+    box_name: String,
+    table_name: String,
+    attr_name: String,
+    variants: Vec<String>,
+}
+
+#[derive(Debug)]
+struct FiringDescriptor {
+    box_name: String,
+    transition_name: String,
+    rule_id: u32,
+}
+
+fn csv_field(value: &str) -> String {
+    if value
+        .chars()
+        .any(|character| matches!(character, ',' | '"' | '\n' | '\r'))
+    {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_owned()
+    }
+}
+
+fn generic_enum_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<EnumCountDescriptor> {
+    let mut descriptors = Vec::new();
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            for attr in &table.attrs {
+                if let AttrType::Enum { variants } = &attr.ty {
+                    descriptors.push(EnumCountDescriptor {
+                        box_name: model_box.name.clone(),
+                        table_name: table.name.clone(),
+                        attr_name: attr.name.clone(),
+                        variants: variants.clone(),
+                    });
+                }
+            }
+        }
+    }
+    descriptors
+}
+
+fn generic_firing_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<FiringDescriptor> {
+    model
+        .transitions()
+        .iter()
+        .map(|rule| {
+            let model_box = &model.model().boxes[rule.box_index];
+            let transition = &model_box.transitions[rule.transition_index];
+            FiringDescriptor {
+                box_name: model_box.name.clone(),
+                transition_name: transition.name.clone(),
+                rule_id: rule.rule_id,
+            }
+        })
+        .collect()
+}
+
+fn run_generic_results_csv(
+    model: &sembla_ir::ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+) -> Result<(String, Vec<Vec<usize>>), String> {
+    let enums = generic_enum_descriptors(model);
+    let firings = generic_firing_descriptors(model);
+    let mut csv = String::new();
+    let mut series = Vec::with_capacity(ticks as usize);
+    csv.push_str("# params=");
+    csv.push_str(&canonical_params(params)?);
+    csv.push('\n');
+    csv.push_str(&format!("# dt={}\n", model.model().dt));
+
+    let mut headers = vec!["tick".to_owned()];
+    for descriptor in &enums {
+        for variant in &descriptor.variants {
+            headers.push(format!(
+                "count:{}.{}.{}={variant}",
+                descriptor.box_name, descriptor.table_name, descriptor.attr_name
+            ));
+        }
+    }
+    for descriptor in &firings {
+        headers.push(format!(
+            "fired:{}.{}",
+            descriptor.box_name, descriptor.transition_name
+        ));
+    }
+    headers.push("deferred_total".to_owned());
+    csv.push_str(
+        &headers
+            .iter()
+            .map(|header| csv_field(header))
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+    csv.push('\n');
+
+    for tick in 0..ticks {
+        let report = executor::run_tick(model, state, params, seed, tick)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let snapshot = state.snapshot();
+        let mut row = vec![tick as usize];
+        for descriptor in &enums {
+            let values = snapshot
+                .enum_values(
+                    &descriptor.box_name,
+                    &descriptor.table_name,
+                    &descriptor.attr_name,
+                )
+                .map_err(|error| error.to_string())?;
+            let mut counts = vec![0_usize; descriptor.variants.len()];
+            for value in values {
+                let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
+                    format!(
+                        "invalid enum index {value} for {}.{}.{} with {} variants",
+                        descriptor.box_name,
+                        descriptor.table_name,
+                        descriptor.attr_name,
+                        descriptor.variants.len()
+                    )
+                })?;
+                *slot += 1;
+            }
+            row.extend(counts);
+        }
+        if report.fired.len() != firings.len() {
+            return Err(format!(
+                "tick {tick}: internal firing report length mismatch: expected {}, found {}",
+                firings.len(),
+                report.fired.len()
+            ));
+        }
+        for (descriptor, (reported_rule_id, fired)) in firings.iter().zip(&report.fired) {
+            if *reported_rule_id != descriptor.rule_id {
+                return Err(format!(
+                    "tick {tick}: internal firing report rule mismatch: expected {}, found {}",
+                    descriptor.rule_id, reported_rule_id
+                ));
+            }
+            row.push(*fired);
+        }
+        row.push(
+            report
+                .deferred_per_resource_table
+                .iter()
+                .map(|(_, count)| count)
+                .sum(),
+        );
+        csv.push_str(
+            &row.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+        csv.push('\n');
+        series.push(row);
+    }
+    Ok((csv, series))
+}
+
+fn optional_sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<Option<&str>, String> {
     let matches = model
         .model()
         .boxes
@@ -728,10 +903,15 @@ fn sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<&str, String> {
         })
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [model_box] => Ok(&model_box.name),
-        [] => Err("CSV output requires exactly one SIR person/employer box".to_owned()),
+        [model_box] => Ok(Some(&model_box.name)),
+        [] => Ok(None),
         _ => Err("CSV output found more than one SIR person/employer box".to_owned()),
     }
+}
+
+fn sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<&str, String> {
+    optional_sir_box_name(model)?
+        .ok_or_else(|| "CSV output requires exactly one SIR person/employer box".to_owned())
 }
 
 fn sir_counts(state: &StateStore, box_name: &str) -> Result<[usize; 3], String> {
@@ -971,7 +1151,19 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 
 #[cfg(test)]
 mod tests {
-    use super::{run, VERSION};
+    use super::{
+        csv_field, initialize_population, optional_sir_box_name, run, run_generic_results_csv,
+        run_sir_results_csv, VERSION,
+    };
+    use sembla_runtime::{eval::ParamEnv, state::StateStore};
+
+    fn load(source: &str) -> sembla_ir::ValidatedModel {
+        sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+    }
+
+    fn initialized(model: &sembla_ir::ValidatedModel, rows: usize) -> StateStore {
+        StateStore::new(model, initialize_population(model, rows)).unwrap()
+    }
 
     #[test]
     fn version_matches_library_versions() {
@@ -982,5 +1174,70 @@ mod tests {
     #[test]
     fn invalid_usage_is_nonzero() {
         assert_eq!(run(&[]), 2);
+    }
+
+    #[test]
+    fn legacy_sir_csv_bytes_are_frozen() {
+        let model = load(include_str!("../../../examples/sir.json"));
+        let params = ParamEnv::defaults(&model);
+        let mut state = initialized(&model, 4);
+        let (csv, series) = run_sir_results_csv(&model, &mut state, &params, 1, 2).unwrap();
+        assert_eq!(
+            csv,
+            "# params={\"beta\":0.8,\"gamma\":0.1}\n\
+# dt=0.25\n\
+tick,S,I,R,fired_infect,fired_recover,deferred_total\n\
+0,4,0,0,0,0,0\n\
+1,4,0,0,0,0,0\n"
+        );
+        assert_eq!(series, vec![[4, 0, 0, 0, 0, 0]; 2]);
+        assert_eq!(optional_sir_box_name(&model).unwrap(), Some("sir"));
+    }
+
+    #[test]
+    fn multiple_sir_boxes_are_rejected_as_ambiguous() {
+        let mut raw = sembla_ir::parse_json(include_str!("../../../examples/sir.json")).unwrap();
+        let mut duplicate = raw.boxes[0].clone();
+        duplicate.name = "sir_duplicate".to_owned();
+        raw.boxes.push(duplicate);
+        let model = sembla_ir::validate(raw).unwrap();
+        assert_eq!(
+            optional_sir_box_name(&model).unwrap_err(),
+            "CSV output found more than one SIR person/employer box"
+        );
+    }
+
+    #[test]
+    fn generic_csv_is_ordered_deterministic_and_conservative() {
+        let model = load(include_str!("../../../examples/reversible_ctmc.json"));
+        let params = ParamEnv::defaults(&model);
+        let mut first_state = initialized(&model, 1000);
+        let mut second_state = initialized(&model, 1000);
+        let first = run_generic_results_csv(&model, &mut first_state, &params, 55, 20).unwrap();
+        let second = run_generic_results_csv(&model, &mut second_state, &params, 55, 20).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(optional_sir_box_name(&model).unwrap(), None);
+        assert_eq!(
+            first.0.lines().nth(2).unwrap(),
+            "tick,count:chain.particle.phase=A,count:chain.particle.phase=B,fired:chain.move_ab,fired:chain.move_ba,deferred_total"
+        );
+        assert_eq!(first.1.len(), 20);
+        for row in &first.1 {
+            assert_eq!(row[1] + row[2], 1000);
+            assert_eq!(row.len(), 6);
+        }
+        assert_eq!(
+            first.1[0][4], 0,
+            "B to A must still have a zero-valued column"
+        );
+        assert!(first.1.last().unwrap()[2] > 0);
+    }
+
+    #[test]
+    fn generated_csv_headers_are_escaped() {
+        assert_eq!(csv_field("plain"), "plain");
+        assert_eq!(csv_field("has,comma"), "\"has,comma\"");
+        assert_eq!(csv_field("has\"quote"), "\"has\"\"quote\"");
+        assert_eq!(csv_field("has\nnewline"), "\"has\nnewline\"");
     }
 }
