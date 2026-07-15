@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+exec > >(tee /var/log/sembla-bootstrap.log | logger -t sembla-cloud-init -s 2>/dev/console) 2>&1
+export DEBIAN_FRONTEND=noninteractive
+
+# Install the cost guard before any network or package operation can fail. The
+# EC2 instance converts this guest poweroff into a stop action.
+if [ '${auto_stop_enabled}' = 'true' ]; then
+  cat >/etc/systemd/system/sembla-auto-stop.service <<'SERVICE'
+[Unit]
+Description=Stop the throwaway Sembla precision GPU instance
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/shutdown -h now
+SERVICE
+
+  cat >/etc/systemd/system/sembla-auto-stop.timer <<'TIMER'
+[Unit]
+Description=GPU cost guard: stop this instance after ${auto_stop_hours} hours
+
+[Timer]
+OnBootSec=${auto_stop_hours}h
+AccuracySec=1m
+Unit=sembla-auto-stop.service
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+  systemctl daemon-reload
+  systemctl enable --now sembla-auto-stop.timer
+else
+  systemctl disable --now sembla-auto-stop.timer 2>/dev/null || true
+fi
+
+apt-get update
+apt-get install -y --no-install-recommends \
+  build-essential \
+  ca-certificates \
+  curl \
+  git \
+  libssl-dev \
+  libvulkan1 \
+  pkg-config \
+  vulkan-tools \
+  wget
+
+# The default AWS Deep Learning AMI supplies a compatible NVIDIA driver and CUDA
+# stack. Verify the driver, and install the CUDA toolkit from NVIDIA's repository
+# only when the selected/pinned DLAMI does not already expose nvcc.
+command -v nvidia-smi
+nvidia-smi
+
+if ! command -v nvcc >/dev/null 2>&1; then
+  . /etc/os-release
+  case "$VERSION_ID" in
+    "22.04") cuda_distribution="ubuntu2204" ;;
+    "24.04") cuda_distribution="ubuntu2404" ;;
+    *) echo "Unsupported Ubuntu release for CUDA bootstrap: $VERSION_ID" >&2; exit 1 ;;
+  esac
+  wget -q "https://developer.download.nvidia.com/compute/cuda/repos/$cuda_distribution/x86_64/cuda-keyring_1.1-1_all.deb" -O /tmp/cuda-keyring.deb
+  dpkg -i /tmp/cuda-keyring.deb
+  apt-get update
+  apt-get install -y --no-install-recommends cuda-toolkit-12-9
+fi
+
+if [ ! -e /usr/local/cuda ] && [ -d /usr/local/cuda-12.9 ]; then
+  ln -s /usr/local/cuda-12.9 /usr/local/cuda
+fi
+
+cat >/etc/profile.d/sembla-cuda.sh <<'PROFILE'
+export CUDA_HOME=/usr/local/cuda
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$${LD_LIBRARY_PATH:-}
+export WGPU_BACKEND=vulkan
+PROFILE
+chmod 0644 /etc/profile.d/sembla-cuda.sh
+
+if [ ! -x /home/ubuntu/.cargo/bin/cargo ]; then
+  sudo -u ubuntu env HOME=/home/ubuntu bash -c \
+    'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable'
+fi
+
+if [ ! -d /home/ubuntu/sembla/.git ]; then
+  sudo -u ubuntu git clone '${repository_url}' /home/ubuntu/sembla
+fi
+sudo -u ubuntu git -C /home/ubuntu/sembla fetch --force origin '${repository_ref}'
+sudo -u ubuntu git -C /home/ubuntu/sembla checkout --force --detach FETCH_HEAD
+
+cat >/etc/sembla-spike.env <<'ENV'
+SPIKE_DIR=/home/ubuntu/sembla
+AWS_REGION='${aws_region}'
+AMI_REQUEST='${ami_id}'
+GPU_CLASS='${gpu_class}'
+FP64_CLASS='${fp64_class}'
+FP64_FP32_RATIO='${fp64_fp32_ratio}'
+FULL_RATE_EXTRAPOLATION='${full_rate_extrapolation}'
+GPU_MODEL='${gpu_model}'
+INSTANCE_TYPE='${instance_type}'
+ENV
+chmod 0644 /etc/sembla-spike.env
+
+echo '${run_spike_b64}' | base64 --decode >/home/ubuntu/run-spike.sh
+chown ubuntu:ubuntu /home/ubuntu/run-spike.sh
+chmod 0755 /home/ubuntu/run-spike.sh
+
+touch /var/lib/sembla-bootstrap-complete
+chown -R ubuntu:ubuntu /home/ubuntu/sembla

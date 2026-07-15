@@ -1,0 +1,13 @@
+# Local Terraform working state for this throwaway module.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+
+# Operator-specific values can contain local network/key identifiers.
+terraform.tfvars
+*.auto.tfvars
+!example.tfvars
