@@ -6,11 +6,13 @@
 
 use std::{error::Error, fmt};
 
+use crate::{fp64::Fp64Throughput, native_f64::NativeF64AccuracyReport};
+
+#[cfg(all(feature = "cuda", sembla_cuda_toolkit))]
 use crate::{
     f64_mirror::run_f64_mirror,
-    fp64::Fp64Throughput,
     gpu::{accuracy_workload_config, ACCURACY_TICK},
-    native_f64::{score_native, NativeF64AccuracyReport, NativeF64Device, NativeF64TickResult},
+    native_f64::{score_native, NativeF64Device, NativeF64TickResult},
     oracle::run_oracle,
     workload::Workload,
 };

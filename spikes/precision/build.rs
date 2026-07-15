@@ -15,16 +15,20 @@ fn main() {
         println!("cargo:warning=CUDA feature enabled but nvcc was not found; cuda: toolkit-absent");
         return;
     };
-    let version_ok = Command::new(&nvcc)
+    let version_status = Command::new(&nvcc)
         .arg("--version")
         .status()
-        .is_ok_and(|status| status.success());
-    if !version_ok {
-        println!(
-            "cargo:warning=CUDA feature enabled but nvcc did not execute; cuda: toolkit-absent"
-        );
-        return;
-    }
+        .unwrap_or_else(|error| {
+            panic!(
+                "detected nvcc at {}, but it could not be executed: {error}",
+                nvcc.display()
+            )
+        });
+    assert!(
+        version_status.success(),
+        "detected nvcc at {}, but `nvcc --version` failed with {version_status}",
+        nvcc.display()
+    );
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo did not set OUT_DIR"));
     let library = out_dir.join("libsembla_cuda_f64.a");

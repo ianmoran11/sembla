@@ -246,7 +246,7 @@ pub async fn probe_native_f64() -> NativeF64Status {
 }
 
 impl NativeF64Runner {
-    pub async fn new(workload: &Workload) -> Result<NativeF64RunnerInit, NativeF64Error> {
+    pub async fn initialize(workload: &Workload) -> Result<NativeF64RunnerInit, NativeF64Error> {
         let Some(adapter) = request_adapter().await else {
             return Ok(NativeF64RunnerInit::Unsupported(
                 NativeF64Status::Unsupported {
@@ -565,7 +565,7 @@ pub async fn run_native_f64_accuracy_smoke() -> Result<NativeF64Outcome, NativeF
     })?;
     let oracle = run_oracle(&workload, ACCURACY_TICK);
     let mirror = run_f64_mirror(&workload, ACCURACY_TICK);
-    let NativeF64RunnerInit::Ready(runner) = NativeF64Runner::new(&workload).await? else {
+    let NativeF64RunnerInit::Ready(runner) = NativeF64Runner::initialize(&workload).await? else {
         return Err(NativeF64Error::new(
             "native f64 support changed between probe and device creation",
         ));
