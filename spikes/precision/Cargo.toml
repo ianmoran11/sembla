@@ -1,0 +1,15 @@
+[package]
+name = "sembla-precision-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Deliberately detach this spike from the repository workspace. Cargo treats
+# this manifest as the root of its own workspace rather than inheriting the
+# repository's workspace.
+[workspace]
+
+[dependencies]
+bytemuck = { version = "1.16", features = ["derive"] }
+pollster = "0.3"
+wgpu = "0.20"

@@ -95,3 +95,11 @@ any integration with `sembla-runtime` or the IR, CUDA.
    specific value).
 5. Adapter probe prints adapter name/backend and `SHADER_F64` capability, and the
    computed safe `(N, G)` with any downscale reason.
+
+## Implementation notes
+
+- Workspace exclusion uses the empty `[workspace]` table in
+  `spikes/precision/Cargo.toml`: it makes the spike a nested standalone
+  workspace, while the root workspace's explicit member list contains only the
+  production crates. Root `cargo build --workspace` therefore does not discover
+  or compile the spike.
