@@ -3,6 +3,8 @@ offline_plan         = true
 enable_discovery     = false
 create_instance      = false
 accept_paid_creation = false
+# Paid creation additionally requires TF_VAR_console_password_hash in the
+# authenticated shell. Never place the hash or plaintext password in this file.
 
 # Replace every discovery placeholder with exact account-visible values.
 region_name      = "replace-after-discovery"

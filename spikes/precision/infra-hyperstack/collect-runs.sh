@@ -27,10 +27,38 @@ if [[ ! -s "$SEED_PATH" ]]; then
 fi
 
 cd "$MODULE_DIR"
-PUBLIC_IP="$(terraform output -raw public_ip)"
-SSH_USER="$(terraform output -raw ssh_user)"
+PUBLIC_IP="$(terraform output -raw public_ip 2>/dev/null || true)"
 if [[ -z "$PUBLIC_IP" || "$PUBLIC_IP" == "null" ]]; then
-  echo "Terraform has no public IP yet. Run terraform refresh once if apply just completed." >&2
+  PUBLIC_IP="$(
+    terraform show -json | python3 -c '
+import json
+import sys
+
+state = json.load(sys.stdin)
+modules = [state.get("values", {}).get("root_module", {})]
+while modules:
+    module = modules.pop()
+    for resource in module.get("resources", []):
+        if resource.get("address") == "hyperstack_core_virtual_machine.gpu[0]":
+            print(resource.get("values", {}).get("floating_ip") or "")
+            raise SystemExit
+    modules.extend(module.get("child_modules", []))
+'
+  )"
+fi
+SSH_USER="$(terraform output -raw ssh_user)"
+if ! python3 - "$PUBLIC_IP" <<'PY'
+import ipaddress
+import sys
+
+try:
+    address = ipaddress.ip_address(sys.argv[1])
+except ValueError:
+    raise SystemExit(1)
+raise SystemExit(0 if address.version == 4 and address.is_global else 1)
+PY
+then
+  echo "Terraform state has no valid global public IPv4 for the paid VM." >&2
   exit 2
 fi
 
@@ -40,10 +68,19 @@ COLLECTION_ID="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 printf '%s\n' "$COLLECTION_ID" > "$ARTIFACT_DIR/run-collection-id.txt"
 
 SCANNED_HOST_KEY=""
-for _ in $(seq 1 60); do
+host_key_deadline=$((SECONDS + 300))
+host_key_delay=5
+host_key_attempt=0
+while (( SECONDS < host_key_deadline )); do
+  host_key_attempt=$((host_key_attempt + 1))
   SCANNED_HOST_KEY="$(ssh-keyscan -T 10 -t ed25519 "$PUBLIC_IP" 2>/dev/null || true)"
   [[ -n "$SCANNED_HOST_KEY" ]] && break
-  sleep 5
+  printf 'ED25519 host key is not ready (attempt %s); retrying in %ss.\n' \
+    "$host_key_attempt" "$host_key_delay" >&2
+  sleep "$host_key_delay"
+  if (( host_key_delay < 30 )); then
+    host_key_delay=$((host_key_delay + 5))
+  fi
 done
 if [[ -z "$SCANNED_HOST_KEY" ]]; then
   echo "Could not retrieve the VM's ED25519 SSH host key" >&2
@@ -58,13 +95,20 @@ if [[ "$ACTUAL_HOST_KEY_FINGERPRINT" != "$SSH_HOST_KEY_FINGERPRINT" ]]; then
   echo "actual:   $ACTUAL_HOST_KEY_FINGERPRINT" >&2
   exit 1
 fi
+printf '%s\n' "$SSH_HOST_KEY_FINGERPRINT" \
+  > "$ARTIFACT_DIR/trusted-ssh-host-fingerprint.txt"
+printf '%s\n' "$SCANNED_HOST_KEY" > "$ARTIFACT_DIR/ssh-host-key.pub"
 printf '%s\n' "$SCANNED_HOST_KEY" > "$KNOWN_HOSTS_FILE"
 chmod 0600 "$KNOWN_HOSTS_FILE"
 
 SSH_OPTIONS=(
   -i "$SSH_PRIVATE_KEY_PATH"
   -o BatchMode=yes
+  -o IdentitiesOnly=yes
   -o ConnectTimeout=10
+  -o ConnectionAttempts=1
+  -o ServerAliveInterval=5
+  -o ServerAliveCountMax=2
   -o StrictHostKeyChecking=yes
   -o UserKnownHostsFile="$KNOWN_HOSTS_FILE"
 )
@@ -73,6 +117,10 @@ REMOTE="$SSH_USER@$PUBLIC_IP"
 collect_remote_diagnostics() {
   scp "${SSH_OPTIONS[@]}" "$REMOTE:/var/log/sembla-bootstrap.log" \
     "$ARTIFACT_DIR/bootstrap.log" >/dev/null 2>&1 || true
+  scp "${SSH_OPTIONS[@]}" "$REMOTE:/var/lib/sembla-bootstrap/diagnostics.log" \
+    "$ARTIFACT_DIR/bootstrap-diagnostics.log" >/dev/null 2>&1 || true
+  scp "${SSH_OPTIONS[@]}" "$REMOTE:/var/lib/sembla-bootstrap/ssh-self-test.pub" \
+    "$ARTIFACT_DIR/ssh-self-test.pub" >/dev/null 2>&1 || true
   ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'nvidia-smi -q' \
     > "$ARTIFACT_DIR/nvidia-smi-q.txt" 2>&1 || true
   ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat /var/lib/sembla-bootstrap/repository-commit' \
@@ -86,20 +134,47 @@ collect_remote_diagnostics() {
 }
 
 echo "Waiting for cloud-init on $REMOTE ..."
-for _ in $(seq 1 90); do
-  if ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'test -f /var/lib/sembla-bootstrap/failed'; then
-    collect_remote_diagnostics
-    echo "Cloud-init failed; retrieved complete diagnostics where available" >&2
-    exit 1
+BOOTSTRAP_TIMEOUT_SECONDS="${BOOTSTRAP_TIMEOUT_SECONDS:-1200}"
+bootstrap_deadline=$((SECONDS + BOOTSTRAP_TIMEOUT_SECONDS))
+bootstrap_delay=5
+bootstrap_attempt=0
+bootstrap_ready=false
+while (( SECONDS < bootstrap_deadline )); do
+  bootstrap_attempt=$((bootstrap_attempt + 1))
+  if bootstrap_status="$(
+    ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
+      'if test -f /var/lib/sembla-bootstrap/failed; then echo failed; elif test -f /var/lib/sembla-bootstrap/ready; then echo ready; else echo running; fi' \
+      2> "$ARTIFACT_DIR/ssh-readiness-last.err"
+  )"; then
+    case "$bootstrap_status" in
+      failed)
+        collect_remote_diagnostics
+        echo "Cloud-init failed; retrieved complete diagnostics where available" >&2
+        exit 1
+        ;;
+      ready)
+        bootstrap_ready=true
+        break
+        ;;
+      running)
+        printf 'Bootstrap is still running (attempt %s).\n' "$bootstrap_attempt"
+        ;;
+      *)
+        printf 'Unexpected bootstrap status %q; retrying.\n' "$bootstrap_status" >&2
+        ;;
+    esac
+  else
+    printf 'SSH is not ready (attempt %s); retrying in %ss.\n' \
+      "$bootstrap_attempt" "$bootstrap_delay" >&2
   fi
-  if ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'test -f /var/lib/sembla-bootstrap/ready'; then
-    break
+  sleep "$bootstrap_delay"
+  if (( bootstrap_delay < 30 )); then
+    bootstrap_delay=$((bootstrap_delay + 5))
   fi
-  sleep 10
 done
-if ! ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'test -f /var/lib/sembla-bootstrap/ready'; then
+if [[ "$bootstrap_ready" != true ]]; then
   collect_remote_diagnostics
-  echo "Timed out waiting for cloud-init" >&2
+  echo "Timed out waiting for cloud-init after ${BOOTSTRAP_TIMEOUT_SECONDS}s" >&2
   exit 1
 fi
 

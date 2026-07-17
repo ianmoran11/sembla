@@ -70,24 +70,25 @@ locals {
   selected_image  = length(local.matching_images) == 1 ? local.matching_images[0] : null
 
   bootstrap = templatefile("${path.module}/cloud-init.sh.tftpl", {
-    emergency_poweroff_hours = var.emergency_poweroff_hours
-    environment_name_b64     = base64encode(var.environment_name)
-    expected_gpu_count       = var.expected_gpu_count
-    expected_gpu_model_b64   = base64encode(upper(var.expected_gpu_model))
-    flavor_name_b64          = base64encode(var.flavor_name)
-    image_name_b64           = base64encode(var.image_name)
-    region_name_b64          = base64encode(var.region_name)
-    remote_run_spike_b64     = base64encode(file("${path.module}/remote-run-spike.sh"))
-    repository_ref           = var.repository_ref
-    repository_url_b64       = base64encode(var.repository_url)
-    ssh_cidr_b64             = base64encode(var.ssh_cidr)
-    ssh_user                 = var.ssh_user
+    console_password_hash_b64 = base64encode(var.console_password_hash)
+    emergency_poweroff_hours  = var.emergency_poweroff_hours
+    environment_name_b64      = base64encode(var.environment_name)
+    expected_gpu_count        = var.expected_gpu_count
+    expected_gpu_model_b64    = base64encode(upper(var.expected_gpu_model))
+    flavor_name_b64           = base64encode(var.flavor_name)
+    image_name_b64            = base64encode(var.image_name)
+    region_name_b64           = base64encode(var.region_name)
+    remote_run_spike_b64      = base64encode(file("${path.module}/remote-run-spike.sh"))
+    repository_ref            = var.repository_ref
+    repository_url_b64        = base64encode(var.repository_url)
+    ssh_cidr_b64              = base64encode(var.ssh_cidr)
+    ssh_user                  = var.ssh_user
   })
   # VM Update is unsupported in provider 1.50.2-alpha and user_data is not
   # marked ForceNew. Include every rendered bootstrap input in a ForceNew name
   # so CIDR/ref/script/timer changes destroy and recreate instead of failing an
   # in-place update or leaving the guest firewall stale.
-  bootstrap_fingerprint = substr(sha256(local.bootstrap), 0, 12)
+  bootstrap_fingerprint = substr(nonsensitive(sha256(local.bootstrap)), 0, 12)
 }
 
 check "offline_mode_is_non_creating" {
@@ -99,8 +100,13 @@ check "offline_mode_is_non_creating" {
 
 check "paid_mode_is_explicit" {
   assert {
-    condition     = !var.create_instance || (!var.offline_plan && var.enable_discovery && var.accept_paid_creation)
-    error_message = "Paid creation requires offline_plan=false, enable_discovery=true, and accept_paid_creation=true."
+    condition = !var.create_instance || (
+      !var.offline_plan &&
+      var.enable_discovery &&
+      var.accept_paid_creation &&
+      nonsensitive(length(var.console_password_hash)) > 0
+    )
+    error_message = "Paid creation requires offline_plan=false, enable_discovery=true, accept_paid_creation=true, and a temporary console recovery hash in TF_VAR_console_password_hash."
   }
 }
 
@@ -151,6 +157,10 @@ resource "hyperstack_core_virtual_machine" "gpu" {
     precondition {
       condition     = var.accept_paid_creation
       error_message = "Paid creation requires accept_paid_creation=true after explicit plan and price review."
+    }
+    precondition {
+      condition     = nonsensitive(length(var.console_password_hash)) > 0
+      error_message = "Paid creation requires a temporary console recovery hash supplied only through TF_VAR_console_password_hash."
     }
     precondition {
       condition     = !local.ssh_is_non_public

@@ -10,7 +10,9 @@
 !example.tfvars
 !main.tf
 !outputs.tf
+!prepare-console-password.sh
 !remote-run-spike.sh
+!review-paid-plan.py
 !variables.tf
 !verify-artifacts.py
 !versions.tf

@@ -14,7 +14,7 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
 
 - `HYPERSTACK_API_KEY` stays only in the local process environment. It is never
   placed in Terraform variables, state, user-data, outputs, or Git.
-- SSH is allowed only on TCP/22 from one canonical public IPv4 `/32`.
+- SSH is allowed only on TCP/22 from one canonical public IPv4 `/32` and remains key-only. A temporary password enables trusted VNC-console recovery but is never accepted by `sshd`. Its plaintext is never passed to Terraform; the sensitive hash remains only in ignored local plan/state and rendered guest user-data until deletion.
 - Hyperstack creates VMs with no default ingress. Terraform adds the `/32` rule
   after VM creation; broad IPv4/IPv6 egress is provider-managed.
 - Collection requires an ED25519 SSH host-key fingerprint independently read
@@ -27,8 +27,7 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
   alpha provider does not support in-place VM updates.
 - Flavor/image data-source filters are deliberately omitted because provider
   `1.50.2-alpha` mishandles them; nested live region fields are filtered locally.
-- A public IP can appear after VM creation. If necessary, run `terraform refresh`
-  before `collect-runs.sh`.
+- A public IP can appear after VM creation and a refresh-only operation with non-creating variables can omit its conditional output. `collect-runs.sh` therefore falls back to the paid VM's `floating_ip` in Terraform state; do not run an unreviewed normal apply merely to restore an output.
 - The CUDA image must provide both `nvidia-smi` and `nvcc`. Bootstrap fails rather
   than silently replacing the driver/toolkit used as decision evidence.
 
@@ -38,9 +37,11 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
 - `discover.sh` — authenticated, read-only region/flavor/stock/image/key/pricebook listing;
 - `main.tf` — zero-resource defaults, live selection guards, one VM, and exact `/32` rule;
 - `cloud-init.sh.tftpl` — early guest firewall/poweroff timer and CUDA/Rust bootstrap;
+- `prepare-console-password.sh` — Bash/OpenSSL 3 helper that reads the one-time VNC password without echo and emits only a hash export;
 - `remote-run-spike.sh` — one CUDA+Vulkan benchmark invocation with Hyperstack provenance;
-- `collect-runs.sh` — seeds, executes, and retrieves the required three independent runs;
-- `verify-artifacts.py` — rejects incomplete, unbound, wrong-device, or cross-run evidence;
+- `collect-runs.sh` — resolves the state IP, performs bounded/backed-off SSH readiness checks, then seeds, executes, and retrieves the required three independent runs;
+- `verify-artifacts.py` — rejects incomplete, unbound, wrong-device, host-key, or cross-run evidence;
+- `review-paid-plan.py` — emits a credential-free allowlisted summary and hash of an exact saved plan;
 - `example.tfvars` — safe placeholders with paid creation disabled.
 
 ## 1. Credential-free validation
@@ -54,10 +55,11 @@ terraform fmt -check -recursive
 terraform validate
 terraform plan -refresh=false -var-file=example.tfvars
 bash -n cloud-init.sh.tftpl
+bash -n prepare-console-password.sh
 bash -n remote-run-spike.sh
 bash -n discover.sh
 bash -n collect-runs.sh
-python3 -m py_compile verify-artifacts.py
+python3 -m py_compile verify-artifacts.py review-paid-plan.py
 ```
 
 The offline plan must report **0 to add, 0 to change, 0 to destroy** and a null
@@ -127,16 +129,33 @@ input and is hard-capped by `max_hourly_price_usd` (default `$5/hour`).
 
 Before spending money:
 
-1. implement and test the portable fired-flag mismatch diagnostic required by
-   ADR 0001;
-2. push the exact benchmark commit and set its 40-hex SHA as `repository_ref`;
-3. confirm live stock, image, `/32`, and complete hourly price again;
-4. set `create_instance=true` and `accept_paid_creation=true` locally;
-5. create, inspect, and retain a saved plan:
+1. push the exact benchmark/infrastructure commit and set its 40-hex SHA as `repository_ref`;
+2. confirm live stock, image, `/32`, and complete hourly price again;
+3. choose a strong one-time VNC-console password and export only its SHA-512 crypt hash to Terraform. The helper must be launched with Bash and requires OpenSSL 3 with `passwd -6` support; it prints installation guidance rather than falling back to incompatible stock LibreSSL:
 
 ```bash
-terraform plan -var-file=terraform.tfvars -out=hyperstack-paid.tfplan
-terraform show hyperstack-paid.tfplan
+unset TF_VAR_console_password_hash
+eval "$(bash ./prepare-console-password.sh)"
+test -n "${TF_VAR_console_password_hash:-}"
+```
+
+Keep the plaintext only in a secure password manager until teardown. It is for the trusted VNC console account `ubuntu`; SSH password and keyboard-interactive authentication remain disabled. Keep the hash environment variable in the same authenticated shell through destroy.
+
+4. protect local state and the saved plan. Terraform's `sensitive` marker redacts display but does **not** encrypt plan/state storage; both contain the console password hash inside sensitive user-data:
+
+```bash
+umask 077
+chmod 600 terraform.tfstate terraform.tfstate.backup 2>/dev/null || true
+```
+
+5. create, inspect, and retain a saved plan without changing the non-creating values in `terraform.tfvars`:
+
+```bash
+terraform plan -var-file=terraform.tfvars \
+  -var=create_instance=true \
+  -var=accept_paid_creation=true \
+  -out=hyperstack-paid.tfplan
+python3 review-paid-plan.py hyperstack-paid.tfplan
 ```
 
 The plan must contain exactly:
@@ -162,7 +181,7 @@ continues after poweroff. It then applies the guest `/32` defense, verifies the
 selected CUDA image, installs Rust/Vulkan prerequisites, checks out the exact
 commit, and compiles the spike. It does **not** start the benchmark automatically.
 
-With the VM active, open its trusted Hyperstack VNC console and run:
+Bootstrap writes start, local SSH self-test, ready, and failure diagnostics directly to the trusted Hyperstack VNC console. If interactive recovery is needed, log in there as `ubuntu` with the one-time console password; do not enable SSH passwords. Obtain the ED25519 fingerprint from the first-boot `SSH HOST KEY FINGERPRINTS` output or, after console login, run:
 
 ```bash
 ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub
@@ -179,11 +198,11 @@ SSH_HOST_KEY_FINGERPRINT='SHA256:replace-from-trusted-console' \
 
 The collector:
 
-- waits for bootstrap completion;
+- reads the public IP from outputs or Terraform state, verifies the VNC-trusted host key, and waits for bootstrap with one bounded SSH probe and increasing backoff;
 - copies the Mac-containing `RESULTS.md` into three byte-identical remote files;
 - performs three same-machine runs with distinct absolute `SPIKE_RESULTS_PATH` values and collector-generated run IDs;
 - preserves a separate external log whose start/completion markers bind each run ID to the exact result SHA-256;
-- retrieves all results/logs plus the full bootstrap log, `nvidia-smi -q`, and exact commit;
+- retrieves all results/logs plus bootstrap/SSH diagnostics, local self-test key, `nvidia-smi -q`, and exact commit;
 - parses every embedded `machines.nvidia` state and rejects unsupported state
   versions, wrong hardware, software/non-Vulkan adapters, non-full-rate
   classification, wrong workload, missing diagnostics on answered rows,
@@ -204,8 +223,13 @@ ignored by Git.
 After confirming every artifact is non-empty:
 
 ```bash
-terraform destroy -var-file=terraform.tfvars
+terraform destroy -var-file=terraform.tfvars \
+  -var=create_instance=true \
+  -var=accept_paid_creation=true
 terraform state list
+rm -f hyperstack-paid.tfplan
+chmod 600 terraform.tfstate terraform.tfstate.backup 2>/dev/null || true
+unset TF_VAR_console_password_hash
 ```
 
 The alpha provider waits only 120 seconds for VM deletion. If destroy fails or
@@ -216,4 +240,4 @@ real resource no longer exists. The final state listing must contain no paid VM
 or security-rule resource. **Do not merely stop or power off the VM: `SHUTOFF`
 continues billing.** Keep local Terraform state until deletion is confirmed.
 
-No paid Hyperstack resource has been created by this prepared module.
+No paid Hyperstack resource currently exists. The first A100 attempt was destroyed after OpenSSH stalled before server key exchange; the replacement bootstrap and collector retain bounded recovery and console diagnostics for that failure mode.

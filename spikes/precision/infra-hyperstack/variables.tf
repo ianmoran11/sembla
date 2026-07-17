@@ -102,6 +102,21 @@ variable "ssh_user" {
   }
 }
 
+variable "console_password_hash" {
+  description = "Temporary SHA-512 crypt hash for trusted VNC console recovery. Supply only through TF_VAR_console_password_hash; SSH password authentication remains disabled."
+  type        = string
+  sensitive   = true
+  default     = ""
+
+  validation {
+    condition = var.console_password_hash == "" || can(regex(
+      "^\\$6\\$[./A-Za-z0-9]{1,16}\\$[./A-Za-z0-9]{86}$",
+      var.console_password_hash,
+    ))
+    error_message = "console_password_hash must be empty for non-creating validation or one OpenSSL SHA-512 crypt hash supplied through TF_VAR_console_password_hash."
+  }
+}
+
 variable "expected_gpu_model" {
   description = "GPU model substring expected from both the live flavor and nvidia-smi, for example A100."
   type        = string

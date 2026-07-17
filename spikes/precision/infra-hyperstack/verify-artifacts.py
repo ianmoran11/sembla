@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import math
@@ -42,6 +44,23 @@ def embedded_state(path: Path) -> dict:
         return json.loads(match.group(1))
     except json.JSONDecodeError as error:
         fail(f"{path.name} embedded state is invalid JSON: {error}")
+
+
+def ed25519_fingerprint(path: Path) -> str:
+    for line in path.read_text(encoding="utf-8").splitlines():
+        fields = line.split()
+        if "ssh-ed25519" not in fields:
+            continue
+        index = fields.index("ssh-ed25519")
+        if index + 1 >= len(fields):
+            break
+        try:
+            key_blob = base64.b64decode(fields[index + 1], validate=True)
+        except (ValueError, binascii.Error):
+            break
+        digest = base64.b64encode(hashlib.sha256(key_blob).digest()).decode("ascii")
+        return f"SHA256:{digest.rstrip('=')}"
+    fail(f"{path.name} does not contain one valid ED25519 public key")
 
 
 def exact_gpu_token(text: str, expected: str) -> bool:
@@ -231,9 +250,44 @@ def main() -> None:
     commit_path = directory / "repository-commit.txt"
     gpu_path = directory / "nvidia-smi-q.txt"
     bootstrap_path = directory / "bootstrap.log"
-    for path in (profile_path, commit_path, gpu_path, bootstrap_path):
+    bootstrap_diagnostics_path = directory / "bootstrap-diagnostics.log"
+    trusted_fingerprint_path = directory / "trusted-ssh-host-fingerprint.txt"
+    scanned_host_key_path = directory / "ssh-host-key.pub"
+    self_test_key_path = directory / "ssh-self-test.pub"
+    for path in (
+        profile_path,
+        commit_path,
+        gpu_path,
+        bootstrap_path,
+        bootstrap_diagnostics_path,
+        trusted_fingerprint_path,
+        scanned_host_key_path,
+        self_test_key_path,
+    ):
         if not path.is_file() or path.stat().st_size == 0:
             fail(f"missing or empty {path.name}")
+
+    bootstrap_log = bootstrap_path.read_text(encoding="utf-8", errors="replace")
+    if "Sembla precision bootstrap ready" not in bootstrap_log:
+        fail("bootstrap.log does not contain the ready marker")
+    bootstrap_diagnostics = bootstrap_diagnostics_path.read_text(
+        encoding="utf-8", errors="replace"
+    ).lower()
+    for required in (
+        "passwordauthentication no",
+        "kbdinteractiveauthentication no",
+        "gssapiauthentication no",
+        "logingracetime 30",
+    ):
+        if required not in bootstrap_diagnostics:
+            fail(f"bootstrap-diagnostics.log does not prove {required!r}")
+
+    trusted_fingerprint = trusted_fingerprint_path.read_text(encoding="utf-8").strip()
+    if not re.fullmatch(r"SHA256:[A-Za-z0-9+/]+={0,2}", trusted_fingerprint):
+        fail("trusted-ssh-host-fingerprint.txt is not one SHA256 fingerprint")
+    for path in (scanned_host_key_path, self_test_key_path):
+        if ed25519_fingerprint(path) != trusted_fingerprint:
+            fail(f"{path.name} does not match the independently trusted VNC fingerprint")
 
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
     commit = commit_path.read_text(encoding="utf-8").strip()
