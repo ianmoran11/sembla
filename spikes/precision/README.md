@@ -40,15 +40,19 @@ counter words are `(tick, rule_id, entity_id, draw_idx)`.
 cargo run --release
 ```
 
-The command first runs the committed one-tick accuracy guard, then resolves a
+The command first runs the committed one-tick accuracy guard and records a
+passed, failed, or unavailable outcome for every strategy. It then resolves a
 safe `(N, G)`, computes the CPU `f64` oracle once, and measures every available
-strategy with 10 warmup and 100 measured ticks. GPU timestamp queries provide
+strategy with 10 warmup and 100 measured ticks. A failed candidate does not
+abort measurement of independent candidates. GPU timestamp queries provide
 total, segmented-reduce, and segmented-argmin medians where supported;
 otherwise each interval uses a synchronized wall-clock fallback and is labeled
 as such. The generated `RESULTS.md` always has exactly four rows: `f32`,
 `double-single`, native `f64` via wgpu, and native `f64` via CUDA. Missing
-capabilities, toolkit, or device support are recorded as `unanswered on this
-adapter`, never as zeroes.
+capabilities, toolkit, device support, or strategy-local execution are recorded
+as unanswered with a reason, never as zeroes. Measured rows that fail numerical,
+strict-arithmetic, fired, or native mirror qualification remain answered but
+are explicitly labeled unqualified.
 
 The sizing model checks the largest 8-byte storage binding and a documented
 resident footprint of 32 bytes/person plus 12 bytes/employer. Because wgpu
@@ -86,11 +90,13 @@ The assertions require:
 
 - double-single max reduction relative error `<= 1e-10`;
 - double-single max and mean reduction errors each `<= 1%` of f32;
-- double-single winner-mismatch rate strictly below f32.
+- double-single winner-mismatch rate strictly below f32;
+- zero double-single fired-flag mismatches against the same CPU oracle.
 
 On the Apple M2 Pro / Metal implementation run, f32 reported max/mean reduction
-errors `1.394316e-7` / `3.214444e-8` and 1/50,000 winner mismatches;
-double-single reported `9.292057e-15` / `1.205181e-15` and 0/50,000.
+errors `1.394316e-7` / `3.214444e-8`, 1/50,000 winner mismatches, and 2 fired-flag
+mismatches; double-single reported `9.292057e-15` / `1.205181e-15`, 0/50,000
+winner mismatches, and zero fired-flag mismatches.
 
 ### Strict Metal compilation and FMA finding
 
@@ -126,7 +132,10 @@ IDs complete the lexicographic tie-break. `NativeF64Runner` exposes retained
 reduction-only, map/argmin-only, full-tick, and correctness-readback dispatches.
 The accuracy report distinguishes oracle sum differences explained by the fixed
 reduction tree from unexplained GPU/mirror differences and requires exactly zero
-winner and fired-flag mismatches.
+winner and fired-flag mismatches. The durable benchmark state preserves
+`fired_mismatch_count` for every answered row and
+`unexplained_arithmetic_mirror_difference_count` for native rows; legacy state
+leaves absent diagnostics unanswered rather than fabricating zeroes.
 
 ### fp64 throughput class
 

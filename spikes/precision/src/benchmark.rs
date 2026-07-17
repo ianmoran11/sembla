@@ -6,10 +6,12 @@ use crate::{
     cuda::{
         run_cuda_f64_accuracy_smoke, run_cuda_f64_benchmark, CudaBenchmarkOutcome, CudaF64Outcome,
     },
+    f64_mirror::{run_f64_mirror, F64MirrorResult},
     fp64::Fp64Throughput,
     gpu::{
-        run_accuracy_smoke, score_strategy, FastMathStatus, PortableRunner, PortableStrategy,
-        StrategyAccuracy, DF64_MAX_REDUCTION_RELATIVE_ERROR, DF64_REDUCTION_ERROR_FACTOR,
+        accuracy_workload_config, score_strategy, FastMathStatus, PortableRunner, PortableStrategy,
+        StrategyAccuracy, ACCURACY_TICK, DF64_MAX_REDUCTION_RELATIVE_ERROR,
+        DF64_REDUCTION_ERROR_FACTOR,
     },
     native_f64::{
         run_native_f64_accuracy_smoke, NativeF64Outcome, NativeF64Runner, NativeF64RunnerInit,
@@ -18,8 +20,8 @@ use crate::{
     oracle::{run_oracle, OracleResult},
     probe_default_adapter,
     results::{
-        AccuracyMetrics, Fp64Metadata, HardwareMetadata, MachineRun, StrategyRow, StrategyStatus,
-        StrictMathMetadata, WorkloadMetadata,
+        AccuracyMetrics, Fp64Metadata, GuardStatus, HardwareMetadata, MachineRun, StrategyRow,
+        StrategyStatus, StrictMathMetadata, WorkloadMetadata,
     },
     timing::{BENCHMARK_TICK, MEASURED_TICKS, WARMUP_TICKS},
     workload::{Workload, WorkloadConfig},
@@ -31,7 +33,7 @@ const CONTESTED_SELECTOR: &str = "entity_id % 10 == 5, keyed by employer";
 
 /// Runs the complete benchmark workload once and returns a four-row machine
 /// result ready for durable assembly.
-pub async fn run_benchmark() -> Result<MachineRun, String> {
+pub async fn run_benchmark(guards: BTreeMap<String, GuardStatus>) -> Result<MachineRun, String> {
     let probe = probe_default_adapter(DEFAULT_ROWS, DEFAULT_GROUPS)
         .await
         .map_err(|error| format!("adapter probe failed: {error}"))?;
@@ -42,101 +44,163 @@ pub async fn run_benchmark() -> Result<MachineRun, String> {
     // This is the only oracle evaluation for the measured workload. Every
     // answered strategy below is scored against this exact value.
     let oracle = run_oracle(&workload, BENCHMARK_TICK);
+    // The fixed-tree mirror is supplemental native-path evidence, not a second
+    // oracle. Compute it lazily at most once and reuse it for wgpu and CUDA.
+    let mut native_mirror = None;
 
-    let portable = PortableRunner::new(&workload)
-        .await
-        .map_err(|error| format!("portable runner initialization failed: {error}"))?;
-    let strict_math = portable
-        .fast_math_status()
-        .map_err(|error| format!("portable arithmetic probe failed: {error}"))?;
+    let unavailable_strict_math = || FastMathStatus {
+        adapter_name: probe.name.clone(),
+        backend: probe.backend.clone(),
+        strict_math_requested: false,
+        strict_math_backend_supported: false,
+        fma_contraction_observed: false,
+        reassociation_observed: false,
+        df64_residuals_preserved: false,
+        trustworthy_on_adapter: false,
+    };
+    let (strict_math, strict_math_error, f32_measurement, df64_measurement) =
+        match PortableRunner::new(&workload).await {
+            Err(error) => {
+                let reason = format!("portable runner initialization failed: {error}");
+                (
+                    unavailable_strict_math(),
+                    Some(reason.clone()),
+                    Err(reason.clone()),
+                    Err(reason),
+                )
+            }
+            Ok(portable) => {
+                let (strict_math, strict_math_error) = match portable.fast_math_status() {
+                    Ok(status) => (status, None),
+                    Err(error) => (
+                        unavailable_strict_math(),
+                        Some(format!("portable arithmetic probe failed: {error}")),
+                    ),
+                };
+                (
+                    strict_math,
+                    strict_math_error,
+                    measure_portable_strategy(&portable, PortableStrategy::F32, &oracle, "f32"),
+                    measure_portable_strategy(
+                        &portable,
+                        PortableStrategy::Df64,
+                        &oracle,
+                        "double-single",
+                    ),
+                )
+            }
+        };
 
-    let f32_timing = portable
-        .benchmark(PortableStrategy::F32)
-        .map_err(|error| format!("f32 benchmark failed: {error}"))?;
-    let f32_output = portable
-        .dispatch_tick(PortableStrategy::F32, BENCHMARK_TICK)
-        .map_err(|error| format!("f32 accuracy tick failed: {error}"))?;
-    let f32_accuracy = score_strategy(&f32_output, &oracle);
-    validate_finite_accuracy(&f32_accuracy, "f32")?;
-
-    let df64_timing = portable
-        .benchmark(PortableStrategy::Df64)
-        .map_err(|error| format!("double-single benchmark failed: {error}"))?;
-    let df64_output = portable
-        .dispatch_tick(PortableStrategy::Df64, BENCHMARK_TICK)
-        .map_err(|error| format!("double-single accuracy tick failed: {error}"))?;
-    let df64_accuracy = score_strategy(&df64_output, &oracle);
-    validate_finite_accuracy(&df64_accuracy, "double-single")?;
-    validate_portable_thresholds(&f32_accuracy, &df64_accuracy, false)?;
-
-    let mut strategies = vec![
-        answered_portable_row(
+    let f32_row = match &f32_measurement {
+        Ok((timing, accuracy)) => answered_portable_row(
             "f32",
-            f32_timing,
-            &f32_accuracy,
+            *timing,
+            accuracy,
             &oracle,
-            "Portable baseline. It is the cheapest arithmetic path; its reported reduction and winner errors are the reference that double-single must improve.",
+            "Portable baseline. It is the cheapest arithmetic path; its reported reduction, winner, and fired errors are the reference for candidate qualification.",
         ),
-        answered_portable_row(
-            "double-single",
-            df64_timing,
-            &df64_accuracy,
-            &oracle,
-            if strict_math.trustworthy_on_adapter {
-                "Portable double-single passed the strict-math behavior probe and the PRD-0002 reduction/winner thresholds on this adapter."
-            } else {
-                "Portable double-single ran, but this backend cannot guarantee the strict no-contraction/no-reassociation mode; keep the numbers as an explicitly untrusted portability finding rather than silently treating them as Level B evidence."
-            },
-        ),
-    ];
+        Err(error) => unanswered_row("f32", error.clone()),
+    };
+    let df64_row = match &df64_measurement {
+        Err(error) => unanswered_row("double-single", error.clone()),
+        Ok((timing, accuracy)) => {
+            let df64_verdict = match &f32_measurement {
+                Err(error) => format!(
+                    "Portable double-single produced usable measurements but is unqualified because the f32 performance/accuracy baseline is unavailable: {error}."
+                ),
+                Ok((_, f32_accuracy)) => {
+                    match validate_portable_thresholds(f32_accuracy, accuracy, false) {
+                        Err(error) => format!(
+                            "Portable double-single produced usable measurements but is unqualified: {error}."
+                        ),
+                        Ok(()) if strict_math_error.is_some() => format!(
+                            "Portable double-single produced usable measurements but is unqualified: {}.",
+                            strict_math_error.as_deref().unwrap_or("strict arithmetic probe failed")
+                        ),
+                        Ok(()) if strict_math.trustworthy_on_adapter => {
+                            "Portable double-single passed the strict-math behavior probe and the PRD-0002 reduction/winner/fired thresholds on this adapter.".to_owned()
+                        }
+                        Ok(()) => {
+                            "Portable double-single produced usable measurements but is unqualified: this backend cannot guarantee the strict no-contraction/no-reassociation mode.".to_owned()
+                        }
+                    }
+                }
+            };
+            answered_portable_row("double-single", *timing, accuracy, &oracle, &df64_verdict)
+        }
+    };
+    let mut strategies = vec![f32_row, df64_row];
 
     let mut best_fp64 = Fp64Throughput::from_model_name(probe.name.clone());
 
-    match NativeF64Runner::initialize(&workload)
-        .await
-        .map_err(|error| format!("native f64 wgpu initialization failed: {error}"))?
-    {
-        NativeF64RunnerInit::Unsupported(status) => strategies.push(unanswered_row(
+    match NativeF64Runner::initialize(&workload).await {
+        Err(error) => strategies.push(unanswered_row(
+            "native f64 (wgpu)",
+            format!("native f64 wgpu initialization failed: {error}"),
+        )),
+        Ok(NativeF64RunnerInit::Unsupported(status)) => strategies.push(unanswered_row(
             "native f64 (wgpu)",
             format!("unanswered on this adapter: {status}"),
         )),
-        NativeF64RunnerInit::Ready(runner) => {
-            let timing = runner
-                .benchmark()
-                .map_err(|error| format!("native f64 wgpu benchmark failed: {error}"))?;
-            let output = runner
-                .dispatch_tick(BENCHMARK_TICK)
-                .map_err(|error| format!("native f64 wgpu accuracy tick failed: {error}"))?;
-            let accuracy = score_native_output(&output, &oracle)?;
-            require_zero_native_winner_mismatch(&accuracy, "native f64 (wgpu)")?;
+        Ok(NativeF64RunnerInit::Ready(runner)) => {
             let profile = runner.profile().throughput.clone();
             best_fp64 = profile.clone();
-            strategies.push(answered_native_row(
-                "native f64 (wgpu)",
-                timing,
-                accuracy,
-                &profile,
-            ));
+            let measured = runner
+                .benchmark()
+                .map_err(|error| format!("native f64 wgpu benchmark failed: {error}"))
+                .and_then(|timing| {
+                    runner
+                        .dispatch_tick(BENCHMARK_TICK)
+                        .map(|output| (timing, output))
+                        .map_err(|error| format!("native f64 wgpu accuracy tick failed: {error}"))
+                });
+            match measured {
+                Err(error) => strategies.push(unanswered_row("native f64 (wgpu)", error)),
+                Ok((timing, output)) => {
+                    let mirror = native_mirror
+                        .get_or_insert_with(|| run_f64_mirror(&workload, BENCHMARK_TICK));
+                    match score_native_output(&output, &oracle, mirror) {
+                        Err(error) => strategies.push(unanswered_row(
+                            "native f64 (wgpu)",
+                            format!("native f64 wgpu scoring failed: {error}"),
+                        )),
+                        Ok(accuracy) => strategies.push(answered_native_row(
+                            "native f64 (wgpu)",
+                            timing,
+                            accuracy,
+                            &profile,
+                        )),
+                    }
+                }
+            }
         }
     }
 
-    match run_cuda_f64_benchmark(&workload)
-        .map_err(|error| format!("native f64 CUDA benchmark failed: {error}"))?
-    {
-        CudaBenchmarkOutcome::Unavailable(status) => strategies.push(unanswered_row(
+    match run_cuda_f64_benchmark(&workload) {
+        Err(error) => strategies.push(unanswered_row(
+            "native f64 (CUDA)",
+            format!("native f64 CUDA benchmark failed: {error}"),
+        )),
+        Ok(CudaBenchmarkOutcome::Unavailable(status)) => strategies.push(unanswered_row(
             "native f64 (CUDA)",
             format!("unanswered on this adapter: {status}"),
         )),
-        CudaBenchmarkOutcome::Executed(result) => {
-            let accuracy = score_native_output(&result.output, &oracle)?;
-            require_zero_native_winner_mismatch(&accuracy, "native f64 (CUDA)")?;
+        Ok(CudaBenchmarkOutcome::Executed(result)) => {
             best_fp64 = result.profile.clone();
-            strategies.push(answered_native_row(
-                "native f64 (CUDA)",
-                result.timing,
-                accuracy,
-                &result.profile,
-            ));
+            let mirror =
+                native_mirror.get_or_insert_with(|| run_f64_mirror(&workload, BENCHMARK_TICK));
+            match score_native_output(&result.output, &oracle, mirror) {
+                Err(error) => strategies.push(unanswered_row(
+                    "native f64 (CUDA)",
+                    format!("native f64 CUDA scoring failed: {error}"),
+                )),
+                Ok(accuracy) => strategies.push(answered_native_row(
+                    "native f64 (CUDA)",
+                    result.timing,
+                    accuracy,
+                    &result.profile,
+                )),
+            }
         }
     }
 
@@ -177,41 +241,149 @@ pub async fn run_benchmark() -> Result<MachineRun, String> {
             dt: workload.config.dt,
         },
         strategies,
+        guards,
         infrastructure,
     })
 }
 
 /// One correctness tick at the frozen PRD-0002 scale for every strategy that is
 /// available on the current machine. Unsupported native paths are honest no-ops.
-pub async fn run_regression_guard() -> Result<(), String> {
-    let portable = run_accuracy_smoke()
-        .await
-        .map_err(|error| format!("portable accuracy guard failed: {error}"))?;
-    validate_finite_accuracy(&portable.f32, "f32 guard")?;
-    validate_finite_accuracy(&portable.df64, "double-single guard")?;
-    portable
-        .assert_numerical_thresholds()
-        .map_err(|error| format!("portable accuracy guard failed: {error}"))?;
+pub async fn run_regression_guard() -> BTreeMap<String, GuardStatus> {
+    let mut guards = BTreeMap::new();
+    match Workload::generate(accuracy_workload_config()) {
+        Err(error) => record_shared_portable_guard_failure(
+            &mut guards,
+            format!("portable accuracy workload generation failed: {error}"),
+        ),
+        Ok(workload) => {
+            let oracle = run_oracle(&workload, ACCURACY_TICK);
+            match PortableRunner::new(&workload).await {
+                Err(error) => record_shared_portable_guard_failure(
+                    &mut guards,
+                    format!("portable accuracy runner initialization failed: {error}"),
+                ),
+                Ok(runner) => match runner.assert_philox_known_answers() {
+                    Err(error) => record_shared_portable_guard_failure(
+                        &mut guards,
+                        format!("portable shared Philox guard failed: {error}"),
+                    ),
+                    Ok(()) => {
+                        let strict_math = runner
+                            .fast_math_status()
+                            .map_err(|error| format!("strict arithmetic probe failed: {error}"));
+                        let f32_accuracy = match runner
+                            .dispatch_tick(PortableStrategy::F32, ACCURACY_TICK)
+                        {
+                            Err(error) => {
+                                guards.insert(
+                                    "f32".to_owned(),
+                                    GuardStatus::Failed {
+                                        reason: format!("f32 guard dispatch failed: {error}"),
+                                    },
+                                );
+                                None
+                            }
+                            Ok(output) => {
+                                let accuracy = score_strategy(&output, &oracle);
+                                let validation = validate_finite_accuracy(&accuracy, "f32 guard");
+                                guards.insert("f32".to_owned(), guard_status(validation.clone()));
+                                validation.ok().map(|()| accuracy)
+                            }
+                        };
 
-    match run_native_f64_accuracy_smoke()
-        .await
-        .map_err(|error| format!("native f64 wgpu guard failed: {error}"))?
-    {
-        NativeF64Outcome::Unsupported(_) => {}
-        NativeF64Outcome::Executed(report) => report
-            .assert_expected()
-            .map_err(|error| format!("native f64 wgpu guard failed: {error}"))?,
+                        let df64 = match runner.dispatch_tick(PortableStrategy::Df64, ACCURACY_TICK)
+                        {
+                            Err(error) => GuardStatus::Failed {
+                                reason: format!("double-single guard dispatch failed: {error}"),
+                            },
+                            Ok(output) => {
+                                let accuracy = score_strategy(&output, &oracle);
+                                guard_status(
+                                    validate_finite_accuracy(&accuracy, "double-single guard")
+                                        .and_then(|()| {
+                                            let baseline =
+                                                f32_accuracy.as_ref().ok_or_else(|| {
+                                                    "double-single guard has no valid f32 baseline"
+                                                        .to_owned()
+                                                })?;
+                                            validate_portable_thresholds(baseline, &accuracy, true)
+                                        })
+                                        .and_then(|()| match &strict_math {
+                                            Err(error) => Err(error.clone()),
+                                            Ok(status) if status.trustworthy_on_adapter => Ok(()),
+                                            Ok(status) => Err(format!(
+                                                "strict arithmetic probe is untrustworthy: {status}"
+                                            )),
+                                        }),
+                                )
+                            }
+                        };
+                        guards.insert("double-single".to_owned(), df64);
+                    }
+                },
+            }
+        }
     }
 
-    match run_cuda_f64_accuracy_smoke()
-        .map_err(|error| format!("native f64 CUDA guard failed: {error}"))?
-    {
-        CudaF64Outcome::Unavailable(_) => {}
-        CudaF64Outcome::Executed(report) => report
-            .assert_expected()
-            .map_err(|error| format!("native f64 CUDA guard failed: {error}"))?,
+    let wgpu = match run_native_f64_accuracy_smoke().await {
+        Err(error) => GuardStatus::Failed {
+            reason: format!("native f64 wgpu guard execution failed: {error}"),
+        },
+        Ok(NativeF64Outcome::Unsupported(status)) => GuardStatus::Unavailable {
+            reason: status.to_string(),
+        },
+        Ok(NativeF64Outcome::Executed(report)) => guard_status(report.assert_expected()),
+    };
+    guards.insert("native f64 (wgpu)".to_owned(), wgpu);
+
+    let cuda = match run_cuda_f64_accuracy_smoke() {
+        Err(error) => GuardStatus::Failed {
+            reason: format!("native f64 CUDA guard execution failed: {error}"),
+        },
+        Ok(CudaF64Outcome::Unavailable(status)) => GuardStatus::Unavailable {
+            reason: status.to_string(),
+        },
+        Ok(CudaF64Outcome::Executed(report)) => guard_status(report.assert_expected()),
+    };
+    guards.insert("native f64 (CUDA)".to_owned(), cuda);
+    guards
+}
+
+fn record_shared_portable_guard_failure(
+    guards: &mut BTreeMap<String, GuardStatus>,
+    reason: String,
+) {
+    guards.insert(
+        "f32".to_owned(),
+        GuardStatus::Failed {
+            reason: reason.clone(),
+        },
+    );
+    guards.insert("double-single".to_owned(), GuardStatus::Failed { reason });
+}
+
+fn guard_status(result: Result<(), String>) -> GuardStatus {
+    match result {
+        Ok(()) => GuardStatus::Passed,
+        Err(reason) => GuardStatus::Failed { reason },
     }
-    Ok(())
+}
+
+fn measure_portable_strategy(
+    runner: &PortableRunner,
+    strategy: PortableStrategy,
+    oracle: &OracleResult,
+    label: &str,
+) -> Result<(crate::timing::StageTiming, StrategyAccuracy), String> {
+    let timing = runner
+        .benchmark(strategy)
+        .map_err(|error| format!("{label} benchmark failed: {error}"))?;
+    let output = runner
+        .dispatch_tick(strategy, BENCHMARK_TICK)
+        .map_err(|error| format!("{label} accuracy tick failed: {error}"))?;
+    let accuracy = score_strategy(&output, oracle);
+    validate_finite_accuracy(&accuracy, label)?;
+    Ok((timing, accuracy))
 }
 
 fn answered_portable_row(
@@ -232,6 +404,8 @@ fn answered_portable_row(
                 reduction_mean_relative_error: accuracy.reduction_relative_error.mean,
                 winner_mismatch_fraction: accuracy.winner_mismatch_rate,
                 order_sensitive_groups: oracle.order_sensitive_group_count,
+                fired_mismatch_count: Some(accuracy.fired_mismatch_count),
+                unexplained_arithmetic_mirror_difference_count: None,
             },
         },
     }
@@ -248,11 +422,17 @@ fn answered_native_row(
     } else {
         "This is rate-limited fp64 hardware; the result is pessimistic and full-rate extrapolation is refused."
     };
+    let diagnostic = match validate_native_diagnostics(&accuracy, strategy) {
+        Ok(()) => "Native binary64 matched every oracle argmin winner and fired flag, with zero unexplained fixed-tree arithmetic-mirror differences.".to_owned(),
+        Err(error) => format!(
+            "Native binary64 produced usable measurements but is unqualified: {error}."
+        ),
+    };
     StrategyRow {
         strategy: strategy.to_owned(),
         reduction_choice: REDUCTION_CHOICE.to_owned(),
         verdict: format!(
-            "Native binary64 matched every oracle argmin winner. Device `{}` is classified `{}` from {}; {extrapolation}",
+            "{diagnostic} Device `{}` is classified `{}` from {}; {extrapolation}",
             profile.device_name, profile.class, profile.evidence
         ),
         status: StrategyStatus::Answered { timing, accuracy },
@@ -271,9 +451,12 @@ fn unanswered_row(strategy: &str, reason: String) -> StrategyRow {
 fn score_native_output(
     output: &NativeF64TickResult,
     oracle: &OracleResult,
+    mirror: &F64MirrorResult,
 ) -> Result<AccuracyMetrics, String> {
     if output.segmented_sums.len() != oracle.segmented_sums.len()
+        || output.segmented_sums.len() != mirror.segmented_sums.len()
         || output.winner_entity_ids.len() != oracle.winner_entity_ids.len()
+        || output.fired_flags.len() != oracle.fired_flags.len()
     {
         return Err("native output dimensions do not match the shared oracle".to_owned());
     }
@@ -297,11 +480,27 @@ fn score_native_output(
         .zip(&oracle.winner_entity_ids)
         .filter(|(actual, expected)| actual != expected)
         .count();
+    let fired_mismatches = output
+        .fired_flags
+        .iter()
+        .zip(&oracle.fired_flags)
+        .filter(|(actual, expected)| actual != expected)
+        .count();
+    let unexplained_arithmetic_mirror_differences = output
+        .segmented_sums
+        .iter()
+        .zip(&mirror.segmented_sums)
+        .filter(|(actual, expected)| actual.to_bits() != expected.to_bits())
+        .count();
     Ok(AccuracyMetrics {
         reduction_max_relative_error: maximum,
         reduction_mean_relative_error: sum / oracle.segmented_sums.len() as f64,
         winner_mismatch_fraction: mismatches as f64 / oracle.winner_entity_ids.len() as f64,
         order_sensitive_groups: oracle.order_sensitive_group_count,
+        fired_mismatch_count: Some(fired_mismatches),
+        unexplained_arithmetic_mirror_difference_count: Some(
+            unexplained_arithmetic_mirror_differences,
+        ),
     })
 }
 
@@ -340,6 +539,12 @@ fn validate_portable_thresholds(
             df64.winner_mismatch_rate, f32.winner_mismatch_rate
         ));
     }
+    if df64.fired_mismatch_count != 0 {
+        return Err(format!(
+            "double-single fired-flag mismatches must be zero; f32 baseline={}, double-single={}",
+            f32.fired_mismatch_count, df64.fired_mismatch_count
+        ));
+    }
     // Numerical accuracy is never waived merely because a backend lacks an
     // exposed strict-math switch. The trust bit remains a reporting caveat,
     // while broken reduction arithmetic still blocks RESULTS.md generation.
@@ -366,18 +571,26 @@ fn validate_portable_thresholds(
     Ok(())
 }
 
-fn require_zero_native_winner_mismatch(
-    accuracy: &AccuracyMetrics,
-    strategy: &str,
-) -> Result<(), String> {
-    if accuracy.winner_mismatch_fraction == 0.0 {
-        Ok(())
-    } else {
-        Err(format!(
+fn validate_native_diagnostics(accuracy: &AccuracyMetrics, strategy: &str) -> Result<(), String> {
+    if accuracy.winner_mismatch_fraction != 0.0 {
+        return Err(format!(
             "{strategy} has non-zero winner mismatch fraction {}",
             accuracy.winner_mismatch_fraction
-        ))
+        ));
     }
+    if accuracy.fired_mismatch_count != Some(0) {
+        return Err(format!(
+            "{strategy} has non-zero or missing fired mismatch count {:?}",
+            accuracy.fired_mismatch_count
+        ));
+    }
+    if accuracy.unexplained_arithmetic_mirror_difference_count != Some(0) {
+        return Err(format!(
+            "{strategy} has non-zero or missing unexplained arithmetic-mirror difference count {:?}",
+            accuracy.unexplained_arithmetic_mirror_difference_count
+        ));
+    }
+    Ok(())
 }
 
 fn fp64_metadata(profile: &Fp64Throughput) -> Fp64Metadata {
@@ -439,8 +652,63 @@ fn generated_at() -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn unified_accuracy_guard_covers_all_available_strategies() {
-        pollster::block_on(super::run_regression_guard()).unwrap();
+    fn native_scoring_preserves_fired_and_arithmetic_mirror_differences() {
+        let output = NativeF64TickResult {
+            segmented_sums: vec![1.0, 2.0],
+            winner_entity_ids: vec![7],
+            fired_flags: vec![0, 1],
+        };
+        let oracle = OracleResult {
+            segmented_sums: vec![1.0, 2.0],
+            reversed_segmented_sums: vec![1.0, 2.0],
+            order_sensitive_flags: vec![0, 0],
+            order_sensitive_group_count: 0,
+            winner_entity_ids: vec![7],
+            fired_flags: vec![0, 0],
+        };
+        let mirror = F64MirrorResult {
+            segmented_sums: vec![1.0, 2.5],
+            winner_entity_ids: vec![7],
+            fired_flags: vec![0, 1],
+        };
+        let accuracy = score_native_output(&output, &oracle, &mirror).unwrap();
+        assert_eq!(accuracy.fired_mismatch_count, Some(1));
+        assert_eq!(
+            accuracy.unexplained_arithmetic_mirror_difference_count,
+            Some(1)
+        );
+        assert!(validate_native_diagnostics(&accuracy, "fixture").is_err());
+
+        let row = answered_native_row(
+            "native f64 (CUDA)",
+            crate::timing::StageTiming {
+                total_ms: 1.0,
+                reduce_ms: 0.25,
+                argmin_ms: 0.25,
+                rows_per_second: 1_000.0,
+                warmup_ticks: WARMUP_TICKS,
+                measured_ticks: MEASURED_TICKS,
+                method: crate::timing::TimingMethod::GpuTimestampQueries,
+            },
+            accuracy,
+            &Fp64Throughput::from_cuda_ratio("NVIDIA A100", 2),
+        );
+        assert!(matches!(row.status, StrategyStatus::Answered { .. }));
+        assert!(row
+            .verdict
+            .contains("usable measurements but is unqualified"));
+    }
+
+    #[test]
+    fn unified_accuracy_guard_records_all_available_strategies() {
+        let guards = pollster::block_on(run_regression_guard());
+        assert_eq!(guards.len(), 4);
+        assert!(matches!(guards.get("f32"), Some(GuardStatus::Passed)));
+        assert!(crate::results::STRATEGIES
+            .iter()
+            .all(|strategy| guards.contains_key(*strategy)));
     }
 }

@@ -1,0 +1,16 @@
+# Exact-file allowlist: ignore state, credentials, local tfvars, plans, logs,
+# artifacts, keys, notes, and any unexpected file by default.
+*
+!.gitignore
+!.terraform.lock.hcl
+!README.md
+!cloud-init.sh.tftpl
+!collect-runs.sh
+!discover.sh
+!example.tfvars
+!main.tf
+!outputs.tf
+!remote-run-spike.sh
+!variables.tf
+!verify-artifacts.py
+!versions.tf

@@ -10,10 +10,13 @@ fn main() {
 }
 
 async fn run() -> Result<(), String> {
-    println!("Running one-tick accuracy regression guard for every available strategy...");
-    benchmark::run_regression_guard().await?;
-    println!("Accuracy guard passed; running 10 warmup + 100 measured ticks per strategy...");
-    let run = benchmark::run_benchmark().await?;
+    println!("Running one-tick accuracy regression guard for every strategy...");
+    let guards = benchmark::run_regression_guard().await;
+    for (strategy, status) in &guards {
+        println!("accuracy guard [{strategy}]: {}", status.summary());
+    }
+    println!("Accuracy guard evidence recorded; running 10 warmup + 100 measured ticks per available strategy...");
+    let run = benchmark::run_benchmark(guards).await?;
     let path = std::env::var_os("SEMBLA_RESULTS_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("RESULTS.md"));

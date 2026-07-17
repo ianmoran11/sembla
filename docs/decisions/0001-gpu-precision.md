@@ -117,29 +117,36 @@ Preserve three independent runs as follows:
 
 1. Make three byte-identical copies of the Mac-containing `RESULTS.md` at three
    distinct absolute paths on the NVIDIA machine.
-2. For invocation `i`, set `SPIKE_RESULTS_PATH` to copy `i`, run the PRD-0004
-   wrapper once, and redirect its stdout and stderr to a persistent run-specific
-   log outside the wrapper. The wrapper's own transcript is temporary.
+2. For invocation `i`, set `SPIKE_RESULTS_PATH` to copy `i`, assign a unique
+   `SPIKE_RUN_ID`, run the PRD-0004 wrapper once, and redirect stdout and stderr
+   to a persistent run-specific log outside the wrapper. The wrapper embeds the
+   run ID in state and writes start/completion markers that bind the log to the
+   exact result SHA-256; its own transcript is temporary.
 3. Retrieve all three result files and logs before teardown. Never reuse one
    results path: updating the fixed `nvidia` machine key replaces that file's
    previous NVIDIA run.
 4. In every file verify the same repository commit, exact GPU model, driver,
    `full-rate` fp64 class, actual `(N, G)`, `beta`, `dt`, and strategy
-   availability. A mismatch invalidates the three-run comparison.
+   availability. Also require three distinct run IDs, generation times, result
+   hashes, and matching run-log completion records. A mismatch invalidates the
+   three-run comparison.
 5. Read timing and accuracy from each file's
    `machines.nvidia.strategies[*].status`; specifically, use
    `status.timing.total_ms` for the performance rule. Record all three inputs and
    their computed medians in this ADR when the gate is executed.
 
-The PRD-0005 state does not include fired-flag or arithmetic-mirror counters.
-Before the decision run, make its supplemental diagnostics emit and preserve,
-for each candidate, the count of `GpuTickResult.fired` values that differ from
-the CPU oracle at the benchmark tick; native `f64` must also emit unexplained
-arithmetic-mirror differences. The existing native guard already asserts both
-diagnostics, but the portable guard does not yet score fired flags, so B and C
-cannot qualify until that portable counter is added to the decision evidence.
-Any absent or failed diagnostic leaves the candidate unqualified rather than
-treating a missing counter as zero.
+The PRD-0005 state now preserves `fired_mismatch_count` for every answered
+strategy and `unexplained_arithmetic_mirror_difference_count` for answered
+native `f64` rows. Portable fired flags are scored against the shared CPU oracle;
+native rows additionally compare their segmented sums with the fixed-tree Rust
+mirror. Legacy state omits these optional fields rather than fabricating zeroes,
+and the Hyperstack artifact verifier rejects missing NVIDIA diagnostics. Any
+absent or failed diagnostic leaves the candidate unqualified rather than
+treating a missing counter as zero. Guard outcomes are preserved per strategy
+as passed, failed, or unavailable. A candidate failure never aborts measurement
+of the other candidates; usable failed-candidate metrics remain answered and
+are labeled unqualified, while execution failures remain explicit unanswered
+rows.
 
 Apply this decision rule. Numerical and guard conditions must pass in all three
 runs; performance comparisons use the median of the three NVIDIA-local

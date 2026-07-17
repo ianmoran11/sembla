@@ -27,6 +27,10 @@ pub struct AccuracyMetrics {
     pub reduction_mean_relative_error: f64,
     pub winner_mismatch_fraction: f64,
     pub order_sensitive_groups: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fired_mismatch_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unexplained_arithmetic_mirror_difference_count: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -45,6 +49,25 @@ impl StrategyStatus {
     #[must_use]
     pub fn is_answered(&self) -> bool {
         matches!(self, Self::Answered { .. })
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "status", rename_all = "kebab-case")]
+pub enum GuardStatus {
+    Passed,
+    Failed { reason: String },
+    Unavailable { reason: String },
+}
+
+impl GuardStatus {
+    #[must_use]
+    pub fn summary(&self) -> String {
+        match self {
+            Self::Passed => "passed".to_owned(),
+            Self::Failed { reason } => format!("failed: {reason}"),
+            Self::Unavailable { reason } => format!("unavailable: {reason}"),
+        }
     }
 }
 
@@ -109,6 +132,8 @@ pub struct MachineRun {
     pub hardware: HardwareMetadata,
     pub workload: WorkloadMetadata,
     pub strategies: Vec<StrategyRow>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub guards: BTreeMap<String, GuardStatus>,
     pub infrastructure: BTreeMap<String, String>,
 }
 
@@ -132,6 +157,24 @@ impl MachineRun {
                     "strategy row order mismatch: expected {expected}, got {}",
                     row.strategy
                 ));
+            }
+        }
+        if !self.guards.is_empty() {
+            if self.guards.len() != STRATEGIES.len()
+                || STRATEGIES
+                    .iter()
+                    .any(|strategy| !self.guards.contains_key(*strategy))
+            {
+                return Err("guard evidence must contain exactly the four strategy keys".to_owned());
+            }
+            for (strategy, status) in &self.guards {
+                let reason = match status {
+                    GuardStatus::Passed => continue,
+                    GuardStatus::Failed { reason } | GuardStatus::Unavailable { reason } => reason,
+                };
+                if reason.trim().is_empty() {
+                    return Err(format!("guard {strategy} has an empty reason"));
+                }
             }
         }
         Ok(())
@@ -226,8 +269,8 @@ fn render(state: &ResultsState) -> Result<String, String> {
 
     output.push_str("## Merged strategy × metric matrix\n\n");
     output.push_str("Accuracy cells compare the final benchmark tick against the scalar CPU `f64` oracle computed once for that machine's workload.\n\n");
-    output.push_str("| Strategy | Source machine | Timing method | ms/tick total | ms/tick segmented reduce | ms/tick segmented argmin | rows/sec | Reduction rel-err (max / mean) | Winner mismatch % | Order-sensitive groups |\n");
-    output.push_str("|---|---|---|---:|---:|---:|---:|---:|---:|---:|\n");
+    output.push_str("| Strategy | Source machine | Timing method | ms/tick total | ms/tick segmented reduce | ms/tick segmented argmin | rows/sec | Reduction rel-err (max / mean) | Winner mismatch % | Fired mismatches | Unexplained arithmetic-mirror differences | Order-sensitive groups |\n");
+    output.push_str("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
     let mut selected = Vec::new();
     for strategy in STRATEGIES {
         let (machine, row) = select_row(state, strategy)
@@ -235,8 +278,23 @@ fn render(state: &ResultsState) -> Result<String, String> {
         selected.push((machine, row));
         match &row.status {
             StrategyStatus::Answered { timing, accuracy } => {
+                let fired_mismatches = accuracy
+                    .fired_mismatch_count
+                    .map_or_else(|| "unanswered".to_owned(), |count| count.to_string());
+                let mirror_differences = accuracy
+                    .unexplained_arithmetic_mirror_difference_count
+                    .map_or_else(
+                        || {
+                            if row.strategy.starts_with("native f64") {
+                                "unanswered".to_owned()
+                            } else {
+                                "n/a".to_owned()
+                            }
+                        },
+                        |count| count.to_string(),
+                    );
                 output.push_str(&format!(
-                    "| {} | {} | {} | {:.6} | {:.6} | {:.6} | {:.3} | {:.6e} / {:.6e} | {:.6} | {} |\n",
+                    "| {} | {} | {} | {:.6} | {:.6} | {:.6} | {:.3} | {:.6e} / {:.6e} | {:.6} | {} | {} | {} |\n",
                     row.strategy,
                     display_machine(machine),
                     timing_method_label(&row.strategy, timing.method),
@@ -247,12 +305,14 @@ fn render(state: &ResultsState) -> Result<String, String> {
                     accuracy.reduction_max_relative_error,
                     accuracy.reduction_mean_relative_error,
                     accuracy.winner_mismatch_fraction * 100.0,
+                    fired_mismatches,
+                    mirror_differences,
                     accuracy.order_sensitive_groups,
                 ));
             }
             StrategyStatus::Unanswered { reason } => {
                 output.push_str(&format!(
-                    "| {} | {} | {} | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered |\n",
+                    "| {} | {} | {} | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered |\n",
                     row.strategy,
                     display_machine(machine),
                     escape_cell(reason),
@@ -386,6 +446,19 @@ fn render_machine_section(output: &mut String, key: &str, run: Option<&MachineRu
         workload.beta,
         workload.dt,
     ));
+    if !run.guards.is_empty() {
+        output.push_str("### Accuracy regression guards\n\n");
+        for strategy in STRATEGIES {
+            if let Some(status) = run.guards.get(strategy) {
+                output.push_str(&format!(
+                    "- **{}:** {}\n",
+                    strategy,
+                    status.summary().replace('`', "'")
+                ));
+            }
+        }
+        output.push('\n');
+    }
     if !run.infrastructure.is_empty() {
         output.push_str("### Infrastructure metadata\n\n");
         for (name, value) in &run.infrastructure {
@@ -478,6 +551,10 @@ mod tests {
                                 reduction_mean_relative_error: 1.0e-10,
                                 winner_mismatch_fraction: 0.0,
                                 order_sensitive_groups: 2,
+                                fired_mismatch_count: Some(0),
+                                unexplained_arithmetic_mirror_difference_count: strategy
+                                    .starts_with("native f64")
+                                    .then_some(0),
                             },
                         }
                     } else {
@@ -528,6 +605,10 @@ mod tests {
                 dt: 0.25,
             },
             strategies: rows,
+            guards: STRATEGIES
+                .iter()
+                .map(|strategy| ((*strategy).to_owned(), GuardStatus::Passed))
+                .collect(),
             infrastructure: BTreeMap::new(),
         }
     }
@@ -543,6 +624,38 @@ mod tests {
             assert!(document.contains(&format!("| {strategy} |")));
         }
         assert!(document.contains("unanswered on this adapter"));
+    }
+
+    #[test]
+    fn legacy_machine_state_defaults_to_no_guard_evidence() {
+        let mut legacy = serde_json::to_value(run("development", false)).unwrap();
+        legacy.as_object_mut().unwrap().remove("guards");
+        let parsed: MachineRun = serde_json::from_value(legacy).unwrap();
+        assert!(parsed.guards.is_empty());
+        parsed.validate().unwrap();
+    }
+
+    #[test]
+    fn incomplete_guard_evidence_is_rejected() {
+        let mut fixture = run("development", false);
+        fixture.guards.remove("f32");
+        assert!(fixture.validate().is_err());
+    }
+
+    #[test]
+    fn legacy_accuracy_state_does_not_fabricate_missing_diagnostics() {
+        let legacy = r#"{
+            "reduction_max_relative_error": 1e-9,
+            "reduction_mean_relative_error": 1e-10,
+            "winner_mismatch_fraction": 0.0,
+            "order_sensitive_groups": 2
+        }"#;
+        let parsed: AccuracyMetrics = serde_json::from_str(legacy).unwrap();
+        assert_eq!(parsed.fired_mismatch_count, None);
+        assert_eq!(parsed.unexplained_arithmetic_mirror_difference_count, None);
+        let encoded = serde_json::to_string(&parsed).unwrap();
+        assert!(!encoded.contains("fired_mismatch_count"));
+        assert!(!encoded.contains("unexplained_arithmetic_mirror_difference_count"));
     }
 
     #[test]

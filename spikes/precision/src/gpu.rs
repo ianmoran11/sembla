@@ -82,6 +82,7 @@ pub struct StrategyAccuracy {
     pub winner_mismatch_count: usize,
     pub contested_key_count: usize,
     pub winner_mismatch_rate: f64,
+    pub fired_mismatch_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -158,6 +159,12 @@ impl AccuracyReport {
                 self.df64.winner_mismatch_rate, self.f32.winner_mismatch_rate
             ));
         }
+        if self.df64.fired_mismatch_count != 0 {
+            return Err(format!(
+                "double-single fired-flag mismatches must be zero; f32 baseline={}, double-single={}",
+                self.f32.fired_mismatch_count, self.df64.fired_mismatch_count
+            ));
+        }
         Ok(())
     }
 
@@ -185,13 +192,14 @@ impl fmt::Display for AccuracyReport {
         for result in [&self.f32, &self.df64] {
             writeln!(
                 formatter,
-                "  {}: reduction rel-error max={:.6e} mean={:.6e}; winner mismatches={}/{} ({:.6e})",
+                "  {}: reduction rel-error max={:.6e} mean={:.6e}; winner mismatches={}/{} ({:.6e}); fired mismatches={}",
                 result.strategy,
                 result.reduction_relative_error.max,
                 result.reduction_relative_error.mean,
                 result.winner_mismatch_count,
                 result.contested_key_count,
                 result.winner_mismatch_rate,
+                result.fired_mismatch_count,
             )?;
         }
         write!(formatter, "  fast-math/FMA: {}", self.fast_math)
@@ -880,6 +888,24 @@ impl PortableRunner {
         Ok(bytemuck::cast_slice::<u8, [u32; 4]>(&bytes).to_vec())
     }
 
+    /// Runs the shared random-number vectors before strategy-local guards.
+    /// A failure here invalidates both portable strategies; later dispatches
+    /// remain independently reportable.
+    pub fn assert_philox_known_answers(&self) -> Result<(), GpuError> {
+        let outputs = self.run_philox_known_answers()?;
+        for (index, (actual, expected)) in
+            outputs.iter().zip(PHILOX_KNOWN_ANSWERS.iter()).enumerate()
+        {
+            if actual != &expected.expected {
+                return Err(GpuError::new(format!(
+                    "WGSL Philox vector {index} mismatch: {actual:08x?} != {:08x?}",
+                    expected.expected
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Probes the compiled shader rather than assuming the backend honored the
     /// no-contraction/no-reassociation requirement.
     pub fn fast_math_status(&self) -> Result<FastMathStatus, GpuError> {
@@ -1105,19 +1131,7 @@ pub async fn run_accuracy_smoke() -> Result<AccuracyReport, GpuError> {
     let oracle = run_oracle(&workload, ACCURACY_TICK);
     let runner = PortableRunner::new(&workload).await?;
 
-    let philox_outputs = runner.run_philox_known_answers()?;
-    for (index, (actual, expected)) in philox_outputs
-        .iter()
-        .zip(PHILOX_KNOWN_ANSWERS.iter())
-        .enumerate()
-    {
-        if actual != &expected.expected {
-            return Err(GpuError::new(format!(
-                "WGSL Philox vector {index} mismatch: {actual:08x?} != {:08x?}",
-                expected.expected
-            )));
-        }
-    }
+    runner.assert_philox_known_answers()?;
 
     let fast_math = runner.fast_math_status()?;
     let f32_output = runner.dispatch_f32(ACCURACY_TICK)?;
@@ -1140,6 +1154,7 @@ pub fn score_strategy(output: &GpuTickResult, oracle: &OracleResult) -> Strategy
         output.winner_entity_ids.len(),
         oracle.winner_entity_ids.len()
     );
+    assert_eq!(output.fired_flags.len(), oracle.fired_flags.len());
 
     let mut max_error = 0.0_f64;
     let mut error_sum = 0.0_f64;
@@ -1158,6 +1173,12 @@ pub fn score_strategy(output: &GpuTickResult, oracle: &OracleResult) -> Strategy
         .zip(&oracle.winner_entity_ids)
         .filter(|(actual, expected)| actual != expected)
         .count();
+    let fired_mismatch_count = output
+        .fired_flags
+        .iter()
+        .zip(&oracle.fired_flags)
+        .filter(|(actual, expected)| actual != expected)
+        .count();
     let contested_key_count = oracle.winner_entity_ids.len();
     StrategyAccuracy {
         strategy: output.strategy,
@@ -1168,6 +1189,7 @@ pub fn score_strategy(output: &GpuTickResult, oracle: &OracleResult) -> Strategy
         winner_mismatch_count,
         contested_key_count,
         winner_mismatch_rate: winner_mismatch_count as f64 / contested_key_count as f64,
+        fired_mismatch_count,
     }
 }
 
@@ -1392,6 +1414,25 @@ mod tests {
     }
 
     #[test]
+    fn score_strategy_counts_fired_flag_mismatches() {
+        let output = GpuTickResult {
+            strategy: PortableStrategy::F32,
+            segmented_sums: vec![1.0],
+            winner_entity_ids: vec![7],
+            fired_flags: vec![0, 1, 0],
+        };
+        let oracle = OracleResult {
+            segmented_sums: vec![1.0],
+            reversed_segmented_sums: vec![1.0],
+            order_sensitive_flags: vec![0],
+            order_sensitive_group_count: 0,
+            winner_entity_ids: vec![7],
+            fired_flags: vec![0, 0, 1],
+        };
+        assert_eq!(score_strategy(&output, &oracle).fired_mismatch_count, 2);
+    }
+
+    #[test]
     fn one_million_row_accuracy_smoke_beats_f32_on_both_metrics() {
         pollster::block_on(async {
             let report = run_accuracy_smoke().await.unwrap();
@@ -1412,6 +1453,7 @@ mod tests {
                 report.df64.reduction_relative_error.max < report.f32.reduction_relative_error.max
             );
             assert!(report.df64.winner_mismatch_rate < report.f32.winner_mismatch_rate);
+            assert_eq!(report.df64.fired_mismatch_count, 0);
         });
     }
 }

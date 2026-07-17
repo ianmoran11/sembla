@@ -1,0 +1,123 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+STATUS_DIR=/var/lib/sembla-bootstrap
+LOG_PATH=/var/log/sembla-bootstrap.log
+install -d -m 0755 "$STATUS_DIR"
+exec > >(tee -a "$LOG_PATH") 2>&1
+
+on_exit() {
+  rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    rm -f "$STATUS_DIR/ready"
+    printf '%s\n' "bootstrap failed with exit code $rc" > "$STATUS_DIR/failed"
+  fi
+}
+trap on_exit EXIT
+
+SSH_CIDR="$(printf '%s' '${ssh_cidr_b64}' | base64 -d)"
+REPOSITORY_URL="$(printf '%s' '${repository_url_b64}' | base64 -d)"
+REGION_NAME="$(printf '%s' '${region_name_b64}' | base64 -d)"
+ENVIRONMENT_NAME="$(printf '%s' '${environment_name_b64}' | base64 -d)"
+FLAVOR_NAME="$(printf '%s' '${flavor_name_b64}' | base64 -d)"
+IMAGE_NAME="$(printf '%s' '${image_name_b64}' | base64 -d)"
+EXPECTED_GPU_MODEL="$(printf '%s' '${expected_gpu_model_b64}' | base64 -d)"
+REPOSITORY_REF='${repository_ref}'
+EXPECTED_GPU_COUNT='${expected_gpu_count}'
+SPIKE_DIR=/home/${ssh_user}/sembla
+
+# Install the activity guard before network or package operations. Hyperstack
+# continues charging a SHUTOFF VM, so this poweroff limits exposure only;
+# terraform destroy remains the billing control.
+systemd-run \
+  --unit=sembla-emergency-poweroff \
+  --description='Emergency Sembla GPU guest poweroff (billing continues)' \
+  --on-active='${emergency_poweroff_hours}h' \
+  /usr/bin/systemctl poweroff
+
+# Defense in depth: the provider security rule is the primary pre-boot control.
+# Restrict guest SSH to the same operator /32 before package downloads.
+iptables -I INPUT 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -I INPUT 2 -i lo -j ACCEPT
+iptables -I INPUT 3 -p tcp --dport 22 -s "$SSH_CIDR" -j ACCEPT
+iptables -I INPUT 4 -p tcp --dport 22 -j DROP
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y --no-install-recommends \
+  build-essential \
+  ca-certificates \
+  clang \
+  cmake \
+  curl \
+  git \
+  iptables-persistent \
+  jq \
+  libssl-dev \
+  libudev-dev \
+  libvulkan1 \
+  pkg-config \
+  python3 \
+  vulkan-tools
+netfilter-persistent save
+
+# The selected immutable name must explicitly be an Ubuntu CUDA image. Do not
+# silently install or replace licensed NVIDIA drivers: exact hardware/software
+# provenance is decision evidence.
+command -v nvidia-smi >/dev/null
+nvidia-smi
+if ! command -v nvcc >/dev/null; then
+  if [[ -x /usr/local/cuda/bin/nvcc ]]; then
+    ln -s /usr/local/cuda/bin/nvcc /usr/local/bin/nvcc
+  else
+    echo 'selected CUDA image does not expose nvcc' >&2
+    exit 1
+  fi
+fi
+nvcc --version
+export XDG_RUNTIME_DIR=/tmp/sembla-xdg-root
+install -d -m 0700 "$XDG_RUNTIME_DIR"
+vulkaninfo --summary
+
+CUDA_BIN="$(readlink -f "$(command -v nvcc)")"
+CUDA_HOME="$(dirname "$(dirname "$CUDA_BIN")")"
+test -d "$CUDA_HOME/lib64"
+
+install -d -o ${ssh_user} -g ${ssh_user} /home/${ssh_user}/.cargo
+sudo -u ${ssh_user} bash -lc 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal'
+
+rm -rf "$SPIKE_DIR"
+sudo -u ${ssh_user} git clone "$REPOSITORY_URL" "$SPIKE_DIR"
+sudo -u ${ssh_user} git -C "$SPIKE_DIR" checkout --detach "$REPOSITORY_REF"
+ACTUAL_REF="$(git -C "$SPIKE_DIR" rev-parse HEAD)"
+test "$ACTUAL_REF" = "$REPOSITORY_REF"
+
+printf '%s' '${remote_run_spike_b64}' | base64 -d > /home/${ssh_user}/run-spike.sh
+chown ${ssh_user}:${ssh_user} /home/${ssh_user}/run-spike.sh
+chmod 0755 /home/${ssh_user}/run-spike.sh
+
+{
+  printf 'SPIKE_DIR=%q\n' "$SPIKE_DIR"
+  printf 'HYPERSTACK_REGION=%q\n' "$REGION_NAME"
+  printf 'HYPERSTACK_ENVIRONMENT=%q\n' "$ENVIRONMENT_NAME"
+  printf 'HYPERSTACK_FLAVOR=%q\n' "$FLAVOR_NAME"
+  printf 'HYPERSTACK_IMAGE=%q\n' "$IMAGE_NAME"
+  printf 'EXPECTED_GPU_MODEL=%q\n' "$EXPECTED_GPU_MODEL"
+  printf 'EXPECTED_GPU_COUNT=%q\n' "$EXPECTED_GPU_COUNT"
+  printf 'CUDA_HOME=%q\n' "$CUDA_HOME"
+} > /etc/sembla-spike.env
+chmod 0644 /etc/sembla-spike.env
+
+sudo -u ${ssh_user} env \
+  HOME=/home/${ssh_user} \
+  PATH="/home/${ssh_user}/.cargo/bin:$CUDA_HOME/bin:$PATH" \
+  CUDA_HOME="$CUDA_HOME" \
+  LD_LIBRARY_PATH="$CUDA_HOME/lib64" \
+  WGPU_BACKEND=vulkan \
+  bash -lc "cd '$SPIKE_DIR/spikes/precision' && cargo build --locked --release --features cuda"
+
+printf '%s\n' "$ACTUAL_REF" > "$STATUS_DIR/repository-commit"
+chown -R ${ssh_user}:${ssh_user} "$SPIKE_DIR" /home/${ssh_user}/run-spike.sh
+echo 'Sembla precision bootstrap ready; benchmark not started automatically.'
+printf '%s\n' "ready" > "$STATUS_DIR/ready"
+trap - EXIT
