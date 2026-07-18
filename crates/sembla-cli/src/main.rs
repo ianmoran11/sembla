@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use sembla_ir::{AttrType, ParamType, ParamValue};
 use sembla_runtime::eval::{ParamEnv, ParamOverride};
@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--noise crn|independent] [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K]";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -145,6 +145,7 @@ struct SweepOptions {
     population: String,
     out: String,
     params: Option<String>,
+    export_pairs: Option<String>,
 }
 
 fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
@@ -156,6 +157,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
     let mut params = None;
     let mut theta_file = None;
     let mut noise_mode = None;
+    let mut export_pairs = None;
     let mut index = 0;
     while index < flags.len() {
         let flag = flags[index].as_str();
@@ -189,6 +191,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
             }
             "--out" => set_once(&mut out, value.clone(), flag)?,
             "--params" => set_once(&mut params, value.clone(), flag)?,
+            "--export-pairs" => set_once(&mut export_pairs, value.clone(), flag)?,
             _ => return Err(format!("unknown sweep flag '{flag}'")),
         }
         index += 2;
@@ -211,6 +214,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
         out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
         params,
+        export_pairs,
     })
 }
 
@@ -641,6 +645,17 @@ fn params_from_theta_assignment(
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let model = read_validated(path)?;
+    if options.export_pairs.is_some() && model.model().summaries.is_empty() {
+        return Err(format!(
+            "model '{}' declares no summaries; --export-pairs requires declared summaries (DESIGN.md §4.6)",
+            model.model().name
+        ));
+    }
+    if options.export_pairs.is_some() && options.noise_mode == manifest::NoiseMode::Crn {
+        eprintln!(
+            "warning: --export-pairs with --noise crn is unsuitable for NPE training (DECISIONS.md §G5); use --noise independent"
+        );
+    }
     let ir_hash = manifest::canonical_ir_hash(&model)?;
     let theta_file = options
         .theta_file
@@ -694,6 +709,41 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let out = Path::new(&options.out);
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
     remove_previous_sweep_outputs(out)?;
+    if let Some(export_path) = options.export_pairs.as_deref().map(Path::new) {
+        if let Some(parent) = export_path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            std::fs::create_dir_all(parent)
+                .map_err(|error| format!("{}: {error}", parent.display()))?;
+        }
+    }
+
+    let mut parameter_columns = model
+        .model()
+        .params
+        .iter()
+        .map(|parameter| parameter.name.clone())
+        .collect::<Vec<_>>();
+    parameter_columns.sort();
+    let summary_columns = model
+        .model()
+        .summaries
+        .iter()
+        .map(|summary| summary.name.clone())
+        .collect::<Vec<_>>();
+    let mut pairs_csv = options.export_pairs.as_ref().map(|_| {
+        let mut columns = vec!["k".to_owned()];
+        columns.extend(parameter_columns.iter().cloned());
+        columns.extend(summary_columns.iter().cloned());
+        let mut csv = columns
+            .iter()
+            .map(|column| csv_field(column))
+            .collect::<Vec<_>>()
+            .join(",");
+        csv.push('\n');
+        csv
+    });
 
     let mut csv_manifest = if theta_file.is_some() {
         String::from("# theta_source=file\n# parameter_status")
@@ -770,6 +820,16 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         } else {
             reported_columns = Some(output.series.columns.clone());
         }
+        if let Some(csv) = &mut pairs_csv {
+            append_pairs_row(
+                csv,
+                draw,
+                &params,
+                &parameter_columns,
+                &output.summaries,
+                &summary_columns,
+            )?;
+        }
         let hashes = execution_hashes(&output, &state);
         run_manifest.executions.push(manifest::ManifestExecution {
             k: draw,
@@ -786,6 +846,11 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         let draw_path = out.join(format!("draw_{draw}.csv"));
         std::fs::write(&draw_path, output.csv.as_bytes())
             .map_err(|error| format!("{}: {error}", draw_path.display()))?;
+        if options.export_pairs.is_some() {
+            let draw_summaries = PathBuf::from(format!("{}.summaries.csv", draw_path.display()));
+            std::fs::write(&draw_summaries, output.summaries_csv.as_bytes())
+                .map_err(|error| format!("{}: {error}", draw_summaries.display()))?;
+        }
         all_series.push(output.series.rows);
     }
 
@@ -801,6 +866,21 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     std::fs::write(&summary_path, summary.as_bytes())
         .map_err(|error| format!("{}: {error}", summary_path.display()))?;
     manifest::write(&out.join("run-manifest.json"), &run_manifest)?;
+    if let (Some(export_path), Some(pairs_csv)) =
+        (options.export_pairs.as_deref().map(Path::new), pairs_csv)
+    {
+        std::fs::write(export_path, pairs_csv.as_bytes())
+            .map_err(|error| format!("{}: {error}", export_path.display()))?;
+        let pairs_sha256 = hex(&Sha256::digest(pairs_csv.as_bytes()));
+        let metadata = manifest::PairsMetadata::for_sweep(
+            &run_manifest,
+            draw_count,
+            parameter_columns,
+            summary_columns,
+            pairs_sha256,
+        )?;
+        manifest::write_pairs_metadata(&manifest::pairs_sidecar_path(export_path), &metadata)?;
+    }
     let manifest_hash = hex(&Sha256::digest(csv_manifest.as_bytes()));
     let summary_hash = hex(&Sha256::digest(summary.as_bytes()));
     if let Some(theta) = &theta_file {
@@ -841,6 +921,48 @@ fn param_value_csv(value: &ParamValue) -> String {
         ParamValue::Real { value } => value.to_string(),
         ParamValue::Int { value } => value.to_string(),
     }
+}
+
+fn append_pairs_row(
+    csv: &mut String,
+    draw: u32,
+    params: &ParamEnv,
+    parameter_columns: &[String],
+    summaries: &[SummaryValue],
+    summary_columns: &[String],
+) -> Result<(), String> {
+    let mut values = params.values().collect::<Vec<_>>();
+    values.sort_by(|left, right| left.0.cmp(right.0));
+    if values
+        .iter()
+        .map(|(name, _)| *name)
+        .ne(parameter_columns.iter().map(String::as_str))
+    {
+        return Err(format!(
+            "draw {draw}: resolved parameter columns do not match the export schema"
+        ));
+    }
+    if summaries
+        .iter()
+        .map(|summary| summary.name.as_str())
+        .ne(summary_columns.iter().map(String::as_str))
+    {
+        return Err(format!(
+            "draw {draw}: summary columns do not match model declaration order"
+        ));
+    }
+
+    csv.push_str(&draw.to_string());
+    for (_, value) in values {
+        csv.push(',');
+        csv.push_str(&param_value_csv(value));
+    }
+    for summary in summaries {
+        csv.push(',');
+        csv.push_str(&ReportedValue::from(summary.value).csv());
+    }
+    csv.push('\n');
+    Ok(())
 }
 
 fn summary_csv(
@@ -1015,6 +1137,7 @@ struct ReportedSeries {
 struct RunOutput {
     csv: String,
     series: ReportedSeries,
+    summaries: Vec<SummaryValue>,
     summaries_csv: String,
 }
 
@@ -1245,13 +1368,15 @@ fn run_results_output(
         tick_reports.push(report);
     }
     let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
+    let summaries_csv = summaries_csv(&summaries);
     Ok(RunOutput {
         csv,
         series: ReportedSeries {
             columns: headers.into_iter().skip(1).collect(),
             rows,
         },
-        summaries_csv: summaries_csv(&summaries),
+        summaries,
+        summaries_csv,
     })
 }
 

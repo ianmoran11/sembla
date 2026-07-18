@@ -188,6 +188,32 @@ The file-mode `manifest.csv` starts with `# theta_source=file`, the JSON run
 manifest records the exact input-file SHA-256, and stdout prints it as
 `theta_file_sha256`.
 
+### Exporting `(θ, x)` training pairs
+
+Add `--export-pairs` to write the summaries-only training input for the
+PRD-0007 NPE pipeline:
+
+```sh
+cargo run --release -p sembla-cli -- sweep examples/sir.json \
+  --population pop.bin --seed 99 --draws 5000 --ticks 50 \
+  --noise independent --out sweep-training/ \
+  --export-pairs pairs.csv
+```
+
+`pairs.csv` has one row per draw. Its columns are `k`, parameters sorted by
+name (`beta,gamma` here), then summaries in model declaration order
+(`peak_I,peak_tick` here). Values use the same deterministic formatting as the
+ordinary sweep and summary CSVs. Only declared summaries become `x`; per-tick
+view series are not included. CRN export is allowed for diagnostics but emits
+a warning because those pairs are unsuitable for NPE training.
+
+The canonical `pairs.csv.meta.json` sidecar binds the bytes to the effective IR,
+master seed, noise mode, theta source, draw/tick/`dt` settings, determinism
+level, ordered columns, component versions, and `pairs_sha256`. PRD-0007 reads
+only this CSV and sidecar, verifies their schema and hash, and rejects CRN-mode
+training input. Prior-sampled and `--theta-file` sweeps use the same export
+contract.
+
 `sembla compare --out comparison.csv` similarly writes
 `comparison.csv.manifest.json`. Its `executions` array contains deterministic
 `arm_a` and `arm_b` scenario entries with each arm's model, effective IR hash,

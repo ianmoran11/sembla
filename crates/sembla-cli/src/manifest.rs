@@ -8,6 +8,7 @@ pub const HASH_ALGORITHM: &str = "sha256";
 pub const DETERMINISM_LEVEL: &str = "A";
 const MANIFEST_SCHEMA_VERSION: u32 = 1;
 const BACKEND_IDENTITY_SCHEMA_VERSION: u32 = 1;
+const PAIRS_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -36,6 +37,71 @@ pub struct ThetaSource {
     pub kind: ThetaSourceKind,
     pub sha256: String,
     pub algorithm: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PairsMetadata {
+    pub component_versions: BTreeMap<String, String>,
+    pub determinism_level: String,
+    pub draws: u32,
+    pub dt: f64,
+    pub ir_hash: String,
+    pub ir_hash_algorithm: String,
+    pub model: String,
+    pub noise_mode: NoiseMode,
+    pub parameter_columns: Vec<String>,
+    pub pairs_hash_algorithm: String,
+    pub pairs_sha256: String,
+    pub schema_versions: BTreeMap<String, u32>,
+    pub seed: u64,
+    pub summary_columns: Vec<String>,
+    pub theta_source: ThetaSource,
+    pub ticks: u32,
+}
+
+impl PairsMetadata {
+    pub fn for_sweep(
+        run_manifest: &RunManifest,
+        draws: u32,
+        parameter_columns: Vec<String>,
+        summary_columns: Vec<String>,
+        pairs_sha256: String,
+    ) -> Result<Self, String> {
+        if run_manifest.manifest_kind != ManifestKind::Sweep {
+            return Err("pairs metadata requires a sweep run manifest".to_owned());
+        }
+        Ok(Self {
+            component_versions: run_manifest.component_versions.clone(),
+            determinism_level: run_manifest.determinism_level.clone(),
+            draws,
+            dt: run_manifest
+                .dt
+                .ok_or_else(|| "sweep run manifest has no dt".to_owned())?,
+            ir_hash: run_manifest
+                .ir_hash
+                .clone()
+                .ok_or_else(|| "sweep run manifest has no IR hash".to_owned())?,
+            ir_hash_algorithm: run_manifest.ir_hash_algorithm.clone(),
+            model: run_manifest
+                .model
+                .clone()
+                .ok_or_else(|| "sweep run manifest has no model name".to_owned())?,
+            noise_mode: run_manifest
+                .noise_mode
+                .ok_or_else(|| "sweep run manifest has no noise mode".to_owned())?,
+            parameter_columns,
+            pairs_hash_algorithm: HASH_ALGORITHM.to_owned(),
+            pairs_sha256,
+            schema_versions: BTreeMap::from([("pairs".to_owned(), PAIRS_SCHEMA_VERSION)]),
+            seed: run_manifest.seed,
+            summary_columns,
+            theta_source: run_manifest
+                .theta_source
+                .clone()
+                .ok_or_else(|| "sweep run manifest has no theta source".to_owned())?,
+            ticks: run_manifest.ticks,
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -154,19 +220,9 @@ impl RunManifest {
             BACKEND_IDENTITY_SCHEMA_VERSION,
         );
         schema_versions.insert("manifest".to_owned(), MANIFEST_SCHEMA_VERSION);
-        let mut component_versions = BTreeMap::new();
-        component_versions.insert(
-            "sembla-cli".to_owned(),
-            env!("CARGO_PKG_VERSION").to_owned(),
-        );
-        component_versions.insert("sembla-ir".to_owned(), sembla_ir::VERSION.to_owned());
-        component_versions.insert(
-            "sembla-runtime".to_owned(),
-            sembla_runtime::VERSION.to_owned(),
-        );
         Self {
             backend_identity: Some(BackendIdentity::cpu_oracle()),
-            component_versions,
+            component_versions: component_versions(),
             determinism_level: DETERMINISM_LEVEL.to_owned(),
             enabled_flags: Vec::new(),
             executions: Vec::new(),
@@ -231,6 +287,33 @@ pub fn sidecar_path(output: &str) -> PathBuf {
     PathBuf::from(format!("{output}.manifest.json"))
 }
 
+pub fn pairs_sidecar_path(output: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.meta.json", output.display()))
+}
+
+pub fn write_pairs_metadata(path: &Path, metadata: &PairsMetadata) -> Result<(), String> {
+    if metadata.ir_hash_algorithm != HASH_ALGORITHM {
+        return Err(format!(
+            "unsupported ir_hash_algorithm '{}' (supported: '{HASH_ALGORITHM}')",
+            metadata.ir_hash_algorithm
+        ));
+    }
+    if metadata.pairs_hash_algorithm != HASH_ALGORITHM {
+        return Err(format!(
+            "unsupported pairs_hash_algorithm '{}' (supported: '{HASH_ALGORITHM}')",
+            metadata.pairs_hash_algorithm
+        ));
+    }
+    if metadata.theta_source.algorithm != HASH_ALGORITHM {
+        return Err(format!(
+            "unsupported theta_source.algorithm '{}' (supported: '{HASH_ALGORITHM}')",
+            metadata.theta_source.algorithm
+        ));
+    }
+    let bytes = serialize_canonical(metadata)?;
+    std::fs::write(path, bytes.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))
+}
+
 pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
     validate_observation_tuple(manifest)?;
     validate_algorithms(manifest)?;
@@ -260,7 +343,25 @@ pub fn to_canonical_json(manifest: &RunManifest) -> Result<String, String> {
     let mut normalized = manifest.clone();
     normalized.enabled_flags.sort();
     normalized.enabled_flags.dedup();
-    let value = serde_json::to_value(normalized).map_err(|error| error.to_string())?;
+    serialize_canonical(&normalized)
+}
+
+fn component_versions() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        (
+            "sembla-cli".to_owned(),
+            env!("CARGO_PKG_VERSION").to_owned(),
+        ),
+        ("sembla-ir".to_owned(), sembla_ir::VERSION.to_owned()),
+        (
+            "sembla-runtime".to_owned(),
+            sembla_runtime::VERSION.to_owned(),
+        ),
+    ])
+}
+
+fn serialize_canonical(value: &impl Serialize) -> Result<String, String> {
+    let value = serde_json::to_value(value).map_err(|error| error.to_string())?;
     let mut json = serde_json::to_string(&sort_json(value)).map_err(|error| error.to_string())?;
     json.push('\n');
     Ok(json)

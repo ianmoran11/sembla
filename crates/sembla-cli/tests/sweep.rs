@@ -115,6 +115,88 @@ fn custom_sweep(
     process.output().unwrap()
 }
 
+struct PairsSweepOptions<'a> {
+    seed: u64,
+    draws: Option<u32>,
+    noise: &'a str,
+    theta_file: Option<&'a Path>,
+}
+
+fn pairs_sweep(
+    model: &Path,
+    population: &Path,
+    out: &Path,
+    pairs: &Path,
+    options: PairsSweepOptions<'_>,
+) -> Output {
+    let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    process
+        .arg("sweep")
+        .arg(model)
+        .arg("--population")
+        .arg(population)
+        .arg("--seed")
+        .arg(options.seed.to_string())
+        .arg("--ticks")
+        .arg("8")
+        .arg("--noise")
+        .arg(options.noise)
+        .arg("--out")
+        .arg(out)
+        .arg("--export-pairs")
+        .arg(pairs);
+    if let Some(draws) = options.draws {
+        process.arg("--draws").arg(draws.to_string());
+    }
+    if let Some(theta_file) = options.theta_file {
+        process.arg("--theta-file").arg(theta_file);
+    }
+    process.output().unwrap()
+}
+
+fn pairs_meta_path(pairs: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.meta.json", pairs.display()))
+}
+
+fn assert_pairs_match_sweep_outputs(pairs: &Path, out: &Path) {
+    let pairs_csv = std::fs::read_to_string(pairs).unwrap();
+    let mut pair_lines = pairs_csv.lines();
+    assert_eq!(pair_lines.next(), Some("k,beta,gamma,peak_tick,peak_I"));
+
+    let theta_csv = String::from_utf8(file(out, "manifest.csv")).unwrap();
+    let mut theta_lines = theta_csv.lines().filter(|line| !line.starts_with('#'));
+    let theta_header = theta_lines.next().unwrap().split(',').collect::<Vec<_>>();
+    let beta_index = theta_header
+        .iter()
+        .position(|name| *name == "beta")
+        .unwrap();
+    let gamma_index = theta_header
+        .iter()
+        .position(|name| *name == "gamma")
+        .unwrap();
+
+    let theta_rows = theta_lines.collect::<Vec<_>>();
+    let pair_rows = pair_lines.collect::<Vec<_>>();
+    assert_eq!(pair_rows.len(), theta_rows.len());
+    for (draw, (pair_row, theta_row)) in pair_rows.iter().zip(theta_rows).enumerate() {
+        let pair_values = pair_row.split(',').collect::<Vec<_>>();
+        let theta_values = theta_row.split(',').collect::<Vec<_>>();
+        assert_eq!(pair_values[0], draw.to_string());
+        assert_eq!(pair_values[1], theta_values[beta_index]);
+        assert_eq!(pair_values[2], theta_values[gamma_index]);
+
+        let summaries =
+            std::fs::read_to_string(out.join(format!("draw_{draw}.csv.summaries.csv"))).unwrap();
+        let summary_values = summaries
+            .lines()
+            .skip(1)
+            .map(|row| row.split_once(',').unwrap())
+            .collect::<std::collections::BTreeMap<_, _>>();
+        assert_eq!(pair_values[3], summary_values["peak_tick"]);
+        assert_eq!(pair_values[4], summary_values["peak_I"]);
+    }
+}
+
 fn assert_success(output: &Output) {
     assert!(
         output.status.success(),
@@ -464,6 +546,174 @@ fn theta_file_reports_missing_unknown_and_draw_conflict() {
         conflict_stderr.starts_with("'--theta-file' cannot be combined with '--draws'\nusage:"),
         "{conflict_stderr}"
     );
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn pairs_export_is_deterministic_canonical_and_matches_theta_and_summaries() {
+    let temp = temp_dir("pairs-export");
+    let population = temp.join("population.bin");
+    synth(&population, 2_000, 40, 20);
+    let model = repository_path("crates/sembla-cli/tests/fixtures/pairs_model.json");
+    let first_out = temp.join("first-sweep");
+    let repeat_out = temp.join("repeat-sweep");
+    let first_pairs = temp.join("first-pairs.csv");
+    let repeat_pairs = temp.join("repeat-pairs.csv");
+
+    let first = pairs_sweep(
+        &model,
+        &population,
+        &first_out,
+        &first_pairs,
+        PairsSweepOptions {
+            seed: 91,
+            draws: Some(3),
+            noise: "independent",
+            theta_file: None,
+        },
+    );
+    assert_success(&first);
+    assert!(
+        first.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let repeat = pairs_sweep(
+        &model,
+        &population,
+        &repeat_out,
+        &repeat_pairs,
+        PairsSweepOptions {
+            seed: 91,
+            draws: Some(3),
+            noise: "independent",
+            theta_file: None,
+        },
+    );
+    assert_success(&repeat);
+
+    assert_eq!(
+        std::fs::read(&first_pairs).unwrap(),
+        std::fs::read(&repeat_pairs).unwrap()
+    );
+    assert_eq!(
+        std::fs::read(pairs_meta_path(&first_pairs)).unwrap(),
+        std::fs::read(pairs_meta_path(&repeat_pairs)).unwrap()
+    );
+    assert_pairs_match_sweep_outputs(&first_pairs, &first_out);
+
+    let pairs_bytes = std::fs::read(&first_pairs).unwrap();
+    let metadata_bytes = std::fs::read(pairs_meta_path(&first_pairs)).unwrap();
+    assert_eq!(metadata_bytes.last(), Some(&b'\n'));
+    let metadata: serde_json::Value = serde_json::from_slice(&metadata_bytes).unwrap();
+    assert_eq!(metadata["schema_versions"], serde_json::json!({"pairs": 1}));
+    assert_eq!(metadata["model"], "pairs_fixture");
+    assert_eq!(metadata["seed"], 91);
+    assert_eq!(metadata["noise_mode"], "independent");
+    assert_eq!(metadata["draws"], 3);
+    assert_eq!(metadata["ticks"], 8);
+    assert_eq!(metadata["dt"], 0.25);
+    assert_eq!(metadata["determinism_level"], "A");
+    assert_eq!(metadata["ir_hash_algorithm"], "sha256");
+    assert_eq!(metadata["pairs_hash_algorithm"], "sha256");
+    assert_eq!(metadata["theta_source"]["kind"], "prior");
+    assert_eq!(metadata["theta_source"]["algorithm"], "sha256");
+    assert_eq!(
+        metadata["parameter_columns"],
+        serde_json::json!(["beta", "gamma"])
+    );
+    assert_eq!(
+        metadata["summary_columns"],
+        serde_json::json!(["peak_tick", "peak_I"])
+    );
+    assert_eq!(
+        metadata["pairs_sha256"],
+        format!("{:x}", Sha256::digest(pairs_bytes))
+    );
+    assert_eq!(
+        metadata["component_versions"]["sembla-cli"],
+        env!("CARGO_PKG_VERSION")
+    );
+    assert!(metadata["component_versions"]["sembla-ir"].is_string());
+    assert!(metadata["component_versions"]["sembla-runtime"].is_string());
+
+    // Canonical PRD-0001 JSON recursively sorts object keys and ends in one newline.
+    let reparsed = serde_json::to_string(&metadata).unwrap() + "\n";
+    assert_eq!(metadata_bytes, reparsed.as_bytes());
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn pairs_export_accepts_theta_file_warns_for_crn_and_rejects_missing_summaries() {
+    let temp = temp_dir("pairs-export-modes");
+    let population = temp.join("population.bin");
+    synth(&population, 2_000, 40, 20);
+    let model = repository_path("crates/sembla-cli/tests/fixtures/pairs_model.json");
+    let theta = temp.join("theta.json");
+    let theta_bytes = b"[{\"gamma\":0.12,\"beta\":0.7},{\"gamma\":0.1,\"beta\":0.8},{\"gamma\":0.09,\"beta\":0.9}]\n";
+    std::fs::write(&theta, theta_bytes).unwrap();
+    let out = temp.join("theta-sweep");
+    let pairs = temp.join("theta-pairs.csv");
+
+    let crn = pairs_sweep(
+        &model,
+        &population,
+        &out,
+        &pairs,
+        PairsSweepOptions {
+            seed: 41,
+            draws: None,
+            noise: "crn",
+            theta_file: Some(&theta),
+        },
+    );
+    assert_success(&crn);
+    assert_eq!(
+        String::from_utf8(crn.stderr).unwrap().trim_end(),
+        "warning: --export-pairs with --noise crn is unsuitable for NPE training (DECISIONS.md §G5); use --noise independent"
+    );
+    assert_pairs_match_sweep_outputs(&pairs, &out);
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(pairs_meta_path(&pairs)).unwrap()).unwrap();
+    assert_eq!(metadata["noise_mode"], "crn");
+    assert_eq!(metadata["theta_source"]["kind"], "file");
+    assert_eq!(
+        metadata["theta_source"]["sha256"],
+        format!("{:x}", Sha256::digest(theta_bytes))
+    );
+
+    let no_summaries = temp.join("no-summaries.json");
+    let mut no_summary_model: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&model).unwrap()).unwrap();
+    no_summary_model["name"] = serde_json::Value::String("no_summaries_fixture".to_owned());
+    no_summary_model["summaries"] = serde_json::json!([]);
+    std::fs::write(
+        &no_summaries,
+        serde_json::to_vec(&no_summary_model).unwrap(),
+    )
+    .unwrap();
+    let rejected_pairs = temp.join("rejected.csv");
+    let rejected = pairs_sweep(
+        &no_summaries,
+        Path::new("1"),
+        &temp.join("rejected-sweep"),
+        &rejected_pairs,
+        PairsSweepOptions {
+            seed: 1,
+            draws: Some(1),
+            noise: "independent",
+            theta_file: None,
+        },
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(rejected.stderr).unwrap().trim_end(),
+        "model 'no_summaries_fixture' declares no summaries; --export-pairs requires declared summaries (DESIGN.md §4.6)"
+    );
+    assert!(!rejected_pairs.exists());
+    assert!(!pairs_meta_path(&rejected_pairs).exists());
 
     std::fs::remove_dir_all(temp).unwrap();
 }
