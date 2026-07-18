@@ -56,20 +56,33 @@ cargo run --release -p sembla-cli -- run examples/sir.json \
   --params params.json --out results.csv
 ```
 
-The CSV starts with canonical resolved-theta and `dt` comment headers, then
-rows with
-`tick,S,I,R,fired_infect,fired_recover,deferred_total`. The final stdout line
-prints SHA-256 digests of the exact results bytes and final columnar state.
-Unknown parameters and values with the wrong declared JSON type are errors
-that name the parameter.
+The model declares three filtered count views, `S`, `I`, and `R`, over the
+committed post-tick `person.health` state. Those declarations generically
+produce the legacy byte-for-byte CSV schema
+`tick,S,I,R,fired_infect,fired_recover,deferred_total`; the CLI contains no
+model-name or SIR-shape output branch. The final stdout line prints SHA-256
+digests of the exact results bytes, final columnar state, and observation
+summary bytes. Unknown parameters and values with the wrong declared JSON type
+are errors that name the parameter.
+
+The command also writes `results.csv.summaries.csv` in declaration order:
+
+```text
+name,value
+peak_I,...
+peak_tick,...
+```
+
+`peak_I` is `max(I)` and `peak_tick` is the earliest tick attaining that
+maximum.
 
 The command also writes `results.csv.manifest.json`, a canonical compact JSON
 sidecar with sorted keys and one trailing newline. It records schema versions,
 the effective canonical-IR hash (including `--dt`), model name, seed, ticks,
 `dt`, determinism level `A`, sorted resolved theta, the population basename (or
 numeric specification) and input hash, CPU backend/precision/fallback identity,
-enabled flags, result and final-state hashes, hash algorithm IDs (`sha256`), and
-workspace component versions. It deliberately contains no timestamp, host, or
+enabled flags, result, final-state, and observation hashes, hash algorithm IDs
+(`sha256`), and workspace component versions. It deliberately contains no timestamp, host, or
 absolute path.
 
 ## Verify a recorded run
@@ -91,7 +104,8 @@ incomplete `backend_identity` tuple.
 ## Verify determinism
 
 The run contract is seed + IR + resolved theta. These two commands must print
-the same two hashes and produce byte-identical manifest sidecars (apart from
+the same three hashes and produce byte-identical result CSV, summaries CSV,
+and manifest sidecars (apart from
 the explicitly recorded output population basename when different population
 filenames are used):
 
@@ -101,7 +115,7 @@ cargo run --release -p sembla-cli -- run examples/sir.json --population pop.bin 
 ```
 
 Changing `--seed` or a value in `params.json` changes the results and final
-state hashes. The automated integration test performs this check at 100,000
+state hashes and may change the observation hash. The automated integration test performs this check at 100,000
 people for 100 ticks.
 
 ## Prior-predictive sweep
@@ -121,9 +135,11 @@ draw), one standard `draw_<k>.csv` result per draw, `summary.csv`, and
 is the canonical reproducibility contract. The JSON stores shared model,
 population, seed, tick, backend, schema, and component fields once, then one
 `executions` entry per draw with `k`, sorted resolved theta, results hash, and
-final-state hash. The summary reports the nearest-index 5/25/50/75/95
-percentiles for S, I, R, transition firings, and deferred events at every tick.
-Stdout prints SHA-256 digests for the CSV parameter manifest and summary.
+final-state hash. The summary reports the nearest-index 5/25/50/75/95 percentiles for every
+reported per-tick column—here S, I, R, transition firings, and deferred events.
+The same sweep command also works for views-free models using their generic
+state-count/firing columns. Stdout prints SHA-256 digests for the CSV parameter
+manifest and summary.
 
 Verify every recorded draw, or select one draw with `--draw`:
 

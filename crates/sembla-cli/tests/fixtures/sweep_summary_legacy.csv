@@ -1,0 +1,4 @@
+tick,S_p05,S_p25,S_p50,S_p75,S_p95,I_p05,I_p25,I_p50,I_p75,I_p95,R_p05,R_p25,R_p50,R_p75,R_p95,fired_infect_p05,fired_infect_p25,fired_infect_p50,fired_infect_p75,fired_infect_p95,fired_recover_p05,fired_recover_p25,fired_recover_p50,fired_recover_p75,fired_recover_p95,deferred_total_p05,deferred_total_p25,deferred_total_p50,deferred_total_p75,deferred_total_p95
+0,75,75,75,75,75,5,5,5,5,5,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0
+1,75,75,75,75,75,5,5,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+2,74,74,75,75,75,5,5,6,6,6,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0

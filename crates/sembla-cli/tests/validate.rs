@@ -45,7 +45,7 @@ fn validate_subcommand_rejects_every_invalid_fixture() {
 
 #[test]
 fn diff_ir_compares_validated_canonical_models() {
-    let fixture = repository_path("examples/sir.json");
+    let fixture = repository_path("examples/reversible_ctmc.json");
     let normalized_copy = std::env::temp_dir().join(format!(
         "sembla-diff-ir-{}-{}.json",
         std::process::id(),

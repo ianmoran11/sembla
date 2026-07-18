@@ -2,7 +2,7 @@ use std::path::Path;
 
 use sembla_ir::{AttrType, ParamType, ParamValue};
 use sembla_runtime::eval::{ParamEnv, ParamOverride};
-use sembla_runtime::executor;
+use sembla_runtime::executor::{self, ObservationValue, SummaryValue};
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
@@ -495,6 +495,7 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         run_manifest.resolved_theta = manifest::resolved_theta(&params);
         run_manifest.results_sha256 = Some(hashes.results_sha256);
         run_manifest.final_state_sha256 = Some(hashes.final_state_sha256);
+        run_manifest.observation_sha256 = Some(hashes.observation_sha256);
         manifest::write(&manifest::sidecar_path(out), &run_manifest)
     } else {
         let report = executor::run(&model, &mut state, &params, options.seed, options.ticks)
@@ -537,12 +538,6 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     run_manifest.model = Some(model.model().name.clone());
     run_manifest.dt = Some(model.model().dt);
     run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
-    if optional_sir_box_name(&model)?.is_none() {
-        return Err(
-            "sweep summary currently requires exactly one SIR person/employer box; use sembla run for generic models"
-                .to_owned(),
-        );
-    }
     let pinned = match options.params.as_deref() {
         Some(params_path) => read_param_overrides(&model, params_path)?,
         None => Vec::new(),
@@ -576,6 +571,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     manifest.push('\n');
 
     let mut all_series = Vec::with_capacity(options.draws as usize);
+    let mut reported_columns: Option<Vec<String>> = None;
     // Deliberately sequential: declaration order within each k, then k order.
     for draw in 0..options.draws {
         let params = sample_parameters_for_draw(&model, options.seed, draw, &pinned)
@@ -596,9 +592,17 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
         // The simulation seed is intentionally identical across k: this is
         // common random numbers, so only theta varies between unpinned draws.
-        let (csv, series) =
-            run_sir_results_csv(&model, &mut state, &params, options.seed, options.ticks)?;
-        let hashes = execution_hashes(&csv, &state);
+        let output = run_results_output(&model, &mut state, &params, options.seed, options.ticks)?;
+        if let Some(columns) = &reported_columns {
+            if columns != &output.series.columns {
+                return Err(format!(
+                    "draw {draw}: reported column schema changed across draws"
+                ));
+            }
+        } else {
+            reported_columns = Some(output.series.columns.clone());
+        }
+        let hashes = execution_hashes(&output, &state);
         run_manifest.executions.push(manifest::ManifestExecution {
             k: draw,
             scenario: None,
@@ -608,14 +612,19 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             resolved_theta: manifest::resolved_theta(&params),
             results_sha256: hashes.results_sha256,
             final_state_sha256: hashes.final_state_sha256,
+            observation_sha256: Some(hashes.observation_sha256),
         });
         let draw_path = out.join(format!("draw_{draw}.csv"));
-        std::fs::write(&draw_path, csv.as_bytes())
+        std::fs::write(&draw_path, output.csv.as_bytes())
             .map_err(|error| format!("{}: {error}", draw_path.display()))?;
-        all_series.push(series);
+        all_series.push(output.series.rows);
     }
 
-    let summary = summary_csv(&all_series, options.ticks);
+    let summary = summary_csv(
+        reported_columns.as_deref().unwrap_or_default(),
+        &all_series,
+        options.ticks,
+    )?;
     let manifest_path = out.join("manifest.csv");
     let summary_path = out.join("summary.csv");
     std::fs::write(&manifest_path, manifest.as_bytes())
@@ -660,41 +669,54 @@ fn param_value_csv(value: &ParamValue) -> String {
     }
 }
 
-fn summary_csv(all_series: &[Vec<[usize; 6]>], ticks: u32) -> String {
-    const NAMES: [&str; 6] = [
-        "S",
-        "I",
-        "R",
-        "fired_infect",
-        "fired_recover",
-        "deferred_total",
-    ];
+fn summary_csv(
+    columns: &[String],
+    all_series: &[Vec<Vec<ReportedValue>>],
+    ticks: u32,
+) -> Result<String, String> {
     const PERCENTILES: [usize; 5] = [5, 25, 50, 75, 95];
     let mut csv = String::from("tick");
-    for name in NAMES {
+    for name in columns {
         for percentile in PERCENTILES {
-            csv.push_str(&format!(",{name}_p{percentile:02}"));
+            csv.push(',');
+            csv.push_str(&csv_field(&format!("{name}_p{percentile:02}")));
         }
     }
     csv.push('\n');
     for tick in 0..ticks as usize {
         csv.push_str(&tick.to_string());
-        for column in 0..NAMES.len() {
+        for (column, column_name) in columns.iter().enumerate() {
             let mut values = all_series
                 .iter()
-                .map(|series| series[tick][column])
-                .collect::<Vec<_>>();
-            values.sort_unstable();
+                .map(|series| {
+                    series
+                        .get(tick)
+                        .and_then(|row| row.get(column))
+                        .copied()
+                        .ok_or_else(|| {
+                            format!("reported series is missing tick {tick} column '{column_name}'")
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            if let Some(first) = values.first().copied() {
+                for value in values.iter().skip(1).copied() {
+                    value.cmp(first)?;
+                }
+            }
+            values.sort_by(|left, right| {
+                left.cmp(*right)
+                    .expect("reported column type was checked before sorting")
+            });
             for percentile in PERCENTILES {
                 // Deterministic nearest index to p * (n - 1).
                 let index = ((values.len() - 1) * percentile + 50) / 100;
                 csv.push(',');
-                csv.push_str(&values[index].to_string());
+                csv.push_str(&values[index].csv());
             }
         }
         csv.push('\n');
     }
-    csv
+    Ok(csv)
 }
 
 fn resolve_params(
@@ -748,6 +770,68 @@ fn read_param_overrides(
 struct ExecutionHashes {
     results_sha256: String,
     final_state_sha256: String,
+    observation_sha256: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ReportedValue {
+    Unsigned(usize),
+    Int(i64),
+    Real(f64),
+}
+
+impl ReportedValue {
+    fn csv(self) -> String {
+        match self {
+            Self::Unsigned(value) => value.to_string(),
+            Self::Int(value) => value.to_string(),
+            Self::Real(value) => value.to_string(),
+        }
+    }
+
+    fn cmp(self, other: Self) -> Result<std::cmp::Ordering, String> {
+        match (self, other) {
+            (Self::Unsigned(left), Self::Unsigned(right)) => Ok(left.cmp(&right)),
+            (Self::Int(left), Self::Int(right)) => Ok(left.cmp(&right)),
+            (Self::Real(left), Self::Real(right)) => Ok(left.total_cmp(&right)),
+            _ => Err("reported column changed numeric type across draws".to_owned()),
+        }
+    }
+
+    fn as_usize(self, context: &str) -> Result<usize, String> {
+        match self {
+            Self::Unsigned(value) => Ok(value),
+            Self::Int(value) => usize::try_from(value)
+                .map_err(|_| format!("{context} is negative or exceeds usize")),
+            Self::Real(value) => Err(format!("{context} is real-valued ({value})")),
+        }
+    }
+}
+
+impl From<ObservationValue> for ReportedValue {
+    fn from(value: ObservationValue) -> Self {
+        match value {
+            ObservationValue::Real(value) => Self::Real(value),
+            ObservationValue::Int(value) => Self::Int(value),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ReportedSeries {
+    columns: Vec<String>,
+    rows: Vec<Vec<ReportedValue>>,
+}
+
+#[derive(Clone, Debug)]
+struct RunOutput {
+    csv: String,
+    series: ReportedSeries,
+    summaries_csv: String,
+}
+
+fn summaries_path(output: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(format!("{output}.summaries.csv"))
 }
 
 fn run_results(
@@ -758,78 +842,25 @@ fn run_results(
     ticks: u32,
     out: &str,
 ) -> Result<ExecutionHashes, String> {
-    let csv = run_results_csv(model, state, params, seed, ticks)?;
-    std::fs::write(out, csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
-    let hashes = execution_hashes(&csv, state);
+    let output = run_results_output(model, state, params, seed, ticks)?;
+    std::fs::write(out, output.csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
+    let summaries = summaries_path(out);
+    std::fs::write(&summaries, output.summaries_csv.as_bytes())
+        .map_err(|error| format!("{}: {error}", summaries.display()))?;
+    let hashes = execution_hashes(&output, state);
     println!(
-        "results_sha256={} final_state_sha256={}",
-        hashes.results_sha256, hashes.final_state_sha256
+        "results_sha256={} final_state_sha256={} observation_sha256={}",
+        hashes.results_sha256, hashes.final_state_sha256, hashes.observation_sha256
     );
     Ok(hashes)
 }
 
-fn run_results_csv(
-    model: &sembla_ir::ValidatedModel,
-    state: &mut StateStore,
-    params: &ParamEnv,
-    seed: u64,
-    ticks: u32,
-) -> Result<String, String> {
-    match optional_sir_box_name(model)? {
-        Some(_) => Ok(run_sir_results_csv(model, state, params, seed, ticks)?.0),
-        None => Ok(run_generic_results_csv(model, state, params, seed, ticks)?.0),
-    }
-}
-
-fn execution_hashes(csv: &str, state: &StateStore) -> ExecutionHashes {
+fn execution_hashes(output: &RunOutput, state: &StateStore) -> ExecutionHashes {
     ExecutionHashes {
-        results_sha256: hex(&Sha256::digest(csv.as_bytes())),
+        results_sha256: hex(&Sha256::digest(output.csv.as_bytes())),
         final_state_sha256: hex(&state.state_hash()),
+        observation_sha256: hex(&Sha256::digest(output.summaries_csv.as_bytes())),
     }
-}
-
-/// Preserve the original SIR CSV and fixed six-column sweep series byte-for-byte.
-fn run_sir_results_csv(
-    model: &sembla_ir::ValidatedModel,
-    state: &mut StateStore,
-    params: &ParamEnv,
-    seed: u64,
-    ticks: u32,
-) -> Result<(String, Vec<[usize; 6]>), String> {
-    let sir_box = sir_box_name(model)?.to_owned();
-    let mut csv = String::new();
-    let mut series = Vec::with_capacity(ticks as usize);
-    csv.push_str("# params=");
-    csv.push_str(&canonical_params(params)?);
-    csv.push('\n');
-    csv.push_str(&format!("# dt={}\n", model.model().dt));
-    csv.push_str("tick,S,I,R,fired_infect,fired_recover,deferred_total\n");
-    for tick in 0..ticks {
-        let report = executor::run_tick(model, state, params, seed, tick)
-            .map_err(|error| format!("tick {tick}: {error}"))?;
-        let counts = sir_counts(state, &sir_box)?;
-        let fired_infect = report.fired.first().map_or(0, |entry| entry.1);
-        let fired_recover = report.fired.get(1).map_or(0, |entry| entry.1);
-        let deferred_total: usize = report
-            .deferred_per_resource_table
-            .iter()
-            .map(|(_, count)| count)
-            .sum();
-        let row = [
-            counts[0],
-            counts[1],
-            counts[2],
-            fired_infect,
-            fired_recover,
-            deferred_total,
-        ];
-        series.push(row);
-        csv.push_str(&format!(
-            "{tick},{},{},{},{},{},{}\n",
-            row[0], row[1], row[2], row[3], row[4], row[5]
-        ));
-    }
-    Ok((csv, series))
 }
 
 #[derive(Debug)]
@@ -893,36 +924,56 @@ fn generic_firing_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<FiringDe
         .collect()
 }
 
-fn run_generic_results_csv(
+fn run_results_output(
     model: &sembla_ir::ValidatedModel,
     state: &mut StateStore,
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
-) -> Result<(String, Vec<Vec<usize>>), String> {
-    let enums = generic_enum_descriptors(model);
+) -> Result<RunOutput, String> {
+    let has_views = model
+        .model()
+        .boxes
+        .iter()
+        .any(|model_box| !model_box.views.is_empty());
+    let enums = (!has_views).then(|| generic_enum_descriptors(model));
     let firings = generic_firing_descriptors(model);
     let mut csv = String::new();
-    let mut series = Vec::with_capacity(ticks as usize);
+    let mut rows = Vec::with_capacity(ticks as usize);
+    let mut tick_reports = Vec::with_capacity(ticks as usize);
     csv.push_str("# params=");
     csv.push_str(&canonical_params(params)?);
     csv.push('\n');
     csv.push_str(&format!("# dt={}\n", model.model().dt));
 
     let mut headers = vec!["tick".to_owned()];
-    for descriptor in &enums {
-        for variant in &descriptor.variants {
-            headers.push(format!(
-                "count:{}.{}.{}={variant}",
-                descriptor.box_name, descriptor.table_name, descriptor.attr_name
-            ));
+    if has_views {
+        headers.extend(
+            model
+                .model()
+                .boxes
+                .iter()
+                .flat_map(|model_box| model_box.views.iter().map(|view| view.name.clone())),
+        );
+    } else {
+        for descriptor in enums.as_deref().unwrap_or_default() {
+            for variant in &descriptor.variants {
+                headers.push(format!(
+                    "count:{}.{}.{}={variant}",
+                    descriptor.box_name, descriptor.table_name, descriptor.attr_name
+                ));
+            }
         }
     }
     for descriptor in &firings {
-        headers.push(format!(
-            "fired:{}.{}",
-            descriptor.box_name, descriptor.transition_name
-        ));
+        if has_views {
+            headers.push(format!("fired_{}", descriptor.transition_name));
+        } else {
+            headers.push(format!(
+                "fired:{}.{}",
+                descriptor.box_name, descriptor.transition_name
+            ));
+        }
     }
     headers.push("deferred_total".to_owned());
     csv.push_str(
@@ -937,68 +988,101 @@ fn run_generic_results_csv(
     for tick in 0..ticks {
         let report = executor::run_tick(model, state, params, seed, tick)
             .map_err(|error| format!("tick {tick}: {error}"))?;
-        let snapshot = state.snapshot();
-        let mut row = vec![tick as usize];
-        for descriptor in &enums {
-            let values = snapshot
-                .enum_values(
-                    &descriptor.box_name,
-                    &descriptor.table_name,
-                    &descriptor.attr_name,
-                )
-                .map_err(|error| error.to_string())?;
-            let mut counts = vec![0_usize; descriptor.variants.len()];
-            for value in values {
-                let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
+        let mut row = Vec::with_capacity(headers.len() - 1);
+        if has_views {
+            row.extend(
+                report
+                    .views
+                    .iter()
+                    .map(|view| ReportedValue::from(view.value)),
+            );
+        } else {
+            let snapshot = state.snapshot();
+            for descriptor in enums.as_deref().unwrap_or_default() {
+                let values = snapshot
+                    .enum_values(
+                        &descriptor.box_name,
+                        &descriptor.table_name,
+                        &descriptor.attr_name,
+                    )
+                    .map_err(|error| error.to_string())?;
+                let mut counts = vec![0_usize; descriptor.variants.len()];
+                for value in values {
+                    let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
+                        format!(
+                            "invalid enum index {value} for {}.{}.{} with {} variants",
+                            descriptor.box_name,
+                            descriptor.table_name,
+                            descriptor.attr_name,
+                            descriptor.variants.len()
+                        )
+                    })?;
+                    *slot += 1;
+                }
+                row.extend(counts.into_iter().map(ReportedValue::Unsigned));
+            }
+        }
+        for descriptor in &firings {
+            let (reported_rule_id, fired) = report
+                .fired
+                .get(descriptor.rule_id as usize)
+                .ok_or_else(|| {
                     format!(
-                        "invalid enum index {value} for {}.{}.{} with {} variants",
-                        descriptor.box_name,
-                        descriptor.table_name,
-                        descriptor.attr_name,
-                        descriptor.variants.len()
+                        "tick {tick}: internal firing report has no rule {}",
+                        descriptor.rule_id
                     )
                 })?;
-                *slot += 1;
-            }
-            row.extend(counts);
-        }
-        if report.fired.len() != firings.len() {
-            return Err(format!(
-                "tick {tick}: internal firing report length mismatch: expected {}, found {}",
-                firings.len(),
-                report.fired.len()
-            ));
-        }
-        for (descriptor, (reported_rule_id, fired)) in firings.iter().zip(&report.fired) {
             if *reported_rule_id != descriptor.rule_id {
                 return Err(format!(
                     "tick {tick}: internal firing report rule mismatch: expected {}, found {}",
                     descriptor.rule_id, reported_rule_id
                 ));
             }
-            row.push(*fired);
+            row.push(ReportedValue::Unsigned(*fired));
         }
-        row.push(
+        row.push(ReportedValue::Unsigned(
             report
                 .deferred_per_resource_table
                 .iter()
                 .map(|(_, count)| count)
                 .sum(),
-        );
-        csv.push_str(
-            &row.iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(","),
-        );
+        ));
+        csv.push_str(&tick.to_string());
+        for value in &row {
+            csv.push(',');
+            csv.push_str(&value.csv());
+        }
         csv.push('\n');
-        series.push(row);
+        rows.push(row);
+        tick_reports.push(report);
     }
-    Ok((csv, series))
+    let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
+    Ok(RunOutput {
+        csv,
+        series: ReportedSeries {
+            columns: headers.into_iter().skip(1).collect(),
+            rows,
+        },
+        summaries_csv: summaries_csv(&summaries),
+    })
 }
 
-fn optional_sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<Option<&str>, String> {
-    let matches = model
+fn summaries_csv(summaries: &[SummaryValue]) -> String {
+    let mut csv = String::from("name,value\n");
+    for summary in summaries {
+        csv.push_str(&csv_field(&summary.name));
+        csv.push(',');
+        csv.push_str(&ReportedValue::from(summary.value).csv());
+        csv.push('\n');
+    }
+    csv
+}
+
+fn initializers_from_population(
+    model: &sembla_ir::ValidatedModel,
+    population: &SyntheticPopulation,
+) -> Result<Vec<TableInit>, String> {
+    let population_boxes = model
         .model()
         .boxes
         .iter()
@@ -1016,57 +1100,47 @@ fn optional_sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<Option<&st
             }) && model_box.tables.iter().any(|table| table.name == "employer")
         })
         .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [model_box] => Ok(Some(&model_box.name)),
-        [] => Ok(None),
-        _ => Err("CSV output found more than one SIR person/employer box".to_owned()),
-    }
-}
-
-fn sir_box_name(model: &sembla_ir::ValidatedModel) -> Result<&str, String> {
-    optional_sir_box_name(model)?
-        .ok_or_else(|| "CSV output requires exactly one SIR person/employer box".to_owned())
-}
-
-fn sir_counts(state: &StateStore, box_name: &str) -> Result<[usize; 3], String> {
-    let snapshot = state.snapshot();
-    let health = snapshot
-        .enum_values(box_name, "person", "health")
-        .map_err(|error| error.to_string())?;
-    let mut counts = [0_usize; 3];
-    for value in health {
-        let slot = counts
-            .get_mut(*value as usize)
-            .ok_or_else(|| format!("invalid health enum index {value}"))?;
-        *slot += 1;
-    }
-    Ok(counts)
-}
-
-fn initializers_from_population(
-    model: &sembla_ir::ValidatedModel,
-    population: &SyntheticPopulation,
-) -> Result<Vec<TableInit>, String> {
-    let sir_box = sir_box_name(model)?.to_owned();
-    let is_sir_policy = sir_box == "population"
-        && model.model().boxes.iter().any(|model_box| {
-            model_box.name == "policy"
-                && model_box.tables.iter().any(|table| {
-                    table.name == "controller"
-                        && table.size_hint == 1
-                        && table.attrs.iter().any(|attr| attr.name == "mode")
-                        && table.attrs.iter().any(|attr| attr.name == "modifier")
-                })
-        });
-    let mut initial = if is_sir_policy {
-        population.sir_policy_table_initializers()
-    } else {
-        population.sir_table_initializers_for_box(&sir_box)
+    let [population_box] = population_boxes.as_slice() else {
+        return Err(format!(
+            "population file requires exactly one compatible person/employer schema, found {}",
+            population_boxes.len()
+        ));
+    };
+    let controller_boxes = model
+        .model()
+        .boxes
+        .iter()
+        .filter(|model_box| {
+            model_box.tables.iter().any(|table| {
+                table.name == "controller"
+                    && table.size_hint == 1
+                    && table.attrs.iter().any(|attr| attr.name == "mode")
+                    && table.attrs.iter().any(|attr| attr.name == "modifier")
+            })
+        })
+        .collect::<Vec<_>>();
+    let controller_box = match controller_boxes.as_slice() {
+        [] => None,
+        [model_box] => Some(*model_box),
+        _ => {
+            return Err(format!(
+                "population file found {} compatible controller schemas",
+                controller_boxes.len()
+            ));
+        }
+    };
+    let mut initial = match controller_box {
+        Some(controller) => population
+            .sir_policy_table_initializers_for_boxes(&population_box.name, &controller.name),
+        None => population.sir_table_initializers_for_box(&population_box.name),
     };
     for model_box in &model.model().boxes {
         for table in &model_box.tables {
-            if (model_box.name == sir_box && (table.name == "person" || table.name == "employer"))
-                || (is_sir_policy && model_box.name == "policy" && table.name == "controller")
+            if (model_box.name == population_box.name
+                && (table.name == "person" || table.name == "employer"))
+                || controller_box.is_some_and(|controller| {
+                    model_box.name == controller.name && table.name == "controller"
+                })
             {
                 continue;
             }
@@ -1202,8 +1276,9 @@ fn verify_run_result(
             }
             let params = params_from_manifest(&model, &recorded.resolved_theta)?;
             let mut state = initialized_state(&model, &options.population, model_path)?;
-            let csv = run_results_csv(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
-            let actual = execution_hashes(&csv, &state);
+            let output =
+                run_results_output(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
+            let actual = execution_hashes(&output, &state);
             compare_field(
                 "results_sha256",
                 &recorded.results_sha256,
@@ -1216,6 +1291,14 @@ fn verify_run_result(
                 &Some(actual.final_state_sha256),
                 &mut differences,
             );
+            if recorded.observation_sha256.is_some() {
+                compare_field(
+                    "observation_sha256",
+                    &recorded.observation_sha256,
+                    &Some(actual.observation_sha256),
+                    &mut differences,
+                );
+            }
             finish_verification(differences, 1)
         }
         manifest::ManifestKind::Sweep => {
@@ -1246,9 +1329,9 @@ fn verify_run_result(
                 }
                 let params = params_from_manifest(&model, &execution.resolved_theta)?;
                 let mut state = initialized_state(&model, &options.population, model_path)?;
-                let csv =
-                    run_results_csv(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
-                let actual = execution_hashes(&csv, &state);
+                let output =
+                    run_results_output(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
+                let actual = execution_hashes(&output, &state);
                 compare_field(
                     &format!("executions[{}].results_sha256", execution.k),
                     &execution.results_sha256,
@@ -1261,6 +1344,14 @@ fn verify_run_result(
                     &actual.final_state_sha256,
                     &mut differences,
                 );
+                if execution.observation_sha256.is_some() {
+                    compare_field(
+                        &format!("executions[{}].observation_sha256", execution.k),
+                        &execution.observation_sha256,
+                        &Some(actual.observation_sha256),
+                        &mut differences,
+                    );
+                }
             }
             finish_verification(differences, executions.len())
         }
@@ -1440,6 +1531,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
             resolved_theta: manifest::resolved_theta(params),
             results_sha256: arm.hashes.results_sha256.clone(),
             final_state_sha256: arm.hashes.final_state_sha256.clone(),
+            observation_sha256: Some(arm.hashes.observation_sha256.clone()),
         });
     }
     manifest::write(&manifest::sidecar_path(&options.out), &run_manifest)?;
@@ -1456,19 +1548,43 @@ fn compare_arm(
 ) -> Result<CompareArmOutcome, String> {
     let initial = initializers_from_population(model, population)?;
     let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
-    let (csv, series) = run_sir_results_csv(model, &mut state, params, seed, ticks)?;
-    let ticks = series
-        .into_iter()
-        .map(|row| CompareTick {
-            counts: [row[0], row[1], row[2]],
-            fired_infect: row[3],
-            fired_recover: row[4],
-            deferred_total: row[5],
+    let output = run_results_output(model, &mut state, params, seed, ticks)?;
+    let column = |name: &str| {
+        output
+            .series
+            .columns
+            .iter()
+            .position(|column| column == name)
+            .ok_or_else(|| format!("compare arm is missing reported column '{name}'"))
+    };
+    let indices = [
+        column("S")?,
+        column("I")?,
+        column("R")?,
+        column("fired_infect")?,
+        column("fired_recover")?,
+        column("deferred_total")?,
+    ];
+    let ticks = output
+        .series
+        .rows
+        .iter()
+        .map(|row| {
+            Ok(CompareTick {
+                counts: [
+                    row[indices[0]].as_usize("compare S value")?,
+                    row[indices[1]].as_usize("compare I value")?,
+                    row[indices[2]].as_usize("compare R value")?,
+                ],
+                fired_infect: row[indices[3]].as_usize("compare infect firing")?,
+                fired_recover: row[indices[4]].as_usize("compare recover firing")?,
+                deferred_total: row[indices[5]].as_usize("compare deferred total")?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     Ok(CompareArmOutcome {
         ticks,
-        hashes: execution_hashes(&csv, &state),
+        hashes: execution_hashes(&output, &state),
     })
 }
 
@@ -1536,10 +1652,7 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        csv_field, initialize_population, optional_sir_box_name, run, run_generic_results_csv,
-        run_sir_results_csv, VERSION,
-    };
+    use super::{csv_field, initialize_population, run, run_results_output, VERSION};
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
     fn load(source: &str) -> sembla_ir::ValidatedModel {
@@ -1562,60 +1675,32 @@ mod tests {
     }
 
     #[test]
-    fn legacy_sir_csv_bytes_are_frozen() {
-        let model = load(include_str!("../../../examples/sir.json"));
-        let params = ParamEnv::defaults(&model);
-        let mut state = initialized(&model, 4);
-        let (csv, series) = run_sir_results_csv(&model, &mut state, &params, 1, 2).unwrap();
-        assert_eq!(
-            csv,
-            "# params={\"beta\":0.8,\"gamma\":0.1}\n\
-# dt=0.25\n\
-tick,S,I,R,fired_infect,fired_recover,deferred_total\n\
-0,4,0,0,0,0,0\n\
-1,4,0,0,0,0,0\n"
-        );
-        assert_eq!(series, vec![[4, 0, 0, 0, 0, 0]; 2]);
-        assert_eq!(optional_sir_box_name(&model).unwrap(), Some("sir"));
-    }
-
-    #[test]
-    fn multiple_sir_boxes_are_rejected_as_ambiguous() {
-        let mut raw = sembla_ir::parse_json(include_str!("../../../examples/sir.json")).unwrap();
-        let mut duplicate = raw.boxes[0].clone();
-        duplicate.name = "sir_duplicate".to_owned();
-        raw.boxes.push(duplicate);
-        let model = sembla_ir::validate(raw).unwrap();
-        assert_eq!(
-            optional_sir_box_name(&model).unwrap_err(),
-            "CSV output found more than one SIR person/employer box"
-        );
-    }
-
-    #[test]
     fn generic_csv_is_ordered_deterministic_and_conservative() {
         let model = load(include_str!("../../../examples/reversible_ctmc.json"));
         let params = ParamEnv::defaults(&model);
         let mut first_state = initialized(&model, 1000);
         let mut second_state = initialized(&model, 1000);
-        let first = run_generic_results_csv(&model, &mut first_state, &params, 55, 20).unwrap();
-        let second = run_generic_results_csv(&model, &mut second_state, &params, 55, 20).unwrap();
-        assert_eq!(first, second);
-        assert_eq!(optional_sir_box_name(&model).unwrap(), None);
+        let first = run_results_output(&model, &mut first_state, &params, 55, 20).unwrap();
+        let second = run_results_output(&model, &mut second_state, &params, 55, 20).unwrap();
+        assert_eq!(first.csv, second.csv);
         assert_eq!(
-            first.0.lines().nth(2).unwrap(),
+            first.csv.lines().nth(2).unwrap(),
             "tick,count:chain.particle.phase=A,count:chain.particle.phase=B,fired:chain.move_ab,fired:chain.move_ba,deferred_total"
         );
-        assert_eq!(first.1.len(), 20);
-        for row in &first.1 {
-            assert_eq!(row[1] + row[2], 1000);
-            assert_eq!(row.len(), 6);
+        assert_eq!(first.series.rows.len(), 20);
+        for row in &first.series.rows {
+            assert_eq!(
+                row[0].as_usize("A").unwrap() + row[1].as_usize("B").unwrap(),
+                1000
+            );
+            assert_eq!(row.len(), 5);
         }
         assert_eq!(
-            first.1[0][4], 0,
+            first.series.rows[0][3].as_usize("B to A").unwrap(),
+            0,
             "B to A must still have a zero-valued column"
         );
-        assert!(first.1.last().unwrap()[2] > 0);
+        assert!(first.series.rows.last().unwrap()[1].as_usize("B").unwrap() > 0);
     }
 
     #[test]

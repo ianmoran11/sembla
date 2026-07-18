@@ -87,6 +87,10 @@ fn run_sweep_and_compare_manifests_are_byte_deterministic() {
         std::fs::read(sidecar(&first_run)).unwrap(),
         std::fs::read(sidecar(&second_run)).unwrap()
     );
+    assert_eq!(
+        std::fs::read(format!("{}.summaries.csv", first_run.display())).unwrap(),
+        std::fs::read(format!("{}.summaries.csv", second_run.display())).unwrap()
+    );
     let run_manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(sidecar(&first_run)).unwrap()).unwrap();
     assert_eq!(
@@ -94,6 +98,8 @@ fn run_sweep_and_compare_manifests_are_byte_deterministic() {
         serde_json::json!({"backend_identity": 1, "manifest": 1})
     );
     assert_eq!(run_manifest["ir_hash_algorithm"], "sha256");
+    assert_eq!(run_manifest["observation_hash_algorithm"], "sha256");
+    assert!(run_manifest["observation_sha256"].is_string());
     assert_eq!(run_manifest["population_hash_algorithm"], "sha256");
     assert_eq!(run_manifest["results_hash_algorithm"], "sha256");
     assert_eq!(run_manifest["final_state_hash_algorithm"], "sha256");
@@ -126,6 +132,14 @@ fn run_sweep_and_compare_manifests_are_byte_deterministic() {
         std::fs::read(first_sweep.join("run-manifest.json")).unwrap(),
         std::fs::read(second_sweep.join("run-manifest.json")).unwrap()
     );
+    let sweep_manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(first_sweep.join("run-manifest.json")).unwrap())
+            .unwrap();
+    assert!(sweep_manifest["executions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|execution| execution["observation_sha256"].is_string()));
 
     let first_compare = temp.join("first-compare.csv");
     let second_compare = temp.join("second-compare.csv");
@@ -282,6 +296,30 @@ fn verify_run_reports_tampered_seed_and_partial_backend_tuple() {
     let stderr = String::from_utf8_lossy(&rejected.stderr);
     assert!(stderr.contains("backend_identity tuple"), "{stderr}");
     assert!(stderr.contains("fell_back"), "{stderr}");
+
+    for (label, field) in [
+        (
+            "missing-observation-algorithm",
+            "observation_hash_algorithm",
+        ),
+        ("missing-observation-hash", "observation_sha256"),
+    ] {
+        let mut partial: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&original).unwrap()).unwrap();
+        partial.as_object_mut().unwrap().remove(field);
+        let path = temp.join(format!("{label}.json"));
+        std::fs::write(&path, serde_json::to_vec(&partial).unwrap()).unwrap();
+        let rejected = command(&[
+            "verify-run",
+            path.to_str().unwrap(),
+            model.to_str().unwrap(),
+            "--population",
+            "40",
+        ]);
+        assert_eq!(rejected.status.code(), Some(1));
+        let stderr = String::from_utf8_lossy(&rejected.stderr);
+        assert!(stderr.contains("observation hash tuple"), "{stderr}");
+    }
 
     std::fs::remove_dir_all(temp).unwrap();
 }

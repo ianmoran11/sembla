@@ -173,34 +173,6 @@ fn twenty_draw_hundred_thousand_person_summary_has_monotone_bands() {
 }
 
 #[test]
-fn sweep_rejects_generic_models_before_writing_outputs() {
-    let temp = temp_dir("generic-sweep-rejection");
-    let out = temp.join("sweep");
-    let output = command(&[
-        "sweep",
-        repository_path("examples/reversible_ctmc.json")
-            .to_str()
-            .unwrap(),
-        "--population",
-        "100",
-        "--seed",
-        "1",
-        "--draws",
-        "2",
-        "--ticks",
-        "2",
-        "--out",
-        out.to_str().unwrap(),
-    ]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&output.stderr).contains(
-        "sweep summary currently requires exactly one SIR person/employer box; use sembla run for generic models"
-    ));
-    assert!(!out.exists());
-    std::fs::remove_dir_all(temp).unwrap();
-}
-
-#[test]
 fn sweep_rejects_zero_draws() {
     let output = command(&[
         "sweep",

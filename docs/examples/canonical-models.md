@@ -86,10 +86,11 @@ cmp first.csv second.csv
 cmp first.hashes second.hashes
 ```
 
-## Generic CSV contract
+## Generic no-views CSV contract
 
-Models without a SIR-shaped `person.health = {S,I,R}` plus `employer` box use
-the generic result schema. The two comment headers remain canonical:
+Models with no declared views use the model-agnostic generic result schema;
+this is the default for every canonical model above, not a shape-based special
+case. The two comment headers remain canonical:
 
 ```text
 # params={...}
@@ -114,8 +115,18 @@ tick,count:chain.particle.phase=A,count:chain.particle.phase=B,fired:chain.move_
 ```
 
 Counts are observed after each completed tick. For each enum attribute, its
-variant columns sum to that table's row count. Existing SIR and SIR-policy
-models retain their original `tick,S,I,R,...` CSV bytes and hashes.
+variant columns sum to that table's row count. Every `--out` run also writes an
+`<out>.summaries.csv` file; it contains only the `name,value` header for these
+views-free, summary-free models. The observation hash of those exact bytes is
+printed and recorded in the run manifest. The standalone SIR model instead
+declares views and retains its original `tick,S,I,R,...` CSV bytes and hash.
+The composed SIR-policy model reports the same views plus firing columns for
+all four model-global rules, including `fired_restrict` and `fired_reopen`, as
+required by the generic per-rule contract.
+
+Sweeps use whichever columns the model reports. For these views-free examples,
+`draw_<k>.csv` keeps the generic schema and `summary.csv` contains deterministic
+5/25/50/75/95 bands for each state-count, firing, and deferred column.
 
 ## Numeric initialization semantics
 

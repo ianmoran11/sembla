@@ -226,14 +226,16 @@ impl SyntheticPopulation {
         self.sir_table_initializers_for_box("sir")
     }
 
-    /// Converts this population to the checked-in SIR + policy model.
-    ///
-    /// The policy controller is the one non-population row in that model and
-    /// starts in `Open` (enum index 0) with its contact modifier at `1.0`.
-    pub fn sir_policy_table_initializers(&self) -> Vec<TableInit> {
-        let mut initial = self.sir_table_initializers_for_box("population");
+    /// Converts this population to a composed SIR + policy model using
+    /// validator-resolved box names rather than framework-known model names.
+    pub fn sir_policy_table_initializers_for_boxes(
+        &self,
+        population_box: &str,
+        policy_box: &str,
+    ) -> Vec<TableInit> {
+        let mut initial = self.sir_table_initializers_for_box(population_box);
         initial.push(TableInit::new(
-            "policy",
+            policy_box,
             "controller",
             1,
             vec![
@@ -242,6 +244,14 @@ impl SyntheticPopulation {
             ],
         ));
         initial
+    }
+
+    /// Converts this population to the checked-in SIR + policy model.
+    ///
+    /// The policy controller is the one non-population row in that model and
+    /// starts in `Open` (enum index 0) with its contact modifier at `1.0`.
+    pub fn sir_policy_table_initializers(&self) -> Vec<TableInit> {
+        self.sir_policy_table_initializers_for_boxes("population", "policy")
     }
 }
 

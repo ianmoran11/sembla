@@ -4,7 +4,10 @@ use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
 
-use sembla_ir::{AggOp, AttrType, ClaimOrdering, Effect, Expr, OutputBuilder, ValidatedModel};
+use sembla_ir::{
+    AggOp, AttrType, ClaimOrdering, Effect, Expr, OutputBuilder, SummaryReduce, ValidatedModel,
+    ViewReduce,
+};
 
 use crate::eval::{
     eval_column, eval_typed_ref_column, AggCache, EvalError, EvalTable, ParamEnv, ValueColumn,
@@ -12,10 +15,47 @@ use crate::eval::{
 use crate::rng::exp_f64;
 use crate::state::{ColumnData, InputTable, Snapshot, StateError, StateStore};
 
+/// A numeric observation scalar. Real equality is bitwise so report equality
+/// remains an exact determinism check, including signed zero and NaN payloads.
+#[derive(Clone, Copy, Debug)]
+pub enum ObservationValue {
+    Real(f64),
+    Int(i64),
+}
+
+impl PartialEq for ObservationValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Real(left), Self::Real(right)) => left.to_bits() == right.to_bits(),
+            (Self::Int(left), Self::Int(right)) => left == right,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for ObservationValue {}
+
+/// One declaration-ordered view value from a committed post-tick state.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ViewValue {
+    pub box_name: String,
+    pub name: String,
+    pub value: ObservationValue,
+}
+
+/// One model-declaration-ordered summary value folded across a run.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SummaryValue {
+    pub name: String,
+    pub value: ObservationValue,
+}
+
 /// Observable result of one committed tick.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickReport {
     pub tick: u32,
+    /// View values in box order and then view declaration order.
+    pub views: Vec<ViewValue>,
     /// Model-global rule counts, retained for single-box API compatibility.
     pub fired: Vec<(u32, usize)>,
     /// Counts grouped in box declaration order for composed-model reporting.
@@ -39,6 +79,7 @@ pub struct SaturationWarning {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RunReport {
     pub ticks: Vec<TickReport>,
+    pub summaries: Vec<SummaryValue>,
     pub warnings: Vec<SaturationWarning>,
 }
 
@@ -242,7 +283,12 @@ pub fn run(
         }
         ticks.push(outcome.report);
     }
-    Ok(RunReport { ticks, warnings })
+    let summaries = summarize(model, &ticks)?;
+    Ok(RunReport {
+        ticks,
+        summaries,
+        warnings,
+    })
 }
 
 fn exceeds_saturation_threshold(deferred: usize, fired: usize) -> bool {
@@ -313,6 +359,10 @@ fn execute_tick(
         return Err(error.into());
     }
     state.replace_inputs(next_inputs);
+    // Observation is deliberately evaluated only after commit and receives an
+    // immutable store. It cannot consume RNG coordinates, stage writes, or
+    // influence conflict resolution or scheduling.
+    let views = evaluate_views(model, state, params)?;
 
     let mut fired = model
         .transitions()
@@ -343,6 +393,7 @@ fn execute_tick(
     Ok(TickOutcome {
         report: TickReport {
             tick,
+            views,
             fired,
             fired_per_box,
             deferred_per_resource_table,
@@ -350,6 +401,225 @@ fn execute_tick(
         },
         fired_per_resource_table,
     })
+}
+
+fn evaluate_views(
+    model: &ValidatedModel,
+    state: &StateStore,
+    params: &ParamEnv,
+) -> Result<Vec<ViewValue>, TickError> {
+    let snapshot = state.snapshot();
+    let mut cache = AggCache::new(model, &snapshot, params);
+    let mut observations = Vec::new();
+    for model_box in &model.model().boxes {
+        for view in &model_box.views {
+            let table = EvalTable::new(model, &model_box.name, &view.table)?;
+            let row_count = snapshot.row_count(&model_box.name, &view.table)?;
+            let selected = match &view.filter {
+                Some(filter) => match eval_column(filter, table, &snapshot, params, &mut cache)? {
+                    ValueColumn::Bool(values) => values,
+                    other => return Err(runtime_type("view filter", &other)),
+                },
+                None => vec![true; row_count],
+            };
+            let value = match view.reduce {
+                ViewReduce::Count => ObservationValue::Int(
+                    i64::try_from(selected.iter().filter(|selected| **selected).count()).map_err(
+                        |_| {
+                            TickError::Evaluation(format!(
+                                "view '{}.{}' count exceeds i64",
+                                model_box.name, view.name
+                            ))
+                        },
+                    )?,
+                ),
+                ViewReduce::Sum | ViewReduce::Min | ViewReduce::Max => {
+                    let expression = view
+                        .value
+                        .as_ref()
+                        .expect("validated numeric view has a value");
+                    let column = eval_column(expression, table, &snapshot, params, &mut cache)?;
+                    reduce_view_column(&model_box.name, &view.name, view.reduce, column, &selected)?
+                }
+            };
+            observations.push(ViewValue {
+                box_name: model_box.name.clone(),
+                name: view.name.clone(),
+                value,
+            });
+        }
+    }
+    Ok(observations)
+}
+
+fn reduce_view_column(
+    box_name: &str,
+    view_name: &str,
+    reduce: ViewReduce,
+    column: ValueColumn,
+    selected: &[bool],
+) -> Result<ObservationValue, TickError> {
+    match column {
+        ValueColumn::Int(values) => {
+            let mut result = match reduce {
+                ViewReduce::Sum => 0_i64,
+                ViewReduce::Min => i64::MAX,
+                ViewReduce::Max => i64::MIN,
+                ViewReduce::Count => unreachable!("count does not evaluate a value"),
+            };
+            for value in values
+                .into_iter()
+                .zip(selected)
+                .filter_map(|(value, selected)| selected.then_some(value))
+            {
+                result = match reduce {
+                    ViewReduce::Sum => result.checked_add(value).ok_or_else(|| {
+                        TickError::Evaluation(format!(
+                            "view '{box_name}.{view_name}' integer sum overflowed"
+                        ))
+                    })?,
+                    ViewReduce::Min => result.min(value),
+                    ViewReduce::Max => result.max(value),
+                    ViewReduce::Count => unreachable!(),
+                };
+            }
+            Ok(ObservationValue::Int(result))
+        }
+        ValueColumn::Real(values) => {
+            let mut result = match reduce {
+                ViewReduce::Sum => 0.0,
+                ViewReduce::Min => f64::INFINITY,
+                ViewReduce::Max => f64::NEG_INFINITY,
+                ViewReduce::Count => unreachable!("count does not evaluate a value"),
+            };
+            for value in values
+                .into_iter()
+                .zip(selected)
+                .filter_map(|(value, selected)| selected.then_some(value))
+            {
+                result = match reduce {
+                    ViewReduce::Sum => result + value,
+                    ViewReduce::Min if value.total_cmp(&result) == Ordering::Less => value,
+                    ViewReduce::Max if value.total_cmp(&result) == Ordering::Greater => value,
+                    ViewReduce::Min | ViewReduce::Max => result,
+                    ViewReduce::Count => unreachable!(),
+                };
+            }
+            Ok(ObservationValue::Real(result))
+        }
+        other => Err(runtime_type("view value", &other)),
+    }
+}
+
+/// Folds model-declared summaries over tick view values in tick order.
+pub fn summarize(
+    model: &ValidatedModel,
+    ticks: &[TickReport],
+) -> Result<Vec<SummaryValue>, TickError> {
+    let mut summaries = Vec::with_capacity(model.model().summaries.len());
+    for declaration in &model.model().summaries {
+        let values = ticks
+            .iter()
+            .map(|tick| {
+                tick.views
+                    .iter()
+                    .find(|view| {
+                        view.box_name == declaration.r#box && view.name == declaration.view
+                    })
+                    .map(|view| (tick.tick, view.value))
+                    .ok_or_else(|| {
+                        TickError::Evaluation(format!(
+                            "summary '{}' could not find view '{}.{}' at tick {}",
+                            declaration.name, declaration.r#box, declaration.view, tick.tick
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let value = fold_summary(&declaration.name, declaration.reduce, &values)?;
+        summaries.push(SummaryValue {
+            name: declaration.name.clone(),
+            value,
+        });
+    }
+    Ok(summaries)
+}
+
+fn fold_summary(
+    name: &str,
+    reduce: SummaryReduce,
+    values: &[(u32, ObservationValue)],
+) -> Result<ObservationValue, TickError> {
+    let Some(&(first_tick, first_value)) = values.first() else {
+        return Err(TickError::Evaluation(format!(
+            "summary '{name}' cannot reduce an empty run"
+        )));
+    };
+    match reduce {
+        SummaryReduce::Last => Ok(values.last().expect("nonempty").1),
+        SummaryReduce::ArgmaxTick => {
+            let mut best_tick = first_tick;
+            let mut best_value = first_value;
+            for &(tick, value) in &values[1..] {
+                if observation_cmp(value, best_value)? == Ordering::Greater {
+                    best_tick = tick;
+                    best_value = value;
+                }
+            }
+            Ok(ObservationValue::Int(i64::from(best_tick)))
+        }
+        SummaryReduce::Sum => match first_value {
+            ObservationValue::Int(_) => {
+                let mut total = 0_i64;
+                for &(_, value) in values {
+                    let ObservationValue::Int(value) = value else {
+                        return Err(summary_type_mismatch(name));
+                    };
+                    total = total.checked_add(value).ok_or_else(|| {
+                        TickError::Evaluation(format!("summary '{name}' integer sum overflowed"))
+                    })?;
+                }
+                Ok(ObservationValue::Int(total))
+            }
+            ObservationValue::Real(_) => {
+                let mut total = 0.0;
+                for &(_, value) in values {
+                    let ObservationValue::Real(value) = value else {
+                        return Err(summary_type_mismatch(name));
+                    };
+                    total += value;
+                }
+                Ok(ObservationValue::Real(total))
+            }
+        },
+        SummaryReduce::Min | SummaryReduce::Max => {
+            let mut result = first_value;
+            for &(_, value) in &values[1..] {
+                let ordering = observation_cmp(value, result)?;
+                if (reduce == SummaryReduce::Min && ordering == Ordering::Less)
+                    || (reduce == SummaryReduce::Max && ordering == Ordering::Greater)
+                {
+                    result = value;
+                }
+            }
+            Ok(result)
+        }
+    }
+}
+
+fn observation_cmp(left: ObservationValue, right: ObservationValue) -> Result<Ordering, TickError> {
+    match (left, right) {
+        (ObservationValue::Int(left), ObservationValue::Int(right)) => Ok(left.cmp(&right)),
+        (ObservationValue::Real(left), ObservationValue::Real(right)) => Ok(left.total_cmp(&right)),
+        _ => Err(TickError::Evaluation(
+            "observation values changed numeric type across ticks".to_owned(),
+        )),
+    }
+}
+
+fn summary_type_mismatch(name: &str) -> TickError {
+    TickError::Evaluation(format!(
+        "summary '{name}' source changed numeric type across ticks"
+    ))
 }
 
 fn report_table_name(model_box: &sembla_ir::Box, table_index: usize, qualify: bool) -> String {

@@ -60,10 +60,15 @@ done
 cd "$repo_root"
 cargo build --quiet -p sembla-cli
 sembla="$repo_root/target/debug/sembla"
+"$sembla" validate examples/sir.json
+"$sembla" validate examples/sir_policy.json
 "$sembla" validate "$tmp/sir.json"
 "$sembla" validate "$tmp/sir_policy.json"
-"$sembla" diff-ir examples/sir.json "$tmp/sir.json"
-"$sembla" diff-ir examples/sir_policy.json "$tmp/sir_policy.json"
+# PRD 0003 migrates the checked fixtures to declared observations. The Lean
+# surface intentionally remains observation-free until PRD 0004, so full IR
+# equality for these two fixtures is temporarily replaced by validation plus
+# the state-hash parity check below. Canonical views-free models retain exact
+# byte and normalized parity in the loops that follow.
 alias_index=0
 for specification in "${canonical_aliases[@]}"; do
   IFS='|' read -r _ file <<<"$specification"
@@ -114,11 +119,13 @@ for specification in "${canonical_models[@]}"; do
 done
 
 # End-to-end parity traverses population serialization and the executor, not
-# only JSON normalization. Identical stdout proves both results and final-state
-# hashes match; byte-identical CSV is an additional assertion.
+# only JSON normalization. Until PRD 0004 teaches Lean the observation surface,
+# reported CSV and observation hashes intentionally differ; final state must
+# remain bitwise identical by the observation-sink invariant.
 "$sembla" synth-pop --persons 1000 --employers 50 --initial-infected 10 --seed 12 --out "$tmp/pop.bin" >/dev/null
 "$sembla" run examples/sir.json --population "$tmp/pop.bin" --seed 55 --ticks 20 --out "$tmp/fixture.csv" >"$tmp/fixture.hashes"
 "$sembla" run "$tmp/sir.json" --population "$tmp/pop.bin" --seed 55 --ticks 20 --out "$tmp/exported.csv" >"$tmp/exported.hashes"
-cmp "$tmp/fixture.hashes" "$tmp/exported.hashes"
-cmp "$tmp/fixture.csv" "$tmp/exported.csv"
-echo "Lean export, validation, canonical-byte/normalized parity, and run-hash parity passed"
+grep -o 'final_state_sha256=[^ ]*' "$tmp/fixture.hashes" >"$tmp/fixture.state-hash"
+grep -o 'final_state_sha256=[^ ]*' "$tmp/exported.hashes" >"$tmp/exported.state-hash"
+cmp "$tmp/fixture.state-hash" "$tmp/exported.state-hash"
+echo "Lean export, validation, canonical-byte/normalized parity, and state-hash parity passed"

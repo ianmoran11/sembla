@@ -69,7 +69,7 @@ fn run_multi_box_reports_counts_per_box() {
     );
 }
 
-fn reported_hashes(output: &std::process::Output) -> (String, String) {
+fn reported_hashes(output: &std::process::Output) -> (String, String, String) {
     assert!(
         output.status.success(),
         "{}",
@@ -87,10 +87,16 @@ fn reported_hashes(output: &std::process::Output) -> (String, String) {
         .and_then(|field| field.strip_prefix("final_state_sha256="))
         .expect("final state hash field")
         .to_owned();
+    let observation = fields
+        .next()
+        .and_then(|field| field.strip_prefix("observation_sha256="))
+        .expect("observation hash field")
+        .to_owned();
     assert!(fields.next().is_none(), "unexpected stdout: {stdout}");
     assert_eq!(results.len(), 64);
     assert_eq!(state.len(), 64);
-    (results, state)
+    assert_eq!(observation.len(), 64);
+    (results, state, observation)
 }
 
 #[test]

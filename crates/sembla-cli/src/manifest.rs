@@ -73,6 +73,8 @@ pub struct ManifestExecution {
     pub resolved_theta: BTreeMap<String, ResolvedValue>,
     pub results_sha256: String,
     pub final_state_sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub observation_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -92,6 +94,10 @@ pub struct RunManifest {
     pub manifest_kind: ManifestKind,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub observation_hash_algorithm: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub observation_sha256: Option<String>,
     pub population_hash_algorithm: String,
     pub population_sha256: String,
     pub population_source: PopulationSource,
@@ -143,6 +149,8 @@ impl RunManifest {
             ir_hash_algorithm: HASH_ALGORITHM.to_owned(),
             manifest_kind: kind,
             model: None,
+            observation_hash_algorithm: Some(HASH_ALGORITHM.to_owned()),
+            observation_sha256: None,
             population_hash_algorithm: HASH_ALGORITHM.to_owned(),
             population_sha256,
             population_source,
@@ -195,6 +203,8 @@ pub fn sidecar_path(output: &str) -> PathBuf {
 }
 
 pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
+    validate_observation_tuple(manifest)?;
+    validate_algorithms(manifest)?;
     let bytes = to_canonical_json(manifest)?;
     std::fs::write(path, bytes.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))
 }
@@ -211,6 +221,7 @@ pub fn read(path: &Path) -> Result<RunManifest, String> {
     // break exact replay of sampled sweep parameters.
     let manifest: RunManifest =
         serde_json::from_str(&source).map_err(|error| format!("{}: {error}", path.display()))?;
+    validate_observation_tuple(&manifest)?;
     validate_algorithms(&manifest)?;
     Ok(manifest)
 }
@@ -296,6 +307,31 @@ fn validate_backend_identity_tuple(value: &serde_json::Value) -> Result<(), Stri
     Ok(())
 }
 
+fn validate_observation_tuple(manifest: &RunManifest) -> Result<(), String> {
+    let algorithm_present = manifest.observation_hash_algorithm.is_some();
+    let top_level_present = manifest.observation_sha256.is_some();
+    let execution_count = manifest
+        .executions
+        .iter()
+        .filter(|execution| execution.observation_sha256.is_some())
+        .count();
+    let all_execution_hashes = execution_count == manifest.executions.len();
+    let shape_is_complete = match manifest.manifest_kind {
+        ManifestKind::Run => top_level_present && execution_count == 0,
+        ManifestKind::Sweep | ManifestKind::Compare => {
+            !top_level_present && !manifest.executions.is_empty() && all_execution_hashes
+        }
+    };
+    let shape_is_absent = !top_level_present && execution_count == 0;
+    if (algorithm_present && !shape_is_complete) || (!algorithm_present && !shape_is_absent) {
+        return Err(
+            "observation hash tuple must be all-present or all-absent for the manifest kind"
+                .to_owned(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_algorithms(manifest: &RunManifest) -> Result<(), String> {
     for (field, value) in [
         ("ir_hash_algorithm", manifest.ir_hash_algorithm.as_str()),
@@ -315,6 +351,13 @@ fn validate_algorithms(manifest: &RunManifest) -> Result<(), String> {
         if value != HASH_ALGORITHM {
             return Err(format!(
                 "unsupported {field} '{value}' (supported: '{HASH_ALGORITHM}')"
+            ));
+        }
+    }
+    if let Some(value) = manifest.observation_hash_algorithm.as_deref() {
+        if value != HASH_ALGORITHM {
+            return Err(format!(
+                "unsupported observation_hash_algorithm '{value}' (supported: '{HASH_ALGORITHM}')"
             ));
         }
     }
@@ -370,6 +413,35 @@ mod tests {
     }
 
     #[test]
+    fn reader_rejects_partial_observation_hash_tuples() {
+        let path = temp_file("partial-observation");
+        let mut missing_algorithm = RunManifest::new(
+            ManifestKind::Run,
+            1,
+            2,
+            PopulationSource::Numeric(10),
+            "abc".to_owned(),
+        );
+        missing_algorithm.observation_hash_algorithm = None;
+        missing_algorithm.observation_sha256 = Some("hash".to_owned());
+        std::fs::write(&path, to_canonical_json(&missing_algorithm).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("observation hash tuple"), "{error}");
+
+        let missing_hash = RunManifest::new(
+            ManifestKind::Run,
+            1,
+            2,
+            PopulationSource::Numeric(10),
+            "abc".to_owned(),
+        );
+        std::fs::write(&path, to_canonical_json(&missing_hash).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("observation hash tuple"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn integer_parameter_type_survives_manifest_round_trip() {
         let path = temp_file("integer-round-trip");
         let mut manifest = RunManifest::new(
@@ -379,6 +451,7 @@ mod tests {
             PopulationSource::Numeric(10),
             "abc".to_owned(),
         );
+        manifest.observation_sha256 = Some("observation".to_owned());
         manifest
             .resolved_theta
             .insert("count".to_owned(), super::ResolvedValue::Int(3));
@@ -399,6 +472,7 @@ mod tests {
             "abc".to_owned(),
         );
         let value = 0.10963506619780773_f64;
+        manifest.observation_sha256 = Some("observation".to_owned());
         manifest
             .resolved_theta
             .insert("gamma".to_owned(), super::ResolvedValue::Real(value));
