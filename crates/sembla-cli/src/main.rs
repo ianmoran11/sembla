@@ -8,8 +8,10 @@ use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
+mod manifest;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S --draws K --ticks T --out dir [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S --draws K --ticks T --out dir [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K]";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -56,6 +58,16 @@ fn run(arguments: &[String]) -> i32 {
                 }
             };
             sweep_file(path, options)
+        }
+        [command, manifest_path, model_path, flags @ ..] if command == "verify-run" => {
+            let options = match parse_verify_options(flags) {
+                Ok(options) => options,
+                Err(message) => {
+                    eprintln!("{message}\n{USAGE}");
+                    return 2;
+                }
+            };
+            verify_run(manifest_path, model_path, options)
         }
         [command, arguments @ ..] if command == "compare" => compare_command(arguments),
         _ => {
@@ -174,6 +186,45 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
         out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
         params,
+    })
+}
+
+#[derive(Clone, Debug)]
+struct VerifyOptions {
+    population: String,
+    params: Option<String>,
+    draw: Option<u32>,
+}
+
+fn parse_verify_options(flags: &[String]) -> Result<VerifyOptions, String> {
+    let mut population = None;
+    let mut params = None;
+    let mut draw = None;
+    let mut index = 0;
+    while index < flags.len() {
+        let flag = flags[index].as_str();
+        let value = flags
+            .get(index + 1)
+            .ok_or_else(|| format!("missing value for '{flag}'"))?;
+        match flag {
+            "--population" => {
+                if value.parse::<usize>().is_err() && !Path::new(value).is_file() {
+                    return Err(format!(
+                        "invalid numeric value or population file '{value}' for '{flag}'"
+                    ));
+                }
+                set_once(&mut population, value.clone(), flag)?;
+            }
+            "--params" => set_once(&mut params, value.clone(), flag)?,
+            "--draw" => set_once(&mut draw, parse_number(value, flag)?, flag)?,
+            _ => return Err(format!("unknown verify-run flag '{flag}'")),
+        }
+        index += 2;
+    }
+    Ok(VerifyOptions {
+        population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
+        params,
+        draw,
     })
 }
 
@@ -410,6 +461,8 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         raw_model.dt = dt;
     }
     let model = sembla_ir::validate(raw_model).map_err(|error| format!("{path}: {error}"))?;
+    let (population_source, population_sha256) =
+        manifest::population_identity(&options.population)?;
     let initial = match options.population.parse::<usize>() {
         Ok(population) => initialize_population(&model, population),
         Err(_) => initializers_from_population(
@@ -421,14 +474,28 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     let params = resolve_params(&model, options.params.as_deref())?;
 
     if let Some(out) = options.out.as_deref() {
-        run_results(
+        let hashes = run_results(
             &model,
             &mut state,
             &params,
             options.seed,
             options.ticks,
             out,
-        )
+        )?;
+        let mut run_manifest = manifest::RunManifest::new(
+            manifest::ManifestKind::Run,
+            options.seed,
+            options.ticks,
+            population_source,
+            population_sha256,
+        );
+        run_manifest.model = Some(model.model().name.clone());
+        run_manifest.dt = Some(model.model().dt);
+        run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
+        run_manifest.resolved_theta = manifest::resolved_theta(&params);
+        run_manifest.results_sha256 = Some(hashes.results_sha256);
+        run_manifest.final_state_sha256 = Some(hashes.final_state_sha256);
+        manifest::write(&manifest::sidecar_path(out), &run_manifest)
     } else {
         let report = executor::run(&model, &mut state, &params, options.seed, options.ticks)
             .map_err(|error| format!("{path}: {error}"))?;
@@ -458,6 +525,18 @@ fn sweep_file(path: &str, options: SweepOptions) -> i32 {
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let model = read_validated(path)?;
+    let (population_source, population_sha256) =
+        manifest::population_identity(&options.population)?;
+    let mut run_manifest = manifest::RunManifest::new(
+        manifest::ManifestKind::Sweep,
+        options.seed,
+        options.ticks,
+        population_source,
+        population_sha256,
+    );
+    run_manifest.model = Some(model.model().name.clone());
+    run_manifest.dt = Some(model.model().dt);
+    run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
     if optional_sir_box_name(&model)?.is_none() {
         return Err(
             "sweep summary currently requires exactly one SIR person/employer box; use sembla run for generic models"
@@ -519,6 +598,17 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         // common random numbers, so only theta varies between unpinned draws.
         let (csv, series) =
             run_sir_results_csv(&model, &mut state, &params, options.seed, options.ticks)?;
+        let hashes = execution_hashes(&csv, &state);
+        run_manifest.executions.push(manifest::ManifestExecution {
+            k: draw,
+            scenario: None,
+            model: None,
+            ir_hash: None,
+            dt: None,
+            resolved_theta: manifest::resolved_theta(&params),
+            results_sha256: hashes.results_sha256,
+            final_state_sha256: hashes.final_state_sha256,
+        });
         let draw_path = out.join(format!("draw_{draw}.csv"));
         std::fs::write(&draw_path, csv.as_bytes())
             .map_err(|error| format!("{}: {error}", draw_path.display()))?;
@@ -532,6 +622,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
     std::fs::write(&summary_path, summary.as_bytes())
         .map_err(|error| format!("{}: {error}", summary_path.display()))?;
+    manifest::write(&out.join("run-manifest.json"), &run_manifest)?;
     println!(
         "manifest_sha256={} summary_sha256={}",
         hex(&Sha256::digest(manifest.as_bytes())),
@@ -552,6 +643,7 @@ fn remove_previous_sweep_outputs(directory: &Path) -> Result<(), String> {
             .and_then(|name| name.to_str())
             .unwrap_or("");
         if name == "manifest.csv"
+            || name == "run-manifest.json"
             || name == "summary.csv"
             || (name.starts_with("draw_") && name.ends_with(".csv"))
         {
@@ -652,6 +744,12 @@ fn read_param_overrides(
     Ok(overrides)
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ExecutionHashes {
+    results_sha256: String,
+    final_state_sha256: String,
+}
+
 fn run_results(
     model: &sembla_ir::ValidatedModel,
     state: &mut StateStore,
@@ -659,19 +757,35 @@ fn run_results(
     seed: u64,
     ticks: u32,
     out: &str,
-) -> Result<(), String> {
-    let csv = match optional_sir_box_name(model)? {
-        Some(_) => run_sir_results_csv(model, state, params, seed, ticks)?.0,
-        None => run_generic_results_csv(model, state, params, seed, ticks)?.0,
-    };
+) -> Result<ExecutionHashes, String> {
+    let csv = run_results_csv(model, state, params, seed, ticks)?;
     std::fs::write(out, csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
-    let results_hash = Sha256::digest(csv.as_bytes());
+    let hashes = execution_hashes(&csv, state);
     println!(
         "results_sha256={} final_state_sha256={}",
-        hex(&results_hash),
-        hex(&state.state_hash())
+        hashes.results_sha256, hashes.final_state_sha256
     );
-    Ok(())
+    Ok(hashes)
+}
+
+fn run_results_csv(
+    model: &sembla_ir::ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+) -> Result<String, String> {
+    match optional_sir_box_name(model)? {
+        Some(_) => Ok(run_sir_results_csv(model, state, params, seed, ticks)?.0),
+        None => Ok(run_generic_results_csv(model, state, params, seed, ticks)?.0),
+    }
+}
+
+fn execution_hashes(csv: &str, state: &StateStore) -> ExecutionHashes {
+    ExecutionHashes {
+        results_sha256: hex(&Sha256::digest(csv.as_bytes())),
+        final_state_sha256: hex(&state.state_hash()),
+    }
 }
 
 /// Preserve the original SIR CSV and fixed six-column sweep series byte-for-byte.
@@ -983,12 +1097,259 @@ fn initializers_from_population(
     Ok(initial)
 }
 
+fn verify_run(manifest_path: &str, model_path: &str, options: VerifyOptions) -> i32 {
+    match verify_run_result(manifest_path, model_path, options) {
+        Ok(count) => {
+            println!("verified {count} execution(s)");
+            0
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn verify_run_result(
+    manifest_path: &str,
+    model_path: &str,
+    options: VerifyOptions,
+) -> Result<usize, String> {
+    let recorded = manifest::read(Path::new(manifest_path))?;
+    if recorded.manifest_kind == manifest::ManifestKind::Compare {
+        return Err(
+            "verify-run does not accept compare manifests because both original model inputs are required"
+                .to_owned(),
+        );
+    }
+
+    let dt = recorded
+        .dt
+        .ok_or_else(|| "manifest is missing required field 'dt'".to_owned())?;
+    let mut raw_model = read_model(model_path)?;
+    raw_model.dt = dt;
+    let model = sembla_ir::validate(raw_model).map_err(|error| format!("{model_path}: {error}"))?;
+    let (population_source, population_sha256) =
+        manifest::population_identity(&options.population)?;
+    let expected_base = manifest::RunManifest::new(
+        recorded.manifest_kind,
+        recorded.seed,
+        recorded.ticks,
+        population_source.clone(),
+        population_sha256.clone(),
+    );
+    let mut differences = Vec::new();
+
+    compare_field(
+        "backend_identity",
+        &recorded.backend_identity,
+        &expected_base.backend_identity,
+        &mut differences,
+    );
+    compare_field(
+        "component_versions",
+        &recorded.component_versions,
+        &expected_base.component_versions,
+        &mut differences,
+    );
+    compare_field(
+        "determinism_level",
+        &recorded.determinism_level,
+        &expected_base.determinism_level,
+        &mut differences,
+    );
+    compare_field(
+        "enabled_flags",
+        &recorded.enabled_flags,
+        &expected_base.enabled_flags,
+        &mut differences,
+    );
+    compare_field(
+        "population_source",
+        &recorded.population_source,
+        &population_source,
+        &mut differences,
+    );
+    compare_field(
+        "population_sha256",
+        &recorded.population_sha256,
+        &population_sha256,
+        &mut differences,
+    );
+    compare_field(
+        "model",
+        &recorded.model,
+        &Some(model.model().name.clone()),
+        &mut differences,
+    );
+    compare_field(
+        "ir_hash",
+        &recorded.ir_hash,
+        &Some(manifest::canonical_ir_hash(&model)?),
+        &mut differences,
+    );
+
+    match recorded.manifest_kind {
+        manifest::ManifestKind::Run => {
+            if let Some(params_path) = options.params.as_deref() {
+                let supplied = resolve_params(&model, Some(params_path))?;
+                compare_field(
+                    "resolved_theta",
+                    &recorded.resolved_theta,
+                    &manifest::resolved_theta(&supplied),
+                    &mut differences,
+                );
+            }
+            let params = params_from_manifest(&model, &recorded.resolved_theta)?;
+            let mut state = initialized_state(&model, &options.population, model_path)?;
+            let csv = run_results_csv(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
+            let actual = execution_hashes(&csv, &state);
+            compare_field(
+                "results_sha256",
+                &recorded.results_sha256,
+                &Some(actual.results_sha256),
+                &mut differences,
+            );
+            compare_field(
+                "final_state_sha256",
+                &recorded.final_state_sha256,
+                &Some(actual.final_state_sha256),
+                &mut differences,
+            );
+            finish_verification(differences, 1)
+        }
+        manifest::ManifestKind::Sweep => {
+            let executions = match options.draw {
+                Some(draw) => vec![recorded
+                    .executions
+                    .iter()
+                    .find(|execution| execution.k == draw)
+                    .ok_or_else(|| format!("manifest has no sweep execution with k={draw}"))?],
+                None => recorded.executions.iter().collect::<Vec<_>>(),
+            };
+            if executions.is_empty() {
+                return Err("sweep manifest contains no executions".to_owned());
+            }
+            let supplied_pins = match options.params.as_deref() {
+                Some(path) => read_param_overrides(&model, path)?,
+                None => Vec::new(),
+            };
+            for execution in &executions {
+                for pin in &supplied_pins {
+                    let expected = manifest::ResolvedValue::from(&pin.value);
+                    compare_field(
+                        &format!("executions[{}].resolved_theta.{}", execution.k, pin.name),
+                        &execution.resolved_theta.get(&pin.name),
+                        &Some(&expected),
+                        &mut differences,
+                    );
+                }
+                let params = params_from_manifest(&model, &execution.resolved_theta)?;
+                let mut state = initialized_state(&model, &options.population, model_path)?;
+                let csv =
+                    run_results_csv(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
+                let actual = execution_hashes(&csv, &state);
+                compare_field(
+                    &format!("executions[{}].results_sha256", execution.k),
+                    &execution.results_sha256,
+                    &actual.results_sha256,
+                    &mut differences,
+                );
+                compare_field(
+                    &format!("executions[{}].final_state_sha256", execution.k),
+                    &execution.final_state_sha256,
+                    &actual.final_state_sha256,
+                    &mut differences,
+                );
+            }
+            finish_verification(differences, executions.len())
+        }
+        manifest::ManifestKind::Compare => unreachable!("handled above"),
+    }
+}
+
+fn initialized_state(
+    model: &sembla_ir::ValidatedModel,
+    population_spec: &str,
+    model_path: &str,
+) -> Result<StateStore, String> {
+    let initial = match population_spec.parse::<usize>() {
+        Ok(population) => initialize_population(model, population),
+        Err(_) => initializers_from_population(
+            model,
+            &SyntheticPopulation::read(population_spec).map_err(|error| error.to_string())?,
+        )?,
+    };
+    StateStore::new(model, initial).map_err(|error| format!("{model_path}: {error}"))
+}
+
+fn params_from_manifest(
+    model: &sembla_ir::ValidatedModel,
+    values: &std::collections::BTreeMap<String, manifest::ResolvedValue>,
+) -> Result<ParamEnv, String> {
+    let expected_names = model
+        .model()
+        .params
+        .iter()
+        .map(|parameter| parameter.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let actual_names = values
+        .keys()
+        .map(String::as_str)
+        .collect::<std::collections::BTreeSet<_>>();
+    if actual_names != expected_names {
+        return Err(format!(
+            "manifest resolved_theta parameter names mismatch: recorded={actual_names:?} expected={expected_names:?}"
+        ));
+    }
+    let overrides = values
+        .iter()
+        .map(|(name, value)| {
+            let value = match value {
+                manifest::ResolvedValue::Real(value) => ParamValue::Real { value: *value },
+                manifest::ResolvedValue::Int(value) => ParamValue::Int { value: *value },
+            };
+            ParamOverride::new(name, value)
+        })
+        .collect::<Vec<_>>();
+    ParamEnv::resolve(model, &overrides)
+        .map_err(|error| format!("manifest resolved_theta: {error}"))
+}
+
+fn compare_field<T: std::fmt::Debug + PartialEq>(
+    field: &str,
+    recorded: &T,
+    actual: &T,
+    differences: &mut Vec<String>,
+) {
+    if recorded != actual {
+        differences.push(format!("{field}: recorded={recorded:?} actual={actual:?}"));
+    }
+}
+
+fn finish_verification(differences: Vec<String>, count: usize) -> Result<usize, String> {
+    if differences.is_empty() {
+        Ok(count)
+    } else {
+        Err(format!(
+            "verification mismatch:\n  {}",
+            differences.join("\n  ")
+        ))
+    }
+}
+
 #[derive(Clone, Debug)]
 struct CompareTick {
     counts: [usize; 3],
     fired_infect: usize,
     fired_recover: usize,
     deferred_total: usize,
+}
+
+#[derive(Clone, Debug)]
+struct CompareArmOutcome {
+    ticks: Vec<CompareTick>,
+    hashes: ExecutionHashes,
 }
 
 fn compare_result(options: CompareOptions) -> Result<(), String> {
@@ -1000,14 +1361,14 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     let params_b = resolve_params(&model_b, options.params_b.as_deref())?;
     let population =
         SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?;
-    let ticks_a = compare_arm(
+    let arm_a = compare_arm(
         &model_a,
         &params_a,
         &population,
         options.seed,
         options.ticks,
     )?;
-    let ticks_b = compare_arm(
+    let arm_b = compare_arm(
         &model_b,
         &params_b,
         &population,
@@ -1017,10 +1378,10 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
 
     let mut csv = String::new();
     csv.push_str("# arm_a_model=");
-    csv.push_str(path_a);
+    csv.push_str(&model_a.model().name);
     csv.push('\n');
     csv.push_str("# arm_b_model=");
-    csv.push_str(path_b);
+    csv.push_str(&model_b.model().name);
     csv.push('\n');
     csv.push_str("# arm_a_params=");
     csv.push_str(&canonical_params(&params_a)?);
@@ -1032,30 +1393,57 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     csv.push_str(&format!("# dt_a={}\n", model_a.model().dt));
     csv.push_str(&format!("# dt_b={}\n", model_b.model().dt));
     csv.push_str("tick,S_a,I_a,R_a,S_b,I_b,R_b,dS,dI,dR,fired_infect_a,fired_recover_a,deferred_a,fired_infect_b,fired_recover_b,deferred_b\n");
-    for (tick, (arm_a, arm_b)) in ticks_a.iter().zip(&ticks_b).enumerate() {
+    for (tick, (tick_a, tick_b)) in arm_a.ticks.iter().zip(&arm_b.ticks).enumerate() {
         let difference = |a: usize, b: usize| b as i128 - a as i128;
         csv.push_str(&format!(
             "{tick},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
-            arm_a.counts[0],
-            arm_a.counts[1],
-            arm_a.counts[2],
-            arm_b.counts[0],
-            arm_b.counts[1],
-            arm_b.counts[2],
-            difference(arm_a.counts[0], arm_b.counts[0]),
-            difference(arm_a.counts[1], arm_b.counts[1]),
-            difference(arm_a.counts[2], arm_b.counts[2]),
-            arm_a.fired_infect,
-            arm_a.fired_recover,
-            arm_a.deferred_total,
-            arm_b.fired_infect,
-            arm_b.fired_recover,
-            arm_b.deferred_total,
+            tick_a.counts[0],
+            tick_a.counts[1],
+            tick_a.counts[2],
+            tick_b.counts[0],
+            tick_b.counts[1],
+            tick_b.counts[2],
+            difference(tick_a.counts[0], tick_b.counts[0]),
+            difference(tick_a.counts[1], tick_b.counts[1]),
+            difference(tick_a.counts[2], tick_b.counts[2]),
+            tick_a.fired_infect,
+            tick_a.fired_recover,
+            tick_a.deferred_total,
+            tick_b.fired_infect,
+            tick_b.fired_recover,
+            tick_b.deferred_total,
         ));
     }
     std::fs::write(&options.out, csv.as_bytes())
         .map_err(|error| format!("{}: {error}", options.out))?;
-    println!("compare_sha256={}", hex(&Sha256::digest(csv.as_bytes())));
+    let compare_sha256 = hex(&Sha256::digest(csv.as_bytes()));
+    let (population_source, population_sha256) =
+        manifest::population_identity(&options.population)?;
+    let mut run_manifest = manifest::RunManifest::new(
+        manifest::ManifestKind::Compare,
+        options.seed,
+        options.ticks,
+        population_source,
+        population_sha256,
+    );
+    run_manifest.results_sha256 = Some(compare_sha256.clone());
+    for (k, scenario, model, params, arm) in [
+        (0, "arm_a", &model_a, &params_a, &arm_a),
+        (1, "arm_b", &model_b, &params_b, &arm_b),
+    ] {
+        run_manifest.executions.push(manifest::ManifestExecution {
+            k,
+            scenario: Some(scenario.to_owned()),
+            model: Some(model.model().name.clone()),
+            ir_hash: Some(manifest::canonical_ir_hash(model)?),
+            dt: Some(model.model().dt),
+            resolved_theta: manifest::resolved_theta(params),
+            results_sha256: arm.hashes.results_sha256.clone(),
+            final_state_sha256: arm.hashes.final_state_sha256.clone(),
+        });
+    }
+    manifest::write(&manifest::sidecar_path(&options.out), &run_manifest)?;
+    println!("compare_sha256={compare_sha256}");
     Ok(())
 }
 
@@ -1065,26 +1453,23 @@ fn compare_arm(
     population: &SyntheticPopulation,
     seed: u64,
     ticks: u32,
-) -> Result<Vec<CompareTick>, String> {
-    let sir_box = sir_box_name(model)?.to_owned();
+) -> Result<CompareArmOutcome, String> {
     let initial = initializers_from_population(model, population)?;
     let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
-    let mut rows = Vec::with_capacity(ticks as usize);
-    for tick in 0..ticks {
-        let report = executor::run_tick(model, &mut state, params, seed, tick)
-            .map_err(|error| format!("tick {tick}: {error}"))?;
-        rows.push(CompareTick {
-            counts: sir_counts(&state, &sir_box)?,
-            fired_infect: report.fired.first().map_or(0, |entry| entry.1),
-            fired_recover: report.fired.get(1).map_or(0, |entry| entry.1),
-            deferred_total: report
-                .deferred_per_resource_table
-                .iter()
-                .map(|(_, count)| count)
-                .sum(),
-        });
-    }
-    Ok(rows)
+    let (csv, series) = run_sir_results_csv(model, &mut state, params, seed, ticks)?;
+    let ticks = series
+        .into_iter()
+        .map(|row| CompareTick {
+            counts: [row[0], row[1], row[2]],
+            fired_infect: row[3],
+            fired_recover: row[4],
+            deferred_total: row[5],
+        })
+        .collect();
+    Ok(CompareArmOutcome {
+        ticks,
+        hashes: execution_hashes(&csv, &state),
+    })
 }
 
 fn canonical_params(params: &ParamEnv) -> Result<String, String> {
