@@ -1,5 +1,6 @@
 use sembla_ir::{Prior, PriorFamily, ValidatedModel};
 use sembla_runtime::prior::{sample_parameters_for_draw, sample_prior, PRIOR_DRAW_RULE_ID};
+use sembla_runtime::rng::SWEEP_REPLICA_RULE_ID;
 
 fn moments(values: impl Iterator<Item = f64>) -> (f64, f64) {
     let values = values.collect::<Vec<_>>();
@@ -126,11 +127,12 @@ fn reserved_namespace_and_draw_index_are_sweep_length_independent() {
         .map(|draw| values(&model, 99, draw))
         .collect::<Vec<_>>();
     assert_eq!(five[3], fifty[3]);
+    assert_eq!(SWEEP_REPLICA_RULE_ID, u32::MAX - 1);
     assert_eq!(PRIOR_DRAW_RULE_ID, u32::MAX);
     assert!(model
         .transitions()
         .iter()
-        .all(|transition| transition.rule_id != PRIOR_DRAW_RULE_ID));
+        .all(|transition| transition.rule_id < SWEEP_REPLICA_RULE_ID));
 
     let mut raw = sembla_ir::parse_json(include_str!("../../../examples/sir.json")).unwrap();
     raw.params[1].prior = None;

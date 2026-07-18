@@ -100,6 +100,12 @@ pub fn validate(model: Model) -> Result<ValidatedModel, ValidationError> {
                     "too many transitions to assign a u32 rule_id",
                 )
             })?;
+            if rule_id >= u32::MAX - 1 {
+                return Err(ValidationError::new(
+                    format!("$.boxes[{box_index}].transitions[{transition_index}]"),
+                    "too many transitions: rule_id namespaces u32::MAX - 1 and u32::MAX are reserved",
+                ));
+            }
             transitions.push(ValidatedTransition {
                 box_index,
                 transition_index,

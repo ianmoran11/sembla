@@ -135,11 +135,20 @@ fn run_sweep_and_compare_manifests_are_byte_deterministic() {
     let sweep_manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(first_sweep.join("run-manifest.json")).unwrap())
             .unwrap();
+    assert_eq!(sweep_manifest["noise_mode"], "crn");
+    assert_eq!(sweep_manifest["theta_source"]["kind"], "prior");
+    assert_eq!(sweep_manifest["theta_source"]["algorithm"], "sha256");
+    assert_eq!(
+        sweep_manifest["theta_source"]["sha256"],
+        sweep_manifest["ir_hash"]
+    );
     assert!(sweep_manifest["executions"]
         .as_array()
         .unwrap()
         .iter()
-        .all(|execution| execution["observation_sha256"].is_string()));
+        .all(|execution| {
+            execution["observation_sha256"].is_string() && execution["seed"] == 9
+        }));
 
     let first_compare = temp.join("first-compare.csv");
     let second_compare = temp.join("second-compare.csv");
@@ -226,7 +235,17 @@ fn verify_run_round_trips_sir_generic_and_one_sweep_draw() {
         .arg(&sir)
         .arg("--population")
         .arg(&population)
-        .args(["--seed", "23", "--draws", "3", "--ticks", "3", "--out"])
+        .args([
+            "--seed",
+            "23",
+            "--draws",
+            "3",
+            "--ticks",
+            "3",
+            "--noise",
+            "independent",
+            "--out",
+        ])
         .arg(&sweep)
         .output()
         .unwrap();

@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use sha2::{Digest, Sha256};
+
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -80,8 +82,54 @@ fn sweep(population: &Path, out: &Path, seed: u64, draws: u32, ticks: u32, param
     assert!(stdout.contains("summary_sha256="), "{stdout}");
 }
 
+fn custom_sweep(
+    population: &Path,
+    out: &Path,
+    seed: u64,
+    draws: Option<u32>,
+    ticks: u32,
+    noise: Option<&str>,
+    theta_file: Option<&Path>,
+) -> Output {
+    let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    process
+        .arg("sweep")
+        .arg(repository_path("examples/sir.json"))
+        .arg("--population")
+        .arg(population)
+        .arg("--seed")
+        .arg(seed.to_string())
+        .arg("--ticks")
+        .arg(ticks.to_string())
+        .arg("--out")
+        .arg(out);
+    if let Some(draws) = draws {
+        process.arg("--draws").arg(draws.to_string());
+    }
+    if let Some(noise) = noise {
+        process.arg("--noise").arg(noise);
+    }
+    if let Some(theta_file) = theta_file {
+        process.arg("--theta-file").arg(theta_file);
+    }
+    process.output().unwrap()
+}
+
+fn assert_success(output: &Output) {
+    assert!(
+        output.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn file(path: &Path, name: &str) -> Vec<u8> {
     std::fs::read(path.join(name)).unwrap()
+}
+
+fn run_manifest(path: &Path) -> serde_json::Value {
+    serde_json::from_slice(&file(path, "run-manifest.json")).unwrap()
 }
 
 #[test]
@@ -169,6 +217,254 @@ fn twenty_draw_hundred_thousand_person_summary_has_monotone_bands() {
             .count(),
         20
     );
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn independent_noise_is_k_stable_and_preserves_prior_theta() {
+    let temp = temp_dir("independent-stability");
+    let population = temp.join("population.bin");
+    synth(&population, 2_000, 40, 20);
+
+    let five = temp.join("five");
+    let fifty = temp.join("fifty");
+    let crn = temp.join("crn");
+    assert_success(&custom_sweep(
+        &population,
+        &five,
+        99,
+        Some(5),
+        8,
+        Some("independent"),
+        None,
+    ));
+    assert_success(&custom_sweep(
+        &population,
+        &fifty,
+        99,
+        Some(50),
+        8,
+        Some("independent"),
+        None,
+    ));
+    assert_success(&custom_sweep(
+        &population,
+        &crn,
+        99,
+        Some(5),
+        8,
+        Some("crn"),
+        None,
+    ));
+
+    let five_manifest = run_manifest(&five);
+    let fifty_manifest = run_manifest(&fifty);
+    let five_k3 = &five_manifest["executions"][3];
+    let fifty_k3 = &fifty_manifest["executions"][3];
+    assert_eq!(five_k3["seed"], fifty_k3["seed"]);
+    assert_eq!(five_k3["resolved_theta"], fifty_k3["resolved_theta"]);
+    assert_eq!(file(&five, "draw_3.csv"), file(&fifty, "draw_3.csv"));
+    assert_eq!(five_manifest["noise_mode"], "independent");
+    assert_eq!(five_manifest["theta_source"]["kind"], "prior");
+    assert_eq!(five_manifest["theta_source"]["algorithm"], "sha256");
+    assert_eq!(
+        five_manifest["theta_source"]["sha256"],
+        five_manifest["ir_hash"]
+    );
+
+    // Prior coordinates never include the simulation-noise mode.
+    assert_eq!(file(&five, "manifest.csv"), file(&crn, "manifest.csv"));
+    for draw in 0..5 {
+        assert_eq!(
+            five_manifest["executions"][draw]["resolved_theta"],
+            run_manifest(&crn)["executions"][draw]["resolved_theta"]
+        );
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn identical_theta_is_crn_paired_and_independent_noise_is_distinct() {
+    let temp = temp_dir("independent-identical-theta");
+    let population = temp.join("population.bin");
+    synth(&population, 2_000, 40, 20);
+    let theta = temp.join("theta.json");
+    let theta_bytes = b"[{\"beta\":0.7,\"gamma\":0.12},{\"beta\":0.7,\"gamma\":0.12}]\n";
+    std::fs::write(&theta, theta_bytes).unwrap();
+
+    let crn = temp.join("crn");
+    let independent = temp.join("independent");
+    let crn_output = custom_sweep(&population, &crn, 81, None, 12, Some("crn"), Some(&theta));
+    assert_success(&crn_output);
+    let independent_output = custom_sweep(
+        &population,
+        &independent,
+        81,
+        None,
+        12,
+        Some("independent"),
+        Some(&theta),
+    );
+    assert_success(&independent_output);
+
+    assert_eq!(file(&crn, "draw_0.csv"), file(&crn, "draw_1.csv"));
+    assert_ne!(
+        file(&independent, "draw_0.csv"),
+        file(&independent, "draw_1.csv")
+    );
+    assert_eq!(
+        file(&crn, "manifest.csv"),
+        file(&independent, "manifest.csv")
+    );
+    assert!(String::from_utf8(file(&crn, "manifest.csv"))
+        .unwrap()
+        .starts_with("# theta_source=file\n# parameter_status,beta=file,gamma=file\n"));
+
+    let expected_hash = format!("{:x}", Sha256::digest(theta_bytes));
+    let stdout = String::from_utf8(independent_output.stdout).unwrap();
+    assert!(
+        stdout.contains(&format!("theta_file_sha256={expected_hash}")),
+        "{stdout}"
+    );
+    let manifest = run_manifest(&independent);
+    assert_eq!(manifest["theta_source"]["kind"], "file");
+    assert_eq!(manifest["theta_source"]["sha256"], expected_hash);
+    assert_ne!(
+        manifest["executions"][0]["seed"],
+        manifest["executions"][1]["seed"]
+    );
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn prior_manifest_theta_round_trips_through_theta_file() {
+    let temp = temp_dir("theta-round-trip");
+    let population = temp.join("population.bin");
+    synth(&population, 2_000, 40, 20);
+    let prior = temp.join("prior");
+    assert_success(&custom_sweep(
+        &population,
+        &prior,
+        37,
+        Some(4),
+        8,
+        None,
+        None,
+    ));
+
+    let csv = String::from_utf8(file(&prior, "manifest.csv")).unwrap();
+    let mut lines = csv.lines();
+    assert!(lines.next().unwrap().starts_with("# parameter_status"));
+    let names = lines
+        .next()
+        .unwrap()
+        .split(',')
+        .skip(1)
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let assignments = lines
+        .map(|row| {
+            let values = row.split(',').skip(1);
+            names
+                .iter()
+                .zip(values)
+                .map(|(name, value)| {
+                    (
+                        name.clone(),
+                        serde_json::Value::from(value.parse::<f64>().unwrap()),
+                    )
+                })
+                .collect::<serde_json::Map<_, _>>()
+        })
+        .map(serde_json::Value::Object)
+        .collect::<Vec<_>>();
+    let theta = temp.join("theta.json");
+    std::fs::write(&theta, serde_json::to_vec(&assignments).unwrap()).unwrap();
+
+    let replay = temp.join("replay");
+    assert_success(&custom_sweep(
+        &population,
+        &replay,
+        37,
+        None,
+        8,
+        Some("crn"),
+        Some(&theta),
+    ));
+    for draw in 0..4 {
+        assert_eq!(
+            file(&prior, &format!("draw_{draw}.csv")),
+            file(&replay, &format!("draw_{draw}.csv"))
+        );
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn theta_file_reports_missing_unknown_and_draw_conflict() {
+    let temp = temp_dir("theta-errors");
+    let missing = temp.join("missing.json");
+    let unknown = temp.join("unknown.json");
+    std::fs::write(&missing, r#"[{"beta":0.7}]"#).unwrap();
+    std::fs::write(&unknown, r#"[{"beta":0.7,"gamma":0.12,"mystery":1.0}]"#).unwrap();
+
+    let missing_output = custom_sweep(
+        Path::new("1"),
+        &temp.join("missing-out"),
+        1,
+        None,
+        1,
+        None,
+        Some(&missing),
+    );
+    assert_eq!(missing_output.status.code(), Some(1));
+    let missing_stderr = String::from_utf8_lossy(&missing_output.stderr);
+    assert_eq!(
+        missing_stderr.trim_end(),
+        format!(
+            "{}: theta assignment 0 is missing prior-bearing parameter 'gamma'",
+            missing.display()
+        )
+    );
+
+    let unknown_output = custom_sweep(
+        Path::new("1"),
+        &temp.join("unknown-out"),
+        1,
+        None,
+        1,
+        None,
+        Some(&unknown),
+    );
+    assert_eq!(unknown_output.status.code(), Some(1));
+    let unknown_stderr = String::from_utf8_lossy(&unknown_output.stderr);
+    assert_eq!(
+        unknown_stderr.trim_end(),
+        format!(
+            "{}: theta assignment 0 has unknown parameter 'mystery'",
+            unknown.display()
+        )
+    );
+
+    let conflict = custom_sweep(
+        Path::new("1"),
+        &temp.join("conflict-out"),
+        1,
+        Some(2),
+        1,
+        None,
+        Some(&missing),
+    );
+    assert_eq!(conflict.status.code(), Some(2));
+    let conflict_stderr = String::from_utf8_lossy(&conflict.stderr);
+    assert!(
+        conflict_stderr.starts_with("'--theta-file' cannot be combined with '--draws'\nusage:"),
+        "{conflict_stderr}"
+    );
+
     std::fs::remove_dir_all(temp).unwrap();
 }
 

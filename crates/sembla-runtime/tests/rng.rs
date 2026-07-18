@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use sembla_runtime::rng::{draw_u32x4, exp_f64, uniform_f64};
+use sembla_runtime::prior::PRIOR_DRAW_RULE_ID;
+use sembla_runtime::rng::{
+    derive_sweep_replica_seed, draw_u32x4, exp_f64, uniform_f64, SWEEP_REPLICA_RULE_ID,
+};
 
 #[test]
 fn philox4x32_10_matches_random123_known_answers() {
@@ -24,6 +27,19 @@ fn philox4x32_10_matches_random123_known_answers() {
         ),
         [0xd16c_fe09, 0x94fd_cceb, 0x5001_e420, 0x2412_6ea1]
     );
+}
+
+#[test]
+fn sweep_replica_seed_namespace_and_composition_are_frozen() {
+    assert_eq!(SWEEP_REPLICA_RULE_ID, u32::MAX - 1);
+    assert_eq!(PRIOR_DRAW_RULE_ID, u32::MAX);
+    assert_ne!(SWEEP_REPLICA_RULE_ID, PRIOR_DRAW_RULE_ID);
+
+    assert_eq!(
+        derive_sweep_replica_seed(0x0123_4567_89ab_cdef, 3),
+        0x028a_f714_1e61_79f0
+    );
+    assert_eq!(derive_sweep_replica_seed(99, 3), 0x9022_e385_27d8_974c);
 }
 
 #[test]

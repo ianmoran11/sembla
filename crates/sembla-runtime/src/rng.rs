@@ -19,6 +19,13 @@ const PHILOX_W0: u32 = 0x9E37_79B9;
 const PHILOX_W1: u32 = 0xBB67_AE85;
 const PHILOX_ROUNDS: usize = 10;
 
+/// Reserved `rule_id` for deriving independent sweep-replica seeds.
+///
+/// Simulation transition IDs are strictly smaller and prior draws reserve
+/// [`crate::prior::PRIOR_DRAW_RULE_ID`] (`u32::MAX`), so all three namespaces
+/// are disjoint.
+pub const SWEEP_REPLICA_RULE_ID: u32 = u32::MAX - 1;
+
 #[inline]
 fn round(counter: [u32; 4], key: [u32; 2]) -> [u32; 4] {
     let product_0 = u64::from(PHILOX_M0) * u64::from(counter[0]);
@@ -57,6 +64,19 @@ pub fn draw_u32x4(seed: u64, tick: u32, rule_id: u32, entity_id: u32, draw_idx: 
     }
 
     counter
+}
+
+/// Derives the simulation seed for independent-noise sweep replica `k`.
+///
+/// This uses the frozen Philox coordinates `(master_seed, tick = k,
+/// rule_id = u32::MAX - 1, entity_id = 0, draw_idx = 0)`. Output lane 0 is
+/// the low 32 bits and lane 1 is the high 32 bits of the returned `u64`:
+/// `seed_k = u64(lane0) | (u64(lane1) << 32)`. The derivation depends only on
+/// the master seed and `k`, never on the sweep length or evaluation order.
+#[must_use]
+pub fn derive_sweep_replica_seed(master_seed: u64, k: u32) -> u64 {
+    let lanes = draw_u32x4(master_seed, k, SWEEP_REPLICA_RULE_ID, 0, 0);
+    u64::from(lanes[0]) | (u64::from(lanes[1]) << 32)
 }
 
 /// Returns a uniform sample strictly inside `(0, 1)` for the coordinates.

@@ -17,6 +17,27 @@ pub enum ManifestKind {
     Compare,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NoiseMode {
+    Crn,
+    Independent,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThetaSourceKind {
+    Prior,
+    File,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThetaSource {
+    pub kind: ThetaSourceKind,
+    pub sha256: String,
+    pub algorithm: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ResolvedValue {
@@ -62,6 +83,8 @@ impl BackendIdentity {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ManifestExecution {
     pub k: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub seed: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenario: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -92,6 +115,8 @@ pub struct RunManifest {
     pub ir_hash: Option<String>,
     pub ir_hash_algorithm: String,
     pub manifest_kind: ManifestKind,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub noise_mode: Option<NoiseMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -111,6 +136,8 @@ pub struct RunManifest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dt: Option<f64>,
     pub ticks: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub theta_source: Option<ThetaSource>,
 }
 
 impl RunManifest {
@@ -148,6 +175,7 @@ impl RunManifest {
             ir_hash: None,
             ir_hash_algorithm: HASH_ALGORITHM.to_owned(),
             manifest_kind: kind,
+            noise_mode: None,
             model: None,
             observation_hash_algorithm: Some(HASH_ALGORITHM.to_owned()),
             observation_sha256: None,
@@ -161,6 +189,7 @@ impl RunManifest {
             seed,
             dt: None,
             ticks,
+            theta_source: None,
         }
     }
 }
@@ -216,6 +245,7 @@ pub fn read(path: &Path) -> Result<RunManifest, String> {
         serde_json::from_str(&source).map_err(|error| format!("{}: {error}", path.display()))?;
     validate_schema_versions(&value)?;
     validate_backend_identity_tuple(&value)?;
+    validate_theta_source_tuple(&value)?;
     // Deserialize from the original bytes rather than through `Value`: the
     // latter can round an already-parsed f64 during `from_value`, which would
     // break exact replay of sampled sweep parameters.
@@ -307,6 +337,29 @@ fn validate_backend_identity_tuple(value: &serde_json::Value) -> Result<(), Stri
     Ok(())
 }
 
+fn validate_theta_source_tuple(value: &serde_json::Value) -> Result<(), String> {
+    let Some(source) = value.get("theta_source") else {
+        return Ok(());
+    };
+    if source.is_null() {
+        return Ok(());
+    }
+    let object = source.as_object().ok_or_else(|| {
+        "theta_source tuple must be all-present or all-absent and must be an object".to_owned()
+    })?;
+    let missing = ["kind", "sha256", "algorithm"]
+        .into_iter()
+        .filter(|field| !object.contains_key(*field))
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(format!(
+            "theta_source tuple must be all-present or all-absent; missing {}",
+            missing.join(", ")
+        ));
+    }
+    Ok(())
+}
+
 fn validate_observation_tuple(manifest: &RunManifest) -> Result<(), String> {
     let algorithm_present = manifest.observation_hash_algorithm.is_some();
     let top_level_present = manifest.observation_sha256.is_some();
@@ -358,6 +411,14 @@ fn validate_algorithms(manifest: &RunManifest) -> Result<(), String> {
         if value != HASH_ALGORITHM {
             return Err(format!(
                 "unsupported observation_hash_algorithm '{value}' (supported: '{HASH_ALGORITHM}')"
+            ));
+        }
+    }
+    if let Some(source) = &manifest.theta_source {
+        if source.algorithm != HASH_ALGORITHM {
+            return Err(format!(
+                "unsupported theta_source.algorithm '{}' (supported: '{HASH_ALGORITHM}')",
+                source.algorithm
             ));
         }
     }
@@ -496,6 +557,20 @@ mod tests {
         let error = read(&path).unwrap_err();
         assert!(error.contains("backend_identity tuple"), "{error}");
         assert!(error.contains("fell_back"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_rejects_partial_theta_source_tuple_by_name() {
+        let path = temp_file("partial-theta-source");
+        std::fs::write(
+            &path,
+            r#"{"backend_identity":null,"schema_versions":{"backend_identity":1,"manifest":1},"theta_source":{"kind":"file","sha256":"abc"}}"#,
+        )
+        .unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("theta_source tuple"), "{error}");
+        assert!(error.contains("algorithm"), "{error}");
         let _ = std::fs::remove_file(path);
     }
 

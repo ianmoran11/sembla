@@ -121,12 +121,21 @@ people for 100 ticks.
 ## Prior-predictive sweep
 
 Draw 20 parameter vectors from the priors declared in `examples/sir.json`
-and run the same population for 50 ticks under each vector:
+and run the same population for 50 ticks under independent simulation noise:
 
 ```sh
 cargo run --release -p sembla-cli -- sweep examples/sir.json \
-  --population pop.bin --seed 99 --draws 20 --ticks 50 --out sweep/
+  --population pop.bin --seed 99 --draws 20 --ticks 50 \
+  --noise independent --out sweep/
 ```
+
+`--noise crn` is the default and preserves the historical sweep bytes: every
+θ draw reuses the master simulation seed, which is useful for paired policy or
+sensitivity contrasts. Use `--noise independent` for NPE training data; it
+derives a stable simulation seed from the master seed and replica index for
+each draw without changing θ. As explained in `DECISIONS.md` §G5, CRN is wrong
+for training pairs because one shared noise realization teaches an artificially
+deterministic θ→x mapping and produces an overconfident learned posterior.
 
 The directory contains `manifest.csv` (the pre-existing theta table for each
 draw), one standard `draw_<k>.csv` result per draw, `summary.csv`, and
@@ -134,12 +143,15 @@ draw), one standard `draw_<k>.csv` result per draw, `summary.csv`, and
 `manifest.csv` is only a tabular parameter report, while `run-manifest.json`
 is the canonical reproducibility contract. The JSON stores shared model,
 population, seed, tick, backend, schema, and component fields once, then one
-`executions` entry per draw with `k`, sorted resolved theta, results hash, and
-final-state hash. The summary reports the nearest-index 5/25/50/75/95 percentiles for every
+`executions` entry per draw with `k`, its actual simulation seed, sorted
+resolved theta, results hash, and final-state hash. It also records the
+`noise_mode` and the all-or-nothing `theta_source` kind/hash/algorithm tuple.
+The summary reports the nearest-index 5/25/50/75/95 percentiles for every
 reported per-tick column—here S, I, R, transition firings, and deferred events.
 The same sweep command also works for views-free models using their generic
 state-count/firing columns. Stdout prints SHA-256 digests for the CSV parameter
-manifest and summary.
+manifest and summary. In prior mode, `theta_source.sha256` is the effective
+canonical-IR digest because that IR contains the prior declarations.
 
 Verify every recorded draw, or select one draw with `--draw`:
 
@@ -160,6 +172,22 @@ cargo run --release -p sembla-cli -- sweep examples/sir.json \
   --params pinned.json --out sweep-pinned/
 ```
 
+External sequential or proposal methods can supply an ordered JSON list of θ
+objects instead of sampling priors. Every entry must provide every
+prior-bearing parameter; the entry count is the draw count, so `--theta-file`
+and `--draws` are mutually exclusive:
+
+```sh
+printf '[{"beta":0.7,"gamma":0.12},{"beta":0.8,"gamma":0.1}]\n' > theta.json
+cargo run --release -p sembla-cli -- sweep examples/sir.json \
+  --population pop.bin --seed 99 --theta-file theta.json --ticks 50 \
+  --noise independent --out sweep-proposals/
+```
+
+The file-mode `manifest.csv` starts with `# theta_source=file`, the JSON run
+manifest records the exact input-file SHA-256, and stdout prints it as
+`theta_file_sha256`.
+
 `sembla compare --out comparison.csv` similarly writes
 `comparison.csv.manifest.json`. Its `executions` array contains deterministic
 `arm_a` and `arm_b` scenario entries with each arm's model, effective IR hash,
@@ -169,9 +197,8 @@ ticks, backend identity, flags, and component versions remain shared.
 Normal priors use the frozen cosine branch of Box--Muller; LogNormal draws are
 the exponential of that Normal draw. Parameter coordinates reserve
 `rule_id = 0xffffffff`, use the draw index as `tick`, and the parameter's
-declaration index as `entity_id`, so extending K never changes an earlier
-draw. Every simulation run deliberately reuses seed 99 and therefore the same
-simulation coordinates (**common random numbers**). This makes output
-variation attributable to theta, but the draw results are paired rather than
-independent simulation-noise replicates; use different sweep seeds when
-independent shocks are required.
+declaration index as `entity_id`, so extending K never changes an earlier θ
+draw. Independent simulation seeds reserve `rule_id = 0xfffffffe`, use the
+replica index as `tick`, and set `entity_id = draw_idx = 0`; Philox output lane
+0 supplies the low 32 bits and lane 1 the high 32 bits of the derived `u64`.
+Thus extending K also never changes an earlier replica seed or result.

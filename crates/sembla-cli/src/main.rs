@@ -5,13 +5,14 @@ use sembla_runtime::eval::{ParamEnv, ParamOverride};
 use sembla_runtime::executor::{self, ObservationValue, SummaryValue};
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::prior::sample_parameters_for_draw;
+use sembla_runtime::rng::derive_sweep_replica_seed;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S --draws K --ticks T --out dir [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--noise crn|independent] [--params file.json] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K]";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -137,7 +138,9 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
 #[derive(Clone, Debug)]
 struct SweepOptions {
     seed: u64,
-    draws: u32,
+    draws: Option<u32>,
+    theta_file: Option<String>,
+    noise_mode: manifest::NoiseMode,
     ticks: u32,
     population: String,
     out: String,
@@ -151,6 +154,8 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
     let mut population = None;
     let mut out = None;
     let mut params = None;
+    let mut theta_file = None;
+    let mut noise_mode = None;
     let mut index = 0;
     while index < flags.len() {
         let flag = flags[index].as_str();
@@ -160,6 +165,19 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         match flag {
             "--seed" => set_once(&mut seed, parse_number(value, flag)?, flag)?,
             "--draws" => set_once(&mut draws, parse_number(value, flag)?, flag)?,
+            "--theta-file" => set_once(&mut theta_file, value.clone(), flag)?,
+            "--noise" => {
+                let value = match value.as_str() {
+                    "crn" => manifest::NoiseMode::Crn,
+                    "independent" => manifest::NoiseMode::Independent,
+                    _ => {
+                        return Err(format!(
+                            "invalid value '{value}' for '--noise' (expected 'crn' or 'independent')"
+                        ));
+                    }
+                };
+                set_once(&mut noise_mode, value, flag)?;
+            }
             "--ticks" => set_once(&mut ticks, parse_number(value, flag)?, flag)?,
             "--population" => {
                 if value.parse::<usize>().is_err() && !Path::new(value).is_file() {
@@ -175,13 +193,20 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         }
         index += 2;
     }
-    let draws = draws.ok_or_else(|| "missing required flag '--draws'".to_owned())?;
-    if draws == 0 {
+    if draws.is_some() && theta_file.is_some() {
+        return Err("'--theta-file' cannot be combined with '--draws'".to_owned());
+    }
+    if draws.is_none() && theta_file.is_none() {
+        return Err("missing required flag '--draws' or '--theta-file'".to_owned());
+    }
+    if draws == Some(0) {
         return Err("'--draws' must be greater than zero".to_owned());
     }
     Ok(SweepOptions {
         seed: seed.ok_or_else(|| "missing required flag '--seed'".to_owned())?,
         draws,
+        theta_file,
+        noise_mode: noise_mode.unwrap_or(manifest::NoiseMode::Crn),
         ticks: ticks.ok_or_else(|| "missing required flag '--ticks'".to_owned())?,
         population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
         out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
@@ -524,8 +549,111 @@ fn sweep_file(path: &str, options: SweepOptions) -> i32 {
     }
 }
 
+#[derive(Debug)]
+struct ThetaFile {
+    assignments: Vec<Vec<ParamOverride>>,
+    sha256: String,
+}
+
+fn read_theta_file(model: &sembla_ir::ValidatedModel, path: &str) -> Result<ThetaFile, String> {
+    let bytes = std::fs::read(path).map_err(|error| format!("{path}: {error}"))?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|error| format!("{path}: {error}"))?;
+    let entries = value
+        .as_array()
+        .ok_or_else(|| format!("{path}: theta file must be a JSON array"))?;
+    if entries.is_empty() {
+        return Err(format!(
+            "{path}: theta file must contain at least one theta assignment"
+        ));
+    }
+    u32::try_from(entries.len())
+        .map_err(|_| format!("{path}: theta file contains more than u32::MAX assignments"))?;
+
+    let mut assignments = Vec::with_capacity(entries.len());
+    for (index, entry) in entries.iter().enumerate() {
+        let object = entry
+            .as_object()
+            .ok_or_else(|| format!("{path}: theta assignment {index} must be a JSON object"))?;
+        for declaration in model
+            .model()
+            .params
+            .iter()
+            .filter(|declaration| declaration.prior.is_some())
+        {
+            if !object.contains_key(&declaration.name) {
+                return Err(format!(
+                    "{path}: theta assignment {index} is missing prior-bearing parameter '{}'",
+                    declaration.name
+                ));
+            }
+        }
+
+        let mut overrides = Vec::with_capacity(object.len());
+        for (name, value) in object {
+            let declaration = model
+                .model()
+                .params
+                .iter()
+                .find(|parameter| parameter.name == *name)
+                .ok_or_else(|| {
+                    format!("{path}: theta assignment {index} has unknown parameter '{name}'")
+                })?;
+            let value = param_value_from_json(
+                declaration,
+                value,
+                &format!("{path}: theta assignment {index}"),
+            )?;
+            overrides.push(ParamOverride::new(name, value));
+        }
+        ParamEnv::resolve(model, &overrides)
+            .map_err(|error| format!("{path}: theta assignment {index}: {error}"))?;
+        assignments.push(overrides);
+    }
+
+    Ok(ThetaFile {
+        assignments,
+        sha256: hex(&Sha256::digest(&bytes)),
+    })
+}
+
+fn params_from_theta_assignment(
+    model: &sembla_ir::ValidatedModel,
+    path: &str,
+    draw: u32,
+    assignment: &[ParamOverride],
+    pinned: &[ParamOverride],
+) -> Result<ParamEnv, String> {
+    for supplied in assignment {
+        if pinned.iter().any(|pin| pin.name == supplied.name) {
+            return Err(format!(
+                "{path}: theta assignment {draw} parameter '{}' is also supplied by --params",
+                supplied.name
+            ));
+        }
+    }
+    let mut overrides = Vec::with_capacity(pinned.len() + assignment.len());
+    overrides.extend_from_slice(pinned);
+    overrides.extend_from_slice(assignment);
+    ParamEnv::resolve(model, &overrides)
+        .map_err(|error| format!("{path}: theta assignment {draw}: {error}"))
+}
+
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let model = read_validated(path)?;
+    let ir_hash = manifest::canonical_ir_hash(&model)?;
+    let theta_file = options
+        .theta_file
+        .as_deref()
+        .map(|theta_path| read_theta_file(&model, theta_path))
+        .transpose()?;
+    let draw_count = match (&theta_file, options.draws) {
+        (Some(theta), None) => u32::try_from(theta.assignments.len())
+            .expect("theta-file length was checked while reading"),
+        (None, Some(draws)) => draws,
+        _ => unreachable!("sweep option exclusivity was checked while parsing"),
+    };
+
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
     let mut run_manifest = manifest::RunManifest::new(
@@ -537,7 +665,22 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     );
     run_manifest.model = Some(model.model().name.clone());
     run_manifest.dt = Some(model.model().dt);
-    run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
+    run_manifest.ir_hash = Some(ir_hash.clone());
+    run_manifest.noise_mode = Some(options.noise_mode);
+    run_manifest.theta_source = Some(match &theta_file {
+        Some(theta) => manifest::ThetaSource {
+            kind: manifest::ThetaSourceKind::File,
+            sha256: theta.sha256.clone(),
+            algorithm: manifest::HASH_ALGORITHM.to_owned(),
+        },
+        None => manifest::ThetaSource {
+            kind: manifest::ThetaSourceKind::Prior,
+            // Prior-mode theta comes from declarations in the effective,
+            // canonical IR, whose digest is already the run's IR identity.
+            sha256: ir_hash,
+            algorithm: manifest::HASH_ALGORITHM.to_owned(),
+        },
+    });
     let pinned = match options.params.as_deref() {
         Some(params_path) => read_param_overrides(&model, params_path)?,
         None => Vec::new(),
@@ -552,36 +695,58 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
     remove_previous_sweep_outputs(out)?;
 
-    let mut manifest = String::from("# parameter_status");
+    let mut csv_manifest = if theta_file.is_some() {
+        String::from("# theta_source=file\n# parameter_status")
+    } else {
+        String::from("# parameter_status")
+    };
     for declaration in &model.model().params {
-        let status = if pinned.iter().any(|pin| pin.name == declaration.name) {
+        let supplied_by_file = theta_file.as_ref().is_some_and(|theta| {
+            theta.assignments.iter().any(|assignment| {
+                assignment
+                    .iter()
+                    .any(|value| value.name == declaration.name)
+            })
+        });
+        let status = if supplied_by_file {
+            "file"
+        } else if pinned.iter().any(|pin| pin.name == declaration.name) {
             "pinned"
         } else if declaration.prior.is_some() {
             "sampled"
         } else {
             "default"
         };
-        manifest.push_str(&format!(",{}={status}", declaration.name));
+        csv_manifest.push_str(&format!(",{}={status}", declaration.name));
     }
-    manifest.push_str("\nk");
+    csv_manifest.push_str("\nk");
     for declaration in &model.model().params {
-        manifest.push(',');
-        manifest.push_str(&declaration.name);
+        csv_manifest.push(',');
+        csv_manifest.push_str(&declaration.name);
     }
-    manifest.push('\n');
+    csv_manifest.push('\n');
 
-    let mut all_series = Vec::with_capacity(options.draws as usize);
+    let mut all_series = Vec::with_capacity(draw_count as usize);
     let mut reported_columns: Option<Vec<String>> = None;
     // Deliberately sequential: declaration order within each k, then k order.
-    for draw in 0..options.draws {
-        let params = sample_parameters_for_draw(&model, options.seed, draw, &pinned)
-            .map_err(|error| format!("draw {draw}: {error}"))?;
-        manifest.push_str(&draw.to_string());
+    for draw in 0..draw_count {
+        let params = match &theta_file {
+            Some(theta) => params_from_theta_assignment(
+                &model,
+                options.theta_file.as_deref().expect("theta path exists"),
+                draw,
+                &theta.assignments[draw as usize],
+                &pinned,
+            )?,
+            None => sample_parameters_for_draw(&model, options.seed, draw, &pinned)
+                .map_err(|error| format!("draw {draw}: {error}"))?,
+        };
+        csv_manifest.push_str(&draw.to_string());
         for (_, value) in params.values() {
-            manifest.push(',');
-            manifest.push_str(&param_value_csv(value));
+            csv_manifest.push(',');
+            csv_manifest.push_str(&param_value_csv(value));
         }
-        manifest.push('\n');
+        csv_manifest.push('\n');
 
         let initial = match (&population, &population_file) {
             (Some(row_count), None) => initialize_population(&model, *row_count),
@@ -590,9 +755,12 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         };
         let mut state =
             StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
-        // The simulation seed is intentionally identical across k: this is
-        // common random numbers, so only theta varies between unpinned draws.
-        let output = run_results_output(&model, &mut state, &params, options.seed, options.ticks)?;
+        let execution_seed = match options.noise_mode {
+            manifest::NoiseMode::Crn => options.seed,
+            manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
+        };
+        let output =
+            run_results_output(&model, &mut state, &params, execution_seed, options.ticks)?;
         if let Some(columns) = &reported_columns {
             if columns != &output.series.columns {
                 return Err(format!(
@@ -605,6 +773,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         let hashes = execution_hashes(&output, &state);
         run_manifest.executions.push(manifest::ManifestExecution {
             k: draw,
+            seed: Some(execution_seed),
             scenario: None,
             model: None,
             ir_hash: None,
@@ -627,16 +796,21 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     )?;
     let manifest_path = out.join("manifest.csv");
     let summary_path = out.join("summary.csv");
-    std::fs::write(&manifest_path, manifest.as_bytes())
+    std::fs::write(&manifest_path, csv_manifest.as_bytes())
         .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
     std::fs::write(&summary_path, summary.as_bytes())
         .map_err(|error| format!("{}: {error}", summary_path.display()))?;
     manifest::write(&out.join("run-manifest.json"), &run_manifest)?;
-    println!(
-        "manifest_sha256={} summary_sha256={}",
-        hex(&Sha256::digest(manifest.as_bytes())),
-        hex(&Sha256::digest(summary.as_bytes()))
-    );
+    let manifest_hash = hex(&Sha256::digest(csv_manifest.as_bytes()));
+    let summary_hash = hex(&Sha256::digest(summary.as_bytes()));
+    if let Some(theta) = &theta_file {
+        println!(
+            "manifest_sha256={manifest_hash} summary_sha256={summary_hash} theta_file_sha256={}",
+            theta.sha256
+        );
+    } else {
+        println!("manifest_sha256={manifest_hash} summary_sha256={summary_hash}");
+    }
     Ok(())
 }
 
@@ -730,6 +904,31 @@ fn resolve_params(
     ParamEnv::resolve(model, &overrides).map_err(|error| format!("{path}: {error}"))
 }
 
+fn param_value_from_json(
+    declaration: &sembla_ir::ParamDecl,
+    value: &serde_json::Value,
+    context: &str,
+) -> Result<ParamValue, String> {
+    match declaration.ty {
+        ParamType::Real => Ok(ParamValue::Real {
+            value: value.as_f64().ok_or_else(|| {
+                format!(
+                    "{context}: parameter '{}' must have type real",
+                    declaration.name
+                )
+            })?,
+        }),
+        ParamType::Int => Ok(ParamValue::Int {
+            value: value.as_i64().ok_or_else(|| {
+                format!(
+                    "{context}: parameter '{}' must have type int",
+                    declaration.name
+                )
+            })?,
+        }),
+    }
+}
+
 fn read_param_overrides(
     model: &sembla_ir::ValidatedModel,
     path: &str,
@@ -748,18 +947,7 @@ fn read_param_overrides(
             .iter()
             .find(|parameter| parameter.name == *name)
             .ok_or_else(|| format!("{path}: unknown parameter '{name}'"))?;
-        let value = match declaration.ty {
-            ParamType::Real => ParamValue::Real {
-                value: value
-                    .as_f64()
-                    .ok_or_else(|| format!("{path}: parameter '{name}' must have type real"))?,
-            },
-            ParamType::Int => ParamValue::Int {
-                value: value
-                    .as_i64()
-                    .ok_or_else(|| format!("{path}: parameter '{name}' must have type int"))?,
-            },
-        };
+        let value = param_value_from_json(declaration, value, path)?;
         overrides.push(ParamOverride::new(name, value));
     }
     ParamEnv::resolve(model, &overrides).map_err(|error| format!("{path}: {error}"))?;
@@ -1327,10 +1515,29 @@ fn verify_run_result(
                         &mut differences,
                     );
                 }
+                let expected_seed = match recorded.noise_mode {
+                    Some(manifest::NoiseMode::Independent) => {
+                        derive_sweep_replica_seed(recorded.seed, execution.k)
+                    }
+                    Some(manifest::NoiseMode::Crn) | None => recorded.seed,
+                };
+                if recorded.noise_mode.is_some() || execution.seed.is_some() {
+                    compare_field(
+                        &format!("executions[{}].seed", execution.k),
+                        &execution.seed,
+                        &Some(expected_seed),
+                        &mut differences,
+                    );
+                }
                 let params = params_from_manifest(&model, &execution.resolved_theta)?;
                 let mut state = initialized_state(&model, &options.population, model_path)?;
-                let output =
-                    run_results_output(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
+                let output = run_results_output(
+                    &model,
+                    &mut state,
+                    &params,
+                    execution.seed.unwrap_or(recorded.seed),
+                    recorded.ticks,
+                )?;
                 let actual = execution_hashes(&output, &state);
                 compare_field(
                     &format!("executions[{}].results_sha256", execution.k),
@@ -1524,6 +1731,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     ] {
         run_manifest.executions.push(manifest::ManifestExecution {
             k,
+            seed: None,
             scenario: Some(scenario.to_owned()),
             model: Some(model.model().name.clone()),
             ir_hash: Some(manifest::canonical_ir_hash(model)?),
