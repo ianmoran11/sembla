@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/sembla-cli",
+    "crates/sembla-cuda",
     "crates/sembla-ir",
     "crates/sembla-runtime",
 ]

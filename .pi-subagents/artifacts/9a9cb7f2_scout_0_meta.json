@@ -1,0 +1,37 @@
+{
+  "runId": "9a9cb7f2",
+  "agent": "scout",
+  "task": "[Read from: /Users/ian/projects/sembla/docs/prds-npe-path/0008-cuda-backend.md, /Users/ian/projects/sembla/crates/sembla-ir, /Users/ian/projects/sembla/crates/sembla-runtime]\n\nIn /Users/ian/projects/sembla, analyze PRD docs/prds-npe-path/0008-cuda-backend.md against current crates/sembla-ir and crates/sembla-runtime. Return a concrete implementation map: relevant types/functions, exact CPU semantics/order/hash behavior, supported expression/effect/wire fragment, test helpers, and likely risks. Read-only; do not edit. Include file paths and symbols.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/ian/projects/sembla/.pi-subagents/artifacts/outputs/9a9cb7f2/.pi-subagents/prd0008-runtime-analysis.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.",
+  "exitCode": 0,
+  "usage": {
+    "input": 65926,
+    "output": 5432,
+    "cacheRead": 163328,
+    "cacheWrite": 0,
+    "cost": 0.574254,
+    "turns": 6
+  },
+  "model": "openai-codex/gpt-5.6-sol:low",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:low"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:low",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 65926,
+        "output": 5432,
+        "cacheRead": 163328,
+        "cacheWrite": 0,
+        "cost": 0.574254,
+        "turns": 6
+      }
+    }
+  ],
+  "durationMs": 174307,
+  "toolCount": 25,
+  "transcriptPath": "/Users/ian/projects/sembla/.pi-subagents/artifacts/9a9cb7f2_scout_0_transcript.jsonl",
+  "timestamp": 1784381165875
+}
