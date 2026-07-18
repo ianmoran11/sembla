@@ -1,9 +1,9 @@
 # ADR 0001: GPU precision strategy
 
-- **Status:** Measured; decision pending full-rate NVIDIA confirmation
-- **Date:** 2026-07-16
+- **Status:** Accepted — Strategy A, native `f64` through CUDA
+- **Date:** 2026-07-18
 - **Decision scope:** v0.2 GPU backend precision and reachable determinism levels
-- **Evidence:** [`spikes/precision/RESULTS.md`](../../spikes/precision/RESULTS.md)
+- **Evidence:** [`spikes/precision/RESULTS.md`](../../spikes/precision/RESULTS.md) and the [verified three-run H100 bundle](../../spikes/precision/evidence/hyperstack-h100-20260718/README.md)
 
 ## Context
 
@@ -26,131 +26,94 @@ separately state whether it can deliver Level A, B, or C.
 
 ## Evidence
 
-The durable matrix is
-[`spikes/precision/RESULTS.md`](../../spikes/precision/RESULTS.md). The recorded
-run used an Apple M2 Pro integrated GPU with Metal, the full
-`(N, G) = (26,000,000, 1,300,000)` workload, `beta = 0.35`, `dt = 0.25`, 10
-warmup ticks, and 100 measured ticks. Metal's advertised timestamp support did
-not return every stage pair, so the artifact correctly labels these medians as
-synchronized wall-clock fallback measurements.
+The canonical merged result is
+[`spikes/precision/RESULTS.md`](../../spikes/precision/RESULTS.md), byte-identical
+to verified H100 run 1. The complete three-run bundle, external completion logs,
+hardware report, bootstrap diagnostics, trusted host-key evidence, and computed
+summary are tracked under
+[`spikes/precision/evidence/hyperstack-h100-20260718/`](../../spikes/precision/evidence/hyperstack-h100-20260718/README.md).
 
-| Strategy | Total ms/tick | Rows/sec | Reduction relative error, max / mean | Winner mismatch | Result |
-|---|---:|---:|---:|---:|---|
-| `f32` | 10.711042 | 2,427,401,667.709 | `1.714669e-7` / `3.216831e-8` | 0.000000% | answered on Apple M2 Pro |
-| double-single | 13.868958 | 1,874,690,225.466 | `1.096998e-14` / `1.206441e-15` | 0.000000% | answered on Apple M2 Pro |
-| native `f64` (wgpu) | unanswered | unanswered | unanswered | unanswered | Metal has no `SHADER_F64` |
-| native `f64` (CUDA) | unanswered | unanswered | unanswered | unanswered | CUDA was not enabled or run |
+Both machines ran the full `(N, G) = (26,000,000, 1,300,000)` workload with
+`beta = 0.35`, `dt = 0.25`, 10 warmup ticks, and 100 measured ticks. The earlier
+Apple M2 Pro result remains useful supporting evidence:
 
-On this workload, double-single cost 1.295× the `f32` total time: a 29.5%
-latency increase and 22.8% throughput loss, retaining 77.2% of `f32` throughput
-(72.10 versus 93.36 ticks/sec). It reduced max and mean reduction error by about
-15.6 million× and 26.7 million× respectively. Both measured paths had zero
-winner mismatches, but that finite observation is not proof of equivalence for
-all models. The 276,097 order-sensitive groups in both rows reinforce the need
-for a fixed reduction order; they are not winner mismatches.
+| Strategy | Apple total ms/tick | Apple rows/sec | Reduction relative error, max / mean | Winner mismatch |
+|---|---:|---:|---:|---:|
+| `f32` | 10.711042 | 2,427,401,667.709 | `1.714669e-7` / `3.216831e-8` | 0.000000% |
+| double-single | 13.868958 | 1,874,690,225.466 | `1.096998e-14` / `1.206441e-15` | 0.000000% |
 
-No NVIDIA machine was measured. Consequently there is **no measured NVIDIA fp64
-throughput class or native-`f64` timing**. The Apple metadata's conservative
-`rate-limited / unknown` label is not a commodity-NVIDIA measurement and cannot
-be extrapolated to A100/V100/H100 full-rate behavior. Both native rows that bear
-on Strategy A remain explicitly unanswered.
+The binding gate used three NVIDIA-local rows from one `n3-H100x1` machine,
+not the rendered cross-machine matrix. The device was an NVIDIA H100 PCIe with
+driver `570.195.03`; CUDA reported an FP32:FP64 performance ratio of `2:1`, so
+the machine was verified as full-rate. GPU timestamp-query results were:
+
+| Run | `f32` ms/tick | double-single ms/tick | CUDA `f64` ms/tick |
+|---|---:|---:|---:|
+| 1 | 0.817456000 | 0.829600000 | 0.724384010 |
+| 2 | 0.818064000 | 0.832112000 | 0.724880010 |
+| 3 | 0.817936000 | 0.829472000 | 0.722815990 |
+| **median** | **0.817936000** | **0.829600000** | **0.724384010** |
+
+The median CUDA path delivered 35,892,564,781.780 rows/sec, retained 112.915%
+of `f32` throughput, and used 88.562% of its time. In all three runs CUDA
+native `f64` had zero max and mean reduction error, zero winner mismatches, zero
+fired mismatches, and zero unexplained fixed-tree arithmetic-mirror differences.
+Its guard passed every time.
+
+Double-single produced usable timings but failed its guard in every run: its
+one-million-row winner mismatch rate (`0.00002`) did not improve on `f32`, its
+full-workload row had one fired mismatch, and NVIDIA/Vulkan did not provide a
+trustworthy strict-arithmetic path. The `f32` full-workload row also had one
+fired mismatch. Native `f64` through wgpu was unavailable on this exact H100:
+the observed wgpu 0.20 Vulkan pipeline produced an NVIDIA NVVM compiler failure
+and unsafe teardown behavior, so the implementation gates it before pipeline
+creation. CUDA remained independently available and passed.
 
 ## Options
 
 ### A — native `f64`
 
-Native `f64` is the closest representation to the CPU oracle and makes Level A
-plausible with the spike's fixed-order two-pass reductions on the same binary
-and GPU model. Level B remains unproven because cross-hardware bitwise behavior
-was not measured. The strategy excludes Metal and portable-WGSL-only devices and
-its throughput depends strongly on the GPU's fp64:fp32 ratio.
+Native `f64` is the closest representation to the CPU oracle. On the verified
+full-rate H100, the CUDA implementation passed every numerical and guard check
+in all three runs and exceeded the same-machine performance floor. CUDA is the
+selected production backend and accuracy reference.
 
-There is no concrete throughput or accuracy number for A yet. Treating the
-Apple result, a commodity GPU ratio, or a model-name lookup as a full-rate result
-would be an unsupported extrapolation.
+The wgpu/Vulkan implementation remains a separately reported path, but it is
+unavailable on the observed H100 compiler stack. Strategy A therefore accepts a
+CUDA and full-rate-NVIDIA deployment requirement. Fixed-order two-pass
+reductions make Level A plausible on the same pinned binary and GPU model;
+Level B remains unproven because cross-hardware bitwise behavior was not tested.
 
 ### B — double-single
 
-Double-single is portable in representation and delivered approximately 48-bit
-accuracy on Metal. Its measured end-to-end cost was 1.295× `f32`, not the
-previously estimated 3–4× arithmetic cost. It met the spike's strict-arithmetic
-probe, `1e-10` max-reduction-error threshold, and winner threshold on this
-machine.
+Double-single remains strong supporting evidence on Metal, where it delivered
+approximately 48-bit reduction accuracy while retaining 77.2% of `f32`
+throughput. It did not transfer to the tested NVIDIA/Vulkan compiler path: its
+strict-arithmetic probe was untrustworthy, its guard failed, and its full row
+had the same reduction error and fired mismatch as `f32`.
 
-Fixed ordering plus a strict arithmetic compilation path makes Level A plausible
-on a supported binary/GPU pair. Level B is only a candidate: it requires pinned
-operations and cross-hardware bitwise tests that the spike did not perform.
-Double-single is not native `f64`; selecting it would require the final numeric
-contract to state an oracle-relative tolerance rather than claim `f64`
-equivalence.
+Strategy B therefore does not qualify. This is a portability result, not a claim
+that the representation is universally defective: selecting it on another
+backend would require a new gate demonstrating strict operations and the stated
+numerical contract there.
 
 ### C — tiered precision by contract
 
-The measured `f32` path was fastest and had zero observed winner mismatches, but
-its max reduction error was `1.714669e-7`. It does **not** satisfy the current
-`f64` convention. A tiered backend would keep the CPU `f64` interpreter as the
-semantic oracle and explicitly define where reduced precision is permitted.
+The H100 `f32` path was a fast baseline, but its max reduction error was
+`1.714669e-7` and its full-workload row had one fired mismatch. It does not
+satisfy the unchanged `f64` convention or the proposed reduced contract's
+zero-fired-mismatch condition.
 
-Level C is the natural baseline when atomics and summation-order jitter are
-allowed. Fixed-order kernels can make Level A reproducibility plausible for the
-reduced contract on one binary/GPU model, but not `f64` equivalence. Level B is
-out unless a software-pinned representation is separately demonstrated.
+Strategy C is unnecessary because A qualifies, and it would not independently
+qualify from this evidence. Any future tiered backend must remain explicitly
+reduced precision, retain the CPU `f64` oracle, and pass a separately accepted
+contract; it must not be called native-`f64` equivalence.
 
-## Decision
+## Precommitted decision rule
 
-**No A/B/C strategy is selected yet.** The evidence is measured but not decisive
-because neither native-`f64` path ran and no full-rate NVIDIA GPU was measured.
-The next decision action is mandatory and precise: run PRD 0004 with
-`gpu_class = "full_rate"` on one verified full-rate NVIDIA machine, then run the
-complete PRD-0005 benchmark three times on that same machine. Use the full
-`(26,000,000, 1,300,000)` workload when it fits and identical parameters for
-every strategy and invocation. Apple and NVIDIA timings must not be compared as
-if they came from one machine.
-
-The rendered merged matrix is a cross-machine presentation and is **not** an
-input to the performance gate: by design it selects Development rows for `f32`
-and double-single and NVIDIA rows for native `f64`. Each invocation instead
-stores all four local rows in the marker-delimited JSON at
-`machines.nvidia.strategies`. Those NVIDIA-local rows are the decision evidence.
-
-Preserve three independent runs as follows:
-
-1. Make three byte-identical copies of the Mac-containing `RESULTS.md` at three
-   distinct absolute paths on the NVIDIA machine.
-2. For invocation `i`, set `SPIKE_RESULTS_PATH` to copy `i`, assign a unique
-   `SPIKE_RUN_ID`, run the PRD-0004 wrapper once, and redirect stdout and stderr
-   to a persistent run-specific log outside the wrapper. The wrapper embeds the
-   run ID in state and writes start/completion markers that bind the log to the
-   exact result SHA-256; its own transcript is temporary.
-3. Retrieve all three result files and logs before teardown. Never reuse one
-   results path: updating the fixed `nvidia` machine key replaces that file's
-   previous NVIDIA run.
-4. In every file verify the same repository commit, exact GPU model, driver,
-   `full-rate` fp64 class, actual `(N, G)`, `beta`, `dt`, and strategy
-   availability. Also require three distinct run IDs, generation times, result
-   hashes, and matching run-log completion records. A mismatch invalidates the
-   three-run comparison.
-5. Read timing and accuracy from each file's
-   `machines.nvidia.strategies[*].status`; specifically, use
-   `status.timing.total_ms` for the performance rule. Record all three inputs and
-   their computed medians in this ADR when the gate is executed.
-
-The PRD-0005 state now preserves `fired_mismatch_count` for every answered
-strategy and `unexplained_arithmetic_mirror_difference_count` for answered
-native `f64` rows. Portable fired flags are scored against the shared CPU oracle;
-native rows additionally compare their segmented sums with the fixed-tree Rust
-mirror. Legacy state omits these optional fields rather than fabricating zeroes,
-and the Hyperstack artifact verifier rejects missing NVIDIA diagnostics. Any
-absent or failed diagnostic leaves the candidate unqualified rather than
-treating a missing counter as zero. Guard outcomes are preserved per strategy
-as passed, failed, or unavailable. A candidate failure never aborts measurement
-of the other candidates; usable failed-candidate metrics remain answered and
-are labeled unqualified, while execution failures remain explicit unanswered
-rows.
-
-Apply this decision rule. Numerical and guard conditions must pass in all three
-runs; performance comparisons use the median of the three NVIDIA-local
-`total_ms` values:
+The following rule was committed before the H100 evidence was collected.
+Numerical and guard conditions must pass in all three runs; performance
+comparisons use the median of the three NVIDIA-local `total_ms` values:
 
 1. A precise candidate qualifies numerically only when every run reports max
    reduction relative error `<= 1e-10` and zero winner mismatches, its recorded
@@ -164,8 +127,8 @@ runs; performance comparisons use the median of the three NVIDIA-local
    native path (CUDA or wgpu/Vulkan) independently passes both the numerical and
    performance gates. CUDA remains the accuracy reference when wgpu is chosen.
 4. **B qualifies** only if double-single passes its numerical, strict-arithmetic,
-   and performance gates on the decision machine. The current Apple result is
-   supporting evidence, not a same-machine gate input.
+   and performance gates on the decision machine. The Apple result is supporting
+   evidence, not a same-machine gate input.
 5. **C qualifies** only if neither precise strategy qualifies and a separate
    reduced-precision contract is accepted. That contract must require max
    reduction relative error `<= 2e-7`, zero winner and fired-flag mismatches
@@ -182,31 +145,57 @@ runs; performance comparisons use the median of the three NVIDIA-local
 | does not qualify | does not qualify | C passes its reduced contract | **C** |
 | does not qualify | does not qualify | C does not qualify | **blocked** |
 
-Record the named native backend when A is selected. Restricted full-rate
-hardware is accepted when A is the sole qualifying precise path, or when A earns
-the specified material gain over qualifying B. Thresholds are not relaxed
-silently.
-
 The 20% native-over-double-single preference and 75% throughput floor are
-engineering policy: they quantify the trade required to surrender portability
-or throughput. They are intentionally falsifiable, not claims about unmeasured
-hardware.
+engineering policy. Thresholds are not relaxed after observing measurements.
+
+## Decision
+
+**Select Strategy A: native `f64`, with CUDA as the named production backend.**
+The full-rate gate was executed three times on the same NVIDIA H100 PCIe at
+commit `d6c545f63a89135d01addeea42b9fbe44fac897a`. Artifact verification required
+distinct run IDs, generated times, result hashes, and bound external completion
+logs while holding hardware, driver, workload, availability, and provenance
+constant.
+
+The binding rule resolves as follows:
+
+1. CUDA passed the numerical gate in every run: max reduction error, winner
+   mismatches, fired mismatches, and unexplained arithmetic-mirror differences
+   were all zero, and every CUDA guard passed.
+2. CUDA passed the performance floor. Its median `0.724384010` ms/tick is below
+   the permitted `(4/3) * 0.817936000` ms/tick and retains 112.915% of
+   same-machine `f32` throughput.
+3. CUDA is both the accuracy reference and the named production native path, so
+   A qualifies even though the independently reported wgpu path is unavailable
+   on this exact H100 compiler stack.
+4. B does not qualify because its guard and strict-arithmetic requirements
+   failed; the full-workload fired mismatch independently confirms the failure.
+5. C is not considered for selection because A qualifies. The measured `f32`
+   row also fails C's zero-fired-mismatch requirement.
+
+The three result hashes are
+`68e0acd5a9aeb4c624693f3e81319f4e7a502331d27c5bc758b5a9d0439b7e69`,
+`f6b18ebbbe9d5cedc54119e3126b6153a74d08d59f96a305d21ee103157a98fe`, and
+`e941ff74d1fffc377392233d3cc2dfec6d29fd6befd7989b3ffaab26ca94fb47`.
+The tracked evidence bundle is authoritative for per-run details.
 
 ## Consequences
 
-Until the full-rate gate is executed:
-
-- the CPU `f64` interpreter remains the production semantics oracle and the
-  numeric contract is unchanged;
-- v0.2 must not commit to a precision-dependent GPU backend;
-- `f32` is a performance baseline, not an implementation of the `f64` contract;
-- fixed-order double-single is the measured provisional precise candidate, not
-  the selected strategy;
-- Level A is plausible for fixed-order A or B on one binary/GPU model, Level B
-  remains unproven, and C supplies only its explicitly reduced contract.
-
-After the gate, v0.2 must build exactly the strategy selected by the rule, retain
-differential tests against the CPU `f64` oracle, and amend `DESIGN.md` §5.2 with
-the selected representation and tolerance. Choosing A accepts full-rate-NVIDIA
-hardware restrictions; choosing B accepts emulation cost and a tolerance-based
-contract; choosing C accepts a deliberately reduced GPU numeric contract.
+- v0.2 must implement the production GPU precision path with CUDA native `f64`
+  on verified full-rate NVIDIA hardware.
+- The CPU `f64` interpreter remains the semantics oracle, and every production
+  kernel must be differentially tested against it. Selection of native `f64`
+  does not remove oracle-relative diagnostics.
+- The numeric contract remains `f64`; no reduced-precision tolerance is adopted.
+- `f32` remains a performance baseline only. Double-single remains useful Metal
+  evidence but is not the selected production representation.
+- The production scheduler must preserve the fixed-order reduction and
+  lexicographic winner rules measured here. This supports Level A only for the
+  same pinned binary and GPU model. Level B remains unproven pending
+  cross-hardware bitwise evidence.
+- Runtime manifests must name the CUDA backend, native-`f64` representation,
+  exact GPU/driver, determinism level, and any fallback. Silent fallback to
+  wgpu, double-single, or `f32` is prohibited.
+- Supporting non-NVIDIA or non-full-rate hardware requires an explicit future
+  backend decision and a new qualification gate; it must not weaken this
+  decision silently.

@@ -20,7 +20,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
 | f32 | Development | synchronized wall-clock fallback | 10.711042 | 3.273896 | 4.984000 | 2427401667.709 | 1.714669e-7 / 3.216831e-8 | 0.000000 | unanswered | n/a | 276097 |
 | double-single | Development | synchronized wall-clock fallback | 13.868958 | 3.201605 | 4.334770 | 1874690225.466 | 1.096998e-14 / 1.206441e-15 | 0.000000 | unanswered | n/a | 276097 |
 | native f64 (wgpu) | NVIDIA | unanswered on this adapter: native_f64: unsupported; adapter=NVIDIA H100 PCIe; backend=Vulkan; reason=wgpu 0.20 native f64 is disabled on NVIDIA H100 PCIe after an observed NVVM compiler failure; use the CUDA native-f64 path; device=NVIDIA H100 PCIe; fp64:fp32=1:2; class=full-rate; evidence=documented NVIDIA datacenter-compute model lookup; full-rate-extrapolation=allowed | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered | unanswered |
-| native f64 (CUDA) | NVIDIA | CUDA event timestamps | 0.724384 | 0.139152 | 0.146512 | 35892564781.780 | 0.000000e0 / 0.000000e0 | 0.000000 | 0 | 0 | 276097 |
+| native f64 (CUDA) | NVIDIA | CUDA event timestamps | 0.722816 | 0.139456 | 0.146560 | 35970427250.628 | 0.000000e0 / 0.000000e0 | 0.000000 | 0 | 0 | 276097 |
 
 ## Reduction determinism choice
 
@@ -82,7 +82,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
 
 ## NVIDIA machine
 
-- generated: `unix-seconds:1784348255`
+- generated: `unix-seconds:1784348289`
 - adapter: `NVIDIA H100 PCIe`
 - backend/device type: `Vulkan` / `DiscreteGpu`
 - driver: `NVIDIA` (`570.195.03`)
@@ -114,7 +114,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
 
 - `expected-gpu`: `H100`
 - `full-rate-extrapolation`: `refused-until-runtime-verification`
-- `generated-at-utc`: `2026-07-18T04:17:27Z`
+- `generated-at-utc`: `2026-07-18T04:18:06Z`
 - `hyperstack-environment`: `default-CANADA-1`
 - `hyperstack-flavor`: `n3-H100x1`
 - `hyperstack-image`: `Ubuntu Server 22.04 LTS R570 CUDA 12.8`
@@ -123,7 +123,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
 - `provider`: `hyperstack`
 - `repository-commit`: `d6c545f63a89135d01addeea42b9fbe44fac897a`
 - `requested-fp64-class`: `full-rate`
-- `run-id`: `b902e6a3318f221a138e8f88df0aa9e4-run-1`
+- `run-id`: `b902e6a3318f221a138e8f88df0aa9e4-run-3`
 
 ### Local rows
 
@@ -247,7 +247,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
     },
     "nvidia": {
       "machine_key": "nvidia",
-      "generated_at": "unix-seconds:1784348255",
+      "generated_at": "unix-seconds:1784348289",
       "hardware": {
         "adapter_name": "NVIDIA H100 PCIe",
         "backend": "Vulkan",
@@ -292,10 +292,10 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
           "status": {
             "status": "answered",
             "timing": {
-              "total_ms": 0.817456,
-              "reduce_ms": 0.13504,
-              "argmin_ms": 0.227136,
-              "rows_per_second": 31805993227.77006,
+              "total_ms": 0.817936,
+              "reduce_ms": 0.135104,
+              "argmin_ms": 0.228624,
+              "rows_per_second": 31787328103.91033,
               "warmup_ticks": 10,
               "measured_ticks": 100,
               "method": "gpu-timestamp-queries"
@@ -316,10 +316,10 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
           "status": {
             "status": "answered",
             "timing": {
-              "total_ms": 0.8295999999999999,
-              "reduce_ms": 0.13539199999999998,
-              "argmin_ms": 0.228016,
-              "rows_per_second": 31340405014.464806,
+              "total_ms": 0.829472,
+              "reduce_ms": 0.135264,
+              "argmin_ms": 0.22855999999999999,
+              "rows_per_second": 31345241310.134644,
               "warmup_ticks": 10,
               "measured_ticks": 100,
               "method": "gpu-timestamp-queries"
@@ -349,10 +349,10 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
           "status": {
             "status": "answered",
             "timing": {
-              "total_ms": 0.7243840098381042,
-              "reduce_ms": 0.13915199786424637,
-              "argmin_ms": 0.1465120017528534,
-              "rows_per_second": 35892564781.78039,
+              "total_ms": 0.722815990447998,
+              "reduce_ms": 0.13945599645376205,
+              "argmin_ms": 0.14655999839305878,
+              "rows_per_second": 35970427250.62753,
               "warmup_ticks": 10,
               "measured_ticks": 100,
               "method": "gpu-timestamp-queries"
@@ -387,7 +387,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
       "infrastructure": {
         "expected-gpu": "H100",
         "full-rate-extrapolation": "refused-until-runtime-verification",
-        "generated-at-utc": "2026-07-18T04:17:27Z",
+        "generated-at-utc": "2026-07-18T04:18:06Z",
         "hyperstack-environment": "default-CANADA-1",
         "hyperstack-flavor": "n3-H100x1",
         "hyperstack-image": "Ubuntu Server 22.04 LTS R570 CUDA 12.8",
@@ -396,7 +396,7 @@ Accuracy cells compare the final benchmark tick against the scalar CPU `f64` ora
         "provider": "hyperstack",
         "repository-commit": "d6c545f63a89135d01addeea42b9fbe44fac897a",
         "requested-fp64-class": "full-rate",
-        "run-id": "b902e6a3318f221a138e8f88df0aa9e4-run-1"
+        "run-id": "b902e6a3318f221a138e8f88df0aa9e4-run-3"
       }
     }
   }

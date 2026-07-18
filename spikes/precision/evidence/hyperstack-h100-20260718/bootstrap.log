@@ -1,0 +1,716 @@
+Running timer as unit: sembla-emergency-poweroff.timer
+Will run service as unit: sembla-emergency-poweroff.service
+Get:1 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64  InRelease [1581 B]
+Get:2 http://nova.clouds.archive.ubuntu.com/ubuntu jammy InRelease [270 kB]
+Get:3 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64  Packages [2840 kB]
+Get:4 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+Get:5 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+Get:6 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 Packages [1395 kB]
+Get:7 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main Translation-en [510 kB]
+Get:8 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 c-n-f Metadata [30.3 kB]
+Get:9 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/restricted amd64 Packages [129 kB]
+Get:10 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/restricted Translation-en [18.6 kB]
+Get:11 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/restricted amd64 c-n-f Metadata [488 B]
+Get:12 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [14.1 MB]
+Get:13 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe Translation-en [5652 kB]
+Get:14 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe amd64 c-n-f Metadata [286 kB]
+Get:15 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [217 kB]
+Get:16 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/multiverse Translation-en [112 kB]
+Get:17 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/multiverse amd64 c-n-f Metadata [8372 B]
+Get:18 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3646 kB]
+Get:19 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main Translation-en [547 kB]
+Get:20 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 c-n-f Metadata [20.1 kB]
+Get:21 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 Packages [6245 kB]
+Get:22 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/restricted Translation-en [1195 kB]
+Get:23 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/restricted amd64 c-n-f Metadata [584 B]
+Get:24 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1278 kB]
+Get:25 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en [322 kB]
+Get:26 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 c-n-f Metadata [30.8 kB]
+Get:27 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [71.6 kB]
+Get:28 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/multiverse Translation-en [15.5 kB]
+Get:29 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 c-n-f Metadata [756 B]
+Get:30 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [70.2 kB]
+Get:31 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/main Translation-en [11.4 kB]
+Get:32 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/main amd64 c-n-f Metadata [412 B]
+Get:33 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/restricted amd64 c-n-f Metadata [116 B]
+Get:34 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [30.8 kB]
+Get:35 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/universe Translation-en [16.9 kB]
+Get:36 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/universe amd64 c-n-f Metadata [676 B]
+Get:37 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-backports/multiverse amd64 c-n-f Metadata [116 B]
+Get:38 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Get:39 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3361 kB]
+Get:40 http://security.ubuntu.com/ubuntu jammy-security/main Translation-en [475 kB]
+Get:41 http://security.ubuntu.com/ubuntu jammy-security/main amd64 c-n-f Metadata [14.7 kB]
+Get:42 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [5988 kB]
+Get:43 http://security.ubuntu.com/ubuntu jammy-security/restricted Translation-en [1146 kB]
+Get:44 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 c-n-f Metadata [600 B]
+Get:45 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1044 kB]
+Get:46 http://security.ubuntu.com/ubuntu jammy-security/universe Translation-en [233 kB]
+Get:47 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 c-n-f Metadata [23.2 kB]
+Get:48 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [64.3 kB]
+Get:49 http://security.ubuntu.com/ubuntu jammy-security/multiverse Translation-en [12.6 kB]
+Get:50 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 c-n-f Metadata [544 B]
+Fetched 51.8 MB in 33s (1585 kB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+build-essential is already the newest version (12.9ubuntu3).
+build-essential set to manually installed.
+python3 is already the newest version (3.10.6-1~22.04.1).
+python3 set to manually installed.
+The following additional packages will be installed:
+  clang-14 cmake-data cpp-11 cpp-12 dh-elpa-helper emacsen-common g++-11
+  gcc-11 gcc-11-base gcc-12 gcc-12-base lib32gcc-s1 lib32stdc++6 libasan6
+  libasan8 libatomic1 libc-dev-bin libc6 libc6-dev libc6-i386 libcc1-0
+  libclang-common-14-dev libclang-cpp14 libclang1-14 libcurl4 libgc1
+  libgcc-11-dev libgcc-12-dev libgcc-s1 libgomp1 libitm1 libjq1 libjsoncpp25
+  libllvm14 liblsan0 libnss-systemd libobjc-11-dev libobjc4 libonig5
+  libpam-systemd libquadmath0 librhash0 libssl3 libstdc++-11-dev libstdc++6
+  libsystemd0 libtsan0 libtsan2 libubsan1 libudev1 llvm-14-linker-tools
+  netfilter-persistent openssh-server openssh-sftp-server systemd systemd-sysv
+  systemd-timesyncd udev
+Suggested packages:
+  clang-14-doc cmake-doc ninja-build cmake-format gcc-11-locales
+  gcc-12-locales cpp-12-doc g++-11-multilib gcc-11-doc gcc-11-multilib
+  gcc-12-multilib gcc-12-doc git-daemon-run | git-daemon-sysvinit git-doc
+  git-email git-gui gitk gitweb git-cvs git-mediawiki git-svn glibc-doc
+  libssl-doc libstdc++-11-doc keychain libpam-ssh monkeysphere ssh-askpass
+  molly-guard systemd-container libtss2-rc0
+Recommended packages:
+  llvm-14-dev libnss-nis libnss-nisplus mesa-vulkan-drivers | vulkan-icd
+The following NEW packages will be installed:
+  clang clang-14 cmake cmake-data dh-elpa-helper emacsen-common
+  iptables-persistent jq lib32gcc-s1 lib32stdc++6 libc6-i386
+  libclang-common-14-dev libclang-cpp14 libclang1-14 libgc1 libjq1
+  libjsoncpp25 libllvm14 libobjc-11-dev libobjc4 libonig5 librhash0 libssl-dev
+  libudev-dev libvulkan1 llvm-14-linker-tools netfilter-persistent pkg-config
+  vulkan-tools
+The following packages will be upgraded:
+  ca-certificates cpp-11 cpp-12 curl g++-11 gcc-11 gcc-11-base gcc-12
+  gcc-12-base git libasan6 libasan8 libatomic1 libc-dev-bin libc6 libc6-dev
+  libcc1-0 libcurl4 libgcc-11-dev libgcc-12-dev libgcc-s1 libgomp1 libitm1
+  liblsan0 libnss-systemd libpam-systemd libquadmath0 libssl3 libstdc++-11-dev
+  libstdc++6 libsystemd0 libtsan0 libtsan2 libubsan1 libudev1 openssh-client
+  openssh-server openssh-sftp-server systemd systemd-sysv systemd-timesyncd
+  udev
+42 upgraded, 29 newly installed, 0 to remove and 191 not upgraded.
+Need to get 178 MB of archives.
+After this operation, 345 MB of additional disk space will be used.
+Get:1 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dev amd64 2.35-0ubuntu3.13 [2101 kB]
+Get:2 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-dev-bin amd64 2.35-0ubuntu3.13 [20.3 kB]
+Get:3 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcc1-0 amd64 12.3.0-1ubuntu1~22.04.3 [48.3 kB]
+Get:4 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-12-base amd64 12.3.0-1ubuntu1~22.04.3 [216 kB]
+Get:5 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-s1 amd64 12.3.0-1ubuntu1~22.04.3 [53.9 kB]
+Get:6 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgomp1 amd64 12.3.0-1ubuntu1~22.04.3 [127 kB]
+Get:7 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libitm1 amd64 12.3.0-1ubuntu1~22.04.3 [30.2 kB]
+Get:8 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libatomic1 amd64 12.3.0-1ubuntu1~22.04.3 [10.5 kB]
+Get:9 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasan8 amd64 12.3.0-1ubuntu1~22.04.3 [2442 kB]
+Get:10 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 liblsan0 amd64 12.3.0-1ubuntu1~22.04.3 [1069 kB]
+Get:11 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtsan2 amd64 12.3.0-1ubuntu1~22.04.3 [2478 kB]
+Get:12 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libubsan1 amd64 12.3.0-1ubuntu1~22.04.3 [976 kB]
+Get:13 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libquadmath0 amd64 12.3.0-1ubuntu1~22.04.3 [154 kB]
+Get:14 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-12-dev amd64 12.3.0-1ubuntu1~22.04.3 [2618 kB]
+Get:15 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-12 amd64 12.3.0-1ubuntu1~22.04.3 [21.7 MB]
+Get:16 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 cpp-12 amd64 12.3.0-1ubuntu1~22.04.3 [10.8 MB]
+Get:17 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libstdc++6 amd64 12.3.0-1ubuntu1~22.04.3 [699 kB]
+Get:18 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6 amd64 2.35-0ubuntu3.13 [3235 kB]
+Get:19 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libnss-systemd amd64 249.11-0ubuntu3.21 [133 kB]
+Get:20 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsystemd0 amd64 249.11-0ubuntu3.21 [316 kB]
+Get:21 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd-timesyncd amd64 249.11-0ubuntu3.21 [31.2 kB]
+Get:22 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd-sysv amd64 249.11-0ubuntu3.21 [10.5 kB]
+Get:23 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpam-systemd amd64 249.11-0ubuntu3.21 [203 kB]
+Get:24 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd amd64 249.11-0ubuntu3.21 [4585 kB]
+Get:25 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 udev amd64 249.11-0ubuntu3.21 [1559 kB]
+Get:26 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libudev1 amd64 249.11-0ubuntu3.21 [75.6 kB]
+Get:27 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libssl3 amd64 3.0.2-0ubuntu1.25 [1906 kB]
+Get:28 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe amd64 netfilter-persistent all 1.0.16 [7440 B]
+Get:29 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe amd64 iptables-persistent all 1.0.16 [6488 B]
+Get:30 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 git amd64 1:2.34.1-1ubuntu1.17 [3174 kB]
+Get:31 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 openssh-sftp-server amd64 1:8.9p1-3ubuntu0.16 [38.9 kB]
+Get:32 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 openssh-server amd64 1:8.9p1-3ubuntu0.16 [436 kB]
+Get:33 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 openssh-client amd64 1:8.9p1-3ubuntu0.16 [904 kB]
+Get:34 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 ca-certificates all 20260601~22.04.1 [141 kB]
+Get:35 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libllvm14 amd64 1:14.0.0-1ubuntu1.1 [24.0 MB]
+Get:36 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-cpp14 amd64 1:14.0.0-1ubuntu1.1 [12.1 MB]
+Get:37 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasan6 amd64 11.4.0-1ubuntu1~22.04.3 [2283 kB]
+Get:38 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 g++-11 amd64 11.4.0-1ubuntu1~22.04.3 [11.4 MB]
+Get:39 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11 amd64 11.4.0-1ubuntu1~22.04.3 [20.1 MB]
+Get:40 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libstdc++-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [2101 kB]
+Get:41 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgcc-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [2517 kB]
+Get:42 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtsan0 amd64 11.4.0-1ubuntu1~22.04.3 [2260 kB]
+Get:43 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 cpp-11 amd64 11.4.0-1ubuntu1~22.04.3 [10.0 MB]
+Get:44 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 gcc-11-base amd64 11.4.0-1ubuntu1~22.04.3 [216 kB]
+Get:45 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libgc1 amd64 1:8.0.6-1.1build1 [96.8 kB]
+Get:46 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libobjc4 amd64 12.3.0-1ubuntu1~22.04.3 [48.7 kB]
+Get:47 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libobjc-11-dev amd64 11.4.0-1ubuntu1~22.04.3 [196 kB]
+Get:48 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-i386 amd64 2.35-0ubuntu3.13 [2837 kB]
+Get:49 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 lib32gcc-s1 amd64 12.3.0-1ubuntu1~22.04.3 [63.9 kB]
+Get:50 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 lib32stdc++6 amd64 12.3.0-1ubuntu1~22.04.3 [739 kB]
+Get:51 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-common-14-dev amd64 1:14.0.0-1ubuntu1.1 [5975 kB]
+Get:52 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 llvm-14-linker-tools amd64 1:14.0.0-1ubuntu1.1 [1355 kB]
+Get:53 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang1-14 amd64 1:14.0.0-1ubuntu1.1 [6792 kB]
+Get:54 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 clang-14 amd64 1:14.0.0-1ubuntu1.1 [81.2 kB]
+Get:55 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe amd64 clang amd64 1:14.0-55~exp2 [3558 B]
+Get:56 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 curl amd64 7.81.0-1ubuntu1.25 [194 kB]
+Get:57 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcurl4 amd64 7.81.0-1ubuntu1.25 [291 kB]
+Get:58 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libjsoncpp25 amd64 1.9.5-3 [80.0 kB]
+Get:59 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 librhash0 amd64 1.4.2-1ubuntu1 [125 kB]
+Get:60 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 dh-elpa-helper all 2.0.9ubuntu1 [7610 B]
+Get:61 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 emacsen-common all 3.0.4 [14.9 kB]
+Get:62 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 cmake-data all 3.22.1-1ubuntu1.22.04.2 [1913 kB]
+Get:63 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 cmake amd64 3.22.1-1ubuntu1.22.04.2 [5010 kB]
+Get:64 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libonig5 amd64 6.9.7.1-2build1 [172 kB]
+Get:65 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libjq1 amd64 1.6-2.1ubuntu3.2 [135 kB]
+Get:66 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 jq amd64 1.6-2.1ubuntu3.2 [52.5 kB]
+Get:67 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libssl-dev amd64 3.0.2-0ubuntu1.25 [2377 kB]
+Get:68 http://nova.clouds.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libudev-dev amd64 249.11-0ubuntu3.21 [20.7 kB]
+Get:69 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 libvulkan1 amd64 1.3.204.1-2 [128 kB]
+Get:70 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+Get:71 http://nova.clouds.archive.ubuntu.com/ubuntu jammy/universe amd64 vulkan-tools amd64 1.3.204.0+dfsg1-1 [241 kB]
+Preconfiguring packages ...
+Fetched 178 MB in 6s (30.6 MB/s)
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../libc6-dev_2.35-0ubuntu3.13_amd64.deb ...
+Unpacking libc6-dev:amd64 (2.35-0ubuntu3.13) over (2.35-0ubuntu3.11) ...
+Preparing to unpack .../libc-dev-bin_2.35-0ubuntu3.13_amd64.deb ...
+Unpacking libc-dev-bin (2.35-0ubuntu3.13) over (2.35-0ubuntu3.11) ...
+Preparing to unpack .../libcc1-0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libcc1-0:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../gcc-12-base_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-12-base:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Setting up gcc-12-base:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../libgcc-s1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgcc-s1:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Setting up libgcc-s1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../00-libgomp1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgomp1:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../01-libitm1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libitm1:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../02-libatomic1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libatomic1:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../03-libasan8_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libasan8:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../04-liblsan0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking liblsan0:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../05-libtsan2_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libtsan2:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../06-libubsan1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libubsan1:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../07-libquadmath0_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../08-libgcc-12-dev_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgcc-12-dev:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../09-gcc-12_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-12 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../10-cpp-12_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking cpp-12 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../11-libstdc++6_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libstdc++6:amd64 (12.3.0-1ubuntu1~22.04.3) over (12.3.0-1ubuntu1~22.04.2) ...
+Setting up libstdc++6:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../libc6_2.35-0ubuntu3.13_amd64.deb ...
+Unpacking libc6:amd64 (2.35-0ubuntu3.13) over (2.35-0ubuntu3.11) ...
+Setting up libc6:amd64 (2.35-0ubuntu3.13) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../libnss-systemd_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking libnss-systemd:amd64 (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Preparing to unpack .../libsystemd0_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking libsystemd0:amd64 (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Setting up libsystemd0:amd64 (249.11-0ubuntu3.21) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../0-systemd-timesyncd_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking systemd-timesyncd (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Preparing to unpack .../1-systemd-sysv_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking systemd-sysv (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Preparing to unpack .../2-libpam-systemd_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking libpam-systemd:amd64 (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Preparing to unpack .../3-systemd_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking systemd (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Preparing to unpack .../4-udev_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking udev (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Preparing to unpack .../5-libudev1_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking libudev1:amd64 (249.11-0ubuntu3.21) over (249.11-0ubuntu3.17) ...
+Setting up libudev1:amd64 (249.11-0ubuntu3.21) ...
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../libssl3_3.0.2-0ubuntu1.25_amd64.deb ...
+Unpacking libssl3:amd64 (3.0.2-0ubuntu1.25) over (3.0.2-0ubuntu1.20) ...
+Setting up libssl3:amd64 (3.0.2-0ubuntu1.25) ...
+Selecting previously unselected package netfilter-persistent.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 123183 files and directories currently installed.)
+Preparing to unpack .../00-netfilter-persistent_1.0.16_all.deb ...
+Unpacking netfilter-persistent (1.0.16) ...
+Selecting previously unselected package iptables-persistent.
+Preparing to unpack .../01-iptables-persistent_1.0.16_all.deb ...
+Unpacking iptables-persistent (1.0.16) ...
+Preparing to unpack .../02-git_1%3a2.34.1-1ubuntu1.17_amd64.deb ...
+Unpacking git (1:2.34.1-1ubuntu1.17) over (1:2.34.1-1ubuntu1.15) ...
+Preparing to unpack .../03-openssh-sftp-server_1%3a8.9p1-3ubuntu0.16_amd64.deb ...
+Unpacking openssh-sftp-server (1:8.9p1-3ubuntu0.16) over (1:8.9p1-3ubuntu0.13) ...
+Preparing to unpack .../04-openssh-server_1%3a8.9p1-3ubuntu0.16_amd64.deb ...
+Unpacking openssh-server (1:8.9p1-3ubuntu0.16) over (1:8.9p1-3ubuntu0.13) ...
+Preparing to unpack .../05-openssh-client_1%3a8.9p1-3ubuntu0.16_amd64.deb ...
+Unpacking openssh-client (1:8.9p1-3ubuntu0.16) over (1:8.9p1-3ubuntu0.13) ...
+Preparing to unpack .../06-ca-certificates_20260601~22.04.1_all.deb ...
+Unpacking ca-certificates (20260601~22.04.1) over (20240203~22.04.1) ...
+Selecting previously unselected package libllvm14:amd64.
+Preparing to unpack .../07-libllvm14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+Unpacking libllvm14:amd64 (1:14.0.0-1ubuntu1.1) ...
+Selecting previously unselected package libclang-cpp14.
+Preparing to unpack .../08-libclang-cpp14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+Unpacking libclang-cpp14 (1:14.0.0-1ubuntu1.1) ...
+Preparing to unpack .../09-libasan6_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libasan6:amd64 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../10-g++-11_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking g++-11 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../11-gcc-11_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-11 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../12-libstdc++-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../13-libgcc-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../14-libtsan0_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libtsan0:amd64 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../15-cpp-11_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking cpp-11 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Preparing to unpack .../16-gcc-11-base_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.3) over (11.4.0-1ubuntu1~22.04.2) ...
+Selecting previously unselected package libgc1:amd64.
+Preparing to unpack .../17-libgc1_1%3a8.0.6-1.1build1_amd64.deb ...
+Unpacking libgc1:amd64 (1:8.0.6-1.1build1) ...
+Selecting previously unselected package libobjc4:amd64.
+Preparing to unpack .../18-libobjc4_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libobjc4:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libobjc-11-dev:amd64.
+Preparing to unpack .../19-libobjc-11-dev_11.4.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking libobjc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libc6-i386.
+Preparing to unpack .../20-libc6-i386_2.35-0ubuntu3.13_amd64.deb ...
+Unpacking libc6-i386 (2.35-0ubuntu3.13) ...
+Selecting previously unselected package lib32gcc-s1.
+Preparing to unpack .../21-lib32gcc-s1_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking lib32gcc-s1 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package lib32stdc++6.
+Preparing to unpack .../22-lib32stdc++6_12.3.0-1ubuntu1~22.04.3_amd64.deb ...
+Unpacking lib32stdc++6 (12.3.0-1ubuntu1~22.04.3) ...
+Selecting previously unselected package libclang-common-14-dev.
+Preparing to unpack .../23-libclang-common-14-dev_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+Unpacking libclang-common-14-dev (1:14.0.0-1ubuntu1.1) ...
+Selecting previously unselected package llvm-14-linker-tools.
+Preparing to unpack .../24-llvm-14-linker-tools_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+Unpacking llvm-14-linker-tools (1:14.0.0-1ubuntu1.1) ...
+Selecting previously unselected package libclang1-14.
+Preparing to unpack .../25-libclang1-14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+Unpacking libclang1-14 (1:14.0.0-1ubuntu1.1) ...
+Selecting previously unselected package clang-14.
+Preparing to unpack .../26-clang-14_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+Unpacking clang-14 (1:14.0.0-1ubuntu1.1) ...
+Selecting previously unselected package clang.
+Preparing to unpack .../27-clang_1%3a14.0-55~exp2_amd64.deb ...
+Unpacking clang (1:14.0-55~exp2) ...
+Preparing to unpack .../28-curl_7.81.0-1ubuntu1.25_amd64.deb ...
+Unpacking curl (7.81.0-1ubuntu1.25) over (7.81.0-1ubuntu1.21) ...
+Preparing to unpack .../29-libcurl4_7.81.0-1ubuntu1.25_amd64.deb ...
+Unpacking libcurl4:amd64 (7.81.0-1ubuntu1.25) over (7.81.0-1ubuntu1.21) ...
+Selecting previously unselected package libjsoncpp25:amd64.
+Preparing to unpack .../30-libjsoncpp25_1.9.5-3_amd64.deb ...
+Unpacking libjsoncpp25:amd64 (1.9.5-3) ...
+Selecting previously unselected package librhash0:amd64.
+Preparing to unpack .../31-librhash0_1.4.2-1ubuntu1_amd64.deb ...
+Unpacking librhash0:amd64 (1.4.2-1ubuntu1) ...
+Selecting previously unselected package dh-elpa-helper.
+Preparing to unpack .../32-dh-elpa-helper_2.0.9ubuntu1_all.deb ...
+Unpacking dh-elpa-helper (2.0.9ubuntu1) ...
+Selecting previously unselected package emacsen-common.
+Preparing to unpack .../33-emacsen-common_3.0.4_all.deb ...
+Unpacking emacsen-common (3.0.4) ...
+Selecting previously unselected package cmake-data.
+Preparing to unpack .../34-cmake-data_3.22.1-1ubuntu1.22.04.2_all.deb ...
+Unpacking cmake-data (3.22.1-1ubuntu1.22.04.2) ...
+Selecting previously unselected package cmake.
+Preparing to unpack .../35-cmake_3.22.1-1ubuntu1.22.04.2_amd64.deb ...
+Unpacking cmake (3.22.1-1ubuntu1.22.04.2) ...
+Selecting previously unselected package libonig5:amd64.
+Preparing to unpack .../36-libonig5_6.9.7.1-2build1_amd64.deb ...
+Unpacking libonig5:amd64 (6.9.7.1-2build1) ...
+Selecting previously unselected package libjq1:amd64.
+Preparing to unpack .../37-libjq1_1.6-2.1ubuntu3.2_amd64.deb ...
+Unpacking libjq1:amd64 (1.6-2.1ubuntu3.2) ...
+Selecting previously unselected package jq.
+Preparing to unpack .../38-jq_1.6-2.1ubuntu3.2_amd64.deb ...
+Unpacking jq (1.6-2.1ubuntu3.2) ...
+Selecting previously unselected package libssl-dev:amd64.
+Preparing to unpack .../39-libssl-dev_3.0.2-0ubuntu1.25_amd64.deb ...
+Unpacking libssl-dev:amd64 (3.0.2-0ubuntu1.25) ...
+Selecting previously unselected package libudev-dev:amd64.
+Preparing to unpack .../40-libudev-dev_249.11-0ubuntu3.21_amd64.deb ...
+Unpacking libudev-dev:amd64 (249.11-0ubuntu3.21) ...
+Selecting previously unselected package libvulkan1:amd64.
+Preparing to unpack .../41-libvulkan1_1.3.204.1-2_amd64.deb ...
+Unpacking libvulkan1:amd64 (1.3.204.1-2) ...
+Selecting previously unselected package pkg-config.
+Preparing to unpack .../42-pkg-config_0.29.2-1ubuntu3_amd64.deb ...
+Unpacking pkg-config (0.29.2-1ubuntu3) ...
+Selecting previously unselected package vulkan-tools.
+Preparing to unpack .../43-vulkan-tools_1.3.204.0+dfsg1-1_amd64.deb ...
+Unpacking vulkan-tools (1.3.204.0+dfsg1-1) ...
+Setting up gcc-11-base:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up cpp-12 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up openssh-client (1:8.9p1-3ubuntu0.16) ...
+Setting up systemd (249.11-0ubuntu3.21) ...
+Setting up libgomp1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libasan6:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up ca-certificates (20260601~22.04.1) ...
+Updating certificates in /etc/ssl/certs...
+rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+14 added, 39 removed; done.
+Setting up emacsen-common (3.0.4) ...
+Setting up dh-elpa-helper (2.0.9ubuntu1) ...
+Setting up libquadmath0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libssl-dev:amd64 (3.0.2-0ubuntu1.25) ...
+Setting up systemd-timesyncd (249.11-0ubuntu3.21) ...
+Setting up libatomic1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up udev (249.11-0ubuntu3.21) ...
+Setting up libjsoncpp25:amd64 (1.9.5-3) ...
+Setting up pkg-config (0.29.2-1ubuntu3) ...
+Setting up libudev-dev:amd64 (249.11-0ubuntu3.21) ...
+Setting up git (1:2.34.1-1ubuntu1.17) ...
+Setting up libgc1:amd64 (1:8.0.6-1.1build1) ...
+Setting up libvulkan1:amd64 (1.3.204.1-2) ...
+Setting up libubsan1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libllvm14:amd64 (1:14.0.0-1ubuntu1.1) ...
+Setting up netfilter-persistent (1.0.16) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/netfilter-persistent.service → /lib/systemd/system/netfilter-persistent.service.
+Setting up librhash0:amd64 (1.4.2-1ubuntu1) ...
+Setting up libasan8:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libc6-i386 (2.35-0ubuntu3.13) ...
+Setting up libcurl4:amd64 (7.81.0-1ubuntu1.25) ...
+Setting up cmake-data (3.22.1-1ubuntu1.22.04.2) ...
+Setting up curl (7.81.0-1ubuntu1.25) ...
+Setting up libtsan2:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libc-dev-bin (2.35-0ubuntu3.13) ...
+Setting up llvm-14-linker-tools (1:14.0.0-1ubuntu1.1) ...
+Setting up libcc1-0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libonig5:amd64 (6.9.7.1-2build1) ...
+Setting up liblsan0:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libitm1:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libtsan0:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up cpp-11 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up openssh-sftp-server (1:8.9p1-3ubuntu0.16) ...
+Setting up systemd-sysv (249.11-0ubuntu3.21) ...
+Setting up openssh-server (1:8.9p1-3ubuntu0.16) ...
+rescue-ssh.target is a disabled or a static unit not running, not starting it.
+ssh.socket is a disabled or a static unit not running, not starting it.
+Setting up libjq1:amd64 (1.6-2.1ubuntu3.2) ...
+Setting up libclang1-14 (1:14.0.0-1ubuntu1.1) ...
+Setting up libnss-systemd:amd64 (249.11-0ubuntu3.21) ...
+Setting up libobjc4:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up vulkan-tools (1.3.204.0+dfsg1-1) ...
+Setting up iptables-persistent (1.0.16) ...
+update-alternatives: using /lib/systemd/system/netfilter-persistent.service to provide /lib/systemd/system/iptables.service (iptables.service) in auto mode
+Setting up lib32gcc-s1 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up lib32stdc++6 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libgcc-12-dev:amd64 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libclang-common-14-dev (1:14.0.0-1ubuntu1.1) ...
+Setting up libclang-cpp14 (1:14.0.0-1ubuntu1.1) ...
+Setting up libgcc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up gcc-11 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up jq (1.6-2.1ubuntu3.2) ...
+Setting up libpam-systemd:amd64 (249.11-0ubuntu3.21) ...
+Setting up cmake (3.22.1-1ubuntu1.22.04.2) ...
+Setting up libc6-dev:amd64 (2.35-0ubuntu3.13) ...
+Setting up libobjc-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up gcc-12 (12.3.0-1ubuntu1~22.04.3) ...
+Setting up libstdc++-11-dev:amd64 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up clang-14 (1:14.0.0-1ubuntu1.1) ...
+Setting up g++-11 (11.4.0-1ubuntu1~22.04.3) ...
+Setting up clang (1:14.0-55~exp2) ...
+Processing triggers for initramfs-tools (0.140ubuntu13.5) ...
+update-initramfs: Generating /boot/initrd.img-6.8.0-90-generic
+Processing triggers for libc-bin (2.35-0ubuntu3.11) ...
+Processing triggers for ufw (0.36.1-4ubuntu0.1) ...
+Processing triggers for man-db (2.10.2-1) ...
+Processing triggers for dbus (1.12.20-2ubuntu4.1) ...
+Processing triggers for ca-certificates (20260601~22.04.1) ...
+Updating certificates in /etc/ssl/certs...
+0 added, 0 removed; done.
+Running hooks in /etc/ca-certificates/update.d...
+
+done.
+done.
+
+Running kernel seems to be up-to-date.
+
+Services to be restarted:
+ systemctl restart cloud-final.service
+ systemctl restart cron.service
+ systemctl restart irqbalance.service
+ systemctl restart multipathd.service
+ systemctl restart nvidia-persistenced.service
+ systemctl restart packagekit.service
+ systemctl restart polkit.service
+ systemctl restart qemu-guest-agent.service
+ systemctl restart rsyslog.service
+ systemctl restart serial-getty@ttyS0.service
+ systemctl restart snapd.service
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart getty@tty1.service
+ systemctl restart networkd-dispatcher.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+run-parts: executing /usr/share/netfilter-persistent/plugins.d/15-ip4tables save
+run-parts: executing /usr/share/netfilter-persistent/plugins.d/25-ip6tables save
+Sat Jul 18 03:56:16 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.195.03             Driver Version: 570.195.03     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H100 PCIe               On  |   00000000:00:07.0 Off |                    0 |
+| N/A   32C    P0             47W /  350W |       0MiB /  81559MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+'DISPLAY' environment variable not set... skipping surface info
+==========
+VULKANINFO
+==========
+
+Vulkan Instance Version: 1.3.204
+
+
+Instance Extensions: count = 20
+-------------------------------
+VK_EXT_acquire_drm_display             : extension revision 1
+VK_EXT_acquire_xlib_display            : extension revision 1
+VK_EXT_debug_report                    : extension revision 10
+VK_EXT_debug_utils                     : extension revision 2
+VK_EXT_direct_mode_display             : extension revision 1
+VK_EXT_display_surface_counter         : extension revision 1
+VK_EXT_swapchain_colorspace            : extension revision 5
+VK_KHR_device_group_creation           : extension revision 1
+VK_KHR_display                         : extension revision 23
+VK_KHR_external_fence_capabilities     : extension revision 1
+VK_KHR_external_memory_capabilities    : extension revision 1
+VK_KHR_external_semaphore_capabilities : extension revision 1
+VK_KHR_get_display_properties2         : extension revision 1
+VK_KHR_get_physical_device_properties2 : extension revision 2
+VK_KHR_get_surface_capabilities2       : extension revision 1
+VK_KHR_surface                         : extension revision 25
+VK_KHR_surface_protected_capabilities  : extension revision 1
+VK_KHR_wayland_surface                 : extension revision 6
+VK_KHR_xcb_surface                     : extension revision 6
+VK_KHR_xlib_surface                    : extension revision 6
+
+Instance Layers: count = 1
+--------------------------
+VK_LAYER_NV_optimus NVIDIA Optimus layer 1.4.303  version 1
+
+Devices:
+========
+GPU0:
+	apiVersion         = 4210991 (1.4.303)
+	driverVersion      = 2393948352 (0x8eb0c0c0)
+	vendorID           = 0x10de
+	deviceID           = 0x2331
+	deviceType         = PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+	deviceName         = NVIDIA H100 PCIe
+	driverID           = DRIVER_ID_NVIDIA_PROPRIETARY
+	driverName         = NVIDIA
+	driverInfo         = 570.195.03
+	conformanceVersion = 1.4.1.0
+	deviceUUID         = e17ca65b-c3b3-ab74-e80c-6c784b6f31b1
+	driverUUID         = 217781f3-b73f-5a02-b2ac-f0f48f6c367a
+info: downloading installer
+warn: It looks like you have an existing rustup settings file at:
+warn: /home/ubuntu/.rustup/settings.toml
+warn: Rustup will install the default toolchain as specified in the settings file,
+warn: instead of the one inferred from the default host triple.
+info: profile set to minimal
+info: default host triple is x86_64-unknown-linux-gnu
+info: syncing channel updates for stable-x86_64-unknown-linux-gnu
+info: latest update on 2026-07-16 for version 1.97.1 (8bab26f4f 2026-07-14)
+info: downloading 3 components
+info: default toolchain set to stable-x86_64-unknown-linux-gnu
+
+  stable-x86_64-unknown-linux-gnu installed - rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+
+Rust is installed now. Great!
+
+To get started you may need to restart your current shell.
+This would reload your PATH environment variable to include
+Cargo's bin directory ($HOME/.cargo/bin).
+
+To configure your current shell, you need to source
+the corresponding env file under $HOME/.cargo.
+
+This is usually done by running one of the following (note the leading DOT):
+. "$HOME/.cargo/env"            # For sh/bash/zsh/ash/dash/pdksh
+source "$HOME/.cargo/env.fish"  # For fish
+source "~/.cargo/env.nu"  # For nushell
+source "$HOME/.cargo/env.tcsh"  # For tcsh
+. "$HOME/.cargo/env.ps1"        # For pwsh
+source "$HOME/.cargo/env.xsh"   # For xonsh
+Cloning into '/home/ubuntu/sembla'...
+HEAD is now at d6c545f Fix H100 CUDA benchmark compatibility
+info: syncing channel updates for 1.77.2-x86_64-unknown-linux-gnu
+info: latest update on 2024-04-09 for version 1.77.2 (25ef9e3d8 2024-04-09)
+info: downloading 5 components
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded parking_lot v0.12.5
+  Downloaded serde_core v1.0.228
+  Downloaded pollster v0.3.0
+  Downloaded lock_api v0.4.14
+  Downloaded serde_json v1.0.150
+  Downloaded unicode-xid v0.2.6
+  Downloaded zmij v1.0.23
+  Downloaded wgpu-types v0.20.0
+  Downloaded wgpu-core v0.21.1
+  Downloaded unicode-width v0.1.14
+  Downloaded syn v2.0.119
+  Downloaded naga v0.20.0
+  Downloaded libc v0.2.186
+  Downloaded wgpu v0.20.1
+  Downloaded hashbrown v0.15.5
+  Downloaded hashbrown v0.14.5
+  Downloaded glow v0.13.1
+  Downloaded ash v0.37.3+1.3.251
+  Downloaded unicode-ident v1.0.24
+  Downloaded smallvec v1.15.2
+  Downloaded serde_derive v1.0.228
+  Downloaded serde v1.0.228
+  Downloaded proc-macro2 v1.0.106
+  Downloaded once_cell v1.21.4
+  Downloaded num-traits v0.2.19
+  Downloaded memchr v2.8.3
+  Downloaded log v0.4.33
+  Downloaded litrs v1.0.0
+  Downloaded indexmap v2.2.6
+  Downloaded codespan-reporting v0.11.1
+  Downloaded bytemuck v1.25.1
+  Downloaded arrayvec v0.7.8
+  Downloaded thiserror-impl v1.0.69
+  Downloaded thiserror v1.0.69
+  Downloaded termcolor v1.4.1
+  Downloaded static_assertions v1.1.0
+  Downloaded spirv v0.3.0+sdk-1.3.268.0
+  Downloaded profiling v1.0.18
+  Downloaded parking_lot_core v0.9.12
+  Downloaded libloading v0.8.9
+  Downloaded khronos-egl v6.0.0
+  Downloaded gpu-descriptor-types v0.2.0
+  Downloaded cfg_aliases v0.1.1
+  Downloaded bytemuck_derive v1.11.0
+  Downloaded bit-vec v0.6.3
+  Downloaded autocfg v1.5.1
+  Downloaded scopeguard v1.2.0
+  Downloaded rustc-hash v1.1.0
+  Downloaded renderdoc-sys v1.1.0
+  Downloaded itoa v1.0.18
+  Downloaded gpu-descriptor v0.3.2
+  Downloaded gpu-alloc-types v0.3.1
+  Downloaded foldhash v0.1.5
+  Downloaded quote v1.0.46
+  Downloaded libloading v0.7.4
+  Downloaded document-features v0.2.12
+  Downloaded cfg-if v1.0.4
+  Downloaded hexf-parse v0.2.1
+  Downloaded gpu-alloc v0.6.2
+  Downloaded equivalent v1.0.2
+  Downloaded bitflags v2.13.0
+  Downloaded bit-set v0.5.3
+  Downloaded raw-window-handle v0.6.2
+  Downloaded pkg-config v0.3.33
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.46
+   Compiling bitflags v2.13.0
+   Compiling cfg-if v1.0.4
+   Compiling cfg_aliases v0.1.1
+   Compiling libc v0.2.186
+   Compiling autocfg v1.5.1
+   Compiling thiserror v1.0.69
+   Compiling parking_lot_core v0.9.12
+   Compiling ash v0.37.3+1.3.251
+   Compiling foldhash v0.1.5
+   Compiling smallvec v1.15.2
+   Compiling khronos-egl v6.0.0
+   Compiling hashbrown v0.14.5
+   Compiling termcolor v1.4.1
+   Compiling unicode-width v0.1.14
+   Compiling bit-vec v0.6.3
+   Compiling equivalent v1.0.2
+   Compiling scopeguard v1.2.0
+   Compiling arrayvec v0.7.8
+   Compiling unicode-xid v0.2.6
+   Compiling hexf-parse v0.2.1
+   Compiling log v0.4.33
+   Compiling rustc-hash v1.1.0
+   Compiling serde_core v1.0.228
+   Compiling litrs v1.0.0
+   Compiling glow v0.13.1
+   Compiling libloading v0.8.9
+   Compiling wgpu-hal v0.21.1 (/home/ubuntu/sembla/spikes/precision/vendor/wgpu-hal)
+   Compiling libloading v0.7.4
+   Compiling gpu-alloc-types v0.3.1
+   Compiling lock_api v0.4.14
+   Compiling spirv v0.3.0+sdk-1.3.268.0
+   Compiling gpu-descriptor-types v0.2.0
+   Compiling hashbrown v0.15.5
+   Compiling wgpu-types v0.20.0
+   Compiling bit-set v0.5.3
+   Compiling wgpu-core v0.21.1
+   Compiling codespan-reporting v0.11.1
+   Compiling once_cell v1.21.4
+   Compiling gpu-alloc v0.6.2
+   Compiling renderdoc-sys v1.1.0
+   Compiling raw-window-handle v0.6.2
+   Compiling zmij v1.0.23
+   Compiling profiling v1.0.18
+   Compiling wgpu v0.20.1
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling sembla-precision-spike v0.0.0 (/home/ubuntu/sembla/spikes/precision)
+   Compiling static_assertions v1.1.0
+   Compiling pollster v0.3.0
+   Compiling num-traits v0.2.19
+   Compiling document-features v0.2.12
+   Compiling indexmap v2.2.6
+   Compiling gpu-descriptor v0.3.2
+   Compiling syn v2.0.119
+   Compiling parking_lot v0.12.5
+   Compiling thiserror-impl v1.0.69
+   Compiling serde_derive v1.0.228
+   Compiling bytemuck_derive v1.11.0
+   Compiling naga v0.20.0
+   Compiling bytemuck v1.25.1
+    Finished release [optimized] target(s) in 22.22s
+Sembla precision bootstrap ready; benchmark not started automatically.

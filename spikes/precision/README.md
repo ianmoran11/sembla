@@ -5,6 +5,21 @@ Standalone throwaway crate for choosing the v0.2 GPU precision strategy. PRD
 CPU `f64` oracle. PRD 0002 adds portable WGSL `f32` and double-single GPU paths;
 PRD 0003 adds capability-gated native WGSL/Vulkan and optional CUDA `f64` paths.
 
+## Final decision
+
+[ADR 0001](../../docs/decisions/0001-gpu-precision.md) selects **Strategy A:
+native `f64` through CUDA** for v0.2. Three verified same-machine runs on one
+full-rate NVIDIA H100 PCIe produced a median `0.724384010` ms/tick at the full
+26M-row workload (about 35.893 billion rows/sec), with zero reduction error,
+winner/fired mismatches, or unexplained fixed-tree mirror differences. The
+complete raw evidence and derivation are tracked in
+[`evidence/hyperstack-h100-20260718/`](evidence/hyperstack-h100-20260718/README.md).
+
+Double-single remains useful Metal evidence but failed the NVIDIA/Vulkan guard;
+wgpu native `f64` was unavailable on the observed H100 compiler stack. The CPU
+`f64` oracle remains authoritative, and silent fallback from CUDA native `f64`
+is prohibited.
+
 ## Workspace isolation
 
 The empty `[workspace]` table in this crate's `Cargo.toml` makes

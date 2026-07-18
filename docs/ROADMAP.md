@@ -45,7 +45,7 @@ roadmap must retire first, and it shapes v0.2.
 
 | Version | Theme | Retires / unlocks | Headline decision |
 |---|---|---|---|
-| **v0.2** | Real GPU backend | Throughput thesis, for real | [Precision measured; pending full-rate gate](decisions/0001-gpu-precision.md) |
+| **v0.2** | Real GPU backend | Throughput thesis confirmed on H100 | [CUDA native `f64` selected](decisions/0001-gpu-precision.md) |
 | **v0.3** | Expressiveness I: dynamic populations | Birth/death, general composition, ODE + Kurtz | How far to push the wiring-diagram language |
 | **v0.4** | Inference & behavior widgets | Calibration; interactive slider→simulate→plot | Black-box (ABC/SBI) vs. gradient-based |
 | **v0.5** | Policy-domain realism | Courts/queueing; synthetic population | Where population initialization lives |
@@ -73,42 +73,38 @@ pay rent.
   contract. State hashes must match only when the declared level promises
   bitwise equality; tolerance-based paths compare values, winner/fired flags,
   and contract diagnostics instead.
-- Precision and determinism follow the full-rate gate in
-  [ADR 0001](decisions/0001-gpu-precision.md): Level A is the target for a
-  qualifying native-`f64` or strict double-single path; Level C is permitted only
-  with an explicit reduced-precision contract.
+- Precision and determinism follow [ADR 0001](decisions/0001-gpu-precision.md):
+  CUDA native `f64` on verified full-rate NVIDIA hardware is selected, with
+  fixed-order kernels targeting Level A on the same pinned binary and GPU model.
+  Level B remains unproven.
 - Backend-selection plumbing in the CLI and per-box scheduler dispatch.
 
-**⚠ Decision point — GPU precision strategy: measured, pending full-rate
-confirmation.** [ADR 0001](decisions/0001-gpu-precision.md) records the evidence
-and binding decision rule. On Apple M2 Pro, double-single retained 77.2% of
-`f32` throughput, reduced max relative error from `1.714669e-7` to
-`1.096998e-14`, and had zero observed winner mismatches. Native wgpu `f64` was
-unsupported and CUDA was not run; no NVIDIA fp64 class or native timing was
-measured.
+**✓ Decision complete — CUDA native `f64`.**
+[ADR 0001](decisions/0001-gpu-precision.md) and the
+[tracked H100 evidence](../spikes/precision/evidence/hyperstack-h100-20260718/README.md)
+record three verified runs at 26M rows on one full-rate NVIDIA H100 PCIe. CUDA
+native `f64` passed every guard with zero reduction error, winner/fired
+mismatches, and unexplained mirror differences. Its median was `0.724384010`
+ms/tick (35.893 billion rows/sec), retaining 112.915% of same-machine `f32`
+throughput.
 
-Before precision-dependent backend work, run the complete matrix and the ADR's
-supplemental guard diagnostics three times on one verified PRD-0004 `full_rate`
-NVIDIA instance. The gate uses each preserved file's NVIDIA-local embedded rows,
-not the rendered cross-machine matrix; distinct result paths are required because
-a rerun replaces the fixed NVIDIA entry.
-
-Select qualifying native `f64` when double-single does not qualify, or when both
-qualify and the named native production path is at least 20% faster. Otherwise
-select qualifying double-single. Tiered precision is available only when neither
-precise candidate qualifies and an explicit reduced contract passes. Until then
-the CPU `f64` oracle and the existing numeric contract remain authoritative, and
+Double-single did not qualify on NVIDIA/Vulkan: its guard and strict-arithmetic
+requirements failed, and its full row had one fired mismatch. Native `f64` via
+wgpu was unavailable after an observed NVIDIA NVVM compiler failure, so CUDA is
+the named production backend. The CPU `f64` oracle remains authoritative;
+fixed-order CUDA targets Level A for the same pinned binary/GPU model, while
 Level B remains unproven.
 
 **Exit criteria.**
 1. Every checked-in example runs GPU + CPU and passes the selected equality or
    tolerance contract; state hashes match for levels that promise bitwise
    equality.
-2. The full-rate gate in [ADR 0001](decisions/0001-gpu-precision.md) is run at
-   26M rows, and the selected `f64`-compliant or explicitly contract-defined
-   path has measured ticks/sec on its qualifying hardware.
-3. ADR 0001 is updated from pending to the selected strategy and DESIGN.md §5.2
-   states that strategy, tolerance, and determinism consequence.
+2. The completed full-rate gate in
+   [ADR 0001](decisions/0001-gpu-precision.md) remains reproducible from its
+   tracked three-run evidence: CUDA native `f64` measured about 1,380.5 ticks/sec
+   at 26M rows on the qualifying H100.
+3. ADR 0001 and DESIGN.md §5.2 continue to state CUDA native `f64`, the unchanged
+   `f64` contract, full-rate hardware restriction, and Level A consequence.
 
 ---
 

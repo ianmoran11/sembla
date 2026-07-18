@@ -1,0 +1,13 @@
+SEMBLA_RUN_START run_id=b902e6a3318f221a138e8f88df0aa9e4-run-1 started_at=2026-07-18T04:17:27Z repository_commit=d6c545f63a89135d01addeea42b9fbe44fac897a
+   Compiling sembla-precision-spike v0.0.0 (/home/ubuntu/sembla/spikes/precision)
+    Finished release [optimized] target(s) in 3.87s
+     Running `target/release/sembla-precision-spike`
+Running one-tick accuracy regression guard for every strategy...
+accuracy guard [double-single]: failed: double-single winner mismatch rate 0.00002 does not satisfy the f32 baseline 0.00002
+accuracy guard [f32]: passed
+accuracy guard [native f64 (CUDA)]: passed
+accuracy guard [native f64 (wgpu)]: unavailable: native_f64: unsupported; adapter=NVIDIA H100 PCIe; backend=Vulkan; reason=wgpu 0.20 native f64 is disabled on NVIDIA H100 PCIe after an observed NVVM compiler failure; use the CUDA native-f64 path; device=NVIDIA H100 PCIe; fp64:fp32=1:2; class=full-rate; evidence=documented NVIDIA datacenter-compute model lookup; full-rate-extrapolation=allowed
+Accuracy guard evidence recorded; running 10 warmup + 100 measured ticks per available strategy...
+Wrote /home/ubuntu/RESULTS.run-1.md
+SEMBLA_RUN_COMPLETE run_id=b902e6a3318f221a138e8f88df0aa9e4-run-1 result_sha256=68e0acd5a9aeb4c624693f3e81319f4e7a502331d27c5bc758b5a9d0439b7e69 repository_commit=d6c545f63a89135d01addeea42b9fbe44fac897a
+Wrote /home/ubuntu/RESULTS.run-1.md

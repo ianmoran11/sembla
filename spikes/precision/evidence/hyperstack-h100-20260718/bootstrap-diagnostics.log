@@ -1,0 +1,76 @@
+captured_at=2026-07-18T03:56:54Z
+entropy_available=256
+
+=== cloud-init status ===
+status: running
+extended_status: running
+boot_status_code: enabled-by-generator
+last_update: Thu, 01 Jan 1970 00:00:24 +0000
+detail: DataSourceOpenStackLocal [net,ver=2]
+errors: []
+recoverable_errors: {}
+
+=== ssh service ===
+● ssh.service - OpenBSD Secure Shell server
+     Loaded: loaded (/lib/systemd/system/ssh.service; enabled; vendor preset: enabled)
+     Active: active (running) since Sat 2026-07-18 03:56:15 UTC; 38s ago
+       Docs: man:sshd(8)
+             man:sshd_config(5)
+    Process: 20041 ExecStartPre=/usr/sbin/sshd -t (code=exited, status=0/SUCCESS)
+   Main PID: 20042 (sshd)
+      Tasks: 1 (limit: 217335)
+     Memory: 1.8M
+        CPU: 31ms
+     CGroup: /system.slice/ssh.service
+             └─20042 "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups"
+
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: Starting OpenBSD Secure Shell server...
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[20042]: Server listening on 0.0.0.0 port 22.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[20042]: Server listening on :: port 22.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: Started OpenBSD Secure Shell server.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[20050]: Connection closed by 127.0.0.1 port 49166 [preauth]
+
+=== ssh journal ===
+Jul 18 03:54:51 sembla-precision-df8a1739a313 systemd[1]: Starting OpenBSD Secure Shell server...
+Jul 18 03:54:51 sembla-precision-df8a1739a313 sshd[1188]: Server listening on 0.0.0.0 port 22.
+Jul 18 03:54:51 sembla-precision-df8a1739a313 sshd[1188]: Server listening on :: port 22.
+Jul 18 03:54:51 sembla-precision-df8a1739a313 systemd[1]: Started OpenBSD Secure Shell server.
+Jul 18 03:54:52 sembla-precision-df8a1739a313 systemd[1]: Stopping OpenBSD Secure Shell server...
+Jul 18 03:54:52 sembla-precision-df8a1739a313 sshd[1188]: Received signal 15; terminating.
+Jul 18 03:54:52 sembla-precision-df8a1739a313 systemd[1]: ssh.service: Deactivated successfully.
+Jul 18 03:54:52 sembla-precision-df8a1739a313 systemd[1]: Stopped OpenBSD Secure Shell server.
+Jul 18 03:54:52 sembla-precision-df8a1739a313 systemd[1]: Starting OpenBSD Secure Shell server...
+Jul 18 03:54:52 sembla-precision-df8a1739a313 sshd[1255]: Server listening on 0.0.0.0 port 22.
+Jul 18 03:54:52 sembla-precision-df8a1739a313 sshd[1255]: Server listening on :: port 22.
+Jul 18 03:54:52 sembla-precision-df8a1739a313 systemd[1]: Started OpenBSD Secure Shell server.
+Jul 18 03:55:53 sembla-precision-df8a1739a313 systemd[1]: Stopping OpenBSD Secure Shell server...
+Jul 18 03:55:53 sembla-precision-df8a1739a313 sshd[1255]: Received signal 15; terminating.
+Jul 18 03:55:53 sembla-precision-df8a1739a313 systemd[1]: ssh.service: Deactivated successfully.
+Jul 18 03:55:53 sembla-precision-df8a1739a313 systemd[1]: Stopped OpenBSD Secure Shell server.
+Jul 18 03:55:53 sembla-precision-df8a1739a313 systemd[1]: Starting OpenBSD Secure Shell server...
+Jul 18 03:55:53 sembla-precision-df8a1739a313 sshd[8263]: Server listening on 0.0.0.0 port 22.
+Jul 18 03:55:53 sembla-precision-df8a1739a313 sshd[8263]: Server listening on :: port 22.
+Jul 18 03:55:53 sembla-precision-df8a1739a313 systemd[1]: Started OpenBSD Secure Shell server.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: Stopping OpenBSD Secure Shell server...
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[8263]: Received signal 15; terminating.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: ssh.service: Deactivated successfully.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: Stopped OpenBSD Secure Shell server.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: Starting OpenBSD Secure Shell server...
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[20042]: Server listening on 0.0.0.0 port 22.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[20042]: Server listening on :: port 22.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 systemd[1]: Started OpenBSD Secure Shell server.
+Jul 18 03:56:15 sembla-precision-df8a1739a313 sshd[20050]: Connection closed by 127.0.0.1 port 49166 [preauth]
+
+=== ssh effective configuration ===
+logingracetime 30
+permitrootlogin without-password
+gssapiauthentication no
+passwordauthentication no
+kbdinteractiveauthentication no
+maxstartups 10:30:100
+persourcemaxstartups none
+
+=== port 22 listeners ===
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                         
+LISTEN 0      128          0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=20042,fd=3))
+LISTEN 0      128             [::]:22           [::]:*    users:(("sshd",pid=20042,fd=4))
