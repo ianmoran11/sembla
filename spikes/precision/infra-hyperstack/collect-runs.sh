@@ -105,6 +105,7 @@ SSH_OPTIONS=(
   -i "$SSH_PRIVATE_KEY_PATH"
   -o BatchMode=yes
   -o IdentitiesOnly=yes
+  -o IPQoS=none
   -o ConnectTimeout=10
   -o ConnectionAttempts=1
   -o ServerAliveInterval=5

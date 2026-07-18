@@ -170,7 +170,7 @@ sudo -u ${ssh_user} bash -lc 'curl --proto "=https" --tlsv1.2 -sSf https://sh.ru
 rm -rf "$SPIKE_DIR"
 sudo -u ${ssh_user} git clone "$REPOSITORY_URL" "$SPIKE_DIR"
 sudo -u ${ssh_user} git -C "$SPIKE_DIR" checkout --detach "$REPOSITORY_REF"
-ACTUAL_REF="$(git -C "$SPIKE_DIR" rev-parse HEAD)"
+ACTUAL_REF="$(sudo -u ${ssh_user} git -C "$SPIKE_DIR" rev-parse HEAD)"
 test "$ACTUAL_REF" = "$REPOSITORY_REF"
 
 printf '%s' '${remote_run_spike_b64}' | base64 -d > /home/${ssh_user}/run-spike.sh

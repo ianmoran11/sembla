@@ -213,7 +213,7 @@ mod ffi {
 
     use super::*;
 
-    unsafe extern "C" {
+    extern "C" {
         fn sembla_cuda_f64_probe(
             name: *mut c_char,
             name_capacity: u32,

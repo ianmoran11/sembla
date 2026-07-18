@@ -3,6 +3,7 @@
 // --use_fast_math is permitted; build.rs also disables FMA contraction.
 
 #include <cuda_runtime.h>
+#include <math_constants.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>

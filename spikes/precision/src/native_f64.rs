@@ -22,6 +22,7 @@ const PARTIALS_PER_GROUP: u32 = 2;
 const REDUCE_WORKGROUP_SIZE: u32 = 64;
 const MAP_WORKGROUP_SIZE: u32 = 256;
 const SHADER_SOURCE: &str = include_str!("wgsl/f64_native.wgsl");
+const NVIDIA_PCI_VENDOR_ID: u32 = 0x10de;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NativeF64Device {
@@ -409,13 +410,19 @@ impl NativeF64Runner {
             map: create_pipeline(&device, &module, "native f64 map", "map_f64"),
             argmin: create_pipeline(&device, &module, "native f64 argmin", "argmin_f64"),
         };
+        if let Some(error) = device.pop_error_scope().await {
+            return Err(NativeF64Error::new(format!(
+                "native f64 shader/pipeline validation failed: {error}"
+            )));
+        }
+        device.push_error_scope(wgpu::ErrorFilter::Validation);
         let bindings = create_bindings(
             &device, &pipelines, &config, &offsets, &employers, &health, &weights, &partials,
             &sums, &races, &winners, &fired,
         );
         if let Some(error) = device.pop_error_scope().await {
             return Err(NativeF64Error::new(format!(
-                "native f64 shader/pipeline validation failed: {error}"
+                "native f64 binding validation failed: {error}"
             )));
         }
 
@@ -909,13 +916,12 @@ fn status_for_adapter(adapter: &wgpu::Adapter) -> NativeF64Status {
     let info = adapter.get_info();
     let backend = format!("{:?}", info.backend);
     let throughput = Fp64Throughput::from_model_name(info.name.clone());
-    let reason = if info.backend != wgpu::Backend::Vulkan {
-        Some("native WGSL f64 is supported by wgpu only on Vulkan")
-    } else if !adapter.features().contains(wgpu::Features::SHADER_F64) {
-        Some("adapter does not expose Features::SHADER_F64")
-    } else {
-        None
-    };
+    let reason = native_f64_unsupported_reason(
+        info.backend,
+        adapter.features().contains(wgpu::Features::SHADER_F64),
+        info.vendor,
+        &info.name,
+    );
     if let Some(reason) = reason {
         NativeF64Status::Unsupported {
             adapter_name: info.name,
@@ -931,6 +937,27 @@ fn status_for_adapter(adapter: &wgpu::Adapter) -> NativeF64Status {
             device_id: info.device,
             throughput,
         })
+    }
+}
+
+fn native_f64_unsupported_reason(
+    backend: wgpu::Backend,
+    shader_f64: bool,
+    vendor_id: u32,
+    adapter_name: &str,
+) -> Option<&'static str> {
+    if backend != wgpu::Backend::Vulkan {
+        Some("native WGSL f64 is supported by wgpu only on Vulkan")
+    } else if !shader_f64 {
+        Some("adapter does not expose Features::SHADER_F64")
+    } else if vendor_id == NVIDIA_PCI_VENDOR_ID && adapter_name == "NVIDIA H100 PCIe" {
+        // The observed H100 Vulkan compiler reports `NVVM compilation failed`
+        // for this wgpu 0.20 f64 module and can crash the process during device
+        // teardown. Keep the independently compiled CUDA path available as the
+        // honest native-f64 measurement instead of attempting that pipeline.
+        Some("wgpu 0.20 native f64 is disabled on NVIDIA H100 PCIe after an observed NVVM compiler failure; use the CUDA native-f64 path")
+    } else {
+        None
     }
 }
 
@@ -1115,6 +1142,27 @@ mod tests {
                 NativeF64Outcome::Executed(report) => report.assert_expected().unwrap(),
             }
         });
+    }
+
+    #[test]
+    fn nvidia_vulkan_f64_is_gated_before_pipeline_creation() {
+        assert!(native_f64_unsupported_reason(
+            wgpu::Backend::Vulkan,
+            true,
+            NVIDIA_PCI_VENDOR_ID,
+            "NVIDIA H100 PCIe",
+        )
+        .unwrap()
+        .contains("NVVM compiler failure"));
+        assert_eq!(
+            native_f64_unsupported_reason(
+                wgpu::Backend::Vulkan,
+                true,
+                NVIDIA_PCI_VENDOR_ID,
+                "NVIDIA A100-SXM4-80GB",
+            ),
+            None
+        );
     }
 
     #[test]
