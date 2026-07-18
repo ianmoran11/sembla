@@ -91,6 +91,34 @@ the frontend if the interaction story disappoints. It also enforces
 discipline: the semantics lives in the IR's meaning function, not in
 elaboration accidents.
 
+### A6. Units belong in Lean, not in the Rust validator
+
+*(Adopted 2026-07-17 from the PFCLBS review; DESIGN.md §8.)*
+
+**Consideration.** The case for dimensional checking is strong and specific:
+§4.3 writes `hazard 0.02 / year`, `dt` is a *semantic* parameter rather than a
+performance knob, and a rate/`dt` unit mismatch is precisely the error a working
+modeler makes — silently, with plausible-looking output. PFCLBS has a real
+implementation to copy (units, refinements, and dimensioned literals in
+`sks_validate`), so the tempting move is to port it into `sembla-ir`.
+
+**Rationale.** Right goal, wrong building. Porting it would put a dimensional
+type system in the backend validator — duplicating, in Rust, the one thing the
+frontend was chosen to do (§A1: Lean hosts the semantics), and growing the IR's
+trusted surface in the process. Sembla has a type theory available upstream of
+the IR; PFCLBS does not, which is exactly why its units live in the validator.
+Copying that placement would import a workaround for a constraint we don't have.
+
+There is a scale argument too: PFCLBS's units are embedded in a ~44k-line
+validator. Sembla's whole IR crate is ~1.9k lines. "Just port the unit system"
+is not a small change to `sembla-ir`; it is a second `sembla-ir`.
+
+So: units are a **frontend obligation**, discharged during elaboration, with the
+IR receiving already-dimensioned values. The door stays open in Lean; it stays
+shut in `sembla-ir`. If the Lean frontend is ever swapped out (§A5), the new
+frontend inherits the obligation — which is the correct place for the cost to
+land, since it is the frontend that promises the modeler this safety.
+
 ---
 
 ## B. State and data model
@@ -381,6 +409,94 @@ invariant is what collapses "GPU performance" and "bitwise reproducibility"
 from two hard problems into one. Every dynamics-layer decision is downstream
 of it.
 
+### E7. The run manifest: record the contract, don't just claim it
+
+*(Adopted 2026-07-17 from the PFCLBS review; DESIGN.md §5.4.)*
+
+**Consideration.** §2 states the contract as seed + IR + θ + level ⇒
+reproducible results, and v0.1 genuinely delivers it — determinism tests pass,
+hashes are stable. So the manifest looks like paperwork for a property already
+proven, and the counter-argument was real: artifacts you don't need are
+liabilities, and Sembla's whole strategy is refusing scope.
+
+**Rationale.** The property is proven *in the test suite*, where both sides of
+the equation are in scope. In the artifact a user actually keeps, only the
+right-hand side survives: `sembla run --out results.csv` writes a CSV and prints
+its hashes to stdout, where they evaporate. Nobody holding that CSV can say
+which IR, seed, θ, or `dt` produced it. A contract nothing records is a
+convention, not a contract — and reproducibility is claimed as a *semantic
+property* (§1), not a lucky property of our CI.
+
+What forced the timing rather than the decision: v0.2 runs the CPU oracle
+against the GPU backend under a precision strategy ADR 0001 leaves open between
+native `f64`, double-single, and a tiered path. A result that cannot name its
+own precision cannot participate in that gate. One backend makes this a sidecar
+file; two make it a retrofit across both. The structural rules (algorithm IDs
+beside hashes, per-concern schema versions, append-only all-or-nothing tuples)
+are borrowed from PFCLBS's `ReplayManifest` — which earned them across five
+milestones of format evolution, at a cost we can decline to repay.
+
+The scope boundary is explicit and holds: **one file, not an archive.** No
+replay bundles, no event capture, no provenance database. Sembla records what
+its own contract claims. Run management is someone else's product (§8).
+
+### E8. Default-off flags as runtime options, recorded in the manifest
+
+*(Adopted 2026-07-17 from the PFCLBS review; DESIGN.md §5.5.)*
+
+**Consideration.** v0.1 has zero feature flags. Writing a flag policy for zero
+flags is exactly the over-building this project keeps refusing, and the obvious
+mechanism — Cargo features — is free, idiomatic, and already understood by
+every Rust contributor.
+
+**Rationale.** The mechanism choice is the part that cannot be deferred, and
+Cargo features are the wrong one for a reason specific to Sembla rather than to
+taste: they change the compiled surface per build and are **invisible to the run
+manifest** (§E7). A flag changes what a model *means*. If a flag can be on
+without the artifact saying so, then seed + IR + θ + level no longer determines
+the result and the §2 contract is false — quietly, and only for the runs where
+it matters. So flags are runtime options threaded through validation and
+execution, and every enabled flag is recorded. PFCLBS reached the identical
+conclusion from the identical constraint (replay visibility), having considered
+Cargo features first.
+
+The "no inert syntax" rule — accepted syntax is never accepted-and-ignored —
+is the other half, and it is *more* binding here than at PFCLBS: §4.5 commits
+every construct to a Lean meaning, so syntax that elaborates to nothing is a
+lie told in the one place the project promises not to. A default-off flag is the
+honest marker for "meaning is provisional here."
+
+What we deliberately did *not* adopt is the machinery: no flag registry, no
+retirement tooling, no discovery inventory. The rule plus one manifest field.
+The first flag (v0.3 birth/death) validates it; the policy is written now only
+because retrofitting flag-visibility onto a shipped manifest is the avoidable
+version of this work.
+
+### E9. Two execution paths, not a profile matrix
+
+*(Adopted 2026-07-17 from the PFCLBS review; DESIGN.md §8.)*
+
+**Consideration.** PFCLBS demonstrates a genuinely impressive specialization
+framework: tree-walked, prepared, specialized, generated, and hybrid execution
+paths, plus SIMD and WGSL kernels, with capability-dependent fallback and
+differential gates holding them together. Every tier exists because someone
+measured something. It is the most obviously enviable thing in the repository.
+
+**Rationale.** It is also the clearest case of a cost Sembla should not buy. The
+bill is not paid by the maintainers — it is paid by *users*, who must read
+manifests to learn which semantics they actually ran, and by anyone trying to
+tell stable defaults from feature-gated extensions. PFCLBS's own comparison
+lists this as a disadvantage. More decisively: tiers are what you build when you
+lack a normalized kernel IR to optimize *through*. Sembla's closed kernel
+fragment (§4.2) is a bet that one narrow IR plus certified rewrites (§7)
+beats N hand-specialized paths — so shipping the matrix would concede the bet
+before testing it.
+
+Two paths, oracle and GPU, held together by differential testing. The one habit
+worth keeping is narrow and already taken: record which path ran and whether it
+fell back (§E7). Revisit only when a single kernel IR makes a third path cheap
+rather than combinatorial.
+
 ---
 
 ## F. Domain validation (queueing / courts)
@@ -474,6 +590,54 @@ collide with simulation draws, run the same IR per draw, collect outputs. It
 composes with CRN (§E5): draws share simulation coordinates, so output
 variation across draws is attributable to θ alone. Gradient-based calibration
 remains deliberately deferred (§A4).
+
+### G5. Calibration method: amortized NPE, run externally
+
+*(Adopted 2026-07-18; resolves open question §10.4 and the ROADMAP v0.4 method
+fork.)*
+
+**Consideration.** §G4 deliberately deferred the method choice, having built
+the plumbing (first-class parameters, declared priors, the sweep runner) that
+any black-box method needs. The candidates: ABC (simple, but
+rejection-wasteful near a tolerance), gradient-based calibration (would reach
+into the IR and require the differentiable fragment §A4 keeps deferred), or
+simulation-based inference with neural density estimators. Within the neural
+family, sequential variants (SNPE) focus simulation effort around one observed
+dataset but couple the trainer to the runner through a proposal-feedback loop;
+amortized NPE trains once on prior-predictive pairs and then answers any
+observation instantly.
+
+**Rationale.** **Amortized NPE, with the workflow outside the framework.** It
+is the exact consumer of infrastructure already shipped: training data is
+(θᵢ, xᵢ) pairs with θ drawn from declared priors — precisely the
+prior-predictive sweep — and the measured H100 throughput (~1,380 ticks/sec at
+26M rows, ADR 0001) makes large training corpora cheap, which is
+amortization's main cost. It never touches the IR, so §A4 stays intact. The
+posterior workflow is an external Python pipeline (the `sbi` stack) fed by a
+thin, versioned `(θ, x)` export beside the run manifest; Sembla stays
+semantics + runtime. This re-opens standing-no #5 (calibration export formats)
+explicitly and narrowly — the method being chosen was that entry's stated
+condition. Sequential methods stay reachable at zero IR cost via a sweep mode
+that accepts externally supplied θ draws.
+
+Two consequences are recorded now because each is easy to get silently wrong:
+
+1. **Training pairs need independent noise.** The sweep's CRN default shares
+   simulation coordinates across draws so output variation is attributable to
+   θ alone (§G4) — ideal for policy contrasts, wrong for NPE training data.
+   Pairs generated under one shared noise realization teach the estimator a
+   deterministic θ→x map, and the learned posterior comes out overconfident.
+   NPE data generation therefore varies a per-draw replica index that enters
+   the seed coordinate (§5.3 machinery); CRN mode remains the default
+   elsewhere.
+2. **The conditioning data `x` is the declared-summaries construct** (§4.6),
+   not a parallel format: hand-declared summaries first, embedding networks
+   over per-tick views later, with no IR change between the two.
+
+A corollary for §A2's widget taxonomy: a trained amortized posterior evaluates
+in milliseconds, so posterior-conditioned behavior widgets can query the flow
+without re-simulating — a latency path that did not exist when behavior
+widgets were gated solely on runtime speed.
 
 ---
 

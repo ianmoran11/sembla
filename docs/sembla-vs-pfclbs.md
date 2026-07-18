@@ -6,6 +6,7 @@ tags:
   - simulation
   - comparison
 created: 2026-07-14
+updated: 2026-07-17
 ---
 
 # Sembla compared with PFCLBS
@@ -222,13 +223,40 @@ The strongest long-term design would not blindly merge the repositories. A bette
 
 ### What Sembla should borrow from PFCLBS
 
-1. Versioned semantic identities and replay manifests.
-2. A visible validated-IR → runtime-plan boundary with capability and fallback reporting.
-3. Keyed wires, grouped reducers, and explicit missing/duplicate-key semantics.
-4. Richer units, refinements, invariants, and diagnostics.
-5. Differential gates for every optimized backend.
-6. Execution profiles that separate assurance work from hot-path work without changing semantics.
-7. Bounded lifecycle semantics with stable generation identities, if changing populations become a priority.
+> [!important] Resolved 2026-07-17 — this list is no longer open
+> A conservative review worked through this list and dispositioned every item.
+> The outcomes are now normative in [`DESIGN.md`](../DESIGN.md) (§4.6, §5.3,
+> §5.4, §5.5, §8), sequenced in [`ROADMAP.md`](ROADMAP.md), and argued in
+> [`DECISIONS.md`](../DECISIONS.md) (§A6, §E7–E9). Those documents win; the
+> table below is kept to record what was decided and why, so the list is not
+> re-derived from scratch. The test applied was: **does this make a commitment
+> Sembla already made checkable, or does it add a new one?**
+
+| # | Item | Disposition |
+|---|---|---|
+| 1 | Versioned semantic identities and replay manifests | **Adopted, narrowed** — the run manifest (DESIGN.md §5.4, v0.2). Manifest field discipline is borrowed; the archive/replay-bundle surface is explicitly not. One file, not a run-management product. |
+| 2 | Validated-IR → runtime-plan boundary with capability/fallback reporting | **Adopted as one manifest field.** Record which path ran and whether it fell back. Not a plan/capability subsystem (see #6). |
+| 3 | Keyed wires, grouped reducers, missing/duplicate-key semantics | **Deferred to v0.3**, on merit rather than principle — general n-box composition is when these stop being speculative. Read `er8b`/`er3` designs then. |
+| 4 | Richer units, refinements, invariants, diagnostics | **Rejected in this location** (DESIGN.md §8, DECISIONS.md §A6). Right goal, wrong building: units are a Lean frontend obligation. PFCLBS puts them in the validator because it has no type theory upstream of its IR; Sembla does. |
+| 5 | Differential gates for every optimized backend | **Already committed** — v0.2's core (ROADMAP), and the reason the manifest lands first. |
+| 6 | Execution profiles separating assurance from hot-path work | **Rejected** (DESIGN.md §8, DECISIONS.md §E9). Two paths — oracle and GPU — held together by differential testing. Tiers are what you build lacking a normalized kernel IR; §4.2's closed fragment is the bet that we don't need them. |
+| 7 | Bounded lifecycle with stable generation identities | **Deferred to v0.3 as a reference, not an import.** DESIGN.md §4.2 already specifies `(tick, parent, slot)` allocation; `er12b-lifecycle-design.md` is a cross-check on capacity/generation/overflow, read at the milestone. |
+
+Three items were adopted that this list did not name, each found by checking
+the code rather than the design docs:
+
+- **Observation as a sink** (DESIGN.md §4.6, v0.3). PFCLBS's ER13B non-feedback
+  invariant, which fixes a Sembla incoherence this comparison missed: the v0.1
+  CLI branches on a hard-coded SIR box name (`optional_sir_box_name`) and
+  `sembla sweep` refuses non-SIR models, so one named example is wired into the
+  framework's runner — against "the IR is the contract".
+- **Default-off flags as runtime options, recorded in the manifest**
+  (DESIGN.md §5.5, v0.3). Sembla has no flags today; the mechanism choice is
+  what cannot be retrofitted, because Cargo features are invisible to the
+  manifest and a flag changes what a model means.
+- **Coordinate-derived experiment seeds** (DESIGN.md §5.3, v0.4). PFCLBS's ER13C
+  independently rediscovered Sembla's own axiom — randomness is a pure function
+  of coordinates — one level up, at run identity rather than draw identity.
 
 ### What Sembla should avoid copying too early
 
@@ -249,7 +277,7 @@ The strongest long-term design would not blindly merge the repositories. A bette
 
 - Choose **Sembla** when Lean authoring, relational schemas, inspectable stochastic semantics, and future proofs are requirements—and the current fixed-size finite-state scope is acceptable.
 - Choose **PFCLBS** when model breadth, runtime features, replay/provenance, calibration, UI, and existing optimization work matter more than proof-assistant integration.
-- Use **PFCLBS as an implementation reference for Sembla**, especially for replay identity, runtime planning, backend manifests, keyed composition, validation diagnostics, and differential performance gates.
+- Use **PFCLBS as an implementation reference for Sembla** — read at the milestone that needs it, never worked through as a backlog. As resolved on 2026-07-17: manifest identity discipline (v0.2), the flag convention and lifecycle/observability designs (v0.3), and experiment coordinates (v0.4). ROADMAP.md carries the per-milestone reading list and the standing "no" list. Runtime planning, backend/profile manifests, and validator-hosted units were considered and declined (DESIGN.md §8).
 - Do not claim Sembla's planned formal or generated-kernel advantages until there are theorem-bearing Lean semantics and production code-generation paths to demonstrate them.
 
 ## Evidence map

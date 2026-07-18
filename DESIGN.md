@@ -1,6 +1,16 @@
 # Sembla: Design Document
 
 **Status:** Draft v1 — converged through an adversarial design review, 2026-07-12.
+Amended 2026-07-17: §4.6 (observation as a sink), §5.4 (the run manifest), §5.5
+(default-off flags), and two §8 rejections were adopted from a conservative
+review of the sibling PFCLBS/SKS repository — see
+[`docs/sembla-vs-pfclbs.md`](docs/sembla-vs-pfclbs.md). Each addition records a
+commitment Sembla had already made but not made checkable; the rejections are
+load-bearing and should be read as part of the adoption.
+Amended 2026-07-18: §10.4 resolved (amortized neural posterior estimation, run
+as an external workflow — see DECISIONS.md §G5), §10.5 descoped (population
+generation is an external pipeline's product), §10.6 gains the
+amortized-posterior path.
 **Scope:** Semantics, architecture, and v0.1 definition for a compositional simulation
 framework with a Lean 4 frontend and a Rust execution backend.
 
@@ -233,6 +243,44 @@ is over ℝ; determinism levels (§5.2) and tau-leaping are *documented deviatio
 from the ideal. The IR is a deep embedding in Lean with a meaning function into
 this semantics.
 
+### 4.6 Observation: a sink, never a feedback path
+
+What a run *reports* is part of the semantics, and therefore belongs in the IR.
+Models declare named **views** (per-tick projections of committed state) and
+**summaries** (scalars reduced over a run's views). The runner emits declared
+observations generically; it never knows what a model *means*.
+
+The governing invariant:
+
+> Enabling, disabling, filtering, or serializing an observation cannot change
+> state, draws, draw coordinates, conflict resolution, or any scheduling
+> decision. Observation is a **sink**: there is no path in the IR from a view or
+> summary back to a parameter, input, hazard, transition, or wire.
+
+This is not a style rule. It is what makes observation *free* with respect to
+the run contract (§5.4): two runs differing only in what they observed are the
+same run, and their state hashes must match bitwise. It is also a statable
+property of the Lean semantics — the meaning function ignores the observation
+layer — and it is cheap to enforce in types rather than by reviewer vigilance.
+The same invariant forces the honest converse: a quantity a model wants to *act*
+on is a state or an input, and must be declared as one.
+
+**Current status — a known violation.** v0.1's CLI branches on a hard-coded SIR
+box name to decide its output columns, and `sembla sweep` refuses models that
+are not SIR-shaped. One named example model is wired into the framework's
+runner, which contradicts "the IR is the contract" (§2). Declared views and
+summaries are the fix, and retiring that branch is their acceptance test.
+Sequenced in v0.3 (ROADMAP), because n-box and birth/death models make the
+SIR-shaped runner untenable rather than merely embarrassing. Promoted
+2026-07-18 to start immediately: the NPE calibration decision (§10.4) makes
+declared summaries the conditioning data `x`, so this now gates inference as
+well as tidiness, and it is CPU-side work that proceeds alongside the v0.2 GPU
+backend.
+
+**Deliberately excluded:** event streams, paged/windowed capture, adaptive
+triggers, and external streaming. Views and summaries are the whole construct
+until a real model needs more.
+
 ---
 
 ## 5. Conflicts, determinism, and reproducibility
@@ -301,6 +349,97 @@ one model under θ₁ vs θ₂ with a shared seed gives paired sensitivity and
 prior-predictive contrasts. For policy comparison work this may be the
 headline feature; it is a corollary of the reproducibility design, not an
 add-on.
+
+**The principle extends upward.** "Randomness is a pure function of
+coordinates" (§4.2) governs draws *within* a run; the same rule governs seeds
+*across* runs. When a multi-run experiment (a grid, a scenario set, a
+calibration sweep) assigns a seed to each run, that seed derives from a hash of
+the run's **canonical semantic coordinate** — the sorted, normalized set of what
+actually varies (scenario, θ assignments, replica index) — and never from the
+run's positional index in the experiment. The consequence is the one that
+matters: adding a case, removing a case, or reordering axis declarations leaves
+every other case's seed, draws, and results untouched. An index-derived seed
+silently invalidates a whole matrix the moment anyone inserts a row.
+
+Two corollaries follow, and both are load-bearing enough to state now:
+declaration order of axes and values must not survive canonicalization (permuted
+specs produce byte-identical experiments), and a resumed experiment must be
+byte-identical to an uninterrupted one — which is only achievable if run
+identity is semantic, so timestamps, attempt counts, host paths, and output
+locations can never enter a run's identity or its artifacts.
+
+v0.1's prior-predictive sweep keys θ draws on the draw index, which is *correct
+today* — for K i.i.d. prior draws the index genuinely is the coordinate, and
+there is no reordering to be invariant under. The rule binds when named axes
+arrive (v0.4, ROADMAP), and is recorded here so the sweep is not generalized by
+accident into an index-keyed grid.
+
+### 5.4 The run manifest: the contract, recorded
+
+The run contract is **seed + IR + θ + determinism level ⇒ reproducible results**
+(§2). A result artifact that does not record the left-hand side does not
+*have* the contract — it merely hopes for it. Every run therefore emits a
+**manifest** alongside its outputs, recording at minimum:
+
+- IR hash, and the IR/manifest schema versions;
+- seed, resolved θ (symbolic names to values), `dt`, tick count;
+- determinism level, and — once more than one exists — the **backend that
+  actually executed**, its precision representation, and whether it fell back;
+- enabled feature flags (§5.5);
+- final state hash and output hash;
+- component versions.
+
+Three structural rules, each cheap now and expensive to retrofit:
+
+1. **Every hash is stored beside a named algorithm ID.** `ir_hash` travels with
+   `ir_hash_algorithm`. The hash function must be able to change without
+   silently reinterpreting old artifacts.
+2. **Schema versions are explicit and per-concern**, not one global integer.
+3. **Optional fields are append-only, and related fields form all-present-or-
+   all-absent tuples that readers reject when partial.** Absence then means
+   "this run predates the feature" — an honest, checkable statement — rather
+   than a guess. A half-written identity tuple must fail loudly, never default.
+
+The manifest is *the* audit surface, and it is deliberately one file, not an
+archive format: no captured event streams, no replay bundles, no provenance
+database. Sembla records what its own contract claims; it does not grow a
+run-management product (§8).
+
+**Why now rather than with the tooling that wants it.** v0.2's differential
+testing compares the CPU oracle against the selected CUDA native-`f64` backend.
+A result file that cannot name that backend, precision representation, exact
+device, and fallback status cannot substantiate the selected contract. The
+manifest is trivial to add while one production backend exists and awkward to
+retrofit after fallback or additional backends appear.
+
+### 5.5 Extending the semantics: default-off flags, recorded
+
+New semantics land behind **default-off feature flags**, under three rules:
+
+1. **A flag is a runtime option, not a Cargo feature.** Cargo features change
+   the compiled surface per build, multiply the CI matrix, and — decisively —
+   are invisible to the manifest. A flag must be a value threaded through
+   validation and execution, so a run can *record* it.
+2. **Every enabled flag appears in the run manifest** (§5.4), sorted and
+   deduplicated. A flag changes what a model means; an unrecorded flag breaks
+   the run contract, because seed + IR + θ + level would no longer determine
+   the result.
+3. **No inert syntax.** A construct the frontend accepts is never accepted-and-
+   ignored. Either its flag is on and it has full elaboration, validation, and
+   runtime meaning, or it is rejected with a diagnostic naming the flag that
+   would enable it. Silently ignored syntax is how a semantics starts lying.
+
+This is the mechanism that lets §4's "every construct has a Lean meaning" stay
+true while the language grows: a default-off flag is the honest marker for
+*meaning is provisional here*, and flag retirement — the flag becomes a no-op,
+then is deleted — is the marker for a construct whose meaning has settled.
+
+The policy binds from the first flag (birth/death — deferred to demand in the
+2026-07-18 ROADMAP re-cut, but still the first flagged construct whenever it
+lands). It is
+deliberately a rule and a manifest field, not a subsystem: v0.1 has no flags,
+and a flag registry for zero flags would be exactly the over-building this
+section exists to prevent.
 
 ---
 
@@ -387,6 +526,25 @@ this is the thesis that makes the Lean/semantics investment pay rent.
 - **"Guaranteed gradients" as a v1 requirement.** Deferred: applies only to
   the differentiable fragment; discrete-state transitions have no useful
   gradients without relaxation machinery that is its own research field.
+- **An execution-profile matrix** (tree-walked / prepared / specialized /
+  generated / hybrid paths, each with capability-dependent fallback). Rejected
+  for v1: it is backend proliferation before a normalized kernel IR exists, and
+  its real cost is borne by users, who must read manifests to learn which
+  semantics they got. Sembla keeps **exactly two execution paths** — the CPU
+  oracle and one GPU backend — and pays for the difference with differential
+  testing rather than with a compatibility matrix. The one habit worth keeping
+  from that design is narrow and already adopted: record in the manifest which
+  path ran and whether it fell back (§5.4). Revisit only when a single kernel IR
+  makes a third path cheap rather than combinatorial.
+- **Units and refinement types in the Rust validator.** Tempting — §4.3 writes
+  `hazard 0.02 / year`, `dt` is semantic (§4.3), and a rate/`dt` unit mismatch
+  is exactly the error a modeler makes. Rejected *in that location*: it puts the
+  check on the wrong side of the one boundary the project is built around. Units
+  are a frontend obligation, where Lean's type system can carry dimension in the
+  DSL and discharge it before the IR is emitted; replicating a dimensional type
+  system in the backend validator would duplicate the frontend's whole reason to
+  exist and grow the IR's trusted surface. The door stays open in **Lean** (§3),
+  not in `sembla-ir`.
 
 ---
 
@@ -450,18 +608,30 @@ any proofs (theorem *statements* only) · synthetic population realism.
    automatic detection of tau-leap bias beyond the saturation counter.
 3. **Level B feasibility** — how expensive portable-bitwise FP really is on
    modern GPUs; whether it's practical or aspirational.
-4. **Calibration/inference architecture** — the *method* choice (ABC /
-   simulation-based inference vs. gradient-based) remains open, but first-class
-   parameters plus the sweep runner (§9) already provide everything black-box
-   methods need; only gradient-based calibration would reach into the IR, and
-   that path stays deliberately deferred (§3). What remains genuinely open:
-   where the posterior workflow lives and what summary-statistic /
-   distance machinery the framework should standardize.
-5. **Synthetic population initialization** — census/HILDA-style microdata,
-   privacy, validation. Historically >50% of the effort in policy
-   microsimulation; unaddressed by the architecture and must not be forgotten.
+4. **Calibration/inference architecture** — *resolved 2026-07-18*
+   (DECISIONS.md §G5): **amortized neural posterior estimation (NPE)**, run as
+   an **external Python workflow** (the `sbi` stack) fed by a thin, versioned
+   `(θ, x)` export beside the run manifest. Sembla's side stays black-box:
+   first-class parameters plus the sweep runner (§9) generate the training
+   pairs; nothing reaches into the IR, and the gradient path stays deferred
+   (§3). Still open within this choice: the summary-statistic selection
+   (declared summaries (§4.6) first; embedding networks over per-tick views
+   later), and exactly how the per-draw replica index enters the seed
+   coordinate so training pairs carry independent noise (§5.3 — CRN remains
+   the default for policy contrasts).
+5. **Synthetic population initialization** — *descoped 2026-07-18*. Population
+   generation (census/HILDA-style microdata, reweighting, privacy, validation)
+   is an external data pipeline's product, consumed through the versioned
+   population format the runtime already reads. Historically >50% of the
+   effort in policy microsimulation — which is exactly why it is now an
+   explicit non-goal with a format contract at the boundary, rather than an
+   unowned assumption.
 6. **Behavior-widget latency budget** — what interactive loop is achievable
-   once the GPU backend exists (scenario caching? surrogate models?).
+   once the GPU backend exists (scenario caching? surrogate models?). The NPE
+   decision (§10.4) adds a third path: an amortized posterior evaluates in
+   milliseconds once trained, so posterior-conditioned widgets can query the
+   trained flow without re-simulating; live prior-predictive bands still need
+   the runtime or a surrogate.
 7. **Cross-boundary tick-delay ergonomics** — one-tick message delay is
    uniform and honest, but modelers must be taught to see it.
 
