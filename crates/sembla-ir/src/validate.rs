@@ -129,12 +129,20 @@ fn validate_model(model: &Model) -> Result<(), ValidationError> {
         "$.boxes",
         "box",
     )?;
+    unique_names(
+        model.summaries.iter().map(|summary| summary.name.as_str()),
+        "$.summaries",
+        "summary",
+    )?;
 
     for (index, param) in model.params.iter().enumerate() {
         validate_param(param, index)?;
     }
     for (index, model_box) in model.boxes.iter().enumerate() {
         validate_box(model, model_box, index)?;
+    }
+    for (index, summary) in model.summaries.iter().enumerate() {
+        validate_summary(model, summary, index)?;
     }
     for (index, wire) in model.wires.iter().enumerate() {
         if model.wires[..index]
@@ -236,6 +244,11 @@ fn validate_box(model: &Model, model_box: &Box, box_index: usize) -> Result<(), 
         &format!("{base}.outputs"),
         "output port",
     )?;
+    unique_names(
+        model_box.views.iter().map(|view| view.name.as_str()),
+        &format!("{base}.views"),
+        "view",
+    )?;
 
     for (table_index, table) in model_box.tables.iter().enumerate() {
         validate_schema(
@@ -264,7 +277,108 @@ fn validate_box(model: &Model, model_box: &Box, box_index: usize) -> Result<(), 
             &format!("{base}.transitions[{transition_index}]"),
         )?;
     }
+    for (view_index, view) in model_box.views.iter().enumerate() {
+        validate_view(
+            model,
+            model_box,
+            view,
+            &format!("{base}.views[{view_index}]"),
+        )?;
+    }
 
+    Ok(())
+}
+
+fn validate_view(
+    model: &Model,
+    model_box: &Box,
+    view: &ViewDecl,
+    path: &str,
+) -> Result<(), ValidationError> {
+    let table = find_table(model_box, &view.table).ok_or_else(|| {
+        error(
+            format!("{path}.table"),
+            format!(
+                "view '{}' refers to unknown table '{}'",
+                view.name, view.table
+            ),
+        )
+    })?;
+
+    if let Some(filter) = &view.filter {
+        let filter_type = infer_expr(
+            filter,
+            model,
+            model_box,
+            &table.attrs,
+            &format!("{path}.filter"),
+            Some(&ValueType::Bool),
+        )?;
+        require_type(&filter_type, &ValueType::Bool, &format!("{path}.filter"))?;
+    }
+
+    match (&view.reduce, &view.value) {
+        (ViewReduce::Count, Some(_)) => {
+            return Err(error(
+                format!("{path}.value"),
+                format!("count view '{}' must not declare a value", view.name),
+            ));
+        }
+        (ViewReduce::Count, None) => {}
+        (_, None) => {
+            return Err(error(
+                format!("{path}.value"),
+                format!(
+                    "{:?} view '{}' must declare a value",
+                    view.reduce, view.name
+                ),
+            ));
+        }
+        (_, Some(value)) => {
+            let value_type = infer_expr(
+                value,
+                model,
+                model_box,
+                &table.attrs,
+                &format!("{path}.value"),
+                None,
+            )?;
+            if !value_type.is_numeric() {
+                return Err(error(
+                    format!("{path}.value"),
+                    format!("view value must be numeric, found {}", value_type.name()),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_summary(
+    model: &Model,
+    summary: &SummaryDecl,
+    index: usize,
+) -> Result<(), ValidationError> {
+    let base = format!("$.summaries[{index}]");
+    let model_box = find_box(model, &summary.r#box).ok_or_else(|| {
+        error(
+            format!("{base}.box"),
+            format!(
+                "summary '{}' refers to unknown box '{}'",
+                summary.name, summary.r#box
+            ),
+        )
+    })?;
+    if find_view(model_box, &summary.view).is_none() {
+        return Err(error(
+            format!("{base}.view"),
+            format!(
+                "summary '{}' refers to unknown view '{}.{}'",
+                summary.name, summary.r#box, summary.view
+            ),
+        ));
+    }
     Ok(())
 }
 
@@ -997,6 +1111,10 @@ fn find_box<'a>(model: &'a Model, name: &str) -> Option<&'a Box> {
 
 fn find_table<'a>(model_box: &'a Box, name: &str) -> Option<&'a Table> {
     model_box.tables.iter().find(|table| table.name == name)
+}
+
+fn find_view<'a>(model_box: &'a Box, name: &str) -> Option<&'a ViewDecl> {
+    model_box.views.iter().find(|view| view.name == name)
 }
 
 fn find_attr<'a>(attrs: &'a [Attr], name: &str) -> Option<&'a Attr> {

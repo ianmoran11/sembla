@@ -52,7 +52,16 @@ fn diff_ir_compares_validated_canonical_models() {
         std::thread::current().name().unwrap_or("test")
     ));
     let source = std::fs::read_to_string(&fixture).unwrap();
-    std::fs::write(&normalized_copy, format!("\n  {source}\n")).unwrap();
+    let mut legacy_shape: serde_json::Value = serde_json::from_str(&source).unwrap();
+    legacy_shape.as_object_mut().unwrap().remove("summaries");
+    for model_box in legacy_shape["boxes"].as_array_mut().unwrap() {
+        model_box.as_object_mut().unwrap().remove("views");
+    }
+    std::fs::write(
+        &normalized_copy,
+        serde_json::to_vec_pretty(&legacy_shape).unwrap(),
+    )
+    .unwrap();
 
     let identical = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .args(["diff-ir"])
@@ -76,6 +85,27 @@ fn diff_ir_compares_validated_canonical_models() {
         .unwrap()
         .contains("canonical normalization"));
 
+    let observations = repository_path("examples/observations.json");
+    let changed_observation = std::env::temp_dir().join(format!(
+        "sembla-diff-ir-observation-{}-{}.json",
+        std::process::id(),
+        std::thread::current().name().unwrap_or("test")
+    ));
+    let mut changed: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&observations).unwrap()).unwrap();
+    changed["summaries"][0]["reduce"] = serde_json::json!("max");
+    std::fs::write(&changed_observation, serde_json::to_vec(&changed).unwrap()).unwrap();
+    let observation_difference = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .args(["diff-ir"])
+        .arg(&observations)
+        .arg(&changed_observation)
+        .output()
+        .unwrap();
+    assert_eq!(observation_difference.status.code(), Some(1));
+    assert!(String::from_utf8(observation_difference.stderr)
+        .unwrap()
+        .contains("canonical normalization"));
+
     let invalid = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .args(["diff-ir"])
         .arg(repository_path("examples/invalid/wrong_guard_type.json"))
@@ -88,4 +118,5 @@ fn diff_ir_compares_validated_canonical_models() {
         .contains("transitions[0].guard"));
 
     std::fs::remove_file(normalized_copy).unwrap();
+    std::fs::remove_file(changed_observation).unwrap();
 }

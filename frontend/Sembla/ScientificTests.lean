@@ -13,6 +13,6 @@ private def probe : Model :=
 -- module proves that serialization retains all represented decimal digits and
 -- handles both small and very large finite scientific values generally.
 #guard toJson probe ==
-  "{\"name\":\"numeric_probe\",\"dt\":12345678901234567e-16,\"params\":[{\"name\":\"x\",\"ty\":\"real\",\"default\":{\"kind\":\"real\",\"value\":-9876543210987654e-15},\"prior\":{\"family\":\"uniform\",\"args\":[123456789e-15,1e300]}}],\"boxes\":[],\"wires\":[]}\n"
+  "{\"name\":\"numeric_probe\",\"dt\":1.2345678901234567,\"params\":[{\"name\":\"x\",\"ty\":\"real\",\"default\":{\"kind\":\"real\",\"value\":-9.876543210987654},\"prior\":{\"family\":\"uniform\",\"args\":[1.23456789e-7,1e+300]}}],\"boxes\":[],\"wires\":[],\"summaries\":[]}\n"
 
 end Sembla.ScientificTests

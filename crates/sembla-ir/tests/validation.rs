@@ -1,7 +1,8 @@
 use sembla_ir::{
     validate, AggJoin, AggOp, Aggregate, Attr, AttrType, Box as ModelBox, ClaimOrdering, Effect,
     Expr, Model, OutputBuilder, OutputDecl, OutputField, ParamDecl, ParamType, ParamValue,
-    PortDecl, Prior, PriorFamily, ResourceClaim, Table, Transition, Wire, WireEndpoint,
+    PortDecl, Prior, PriorFamily, ResourceClaim, SummaryDecl, SummaryReduce, Table, Transition,
+    ViewDecl, ViewReduce, Wire, WireEndpoint,
 };
 
 fn transition(name: &str) -> Transition {
@@ -26,6 +27,7 @@ fn simple_box(name: &str, transitions: Vec<Transition>) -> ModelBox {
         transitions,
         inputs: vec![],
         outputs: vec![],
+        views: vec![],
     }
 }
 
@@ -33,6 +35,47 @@ fn resource_claim(resource: Expr) -> ResourceClaim {
     ResourceClaim {
         resource,
         ordering: ClaimOrdering::RaceTime,
+    }
+}
+
+fn observation_model(views: Vec<ViewDecl>, summaries: Vec<SummaryDecl>) -> Model {
+    Model {
+        name: "observations".into(),
+        dt: 1.0,
+        params: vec![],
+        boxes: vec![ModelBox {
+            name: "population".into(),
+            tables: vec![Table {
+                name: "Person".into(),
+                size_hint: 10,
+                attrs: vec![
+                    Attr {
+                        name: "score".into(),
+                        ty: AttrType::Real,
+                    },
+                    Attr {
+                        name: "age".into(),
+                        ty: AttrType::Int,
+                    },
+                ],
+            }],
+            transitions: vec![],
+            inputs: vec![],
+            outputs: vec![],
+            views,
+        }],
+        wires: vec![],
+        summaries,
+    }
+}
+
+fn count_view(name: &str) -> ViewDecl {
+    ViewDecl {
+        name: name.into(),
+        table: "Person".into(),
+        filter: None,
+        value: None,
+        reduce: ViewReduce::Count,
     }
 }
 
@@ -78,8 +121,10 @@ fn ref_write_model(value: Expr, contests: Vec<ResourceClaim>) -> Model {
             }],
             inputs: vec![],
             outputs: vec![],
+            views: vec![],
         }],
         wires: vec![],
+        summaries: vec![],
     }
 }
 
@@ -99,6 +144,7 @@ fn int_parameter_priors_are_rejected_at_the_declaration_path() {
         }],
         boxes: vec![simple_box("box", vec![])],
         wires: vec![],
+        summaries: vec![],
     };
     let error = validate(model).unwrap_err().to_string();
     assert!(error.contains("$.params[0].prior"), "{error}");
@@ -162,8 +208,10 @@ fn aggregate_supports_the_infect_group_by_pattern() {
             }],
             inputs: vec![],
             outputs: vec![],
+            views: vec![],
         }],
         wires: vec![],
+        summaries: vec![],
     };
 
     validate(model).expect("infect aggregate must type-check");
@@ -180,6 +228,7 @@ fn rule_ids_follow_global_declaration_order() {
             simple_box("second", vec![transition("c")]),
         ],
         wires: vec![],
+        summaries: vec![],
     };
     let validated = validate(model).unwrap();
 
@@ -228,6 +277,7 @@ fn duplicate_wire_destinations_are_rejected_at_the_second_wire() {
                 }],
             },
         }],
+        views: vec![],
     };
     let destination = ModelBox {
         name: "destination".into(),
@@ -242,6 +292,7 @@ fn duplicate_wire_destinations_are_rejected_at_the_second_wire() {
             schema: schema.clone(),
         }],
         outputs: vec![],
+        views: vec![],
     };
     let endpoint = WireEndpoint {
         r#box: "destination".into(),
@@ -268,6 +319,7 @@ fn duplicate_wire_destinations_are_rejected_at_the_second_wire() {
                 to: endpoint,
             },
         ],
+        summaries: vec![],
     };
 
     let error = validate(model).unwrap_err();
@@ -306,6 +358,7 @@ fn nested_aggregate_in_input_row_expression_is_rejected() {
         params: vec![],
         boxes: vec![model_box],
         wires: vec![],
+        summaries: vec![],
     })
     .unwrap_err();
     assert_eq!(error.path, "$.boxes[0].transitions[0].guard.agg.filter");
@@ -380,11 +433,184 @@ fn duplicate_resource_claim_is_rejected_with_its_path() {
             }],
             inputs: vec![],
             outputs: vec![],
+            views: vec![],
         }],
         wires: vec![],
+        summaries: vec![],
     };
 
     let error = validate(model).unwrap_err();
     assert_eq!(error.path, "$.boxes[0].transitions[0].contests[1].resource");
     assert!(error.message.contains("duplicate resource claim"));
+}
+
+#[test]
+fn duplicate_view_name_is_rejected() {
+    let error = validate(observation_model(
+        vec![count_view("total"), count_view("total")],
+        vec![],
+    ))
+    .unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[1].name");
+    assert_eq!(error.message, "duplicate view name 'total'");
+}
+
+#[test]
+fn duplicate_summary_name_is_rejected() {
+    let summary = SummaryDecl {
+        name: "total_over_time".into(),
+        r#box: "population".into(),
+        view: "total".into(),
+        reduce: SummaryReduce::Sum,
+    };
+    let error = validate(observation_model(
+        vec![count_view("total")],
+        vec![summary.clone(), summary],
+    ))
+    .unwrap_err();
+    assert_eq!(error.path, "$.summaries[1].name");
+    assert_eq!(error.message, "duplicate summary name 'total_over_time'");
+}
+
+#[test]
+fn view_unknown_table_is_rejected() {
+    let mut view = count_view("total");
+    view.table = "Missing".into();
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].table");
+    assert_eq!(
+        error.message,
+        "view 'total' refers to unknown table 'Missing'"
+    );
+}
+
+#[test]
+fn view_unknown_filter_attribute_is_rejected() {
+    let mut view = count_view("filtered");
+    view.filter = Some(Expr::SelfAttr {
+        name: "missing_filter".into(),
+    });
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].filter.name");
+    assert_eq!(error.message, "unresolved self attribute 'missing_filter'");
+}
+
+#[test]
+fn view_unknown_value_attribute_is_rejected() {
+    let view = ViewDecl {
+        name: "sum".into(),
+        table: "Person".into(),
+        filter: None,
+        value: Some(Expr::SelfAttr {
+            name: "missing_value".into(),
+        }),
+        reduce: ViewReduce::Sum,
+    };
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].value.name");
+    assert_eq!(error.message, "unresolved self attribute 'missing_value'");
+}
+
+#[test]
+fn non_bool_view_filter_is_rejected() {
+    let mut view = count_view("filtered");
+    view.filter = Some(Expr::SelfAttr { name: "age".into() });
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].filter");
+    assert_eq!(error.message, "expected Bool, found Int");
+}
+
+#[test]
+fn count_view_with_value_is_rejected() {
+    let mut view = count_view("counted");
+    view.value = Some(Expr::SelfAttr { name: "age".into() });
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].value");
+    assert_eq!(
+        error.message,
+        "count view 'counted' must not declare a value"
+    );
+}
+
+#[test]
+fn non_numeric_view_value_is_rejected() {
+    let view = ViewDecl {
+        name: "invalid_sum".into(),
+        table: "Person".into(),
+        filter: None,
+        value: Some(Expr::Bool { value: true }),
+        reduce: ViewReduce::Sum,
+    };
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].value");
+    assert_eq!(error.message, "view value must be numeric, found Bool");
+}
+
+#[test]
+fn summary_missing_view_is_rejected() {
+    let summary = SummaryDecl {
+        name: "missing_summary".into(),
+        r#box: "population".into(),
+        view: "missing_view".into(),
+        reduce: SummaryReduce::Last,
+    };
+    let error = validate(observation_model(vec![count_view("total")], vec![summary])).unwrap_err();
+    assert_eq!(error.path, "$.summaries[0].view");
+    assert_eq!(
+        error.message,
+        "summary 'missing_summary' refers to unknown view 'population.missing_view'"
+    );
+}
+
+#[test]
+fn summary_missing_box_is_rejected() {
+    let summary = SummaryDecl {
+        name: "missing_summary".into(),
+        r#box: "missing_box".into(),
+        view: "total".into(),
+        reduce: SummaryReduce::Last,
+    };
+    let error = validate(observation_model(vec![count_view("total")], vec![summary])).unwrap_err();
+    assert_eq!(error.path, "$.summaries[0].box");
+    assert_eq!(
+        error.message,
+        "summary 'missing_summary' refers to unknown box 'missing_box'"
+    );
+}
+
+#[test]
+fn observation_names_are_not_transition_attributes() {
+    let mut model = observation_model(
+        vec![count_view("reported_total")],
+        vec![SummaryDecl {
+            name: "reported_total".into(),
+            r#box: "population".into(),
+            view: "reported_total".into(),
+            reduce: SummaryReduce::Last,
+        }],
+    );
+    model.boxes[0].transitions.push(Transition {
+        hazard: Expr::SelfAttr {
+            name: "reported_total".into(),
+        },
+        ..transition("cannot-read-observation")
+    });
+
+    let error = validate(model).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].transitions[0].hazard.name");
+    assert_eq!(error.message, "unresolved self attribute 'reported_total'");
+}
+
+#[test]
+fn non_count_view_without_value_is_rejected() {
+    let view = ViewDecl {
+        name: "maximum".into(),
+        table: "Person".into(),
+        filter: None,
+        value: None,
+        reduce: ViewReduce::Max,
+    };
+    let error = validate(observation_model(vec![view], vec![])).unwrap_err();
+    assert_eq!(error.path, "$.boxes[0].views[0].value");
+    assert_eq!(error.message, "Max view 'maximum' must declare a value");
 }

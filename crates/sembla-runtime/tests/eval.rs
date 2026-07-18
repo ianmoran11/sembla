@@ -74,8 +74,10 @@ fn validated_model(person_rows: u64, employer_rows: u64) -> sembla_ir::Validated
                 schema: vec![attr("amount", AttrType::Real), attr("code", AttrType::Int)],
             }],
             outputs: vec![],
+            views: vec![],
         }],
         wires: vec![],
+        summaries: vec![],
     })
     .expect("evaluation fixture must validate")
 }

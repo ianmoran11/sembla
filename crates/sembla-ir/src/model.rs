@@ -13,6 +13,8 @@ pub struct Model {
     pub params: Vec<ParamDecl>,
     pub boxes: Vec<Box>,
     pub wires: Vec<Wire>,
+    #[serde(default)]
+    pub summaries: Vec<SummaryDecl>,
 }
 
 /// A per-run constant parameter declaration (`DESIGN.md` §4.1).
@@ -65,6 +67,57 @@ pub struct Box {
     pub transitions: Vec<Transition>,
     pub inputs: Vec<PortDecl>,
     pub outputs: Vec<OutputDecl>,
+    #[serde(default)]
+    pub views: Vec<ViewDecl>,
+}
+
+/// A named scalar projection of one table evaluated after each committed tick.
+///
+/// Observation is a sink (`DESIGN.md` §4.6): view names cannot be referenced
+/// by expressions, transitions, wires, or port declarations and therefore
+/// cannot affect model execution.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ViewDecl {
+    pub name: String,
+    pub table: String,
+    pub filter: Option<Expr>,
+    pub value: Option<Expr>,
+    pub reduce: ViewReduce,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ViewReduce {
+    Sum,
+    Count,
+    Min,
+    Max,
+}
+
+/// A named scalar reduction over a box view's values in tick order.
+///
+/// Observation is a sink (`DESIGN.md` §4.6): summary names cannot be
+/// referenced by expressions, transitions, wires, or port declarations and
+/// therefore cannot affect model execution. `argmax_tick` selects the earliest
+/// tick attaining the maximum.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SummaryDecl {
+    pub name: String,
+    pub r#box: String,
+    pub view: String,
+    pub reduce: SummaryReduce,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SummaryReduce {
+    Sum,
+    Min,
+    Max,
+    Last,
+    ArgmaxTick,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

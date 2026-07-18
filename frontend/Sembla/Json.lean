@@ -10,12 +10,33 @@ private def object (fields : List (String × String)) : String :=
 private def opt (f : α → String) : Option α → String
   | none => "null"
   | some value => f value
-/-- Serialize an exact decimal as a JSON number.  Scientific notation keeps
-    the implementation general even for very large finite values and preserves
-    every decimal digit represented by `Scientific`. -/
+/-- Serialize an exact decimal using the same plain/scientific spelling
+    thresholds as serde_json's finite-f64 formatter. This keeps Lean exports
+    byte-compatible with Rust-canonical IR without losing source digits. -/
 private def scientific (value : Scientific) : String :=
   if value.coefficient == 0 then "0"
-  else s!"{value.coefficient}e{value.exponent}"
+  else
+    let negative := value.coefficient < 0
+    let sign := if negative then "-" else ""
+    let digits := toString value.coefficient.natAbs
+    let digitCount := Int.ofNat digits.length
+    let normalizedExponent := value.exponent + digitCount - 1
+    if normalizedExponent < -5 || normalizedExponent >= 16 then
+      let rest := digits.drop 1
+      let mantissa :=
+        if rest.isEmpty then digits.take 1
+        else digits.take 1 ++ "." ++ rest
+      let exponentSign := if normalizedExponent >= 0 then "+" else ""
+      sign ++ mantissa ++ "e" ++ exponentSign ++ toString normalizedExponent
+    else
+      let decimalPosition := digitCount + value.exponent
+      if decimalPosition <= 0 then
+        sign ++ "0." ++ String.mk (List.replicate (-decimalPosition).toNat '0') ++ digits
+      else if decimalPosition >= digitCount then
+        sign ++ digits ++ String.mk (List.replicate (decimalPosition - digitCount).toNat '0')
+      else
+        let position := decimalPosition.toNat
+        sign ++ digits.take position ++ "." ++ digits.drop position
 
 private def paramTypeJson : ParamType → String
   | .real => quote "real"
@@ -110,10 +131,14 @@ private def builderJson : OutputBuilder → String
 private def outputJson (output : OutputDecl) : String := object [
   ("name", quote output.name), ("schema", array (output.schema.map attrJson)),
   ("builder", builderJson output.builder)]
+/-- PRD 0002 keeps the existing Lean surface views-free while emitting the
+    additive observation fields required by Rust-canonical IR. PRD 0004 adds
+    declarations to the Lean IR and replaces these empty arrays. -/
 private def boxJson (box : Box) : String := object [
   ("name", quote box.name), ("tables", array (box.tables.map tableJson)),
   ("transitions", array (box.transitions.map transitionJson)),
-  ("inputs", array (box.inputs.map portJson)), ("outputs", array (box.outputs.map outputJson))]
+  ("inputs", array (box.inputs.map portJson)), ("outputs", array (box.outputs.map outputJson)),
+  ("views", array [])]
 private def endpointJson (endpoint : WireEndpoint) : String := object [
   ("box", quote endpoint.box), ("port", quote endpoint.port)]
 private def wireJson (wire : Wire) : String := object [
@@ -122,6 +147,6 @@ private def wireJson (wire : Wire) : String := object [
 def toJson (model : Model) : String := object [
   ("name", quote model.name), ("dt", scientific model.dt),
   ("params", array (model.params.map paramJson)), ("boxes", array (model.boxes.map boxJson)),
-  ("wires", array (model.wires.map wireJson))] ++ "\n"
+  ("wires", array (model.wires.map wireJson)), ("summaries", array [])] ++ "\n"
 
 end Sembla.IR

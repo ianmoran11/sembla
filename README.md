@@ -19,7 +19,7 @@ cargo run -p sembla-cli -- validate examples/two_state.json
 
 ## IR JSON conventions
 
-IR enums use snake-case `kind` tags, declarations retain source order, and the canonical serializer emits compact JSON with one trailing newline. Validation assigns zero-based `rule_id` values to transitions in declaration order across all boxes; IDs are derived metadata on `ValidatedModel` and are not serialized into the wire format. Parameter expressions always retain symbolic names rather than inlining per-run values.
+IR enums use snake-case `kind` tags, declarations retain source order, and the canonical serializer emits compact JSON with one trailing newline. Validation assigns zero-based `rule_id` values to transitions in declaration order across all boxes; IDs are derived metadata on `ValidatedModel` and are not serialized into the wire format. Parameter expressions always retain symbolic names rather than inlining per-run values. Box-local views declare per-tick scalar projections of committed state, and model summaries declare scalar reductions over those view values. Observation is a sink: view and summary names cannot be referenced by expressions, transitions, wires, or ports and therefore cannot affect execution.
 
 ## SIR end-to-end example
 

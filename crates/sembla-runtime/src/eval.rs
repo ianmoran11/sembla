@@ -1798,8 +1798,10 @@ mod tests {
                 transitions: Vec::new(),
                 inputs: Vec::new(),
                 outputs: Vec::new(),
+                views: Vec::new(),
             }],
             wires: Vec::new(),
+            summaries: Vec::new(),
         })
         .unwrap();
         let params = ParamEnv::defaults(&model);
