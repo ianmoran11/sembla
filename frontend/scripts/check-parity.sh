@@ -46,6 +46,7 @@ lake build
 bash scripts/test-negative.sh
 lake exe sembla-export sir "$tmp/sir.json"
 lake exe sembla-export Sembla.Models.sirPolicy "$tmp/sir_policy.json"
+lake exe sembla-export observations "$tmp/observations.json"
 for specification in "${canonical_models[@]}"; do
   IFS='|' read -r export_name file _ _ _ <<<"$specification"
   lake exe sembla-export "$export_name" "$tmp/$file"
@@ -60,15 +61,12 @@ done
 cd "$repo_root"
 cargo build --quiet -p sembla-cli
 sembla="$repo_root/target/debug/sembla"
-"$sembla" validate examples/sir.json
-"$sembla" validate examples/sir_policy.json
-"$sembla" validate "$tmp/sir.json"
-"$sembla" validate "$tmp/sir_policy.json"
-# PRD 0003 migrates the checked fixtures to declared observations. The Lean
-# surface intentionally remains observation-free until PRD 0004, so full IR
-# equality for these two fixtures is temporarily replaced by validation plus
-# the state-hash parity check below. Canonical views-free models retain exact
-# byte and normalized parity in the loops that follow.
+for file in sir.json sir_policy.json observations.json; do
+  "$sembla" validate "examples/$file"
+  "$sembla" validate "$tmp/$file"
+  cmp "examples/$file" "$tmp/$file"
+  "$sembla" diff-ir "examples/$file" "$tmp/$file"
+done
 alias_index=0
 for specification in "${canonical_aliases[@]}"; do
   IFS='|' read -r _ file <<<"$specification"
@@ -118,14 +116,16 @@ for specification in "${canonical_models[@]}"; do
   ' "$tmp/${file%.json}-checked-first.csv"
 done
 
-# End-to-end parity traverses population serialization and the executor, not
-# only JSON normalization. Until PRD 0004 teaches Lean the observation surface,
-# reported CSV and observation hashes intentionally differ; final state must
-# remain bitwise identical by the observation-sink invariant.
+# End-to-end parity traverses population serialization, observations, and the
+# executor rather than stopping at JSON normalization.
 "$sembla" synth-pop --persons 1000 --employers 50 --initial-infected 10 --seed 12 --out "$tmp/pop.bin" >/dev/null
-"$sembla" run examples/sir.json --population "$tmp/pop.bin" --seed 55 --ticks 20 --out "$tmp/fixture.csv" >"$tmp/fixture.hashes"
-"$sembla" run "$tmp/sir.json" --population "$tmp/pop.bin" --seed 55 --ticks 20 --out "$tmp/exported.csv" >"$tmp/exported.hashes"
-grep -o 'final_state_sha256=[^ ]*' "$tmp/fixture.hashes" >"$tmp/fixture.state-hash"
-grep -o 'final_state_sha256=[^ ]*' "$tmp/exported.hashes" >"$tmp/exported.state-hash"
-cmp "$tmp/fixture.state-hash" "$tmp/exported.state-hash"
-echo "Lean export, validation, canonical-byte/normalized parity, and state-hash parity passed"
+for stem in sir sir_policy; do
+  "$sembla" run "examples/$stem.json" --population "$tmp/pop.bin" --seed 55 --ticks 20 \
+    --out "$tmp/$stem-fixture.csv" >"$tmp/$stem-fixture.hashes"
+  "$sembla" run "$tmp/$stem.json" --population "$tmp/pop.bin" --seed 55 --ticks 20 \
+    --out "$tmp/$stem-exported.csv" >"$tmp/$stem-exported.hashes"
+  cmp "$tmp/$stem-fixture.csv" "$tmp/$stem-exported.csv"
+  cmp "$tmp/$stem-fixture.csv.summaries.csv" "$tmp/$stem-exported.csv.summaries.csv"
+  cmp "$tmp/$stem-fixture.hashes" "$tmp/$stem-exported.hashes"
+done
+echo "Lean export, validation, canonical-byte/normalized parity, observation parity, and execution-hash parity passed"

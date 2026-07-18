@@ -131,22 +131,38 @@ private def builderJson : OutputBuilder → String
 private def outputJson (output : OutputDecl) : String := object [
   ("name", quote output.name), ("schema", array (output.schema.map attrJson)),
   ("builder", builderJson output.builder)]
-/-- PRD 0002 keeps the existing Lean surface views-free while emitting the
-    additive observation fields required by Rust-canonical IR. PRD 0004 adds
-    declarations to the Lean IR and replaces these empty arrays. -/
+private def viewReduceJson : ViewReduce → String
+  | .sum => quote "sum"
+  | .count => quote "count"
+  | .min => quote "min"
+  | .max => quote "max"
+private def viewJson (view : ViewDecl) : String := object [
+  ("name", quote view.name), ("table", quote view.table),
+  ("filter", opt exprJson view.filter), ("value", opt exprJson view.value),
+  ("reduce", viewReduceJson view.reduce)]
 private def boxJson (box : Box) : String := object [
   ("name", quote box.name), ("tables", array (box.tables.map tableJson)),
   ("transitions", array (box.transitions.map transitionJson)),
   ("inputs", array (box.inputs.map portJson)), ("outputs", array (box.outputs.map outputJson)),
-  ("views", array [])]
+  ("views", array (box.views.map viewJson))]
 private def endpointJson (endpoint : WireEndpoint) : String := object [
   ("box", quote endpoint.box), ("port", quote endpoint.port)]
 private def wireJson (wire : Wire) : String := object [
   ("from", endpointJson wire.source), ("to", endpointJson wire.target)]
+private def summaryReduceJson : SummaryReduce → String
+  | .sum => quote "sum"
+  | .min => quote "min"
+  | .max => quote "max"
+  | .last => quote "last"
+  | .argmaxTick => quote "argmax_tick"
+private def summaryJson (summary : SummaryDecl) : String := object [
+  ("name", quote summary.name), ("box", quote summary.box),
+  ("view", quote summary.view), ("reduce", summaryReduceJson summary.reduce)]
 
 def toJson (model : Model) : String := object [
   ("name", quote model.name), ("dt", scientific model.dt),
   ("params", array (model.params.map paramJson)), ("boxes", array (model.boxes.map boxJson)),
-  ("wires", array (model.wires.map wireJson)), ("summaries", array [])] ++ "\n"
+  ("wires", array (model.wires.map wireJson)),
+  ("summaries", array (model.summaries.map summaryJson))] ++ "\n"
 
 end Sembla.IR

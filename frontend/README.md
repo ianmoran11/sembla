@@ -1,7 +1,7 @@
 # Sembla Lean frontend
 
 This Lean 4 package contains Sembla's pure deep IR, a small surface DSL, and
-seven Lean-authored example models. It deliberately does not depend on mathlib.
+eight Lean-authored example models. It deliberately does not depend on mathlib.
 `lean-toolchain` pins Lean 4.13.0, so an `elan` installation selects
 the same compiler automatically.
 
@@ -38,17 +38,35 @@ def sir : Model := model% "sir_workplace_frequency_dependent" step(0.25) where
       guard health = I
       hazard parameter gamma
       set [health := R]]
-    outputs []]
+    outputs []
+    views [
+      view S from Person where health = S reduce count,
+      view I from Person where health = I reduce count,
+      view R from Person where health = R reduce count]]
   wires []
+  summaries [
+    summary peak_I from sir view I reduce max,
+    summary peak_tick from sir view I reduce argmax_tick]
 ```
 
 The elaborator first collects the actual model parameters, boxes, systems,
-ports, transitions, outputs, and wires. It then resolves references and emits
+ports, transitions, outputs, views, wires, and summaries. It then resolves
+references and emits
 the deep IR. A transition's attributes come only from its selected `on`
 system, parameter scope comes only from the enclosing model, and input scope
 comes only from the enclosing box. Reference targets come only from systems
 in that same box; collection happens before resolution, so forward references
 such as `Person` referring to the later `Employer` declaration work.
+
+Views and summaries are observation sinks. Views are declared in their box;
+a view names its source system, may add a `where` predicate, and either uses
+`reduce count` without a value or `using <expression>` with `sum`, `min`, or
+`max`. Model-level summaries name a box and view and fold it with `sum`, `min`,
+`max`, `last`, or `argmax_tick`; the last reduction returns the earliest tick
+attaining the maximum. Both lists preserve textual declaration order in the
+exported IR and reported columns. Unknown systems or attributes, non-Boolean filters, invalid
+count/value combinations, and undeclared summary views fail elaboration rather
+than becoming inert syntax.
 
 There are no caller-supplied attribute, parameter, input, or reference-target
 allow-lists. Ports, output builders, and wires use the same enclosing syntax:
@@ -65,14 +83,15 @@ Expressions support numeric arithmetic, enum guards, symbolic
 the examples. Output builders and wire endpoints/schemas are checked against
 the same collected declarations. Failures use `throwErrorAt` on the original
 surface token. Complete ill-formed models under `Negative/` exercise unknown
-attributes, non-Boolean guards, unknown reference targets, undeclared
-parameters, unknown inputs, effects, systems, invalid numeric typing, enum
-schemas, and Rust representation bounds. `Positive/` covers a forward
-reference, a priorless parameter, and canonical output-field ordering. Run all of them with
+attributes, non-Boolean guards and view filters, unknown reference targets,
+undeclared parameters and summary views, invalid view declarations, unknown
+inputs, effects, systems, invalid numeric typing, enum schemas, and Rust
+representation bounds. `Positive/` covers a forward reference, a priorless
+parameter, canonical output-field ordering, and observation declaration order. Run all of them with
 `bash scripts/test-negative.sh`.
 
-`Sembla.Models` authors the SIR fixtures and five canonical finite-state
-examples as complete model blocks. Parameter references become `Expr.param`
+`Sembla.Models` authors the SIR fixtures, the all-reduction observation fixture,
+and five canonical finite-state examples as complete model blocks. Parameter references become `Expr.param`
 nodes; defaults and optional priors remain in
 the model's first-class `params` block and are never substituted into hazards.
 Real values are stored as exact coefficient/exponent `Scientific` data, so JSON
@@ -86,6 +105,7 @@ From `frontend/`:
 ```sh
 lake exe sembla-export sir /tmp/sir.json
 lake exe sembla-export Sembla.Models.sirPolicy /tmp/sir_policy.json
+lake exe sembla-export observations /tmp/observations.json
 lake exe sembla-export reversible_ctmc /tmp/reversible_ctmc.json
 lake exe sembla-export radioactive_decay_chain /tmp/radioactive_decay_chain.json
 lake exe sembla-export sis_importation /tmp/sis_importation.json
@@ -95,6 +115,7 @@ cd ..
 cargo run -p sembla-cli -- validate /tmp/sir.json
 cargo run -p sembla-cli -- diff-ir examples/sir.json /tmp/sir.json
 cargo run -p sembla-cli -- diff-ir examples/sir_policy.json /tmp/sir_policy.json
+cargo run -p sembla-cli -- diff-ir examples/observations.json /tmp/observations.json
 cargo run -p sembla-cli -- diff-ir examples/reversible_ctmc.json /tmp/reversible_ctmc.json
 ```
 
@@ -112,11 +133,12 @@ fixed-seed execution-hash check, run:
 bash frontend/scripts/check-parity.sh
 ```
 
-That script exports, validates, and compares all seven Lean models. It
-synthesizes one SIR population for the original checked/exported SIR parity
-contract, then runs every canonical checked/exported pair twice from numeric
-initialization, asserting identical result/final-state hashes, identical CSV
-bytes, nontrivial dynamics, and conserved enum counts. The repository
+That script exports, validates, and compares all eight Lean models. It
+synthesizes one SIR population for checked/exported SIR and SIR-policy
+observation/runtime parity, then runs every canonical checked/exported pair
+twice from numeric initialization, asserting identical result/final-state and
+observation hashes, identical CSV bytes, nontrivial dynamics, and conserved
+enum counts. The repository
 `scripts/check.sh` runs the same workflow whenever `lake` is available and
 prints a skip warning on Rust-only hosts.
 

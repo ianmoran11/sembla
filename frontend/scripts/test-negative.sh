@@ -51,7 +51,18 @@ check_failure Negative/OutOfRangeReal.lean \
   "Negative/OutOfRangeReal.lean:4:44: error: decimal literal is outside the supported finite f64 range"
 check_failure Negative/OversizedRows.lean \
   "Negative/OversizedRows.lean:7:44: error: row count exceeds the IR u64 range"
+check_failure Negative/UnknownViewTable.lean \
+  "Negative/UnknownViewTable.lean:13:33: error: view 'bad_table' refers to unknown table 'Missing'"
+check_failure Negative/UnknownViewAttribute.lean \
+  "Negative/UnknownViewAttribute.lean:14:50: error: view 'bad_attribute': unknown state or attribute 'missing'"
+check_failure Negative/NonBooleanViewFilter.lean \
+  "Negative/NonBooleanViewFilter.lean:13:47: error: view 'bad_filter' filter has type Int; expected Bool"
+check_failure Negative/CountViewWithValue.lean \
+  "Negative/CountViewWithValue.lean:13:18: error: view 'bad_count' with reduce count cannot declare a value expression"
+check_failure Negative/UnknownSummaryView.lean \
+  "Negative/UnknownSummaryView.lean:15:54: error: summary 'bad_summary' refers to undeclared view 'population.absent'"
 
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
+lake env lean Positive/ObservationOrder.lean
 echo "Lean positioned negative and positive elaboration tests passed"

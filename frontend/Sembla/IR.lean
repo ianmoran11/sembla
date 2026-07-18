@@ -121,12 +121,24 @@ structure OutputDecl where
   schema : List Attr
   builder : OutputBuilder
 deriving Repr, BEq
+
+inductive ViewReduce where
+  | sum | count | min | max
+deriving Repr, BEq
+structure ViewDecl where
+  name : String
+  table : String
+  filter : Option Expr
+  value : Option Expr
+  reduce : ViewReduce
+deriving Repr, BEq
 structure Box where
   name : String
   tables : List Table
   transitions : List Transition
   inputs : List PortDecl
   outputs : List OutputDecl
+  views : List ViewDecl
 deriving Repr, BEq
 structure WireEndpoint where
   box : String
@@ -136,12 +148,23 @@ structure Wire where
   source : WireEndpoint
   target : WireEndpoint
 deriving Repr, BEq
+
+inductive SummaryReduce where
+  | sum | min | max | last | argmaxTick
+deriving Repr, BEq
+structure SummaryDecl where
+  name : String
+  box : String
+  view : String
+  reduce : SummaryReduce
+deriving Repr, BEq
 structure Model where
   name : String
   dt : Scientific
   params : List ParamDecl
   boxes : List Box
   wires : List Wire
+  summaries : List SummaryDecl
 deriving Repr, BEq
 
 end Sembla.IR

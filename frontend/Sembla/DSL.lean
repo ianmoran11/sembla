@@ -59,6 +59,21 @@ structure SurfaceOutput where
   system : TSyntax `ident
   fields : List SurfaceOutputField
 
+structure SurfaceView where
+  name : String
+  token : Syntax
+  system : TSyntax `ident
+  filter : Option (TSyntax `semblaExpr)
+  value : Option (TSyntax `semblaExpr)
+  reduce : String
+
+structure SurfaceSummary where
+  name : String
+  token : Syntax
+  box : TSyntax `ident
+  view : TSyntax `ident
+  reduce : String
+
 structure SurfaceBox where
   name : String
   token : Syntax
@@ -66,6 +81,7 @@ structure SurfaceBox where
   inputs : List SurfaceInput
   transitions : List SurfaceTransition
   outputs : List SurfaceOutput
+  views : List SurfaceView
 
 structure SurfaceWire where
   fromBox : TSyntax `ident
@@ -128,12 +144,44 @@ syntax "field" ident ":=" "sum" "(" semblaExpr ")" : semblaOutputField
 declare_syntax_cat semblaOutput
 syntax "output" ident "{" semblaAttr,* "}" "from" ident "fields" "[" semblaOutputField,* "]" : semblaOutput
 
+declare_syntax_cat semblaViewReduce
+syntax "sum" : semblaViewReduce
+syntax "count" : semblaViewReduce
+syntax "min" : semblaViewReduce
+syntax "max" : semblaViewReduce
+
+declare_syntax_cat semblaView
+syntax "view" ident "from" ident "reduce" semblaViewReduce : semblaView
+syntax "view" ident "from" ident "where" semblaExpr "reduce" semblaViewReduce : semblaView
+syntax "view" ident "from" ident "using" semblaExpr "reduce" semblaViewReduce : semblaView
+syntax "view" ident "from" ident "where" semblaExpr "using" semblaExpr
+  "reduce" semblaViewReduce : semblaView
+
+declare_syntax_cat semblaSummaryReduce
+syntax "sum" : semblaSummaryReduce
+syntax "min" : semblaSummaryReduce
+syntax "max" : semblaSummaryReduce
+syntax "last" : semblaSummaryReduce
+syntax "argmax_tick" : semblaSummaryReduce
+
+declare_syntax_cat semblaSummary
+syntax "summary" ident "from" ident "view" ident "reduce" semblaSummaryReduce : semblaSummary
+
+declare_syntax_cat semblaSummaryBlock
+syntax "summaries" "[" semblaSummary,* "]" : semblaSummaryBlock
+
 declare_syntax_cat semblaBox
 syntax "box" ident "where"
   "systems" "[" semblaSystem,* "]"
   "inputs" "[" semblaInput,* "]"
   "transitions" "[" semblaTransition,* "]"
   "outputs" "[" semblaOutput,* "]" : semblaBox
+syntax "box" ident "where"
+  "systems" "[" semblaSystem,* "]"
+  "inputs" "[" semblaInput,* "]"
+  "transitions" "[" semblaTransition,* "]"
+  "outputs" "[" semblaOutput,* "]"
+  "views" "[" semblaView,* "]" : semblaBox
 
 declare_syntax_cat semblaWire
 syntax "wire" ident ident "->" ident ident : semblaWire
@@ -260,6 +308,52 @@ private def parseOutput (stx : TSyntax `semblaOutput) : TermElabM SurfaceOutput 
         ← fieldDecls.getElems.toList.mapM parseOutputField⟩
   | _ => throwUnsupportedSyntax
 
+private def parseViewReduce (stx : TSyntax `semblaViewReduce) : TermElabM String := do
+  match stx with
+  | `(semblaViewReduce| sum) => pure "sum"
+  | `(semblaViewReduce| count) => pure "count"
+  | `(semblaViewReduce| min) => pure "min"
+  | `(semblaViewReduce| max) => pure "max"
+  | _ => throwUnsupportedSyntax
+
+private def parseView (stx : TSyntax `semblaView) : TermElabM SurfaceView := do
+  match stx with
+  | `(semblaView| view $name:ident from $source:ident reduce $reducer:semblaViewReduce) =>
+      pure ⟨identText name, name.raw, source, none, none, ← parseViewReduce reducer⟩
+  | `(semblaView| view $name:ident from $source:ident where $filter:semblaExpr
+        reduce $reducer:semblaViewReduce) =>
+      pure ⟨identText name, name.raw, source, some filter, none, ← parseViewReduce reducer⟩
+  | `(semblaView| view $name:ident from $source:ident using $value:semblaExpr
+        reduce $reducer:semblaViewReduce) =>
+      pure ⟨identText name, name.raw, source, none, some value, ← parseViewReduce reducer⟩
+  | `(semblaView| view $name:ident from $source:ident where $filter:semblaExpr
+        using $value:semblaExpr reduce $reducer:semblaViewReduce) =>
+      pure ⟨identText name, name.raw, source, some filter, some value, ← parseViewReduce reducer⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseSummaryReduce (stx : TSyntax `semblaSummaryReduce) : TermElabM String := do
+  match stx with
+  | `(semblaSummaryReduce| sum) => pure "sum"
+  | `(semblaSummaryReduce| min) => pure "min"
+  | `(semblaSummaryReduce| max) => pure "max"
+  | `(semblaSummaryReduce| last) => pure "last"
+  | `(semblaSummaryReduce| argmax_tick) => pure "argmax_tick"
+  | _ => throwUnsupportedSyntax
+
+private def parseSummary (stx : TSyntax `semblaSummary) : TermElabM SurfaceSummary := do
+  match stx with
+  | `(semblaSummary| summary $name:ident from $boxName:ident view $viewName:ident
+        reduce $reducer:semblaSummaryReduce) =>
+      pure ⟨identText name, name.raw, boxName, viewName, ← parseSummaryReduce reducer⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseSummaryBlock (stx : TSyntax `semblaSummaryBlock) :
+    TermElabM (List SurfaceSummary) := do
+  match stx with
+  | `(semblaSummaryBlock| summaries [$declarations:semblaSummary,*]) =>
+      declarations.getElems.toList.mapM parseSummary
+  | _ => throwUnsupportedSyntax
+
 private def parseBox (stx : TSyntax `semblaBox) : TermElabM SurfaceBox := do
   match stx with
   | `(semblaBox| box $name:ident where
@@ -271,7 +365,19 @@ private def parseBox (stx : TSyntax `semblaBox) : TermElabM SurfaceBox := do
         ← systemDecls.getElems.toList.mapM parseSystem,
         ← inputDecls.getElems.toList.mapM parseInput,
         ← transitionDecls.getElems.toList.mapM parseTransition,
-        ← outputDecls.getElems.toList.mapM parseOutput⟩
+        ← outputDecls.getElems.toList.mapM parseOutput, []⟩
+  | `(semblaBox| box $name:ident where
+        systems [$systemDecls:semblaSystem,*]
+        inputs [$inputDecls:semblaInput,*]
+        transitions [$transitionDecls:semblaTransition,*]
+        outputs [$outputDecls:semblaOutput,*]
+        views [$viewDecls:semblaView,*]) =>
+      pure ⟨identText name, name.raw,
+        ← systemDecls.getElems.toList.mapM parseSystem,
+        ← inputDecls.getElems.toList.mapM parseInput,
+        ← transitionDecls.getElems.toList.mapM parseTransition,
+        ← outputDecls.getElems.toList.mapM parseOutput,
+        ← viewDecls.getElems.toList.mapM parseView⟩
   | _ => throwUnsupportedSyntax
 
 private def parseWire (stx : TSyntax `semblaWire) : TermElabM SurfaceWire := do
@@ -346,9 +452,18 @@ private def attrTerm (boxCtx : SurfaceBox) (column : SurfaceAttr) : TermElabM (T
   | .bool => throwErrorAt column.nameToken "Boolean state columns are not part of IR v0.1"
 
 private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List SurfaceAttr)
-    (paramCtx : List SurfaceParam) (inputCtx : List SurfaceInput) (stx : Syntax) :
-    TermElabM (TSyntax `term × SurfaceTy) := do
-  let recur := elaborateExpr tableCtx attrs paramCtx inputCtx
+    (paramCtx : List SurfaceParam) (inputCtx : List SurfaceInput) (stx : Syntax)
+    (declaration : Option String := none) : TermElabM (TSyntax `term × SurfaceTy) := do
+  let recur := fun expression =>
+    elaborateExpr tableCtx attrs paramCtx inputCtx expression declaration
+  let lookupExprAttr := fun (token : TSyntax `ident) => do
+    let name := identText token
+    match attrs.find? (·.name == name) with
+    | some found => pure found
+    | none =>
+        match declaration with
+        | some context => throwErrorAt token "{context}: unknown state or attribute '{name}'"
+        | none => throwErrorAt token "unknown state or attribute '{name}'"
   match stx with
   | `(semblaExpr| ($inner:semblaExpr)) => recur inner
   | `(semblaExpr| $value:num) => pure (← `(Expr.int $value), .int)
@@ -361,10 +476,10 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
         throwErrorAt name "undeclared parameter '{value}'"
       pure (← `(Expr.param $(Lean.quote value)), .real)
   | `(semblaExpr| $name:ident) =>
-      let column ← lookupAttr attrs name
+      let column ← lookupExprAttr name
       pure (← `(Expr.selfAttr $(Lean.quote column.name)), column.ty)
   | `(semblaExpr| countBy $fk:ident ($filter:semblaExpr)) =>
-      let fkAttr ← lookupAttr attrs fk
+      let fkAttr ← lookupExprAttr fk
       match fkAttr.ty with
       | .ref _ => pure ()
       | _ => throwErrorAt fk "countBy key '{identText fk}' must be a Ref attribute"
@@ -373,7 +488,7 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
       pure (← `(Expr.agg AggOp.count $(Lean.quote tableCtx.irName) $(Lean.quote fkAttr.name)
         $(Lean.quote fkAttr.name) $filterTerm), .int)
   | `(semblaExpr| sizeBy $fk:ident) =>
-      let fkAttr ← lookupAttr attrs fk
+      let fkAttr ← lookupExprAttr fk
       match fkAttr.ty with
       | .ref _ => pure ()
       | _ => throwErrorAt fk "sizeBy key '{identText fk}' must be a Ref attribute"
@@ -399,7 +514,7 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
   | `(semblaExpr| $lhs:semblaExpr = $rhs:semblaExpr) =>
       match lhs, rhs with
       | `(semblaExpr| $attrName:ident), `(semblaExpr| $variant:ident) =>
-          let column ← lookupAttr attrs attrName
+          let column ← lookupExprAttr attrName
           match column.ty with
           | .enum variants =>
               let variantName := identText variant
@@ -537,6 +652,67 @@ private def outputTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
   `(OutputDecl.mk $(Lean.quote outputDecl.name) [$schemaTerms,*]
       (OutputBuilder.perTable $(Lean.quote selected.irName) [$fieldTerms,*]))
 
+private def viewTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
+    (viewDecl : SurfaceView) : TermElabM (TSyntax `term) := do
+  let systemName := identText viewDecl.system
+  let selected ← match boxCtx.systems.find? (·.logicalName == systemName) with
+    | some found => pure found
+    | none => throwErrorAt viewDecl.system
+        "view '{viewDecl.name}' refers to unknown table '{systemName}'"
+  let context := some s!"view '{viewDecl.name}'"
+  let filterTerm ← match viewDecl.filter with
+    | none => `(none)
+    | some filterExpr =>
+        let (term, ty) ← elaborateExpr selected selected.attrs paramCtx boxCtx.inputs
+          filterExpr context
+        if ty != .bool then
+          throwErrorAt filterExpr
+            "view '{viewDecl.name}' filter has type {typeName ty}; expected Bool"
+        `(some $term)
+  let valueTerm ← match viewDecl.reduce, viewDecl.value with
+    | "count", none => `(none)
+    | "count", some _ => throwErrorAt viewDecl.token
+        "view '{viewDecl.name}' with reduce count cannot declare a value expression"
+    | _, none => throwErrorAt viewDecl.token
+        "view '{viewDecl.name}' with reduce {viewDecl.reduce} must declare a value expression"
+    | _, some valueExpr =>
+        let (term, ty) ← elaborateExpr selected selected.attrs paramCtx boxCtx.inputs
+          valueExpr context
+        unless isNumeric ty do
+          throwErrorAt valueExpr
+            "view '{viewDecl.name}' value has type {typeName ty}; expected Real or Int"
+        `(some $term)
+  let reduceTerm ← match viewDecl.reduce with
+    | "sum" => `(ViewReduce.sum)
+    | "count" => `(ViewReduce.count)
+    | "min" => `(ViewReduce.min)
+    | "max" => `(ViewReduce.max)
+    | _ => throwErrorAt viewDecl.token "unsupported view reduction '{viewDecl.reduce}'"
+  `(ViewDecl.mk $(Lean.quote viewDecl.name) $(Lean.quote selected.irName)
+      $filterTerm $valueTerm $reduceTerm)
+
+private def summaryTerm (boxCtxs : List SurfaceBox) (summaryDecl : SurfaceSummary) :
+    TermElabM (TSyntax `term) := do
+  let boxName := identText summaryDecl.box
+  let boxCtx ← match boxCtxs.find? (·.name == boxName) with
+    | some found => pure found
+    | none => throwErrorAt summaryDecl.box
+        "summary '{summaryDecl.name}' refers to unknown box '{boxName}'"
+  let viewName := identText summaryDecl.view
+  unless boxCtx.views.any (·.name == viewName) do
+    throwErrorAt summaryDecl.view
+      "summary '{summaryDecl.name}' refers to undeclared view '{boxName}.{viewName}'"
+  let reduceTerm ← match summaryDecl.reduce with
+    | "sum" => `(SummaryReduce.sum)
+    | "min" => `(SummaryReduce.min)
+    | "max" => `(SummaryReduce.max)
+    | "last" => `(SummaryReduce.last)
+    | "argmax_tick" => `(SummaryReduce.argmaxTick)
+    | _ => throwErrorAt summaryDecl.token
+        "unsupported summary reduction '{summaryDecl.reduce}'"
+  `(SummaryDecl.mk $(Lean.quote summaryDecl.name) $(Lean.quote boxName)
+      $(Lean.quote viewName) $reduceTerm)
+
 private def resolvedTy (boxCtx : SurfaceBox) : SurfaceTy → Option SurfaceTy
   | .ref logical => boxCtx.systems.find? (·.logicalName == logical) |>.map fun target => .ref target.irName
   | ty => some ty
@@ -555,12 +731,16 @@ private opaque evalModel (expr : Lean.Expr) : TermElabM Model
 elab "model%" name:str "step" "(" dt:term ")" "where"
     "params" "[" paramDecls:semblaParam,* "]"
     "boxes" "[" boxDecls:semblaBox,* "]"
-    "wires" "[" wireDecls:semblaWire,* "]" : term => do
+    "wires" "[" wireDecls:semblaWire,* "]"
+    summaryBlock:(semblaSummaryBlock)? : term => do
   -- Pass one: collect every declaration and retain the original syntax tokens.
   validateStep dt
   let paramCtx ← paramDecls.getElems.toList.mapM parseParam
   let boxCtxs ← boxDecls.getElems.toList.mapM parseBox
   let wireCtx ← wireDecls.getElems.toList.mapM parseWire
+  let summaryCtx ← match summaryBlock with
+    | some declarations => parseSummaryBlock declarations
+    | none => pure []
   ensureUnique "parameter" (paramCtx.map fun p => (p.name, p.token))
   for paramDecl in paramCtx do
     validateRealTerm paramDecl.default
@@ -577,12 +757,16 @@ elab "model%" name:str "step" "(" dt:term ")" "where"
     ensureUnique "input port" (boxCtx.inputs.map fun p => (p.name, p.token))
     ensureUnique "transition" (boxCtx.transitions.map fun t => (t.name, t.token))
     ensureUnique "output port" (boxCtx.outputs.map fun p => (p.name, p.token))
+    ensureUnique "view" (boxCtx.views.map fun declaration =>
+      (declaration.name, declaration.token))
     for selected in boxCtx.systems do
       validateAttrs "attribute" selected.attrs
     for inputDecl in boxCtx.inputs do
       validateAttrs "input field" inputDecl.schema
     for outputDecl in boxCtx.outputs do
       validateAttrs "output schema field" outputDecl.schema
+  ensureUnique "summary" (summaryCtx.map fun declaration =>
+    (declaration.name, declaration.token))
 
   -- Pass two: resolve from the declarations above and emit one pure deep-IR term.
   let mut paramTerms : Array (TSyntax `term) := #[]
@@ -609,8 +793,9 @@ elab "model%" name:str "step" "(" dt:term ")" "where"
       let schemaTerms ← inputDecl.schema.toArray.mapM (attrTerm boxCtx)
       inputTerms := inputTerms.push (← `(PortDecl.mk $(Lean.quote inputDecl.name) [$schemaTerms,*]))
     let outputTerms ← boxCtx.outputs.toArray.mapM (outputTerm paramCtx boxCtx)
+    let viewTerms ← boxCtx.views.toArray.mapM (viewTerm paramCtx boxCtx)
     boxTerms := boxTerms.push (← `(Box.mk $(Lean.quote boxCtx.name) [$tableTerms,*]
-      [$transitionTerms,*] [$inputTerms,*] [$outputTerms,*]))
+      [$transitionTerms,*] [$inputTerms,*] [$outputTerms,*] [$viewTerms,*]))
 
   let mut wireTerms : Array (TSyntax `term) := #[]
   let mut deliveredInputs : List String := []
@@ -641,7 +826,12 @@ elab "model%" name:str "step" "(" dt:term ")" "where"
       (WireEndpoint.mk $(Lean.quote fromBoxName) $(Lean.quote fromPortName))
       (WireEndpoint.mk $(Lean.quote toBoxName) $(Lean.quote toPortName))))
 
-  let result ← `(Model.mk $name $dt [$paramTerms,*] [$boxTerms,*] [$wireTerms,*])
+  let mut summaryTerms : Array (TSyntax `term) := #[]
+  for summaryDecl in summaryCtx do
+    summaryTerms := summaryTerms.push (← summaryTerm boxCtxs summaryDecl)
+
+  let result ← `(Model.mk $name $dt [$paramTerms,*] [$boxTerms,*] [$wireTerms,*]
+    [$summaryTerms,*])
   let elaborated ← elabTerm result none
   synthesizeSyntheticMVarsNoPostponing
   let modelValue ← evalModel elaborated

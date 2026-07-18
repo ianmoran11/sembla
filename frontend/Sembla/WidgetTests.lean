@@ -68,6 +68,7 @@ private def withoutGammaPrior (declaration : ParamDecl) : ParamDecl :=
 
 private def priorlessModel : Model :=
   Model.mk sir.name sir.dt (sir.params.map withoutGammaPrior) sir.boxes sir.wires
+    sir.summaries
 
 private def priorlessRecover : HazardPanelProps :=
   (hazardPanelProps? priorlessModel "sir" "recover").get!

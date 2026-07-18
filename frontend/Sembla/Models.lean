@@ -26,8 +26,38 @@ def sir : Model := model% "sir_workplace_frequency_dependent" step(0.25) where
           guard health = I
           hazard parameter gamma
           set [health := R]]
-      outputs []]
+      outputs []
+      views [
+        view S from Person where health = S reduce count,
+        view I from Person where health = I reduce count,
+        view R from Person where health = R reduce count]]
   wires []
+  summaries [
+    summary peak_I from sir view I reduce max,
+    summary peak_tick from sir view I reduce argmax_tick]
+
+/-- The PRD-0002 observation fixture covers every view reduction. -/
+def observations : Model := model% "observations" step(1.0) where
+  params []
+  boxes [
+    box population where
+      systems [
+        system Person as "Person" rows(4) where [
+          state status : {active, inactive},
+          attr value : Real,
+          attr visits : Int]]
+      inputs []
+      transitions []
+      outputs []
+      views [
+        view total_value from Person using value reduce sum,
+        view active_count from Person where status = active reduce count,
+        view minimum_visits from Person using visits reduce min,
+        view maximum_value from Person using value reduce max]]
+  wires []
+  summaries [
+    summary total_value_over_time from population view total_value reduce sum,
+    summary peak_value_tick from population view maximum_value reduce argmax_tick]
 
 /-- The two-box feedback fixture.  Declaration order intentionally preserves
     population rule IDs 0 and 1 for common-random-numbers parity. -/
@@ -56,7 +86,11 @@ def sirPolicy : Model := model% "sir_workplace_policy_feedback" step(0.25) where
           set [health := R]]
       outputs [
         output infection_count {infected : Int} from Person fields [
-          field infected := count where health = I]],
+          field infected := count where health = I]]
+      views [
+        view S from Person where health = S reduce count,
+        view I from Person where health = I reduce count,
+        view R from Person where health = R reduce count],
     box policy where
       systems [
         system Controller as "controller" rows(1) where [
@@ -79,6 +113,9 @@ def sirPolicy : Model := model% "sir_workplace_policy_feedback" step(0.25) where
   wires [
     wire population infection_count -> policy infection_count,
     wire policy restriction_modifier -> population restriction_modifier]
+  summaries [
+    summary peak_I from population view I reduce max,
+    summary peak_tick from population view I reduce argmax_tick]
 
 /-- Canonical reversible two-state CTMC hazards, executed as fixed-dt tau leaps. -/
 def reversibleCtmc : Model := model% "reversible_two_state_ctmc" step(0.1) where

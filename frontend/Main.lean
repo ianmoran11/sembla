@@ -3,7 +3,7 @@ import Sembla
 open Sembla
 
 private def usage : String :=
-  "usage: sembla-export <sir|sir_policy|reversible_ctmc|radioactive_decay_chain|sis_importation|seirs_waning|noisy_voter> <out.json>"
+  "usage: sembla-export <sir|sir_policy|observations|reversible_ctmc|radioactive_decay_chain|sis_importation|seirs_waning|noisy_voter> <out.json>"
 
 private def lookupModel (name : String) : Option IR.Model :=
   match name with
@@ -11,6 +11,8 @@ private def lookupModel (name : String) : Option IR.Model :=
   | "sirPolicy" | "sir_policy"
   | "Sembla.Models.sirPolicy" | "Sembla.Models.sir_policy"
   | "Sembla/Models/sirPolicy" | "Sembla/Models/sir_policy" => some Models.sirPolicy
+  | "observations" | "Sembla.Models.observations" | "Sembla/Models/observations" =>
+      some Models.observations
   | "reversibleCtmc" | "reversible_ctmc"
   | "Sembla.Models.reversibleCtmc" | "Sembla.Models.reversible_ctmc"
   | "Sembla/Models/reversibleCtmc" | "Sembla/Models/reversible_ctmc" =>
