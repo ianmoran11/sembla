@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+exec > >(tee /var/log/sembla-bootstrap.log | logger -t sembla-cloud-init -s 2>/dev/console) 2>&1
+export DEBIAN_FRONTEND=noninteractive
+
+# Install the emergency timer before any network operation. Unlike AWS EC2's
+# stop-on-shutdown behavior, a halted Vultr resource continues billing until it
+# is destroyed. This timer limits activity but is not a billing control.
+if [ '${auto_halt_enabled}' = 'true' ]; then
+  cat >/etc/systemd/system/sembla-auto-halt.service <<'SERVICE'
+[Unit]
+Description=Emergency halt for the throwaway Sembla GPU benchmark
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/shutdown -h now
+SERVICE
+
+  cat >/etc/systemd/system/sembla-auto-halt.timer <<'TIMER'
+[Unit]
+Description=Emergency GPU halt after ${auto_halt_hours} hours (billing continues until destroy)
+
+[Timer]
+OnBootSec=${auto_halt_hours}h
+AccuracySec=1m
+Unit=sembla-auto-halt.service
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+  systemctl daemon-reload
+  systemctl enable --now sembla-auto-halt.timer
+fi
+
+# Apply a source-CIDR host rule before package downloads. Bare metal has an
+# unavoidable short SSH-key-only interval between first boot and user-data
+# execution because the provider exposes no firewall-group attachment.
+command -v iptables
+iptables -P INPUT DROP
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p tcp -s '${ssh_cidr}' --dport 22 -j ACCEPT
+
+apt-get update
+apt-get install -y --no-install-recommends \
+  build-essential \
+  ca-certificates \
+  curl \
+  git \
+  libssl-dev \
+  libvulkan1 \
+  pkg-config \
+  ufw \
+  vulkan-tools \
+  wget
+
+# Cloud GPU resources additionally receive a Vultr firewall group. Bare-metal
+# plans do not expose that attachment in the Terraform provider, so establish a
+# host firewall before cloning or installing toolchains.
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow from '${ssh_cidr}' to any port 22 proto tcp
+ufw --force enable
+
+# A GPU-enabled image must provide the licensed NVIDIA driver. Do not silently
+# install or substitute a driver because the exact device is decision evidence.
+command -v nvidia-smi
+nvidia-smi
+
+if ! command -v nvcc >/dev/null 2>&1; then
+  . /etc/os-release
+  case "$VERSION_ID" in
+    "22.04") cuda_distribution="ubuntu2204" ;;
+    "24.04") cuda_distribution="ubuntu2404" ;;
+    *) echo "Unsupported Ubuntu release for CUDA bootstrap: $VERSION_ID" >&2; exit 1 ;;
+  esac
+
+  case "$(dpkg --print-architecture)" in
+    amd64) cuda_arch="x86_64" ;;
+    arm64) cuda_arch="sbsa" ;;
+    *) echo "Unsupported architecture for CUDA bootstrap: $(dpkg --print-architecture)" >&2; exit 1 ;;
+  esac
+
+  wget -q "https://developer.download.nvidia.com/compute/cuda/repos/$${cuda_distribution}/$${cuda_arch}/cuda-keyring_1.1-1_all.deb" -O /tmp/cuda-keyring.deb
+  dpkg -i /tmp/cuda-keyring.deb
+  apt-get update
+  apt-get install -y --no-install-recommends cuda-toolkit-12-9
+fi
+
+if [ ! -e /usr/local/cuda ] && [ -d /usr/local/cuda-12.9 ]; then
+  ln -s /usr/local/cuda-12.9 /usr/local/cuda
+fi
+
+cat >/etc/profile.d/sembla-cuda.sh <<'PROFILE'
+export CUDA_HOME=/usr/local/cuda
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$${LD_LIBRARY_PATH:-}
+export WGPU_BACKEND=vulkan
+PROFILE
+chmod 0644 /etc/profile.d/sembla-cuda.sh
+
+if [ ! -x /root/.cargo/bin/cargo ]; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- \
+    -y --profile minimal --default-toolchain stable
+fi
+
+if [ ! -d /opt/sembla/.git ]; then
+  git clone '${repository_url}' /opt/sembla
+fi
+git -C /opt/sembla fetch --force origin '${repository_ref}'
+git -C /opt/sembla checkout --force --detach FETCH_HEAD
+
+cat >/etc/sembla-spike.env <<'ENV'
+SPIKE_DIR=/opt/sembla
+VULTR_REGION='${region_id}'
+VULTR_PLAN='${plan_id}'
+VULTR_DEPLOYMENT_KIND='${deployment_kind}'
+EXPECTED_GPU_MODEL='${expected_gpu_model}'
+ENV
+chmod 0644 /etc/sembla-spike.env
+
+echo '${run_spike_b64}' | base64 --decode >/usr/local/bin/run-sembla-spike
+chmod 0755 /usr/local/bin/run-sembla-spike
+
+touch /var/lib/sembla-bootstrap-complete

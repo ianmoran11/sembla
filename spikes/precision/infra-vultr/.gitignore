@@ -1,0 +1,15 @@
+# Allowlist the committed module surface. Everything else in this operator
+# directory is ignored so arbitrarily named plans, keys, credentials, logs, and
+# local notes cannot be added accidentally.
+*
+!/.gitignore
+!/.terraform.lock.hcl
+!/README.md
+!/main.tf
+!/outputs.tf
+!/variables.tf
+!/versions.tf
+!/cloud-init.sh.tftpl
+!/discover.sh
+!/run-spike.sh
+!/example.tfvars
