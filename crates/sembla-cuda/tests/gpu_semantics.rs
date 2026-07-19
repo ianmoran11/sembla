@@ -125,6 +125,48 @@ fn effect_aggregate_state(x: [i64; 2]) -> Vec<TableInit> {
     ]
 }
 
+fn scalar_effect_before_effect_aggregate_error_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"scalar_effect_before_effect_aggregate_error","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Group","size_hint":1,"attrs":[]},{"name":"Person","size_hint":2,"attrs":[{"name":"group","ty":{"kind":"ref","table":"Group"}},{"name":"x","ty":{"kind":"int"}},{"name":"y","ty":{"kind":"int"}},{"name":"z","ty":{"kind":"int"}}]}],"transitions":[{"name":"both_fail","table":"Person","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"y","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}}},{"kind":"set_attr","attr":"z","value":{"kind":"agg","op":{"kind":"sum","value":{"kind":"self_attr","name":"x"}},"table":"Person","on":{"fk_attr":"group","self_fk_attr":"group"},"filter":{"kind":"bool","value":true}}}],"contests":[]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn scalar_effect_before_effect_aggregate_error_state() -> Vec<TableInit> {
+    vec![
+        TableInit::new("world", "Group", 1, Vec::new()),
+        TableInit::new(
+            "world",
+            "Person",
+            2,
+            vec![
+                ColumnInit::new("group", ColumnData::Ref(vec![0, 0])),
+                ColumnInit::new("x", ColumnData::Int(vec![i64::MAX, 1])),
+                ColumnInit::new("y", ColumnData::Int(vec![0, 0])),
+                ColumnInit::new("z", ColumnData::Int(vec![0, 0])),
+            ],
+        ),
+    ]
+}
+
+fn scalar_output_before_output_aggregate_error_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"scalar_output_before_output_aggregate_error","dt":1.0,"params":[],"boxes":[{"name":"source","tables":[{"name":"Group","size_hint":1,"attrs":[]},{"name":"Person","size_hint":2,"attrs":[{"name":"group","ty":{"kind":"ref","table":"Group"}},{"name":"x","ty":{"kind":"int"}}]}],"transitions":[],"inputs":[],"outputs":[{"name":"totals","schema":[{"name":"first","ty":{"kind":"int"}},{"name":"second","ty":{"kind":"int"}}],"builder":{"kind":"per_table","table":"Person","fields":[{"name":"first","op":{"kind":"sum","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}}},"filter":null},{"name":"second","op":{"kind":"sum","value":{"kind":"agg","op":{"kind":"sum","value":{"kind":"self_attr","name":"x"}},"table":"Person","on":{"fk_attr":"group","self_fk_attr":"group"},"filter":{"kind":"bool","value":true}}},"filter":null}]}}],"views":[]},{"name":"sink","tables":[],"transitions":[],"inputs":[{"name":"totals","schema":[{"name":"first","ty":{"kind":"int"}},{"name":"second","ty":{"kind":"int"}}]}],"outputs":[],"views":[]}],"wires":[{"from":{"box":"source","port":"totals"},"to":{"box":"sink","port":"totals"}}],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn scalar_output_before_output_aggregate_error_state() -> Vec<TableInit> {
+    vec![
+        TableInit::new("source", "Group", 1, Vec::new()),
+        TableInit::new(
+            "source",
+            "Person",
+            2,
+            vec![
+                ColumnInit::new("group", ColumnData::Ref(vec![0, 0])),
+                ColumnInit::new("x", ColumnData::Int(vec![i64::MAX, 1])),
+            ],
+        ),
+    ]
+}
+
 fn input_integer_ordering_model() -> sembla_ir::ValidatedModel {
     let source = r#"{"name":"input_integer_ordering","dt":1.0,"params":[],"boxes":[{"name":"source","tables":[{"name":"Event","size_hint":1,"attrs":[{"name":"amount","ty":{"kind":"int"}}]}],"transitions":[],"inputs":[],"outputs":[{"name":"events","schema":[{"name":"amount","ty":{"kind":"int"}}],"builder":{"kind":"per_table","table":"Event","fields":[{"name":"amount","op":{"kind":"sum","value":{"kind":"self_attr","name":"amount"}},"filter":null}]}}],"views":[]},{"name":"sink","tables":[{"name":"Agent","size_hint":1,"attrs":[{"name":"state","ty":{"kind":"enum","variants":["Off","On"]}}]}],"transitions":[{"name":"activate","table":"Agent","guard":{"kind":"gt","lhs":{"kind":"input","port":"events","agg":{"op":{"kind":"count"},"filter":{"kind":"gt","lhs":{"kind":"self_attr","name":"amount"},"rhs":{"kind":"int","value":9007199254740992}}}},"rhs":{"kind":"int","value":0}},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"state","value":{"kind":"enum","variant":"On"}}],"contests":[]}],"inputs":[{"name":"events","schema":[{"name":"amount","ty":{"kind":"int"}}]}],"outputs":[],"views":[]}],"wires":[{"from":{"box":"source","port":"events"},"to":{"box":"sink","port":"events"}}],"summaries":[]}"#;
     sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
@@ -247,6 +289,67 @@ fn scalar_before_later_aggregate_error_state() -> Vec<TableInit> {
             ],
         ),
     ]
+}
+
+fn scalar_before_same_rule_aggregate_error_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"scalar_before_same_rule_aggregate_error","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Group","size_hint":1,"attrs":[]},{"name":"Person","size_hint":2,"attrs":[{"name":"group","ty":{"kind":"ref","table":"Group"}},{"name":"x","ty":{"kind":"int"}}]}],"transitions":[{"name":"both_fail","table":"Person","guard":{"kind":"and","lhs":{"kind":"gt","lhs":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}},"rhs":{"kind":"int","value":0}},"rhs":{"kind":"ge","lhs":{"kind":"agg","op":{"kind":"sum","value":{"kind":"self_attr","name":"x"}},"table":"Person","on":{"fk_attr":"group","self_fk_attr":"group"},"filter":{"kind":"bool","value":true}},"rhs":{"kind":"int","value":0}}},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn left_subtree_later_row_before_right_subtree_earlier_row_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"left_subtree_later_row_before_right_subtree_earlier_row","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Person","size_hint":2,"attrs":[{"name":"left","ty":{"kind":"int"}},{"name":"right","ty":{"kind":"int"}}]}],"transitions":[{"name":"ordered","table":"Person","guard":{"kind":"gt","lhs":{"kind":"add","lhs":{"kind":"mul","lhs":{"kind":"self_attr","name":"left"},"rhs":{"kind":"int","value":2}},"rhs":{"kind":"mul","lhs":{"kind":"self_attr","name":"right"},"rhs":{"kind":"int","value":2}}},"rhs":{"kind":"int","value":0}},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn left_subtree_later_row_before_right_subtree_earlier_row_state() -> Vec<TableInit> {
+    vec![TableInit::new(
+        "world",
+        "Person",
+        2,
+        vec![
+            ColumnInit::new("left", ColumnData::Int(vec![0, i64::MAX])),
+            ColumnInit::new("right", ColumnData::Int(vec![i64::MAX, 0])),
+        ],
+    )]
+}
+
+fn cross_box_effect_before_guard_error_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"cross_box_effect_before_guard_error","dt":1.0,"params":[],"boxes":[{"name":"first","tables":[{"name":"A","size_hint":1,"attrs":[{"name":"x","ty":{"kind":"int"}}]}],"transitions":[{"name":"effect_first","table":"A","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"x","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}}}],"contests":[]}],"inputs":[],"outputs":[],"views":[]},{"name":"second","tables":[{"name":"B","size_hint":1,"attrs":[{"name":"y","ty":{"kind":"int"}}]}],"transitions":[{"name":"guard_second","table":"B","guard":{"kind":"gt","lhs":{"kind":"mul","lhs":{"kind":"self_attr","name":"y"},"rhs":{"kind":"int","value":2}},"rhs":{"kind":"int","value":0}},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn cross_box_effect_before_guard_error_state() -> Vec<TableInit> {
+    vec![
+        TableInit::new(
+            "first",
+            "A",
+            1,
+            vec![ColumnInit::new("x", ColumnData::Int(vec![i64::MAX]))],
+        ),
+        TableInit::new(
+            "second",
+            "B",
+            1,
+            vec![ColumnInit::new("y", ColumnData::Int(vec![i64::MAX]))],
+        ),
+    ]
+}
+
+fn later_effect_error_before_double_write_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"later_effect_error_before_double_write","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Person","size_hint":1,"attrs":[{"name":"x","ty":{"kind":"int"}},{"name":"y","ty":{"kind":"int"}}]}],"transitions":[{"name":"first_writer","table":"Person","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"x","value":{"kind":"int","value":0}}],"contests":[]},{"name":"failing_second_writer","table":"Person","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"y","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"y"},"rhs":{"kind":"int","value":2}}},{"kind":"set_attr","attr":"x","value":{"kind":"int","value":1}}],"contests":[]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn later_effect_error_before_double_write_state() -> Vec<TableInit> {
+    vec![TableInit::new(
+        "world",
+        "Person",
+        1,
+        vec![
+            ColumnInit::new("x", ColumnData::Int(vec![0])),
+            ColumnInit::new("y", ColumnData::Int(vec![i64::MAX])),
+        ],
+    )]
 }
 
 fn losing_row_effect_overflow_model() -> sembla_ir::ValidatedModel {
@@ -461,6 +564,126 @@ fn semantic_gpu_fixtures_validate_without_a_device() {
         .to_string()
         .contains("overflow"));
 
+    let same_rule_order = scalar_before_same_rule_aggregate_error_model();
+    let generated = generate(&same_rule_order).unwrap();
+    let validator = generated
+        .source
+        .split_once("extern \"C\" __global__ void sembla_validate_transition")
+        .unwrap()
+        .1
+        .split_once("extern \"C\" __global__ void sembla_transition_")
+        .unwrap()
+        .0;
+    assert!(
+        validator.find("sembla_mul_i64(validation_left").unwrap()
+            < validator.find("if (aggregate_facts[0]").unwrap()
+    );
+    let params = ParamEnv::defaults(&same_rule_order);
+    let mut state = StateStore::new(
+        &same_rule_order,
+        scalar_before_later_aggregate_error_state(),
+    )
+    .unwrap();
+    assert!(run_tick(&same_rule_order, &mut state, &params, 41, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let subtree_order = left_subtree_later_row_before_right_subtree_earlier_row_model();
+    let generated = generate(&subtree_order).unwrap();
+    let validator = generated
+        .source
+        .split_once("extern \"C\" __global__ void sembla_validate_transition")
+        .unwrap()
+        .1
+        .split_once("extern \"C\" __global__ void sembla_transition_")
+        .unwrap()
+        .0;
+    assert!(validator.matches("sembla_mul_i64(validation_left").count() >= 2);
+    let params = ParamEnv::defaults(&subtree_order);
+    let mut state = StateStore::new(
+        &subtree_order,
+        left_subtree_later_row_before_right_subtree_earlier_row_state(),
+    )
+    .unwrap();
+    assert!(run_tick(&subtree_order, &mut state, &params, 42, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let cross_box = cross_box_effect_before_guard_error_model();
+    let generated = generate(&cross_box).unwrap();
+    assert!(generated.source.contains("sembla_validate_effects"));
+    let params = ParamEnv::defaults(&cross_box);
+    let mut state =
+        StateStore::new(&cross_box, cross_box_effect_before_guard_error_state()).unwrap();
+    assert!(run_tick(&cross_box, &mut state, &params, 43, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let effect_order = scalar_effect_before_effect_aggregate_error_model();
+    let generated = generate(&effect_order).unwrap();
+    let validator = generated
+        .source
+        .split_once("extern \"C\" __global__ void sembla_validate_effects")
+        .unwrap()
+        .1
+        .split_once("extern \"C\" __global__ void sembla_prepare_effects")
+        .unwrap()
+        .0;
+    assert!(
+        validator.find("sembla_mul_i64(validation_left").unwrap()
+            < validator.find("if (aggregate_facts[0]").unwrap()
+    );
+    let params = ParamEnv::defaults(&effect_order);
+    let mut state = StateStore::new(
+        &effect_order,
+        scalar_effect_before_effect_aggregate_error_state(),
+    )
+    .unwrap();
+    assert!(run_tick(&effect_order, &mut state, &params, 45, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let effect_before_write = later_effect_error_before_double_write_model();
+    let params = ParamEnv::defaults(&effect_before_write);
+    let mut state = StateStore::new(
+        &effect_before_write,
+        later_effect_error_before_double_write_state(),
+    )
+    .unwrap();
+    assert!(run_tick(&effect_before_write, &mut state, &params, 46, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let output_order = scalar_output_before_output_aggregate_error_model();
+    let generated = generate(&output_order).unwrap();
+    let validator = generated
+        .source
+        .split_once("extern \"C\" __global__ void sembla_validate_outputs")
+        .unwrap()
+        .1
+        .split_once("extern \"C\" __global__ void sembla_prepare_outputs")
+        .unwrap()
+        .0;
+    assert!(
+        validator.find("sembla_mul_i64(validation_left").unwrap()
+            < validator.find("if (aggregate_facts[0]").unwrap()
+    );
+    let params = ParamEnv::defaults(&output_order);
+    let mut state = StateStore::new(
+        &output_order,
+        scalar_output_before_output_aggregate_error_state(),
+    )
+    .unwrap();
+    assert!(run_tick(&output_order, &mut state, &params, 47, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
     let model = prospective_nested_output_model();
     let params = ParamEnv::defaults(&model);
     let mut state = StateStore::new(&model, prospective_nested_output_state()).unwrap();
@@ -586,6 +809,132 @@ fn earlier_scalar_error_precedes_later_aggregate_error() {
         .unwrap_err()
         .to_string()
         .contains("candidate 0 overflowed Int"));
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-gpu-tests.sh"]
+fn earlier_scalar_subtree_precedes_same_rule_aggregate_error() {
+    let model = scalar_before_same_rule_aggregate_error_model();
+    let initial = scalar_before_later_aggregate_error_state();
+    let params = ParamEnv::defaults(&model);
+    let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+    assert!(run_tick(&model, &mut cpu, &params, 41, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let mut gpu = CudaBackend::new(&model, initial, &params, 41, HashMode::FinalOnly)
+        .expect("CUDA device, driver, and NVRTC are required");
+    assert!(gpu
+        .run(1)
+        .unwrap_err()
+        .to_string()
+        .contains("candidate 0 overflowed Int"));
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-gpu-tests.sh"]
+fn left_subtree_column_precedes_right_subtree_column() {
+    let model = left_subtree_later_row_before_right_subtree_earlier_row_model();
+    let initial = left_subtree_later_row_before_right_subtree_earlier_row_state();
+    let params = ParamEnv::defaults(&model);
+    let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+    assert!(run_tick(&model, &mut cpu, &params, 42, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("row 1"));
+
+    let mut gpu = CudaBackend::new(&model, initial, &params, 42, HashMode::FinalOnly)
+        .expect("CUDA device, driver, and NVRTC are required");
+    assert!(gpu
+        .run(1)
+        .unwrap_err()
+        .to_string()
+        .contains("candidate 1 overflowed Int"));
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-gpu-tests.sh"]
+fn earlier_box_effect_error_precedes_later_box_guard_error() {
+    let model = cross_box_effect_before_guard_error_model();
+    let initial = cross_box_effect_before_guard_error_state();
+    let params = ParamEnv::defaults(&model);
+    let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+    assert!(run_tick(&model, &mut cpu, &params, 43, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let mut gpu = CudaBackend::new(&model, initial, &params, 43, HashMode::FinalOnly)
+        .expect("CUDA device, driver, and NVRTC are required");
+    assert!(gpu
+        .run(1)
+        .unwrap_err()
+        .to_string()
+        .contains("candidate 0 effect overflowed Int"));
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-gpu-tests.sh"]
+fn scalar_effect_error_precedes_later_effect_aggregate_error() {
+    let model = scalar_effect_before_effect_aggregate_error_model();
+    let initial = scalar_effect_before_effect_aggregate_error_state();
+    let params = ParamEnv::defaults(&model);
+    let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+    assert!(run_tick(&model, &mut cpu, &params, 45, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let mut gpu = CudaBackend::new(&model, initial, &params, 45, HashMode::FinalOnly)
+        .expect("CUDA device, driver, and NVRTC are required");
+    assert!(gpu
+        .run(1)
+        .unwrap_err()
+        .to_string()
+        .contains("candidate 0 effect overflowed Int"));
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-gpu-tests.sh"]
+fn later_effect_error_precedes_global_double_write_detection() {
+    let model = later_effect_error_before_double_write_model();
+    let initial = later_effect_error_before_double_write_state();
+    let params = ParamEnv::defaults(&model);
+    let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+    assert!(run_tick(&model, &mut cpu, &params, 46, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let mut gpu = CudaBackend::new(&model, initial, &params, 46, HashMode::FinalOnly)
+        .expect("CUDA device, driver, and NVRTC are required");
+    assert!(gpu
+        .run(1)
+        .unwrap_err()
+        .to_string()
+        .contains("candidate 1 effect overflowed Int"));
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-gpu-tests.sh"]
+fn scalar_output_error_precedes_later_output_aggregate_error() {
+    let model = scalar_output_before_output_aggregate_error_model();
+    let initial = scalar_output_before_output_aggregate_error_state();
+    let params = ParamEnv::defaults(&model);
+    let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+    assert!(run_tick(&model, &mut cpu, &params, 47, 0)
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+    let mut gpu = CudaBackend::new(&model, initial, &params, 47, HashMode::FinalOnly)
+        .expect("CUDA device, driver, and NVRTC are required");
+    assert!(gpu
+        .run(1)
+        .unwrap_err()
+        .to_string()
+        .contains("wire output field 0 overflowed Int"));
 }
 
 #[test]

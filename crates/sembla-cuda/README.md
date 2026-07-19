@@ -41,12 +41,18 @@ device worker performs the ordered fold, then a publication kernel copies the
 result without another floating-point or checked-integer operation. This
 correctness-first shape is used for grouped, input, and wire-output reductions.
 Conflict resolution runs one deterministic scan per candidate with
-lexicographic `(key, rule_id, entity_id)` ties. Effects are validated eagerly,
-placed in a dense destination-owner table, checked for duplicates in
-declaration order, and scattered in ascending destination order.
-No result-bearing path uses atomics. Prospective aggregates are rebuilt from
-`next_state` before Moore outputs, and state is swapped only after every device
-status check succeeds.
+lexicographic `(key, rule_id, entity_id)` ties. Correctness-first, single-thread
+device validators reproduce the CPU's recursive column order and surface
+precomputed aggregate error facts only at their first syntactic use. Boxes are
+scheduled, resolved, and effect-validated in declaration order; all effect
+columns are validated before pending writes are checked for duplicates in CPU
+`transition -> winner row -> effect` order. Wired outputs are validated in wire
+and field declaration order before their parallel publication stage. Checked
+binary operands are explicitly sequenced in generated C++14 lambdas, so two
+fallible siblings never write the same error flag without sequencing. Effects
+are scattered in ascending destination order. No result-bearing path uses
+atomics. Prospective aggregates are rebuilt from `next_state` before Moore
+outputs, and state is swapped only after every device status check succeeds.
 
 ## GPU correctness run
 

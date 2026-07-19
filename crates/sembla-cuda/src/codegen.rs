@@ -17,7 +17,10 @@ pub struct GeneratedCuda {
     /// Global table index supplying the result length of each generated
     /// group aggregate, in generated aggregate order.
     pub aggregate_group_tables: Vec<usize>,
-    /// Aggregate indices evaluated against tick-start state before scheduling.
+    /// Aggregate indices evaluated against tick-start state. Error facts are
+    /// recorded eagerly but surfaced only at first semantic use.
+    pub state_aggregate_indices: Vec<usize>,
+    /// Aggregate indices reachable from scheduling expressions.
     pub schedule_aggregate_indices: Vec<usize>,
     /// First-use aggregate indices for each rule, in global rule order.
     pub schedule_aggregate_indices_by_rule: Vec<Vec<usize>>,
@@ -173,6 +176,16 @@ struct Generator<'a> {
     params: BTreeMap<String, usize>,
     aggs: Vec<AggSpec>,
     inputs: Vec<InputSpec>,
+}
+
+#[derive(Clone, Copy)]
+enum ValidationTarget<'a> {
+    /// Validation while constructing an aggregate error fact. Nested
+    /// aggregate facts are propagated without committing global status.
+    AggregateFact,
+    /// Validation in CPU semantic order. `identity` is a CUDA expression
+    /// identifying the transition candidate or output field.
+    Status { code: u64, identity: &'a str },
 }
 
 impl<'a> Generator<'a> {
@@ -572,6 +585,171 @@ impl<'a> Generator<'a> {
         }
     }
 
+    fn emit_scalar_validation_failure(&self, out: &mut String, target: ValidationTarget<'_>) {
+        match target {
+            ValidationTarget::AggregateFact => {
+                out.push_str("      aggregate_errors[0] = 2U; return;\n");
+            }
+            ValidationTarget::Status { code, identity } => {
+                writeln!(out, "      status[0] = {code}ULL; status[1] = (unsigned long long)({identity}); return;").unwrap();
+            }
+        }
+    }
+
+    fn emit_aggregate_validation_failure(
+        &self,
+        out: &mut String,
+        target: ValidationTarget<'_>,
+        aggregate_index: usize,
+    ) -> Result<(), CudaError> {
+        match target {
+            ValidationTarget::AggregateFact => {
+                writeln!(
+                    out,
+                    "      aggregate_errors[0] = aggregate_facts[{aggregate_index}]; return;"
+                )
+                .unwrap();
+            }
+            ValidationTarget::Status { .. } => {
+                writeln!(out, "      status[0] = (unsigned long long)aggregate_facts[{aggregate_index}]; status[1] = {aggregate_index}ULL; return;").unwrap();
+            }
+        }
+        Ok(())
+    }
+
+    /// Emits validation in the CPU evaluator's recursive column order. Child
+    /// expressions are completely validated before their sibling and checked
+    /// integer operations scan rows in ascending order. Value kernels may then
+    /// recompute with the compact expression renderer without discovering a
+    /// new error or relying on C++ operand evaluation order.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_expr_validation(
+        &self,
+        out: &mut String,
+        expr: &Expr,
+        rows: Rows,
+        expected: Option<&Ty>,
+        state_name: &str,
+        row_count: &str,
+        target: ValidationTarget<'_>,
+    ) -> Result<(), CudaError> {
+        match expr {
+            Expr::Add { lhs, rhs } | Expr::Sub { lhs, rhs } | Expr::Mul { lhs, rhs } => {
+                self.emit_expr_validation(out, lhs, rows, None, state_name, row_count, target)?;
+                self.emit_expr_validation(out, rhs, rows, None, state_name, row_count, target)?;
+                let left_ty = self.infer(lhs, rows, None)?;
+                let right_ty = self.infer(rhs, rows, None)?;
+                if left_ty != Ty::Real && right_ty != Ty::Real {
+                    let left = self.render(lhs, rows, Some(&Ty::Int), state_name, "row")?.0;
+                    let right = self.render(rhs, rows, Some(&Ty::Int), state_name, "row")?.0;
+                    let helper = match expr {
+                        Expr::Add { .. } => "sembla_add_i64",
+                        Expr::Sub { .. } => "sembla_sub_i64",
+                        Expr::Mul { .. } => "sembla_mul_i64",
+                        _ => unreachable!(),
+                    };
+                    writeln!(
+                        out,
+                        "    for (unsigned long long row = 0; row < {row_count}; ++row) {{"
+                    )
+                    .unwrap();
+                    writeln!(out, "      local_error = 0U; long long validation_left = (long long)({left}); if (local_error) {{").unwrap();
+                    self.emit_scalar_validation_failure(out, target);
+                    out.push_str("      }\n");
+                    writeln!(out, "      local_error = 0U; long long validation_right = (long long)({right}); if (local_error) {{").unwrap();
+                    self.emit_scalar_validation_failure(out, target);
+                    out.push_str("      }\n      local_error = 0U; (void)");
+                    writeln!(
+                        out,
+                        "{helper}(validation_left, validation_right, error); if (local_error) {{"
+                    )
+                    .unwrap();
+                    self.emit_scalar_validation_failure(out, target);
+                    out.push_str("      }\n    }\n");
+                }
+            }
+            Expr::Div { lhs, rhs }
+            | Expr::Lt { lhs, rhs }
+            | Expr::Le { lhs, rhs }
+            | Expr::Gt { lhs, rhs }
+            | Expr::Ge { lhs, rhs }
+            | Expr::And { lhs, rhs }
+            | Expr::Or { lhs, rhs } => {
+                self.emit_expr_validation(out, lhs, rows, None, state_name, row_count, target)?;
+                self.emit_expr_validation(out, rhs, rows, None, state_name, row_count, target)?;
+            }
+            Expr::Eq { lhs, rhs } | Expr::Ne { lhs, rhs } => {
+                // Enum literals need their sibling's type, but literals cannot
+                // fail. The only observable ordering is therefore the same
+                // left-then-right recursion used by the CPU evaluator.
+                let left_hint = self.infer(lhs, rows, None).ok();
+                let right_hint = self.infer(rhs, rows, left_hint.as_ref()).ok();
+                self.emit_expr_validation(
+                    out,
+                    lhs,
+                    rows,
+                    right_hint.as_ref(),
+                    state_name,
+                    row_count,
+                    target,
+                )?;
+                self.emit_expr_validation(
+                    out,
+                    rhs,
+                    rows,
+                    left_hint.as_ref(),
+                    state_name,
+                    row_count,
+                    target,
+                )?;
+            }
+            Expr::Not { expr } => {
+                self.emit_expr_validation(
+                    out,
+                    expr,
+                    rows,
+                    Some(&Ty::Bool),
+                    state_name,
+                    row_count,
+                    target,
+                )?;
+            }
+            Expr::Input { port, agg } => {
+                let key = format!("{}:{port}:{agg:?}", rows_box(rows));
+                let index = self
+                    .inputs
+                    .iter()
+                    .position(|entry| entry.key == key)
+                    .ok_or_else(|| codegen("input aggregate was not collected"))?;
+                writeln!(out, "    {{ unsigned long long row = 0ULL; local_error = 0U; (void)sembla_input_{index}(inputs, input_offsets, input_counts, params, error); if (local_error) {{").unwrap();
+                self.emit_scalar_validation_failure(out, target);
+                out.push_str("      }\n    }\n");
+            }
+            Expr::Agg { .. } => {
+                let (box_index, table_index) = rows_state(rows)?;
+                let key = format!("{box_index}:{table_index}:{expr:?}");
+                let index = self
+                    .aggs
+                    .iter()
+                    .position(|entry| entry.key == key)
+                    .ok_or_else(|| codegen("group aggregate was not collected"))?;
+                writeln!(out, "    if (aggregate_facts[{index}] != 0U) {{").unwrap();
+                self.emit_aggregate_validation_failure(out, target, index)?;
+                out.push_str("    }\n");
+            }
+            Expr::Real { .. }
+            | Expr::Int { .. }
+            | Expr::Bool { .. }
+            | Expr::Enum { .. }
+            | Expr::Param { .. }
+            | Expr::SelfAttr { .. }
+            | Expr::EnumIs { .. } => {
+                let _ = expected;
+            }
+        }
+        Ok(())
+    }
+
     fn render(
         &self,
         expr: &Expr,
@@ -626,7 +804,10 @@ impl<'a> Generator<'a> {
                         Expr::Mul { .. } => "sembla_mul_i64",
                         _ => unreachable!(),
                     };
-                    (format!("{helper}({left}, {right}, error)"), ty)
+                    (
+                        format!("([&]() {{ long long sembla_left = (long long)({left}); if (*error) return 0LL; long long sembla_right = (long long)({right}); if (*error) return 0LL; return {helper}(sembla_left, sembla_right, error); }}())"),
+                        ty,
+                    )
                 } else {
                     let operator = match expr {
                         Expr::Add { .. } => "+",
@@ -635,7 +816,7 @@ impl<'a> Generator<'a> {
                         _ => unreachable!(),
                     };
                     (
-                        format!("((double)({left}) {operator} (double)({right}))"),
+                        format!("([&]() {{ double sembla_left = (double)({left}); if (*error) return 0.0; double sembla_right = (double)({right}); if (*error) return 0.0; return sembla_left {operator} sembla_right; }}())"),
                         ty,
                     )
                 }
@@ -643,7 +824,10 @@ impl<'a> Generator<'a> {
             Expr::Div { lhs, rhs } => {
                 let (left, _) = self.render(lhs, rows, None, state_name, row_name)?;
                 let (right, _) = self.render(rhs, rows, None, state_name, row_name)?;
-                (format!("((double)({left}) / (double)({right}))"), Ty::Real)
+                (
+                    format!("([&]() {{ double sembla_left = (double)({left}); if (*error) return 0.0; double sembla_right = (double)({right}); if (*error) return 0.0; return sembla_left / sembla_right; }}())"),
+                    Ty::Real,
+                )
             }
             Expr::Eq { lhs, rhs }
             | Expr::Ne { lhs, rhs }
@@ -684,7 +868,10 @@ impl<'a> Generator<'a> {
                     Expr::Ge { .. } => ">=",
                     _ => unreachable!(),
                 };
-                (format!("(({left}) {operator} ({right}))"), Ty::Bool)
+                (
+                    format!("([&]() -> int {{ auto sembla_left = ({left}); if (*error) return 0; auto sembla_right = ({right}); if (*error) return 0; return sembla_left {operator} sembla_right; }}())"),
+                    Ty::Bool,
+                )
             }
             Expr::And { lhs, rhs } | Expr::Or { lhs, rhs } => {
                 let (left, _) = self.render(lhs, rows, Some(&Ty::Bool), state_name, row_name)?;
@@ -694,7 +881,10 @@ impl<'a> Generator<'a> {
                 } else {
                     "|"
                 };
-                (format!("(({left}) {operator} ({right}))"), Ty::Bool)
+                (
+                    format!("([&]() -> int {{ int sembla_left = (int)({left}); if (*error) return 0; int sembla_right = (int)({right}); if (*error) return 0; return sembla_left {operator} sembla_right; }}())"),
+                    Ty::Bool,
+                )
             }
             Expr::Not { expr } => {
                 let (value, _) = self.render(expr, rows, Some(&Ty::Bool), state_name, row_name)?;
@@ -823,6 +1013,14 @@ impl<'a> Generator<'a> {
             .iter()
             .map(|spec| self.global_table(spec.box_index, spec.group_table_index))
             .collect();
+        let state_aggregate_indices = self
+            .aggs
+            .iter()
+            .enumerate()
+            .filter_map(|(index, spec)| {
+                (!spec.schedule_rules.is_empty() || !spec.effect_rules.is_empty()).then_some(index)
+            })
+            .collect();
         let schedule_aggregate_indices = self
             .aggs
             .iter()
@@ -857,6 +1055,7 @@ impl<'a> Generator<'a> {
             source_sha256,
             transition_kernels,
             aggregate_group_tables,
+            state_aggregate_indices,
             schedule_aggregate_indices,
             schedule_aggregate_indices_by_rule,
             effect_aggregate_indices,
@@ -942,11 +1141,35 @@ impl<'a> Generator<'a> {
             }
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_build_aggregate_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, unsigned int aggregate_index, const unsigned char* aggregate_active, unsigned char require_active, unsigned char* partials, const unsigned long long* agg_offsets, unsigned char* aggregate_errors) {\n  unsigned int worker = blockIdx.x * blockDim.x + threadIdx.x;\n  if (worker != 0U || (require_active && !aggregate_active[aggregate_index])) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_build_aggregate_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, unsigned int aggregate_index, const unsigned char* aggregate_active, unsigned char require_active, unsigned char* partials, const unsigned long long* agg_offsets, unsigned char* aggregate_errors) {\n  unsigned int worker = blockIdx.x * blockDim.x + threadIdx.x;\n  if (worker != 0U || (require_active && !aggregate_active[aggregate_index])) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for (index, spec) in self.aggs.iter().enumerate() {
             let groups = self.global_table(spec.box_index, spec.group_table_index);
             let target = self.global_table(spec.box_index, spec.target_table_index);
             writeln!(out, "  if (aggregate_index == {index}U) {{ unsigned long long group_count = row_counts[{groups}]; {}* values = ({}*)(partials + agg_offsets[{index}] * 2ULL);", spec.ty.cuda(), spec.ty.cuda()).unwrap();
+            let rows = Rows::State {
+                box_index: spec.box_index,
+                table_index: spec.target_table_index,
+            };
+            self.emit_expr_validation(
+                out,
+                &spec.filter,
+                rows,
+                Some(&Ty::Bool),
+                "state",
+                &format!("row_counts[{target}]"),
+                ValidationTarget::AggregateFact,
+            )?;
+            if let AggOp::Sum { value } = &spec.op {
+                self.emit_expr_validation(
+                    out,
+                    value,
+                    rows,
+                    Some(&spec.ty),
+                    "state",
+                    &format!("row_counts[{target}]"),
+                    ValidationTarget::AggregateFact,
+                )?;
+            }
             writeln!(out, "    for (unsigned long long group = 0; group < group_count; ++group) values[group] = ({})0;", spec.ty.cuda()).unwrap();
             let rows = Rows::State {
                 box_index: spec.box_index,
@@ -987,11 +1210,80 @@ impl<'a> Generator<'a> {
             writeln!(out, "  if (aggregate_index == {index}U && group < row_counts[{groups}]) {{ const {}* base = (const {}*)(partials + agg_offsets[{index}] * 2ULL); {}* result = ({}*)(aggs + agg_offsets[{index}]); result[group] = base[group]; }}", spec.ty.cuda(), spec.ty.cuda(), spec.ty.cuda(), spec.ty.cuda()).unwrap();
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_check_aggregate_errors(unsigned char* errors, unsigned long long count, unsigned long long aggregate_index, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  unsigned char code = 0U;\n  for (unsigned long long i = 0; i < count; ++i) { if (code == 0U && errors[i]) code = errors[i]; errors[i] = 0U; }\n  if (status[0] == 0ULL && code != 0U) { status[0] = (unsigned long long)code; status[1] = aggregate_index; }\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_record_aggregate_errors(unsigned char* errors, unsigned long long count, unsigned long long aggregate_index, unsigned char* aggregate_facts) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  unsigned char code = 0U;\n  for (unsigned long long i = 0; i < count; ++i) { if (code == 0U && errors[i]) code = errors[i]; errors[i] = 0U; }\n  aggregate_facts[aggregate_index] = code;\n}\n");
         Ok(())
     }
 
     fn emit_transition_kernels(&self, out: &mut String) -> Result<Vec<String>, CudaError> {
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_transition(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        for validated in self.model.transitions() {
+            let transition = &self.model.model().boxes[validated.box_index].transitions
+                [validated.transition_index];
+            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let global_table = self.global_table(validated.box_index, table_index);
+            let rows = Rows::State {
+                box_index: validated.box_index,
+                table_index,
+            };
+            writeln!(out, "  if (rule_id == {}U) {{", validated.rule_id).unwrap();
+            let identity = format!("candidate_offsets[{}] + row", validated.rule_id);
+            self.emit_expr_validation(
+                out,
+                &transition.guard,
+                rows,
+                Some(&Ty::Bool),
+                "state",
+                &format!("row_counts[{global_table}]"),
+                ValidationTarget::Status {
+                    code: 3,
+                    identity: &identity,
+                },
+            )?;
+            self.emit_expr_validation(
+                out,
+                &transition.hazard,
+                rows,
+                Some(&Ty::Real),
+                "state",
+                &format!("row_counts[{global_table}]"),
+                ValidationTarget::Status {
+                    code: 3,
+                    identity: &identity,
+                },
+            )?;
+            for claim in &transition.contests {
+                let resource_ty = self.infer(&claim.resource, rows, None)?;
+                self.emit_expr_validation(
+                    out,
+                    &claim.resource,
+                    rows,
+                    Some(&resource_ty),
+                    "state",
+                    &format!("row_counts[{global_table}]"),
+                    ValidationTarget::Status {
+                        code: 10,
+                        identity: &identity,
+                    },
+                )?;
+                if let ClaimOrdering::Key { expr } = &claim.ordering {
+                    self.emit_expr_validation(
+                        out,
+                        expr,
+                        rows,
+                        None,
+                        "state",
+                        &format!("row_counts[{global_table}]"),
+                        ValidationTarget::Status {
+                            code: 10,
+                            identity: &identity,
+                        },
+                    )?;
+                }
+            }
+            out.push_str("    return;\n  }\n");
+        }
+        out.push_str("}\n");
+
         let mut names = Vec::new();
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
@@ -1000,8 +1292,8 @@ impl<'a> Generator<'a> {
             let global_table = self.global_table(validated.box_index, table_index);
             let name = format!("sembla_transition_{:08x}", validated.rule_id);
             names.push(name.clone());
-            writeln!(out, "\nextern \"C\" __global__ void {name}(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors) {{").unwrap();
-            out.push_str("  unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n");
+            writeln!(out, "\nextern \"C\" __global__ void {name}(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors, const unsigned long long* status) {{").unwrap();
+            out.push_str("  unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (status[0] != 0ULL) return;\n");
             writeln!(out, "  if (row >= row_counts[{global_table}]) return;\n  unsigned long long candidate = candidate_offsets[{}] + row;\n  unsigned char local_error = 0; unsigned char* error = &local_error;", validated.rule_id).unwrap();
             let rows = Rows::State {
                 box_index: validated.box_index,
@@ -1051,7 +1343,7 @@ impl<'a> Generator<'a> {
             out.push_str("    return;\n  }\n");
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned int box_index, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
 
         // Claim expressions are evaluated eagerly above, before compatibility
         // is considered. Emit each statically incompatible claim pair once in
@@ -1122,13 +1414,13 @@ impl<'a> Generator<'a> {
                                 "right_row",
                             )?
                             .0;
-                        writeln!(out, "  {{\n    for (unsigned long long left_row = 0; left_row < row_counts[{left_global}]; ++left_row) {{\n      unsigned long long left_candidate = candidate_offsets[{}] + left_row;\n      if (!enabled[left_candidate]) continue;\n      unsigned int left_resource = (unsigned int)({left_resource});\n      for (unsigned long long right_row = 0; right_row < row_counts[{right_global}]; ++right_row) {{\n        unsigned long long right_candidate = candidate_offsets[{}] + right_row;\n        if (!enabled[right_candidate]) continue;\n        unsigned int right_resource = (unsigned int)({right_resource});\n        if (left_resource != right_resource) continue;\n        status[0] = 4ULL; status[1] = left_candidate; status[2] = right_candidate; return;\n      }}\n    }}\n  }}", left.rule_id, right.rule_id).unwrap();
+                        writeln!(out, "  if (box_index == {}U) {{\n    for (unsigned long long left_row = 0; left_row < row_counts[{left_global}]; ++left_row) {{\n      unsigned long long left_candidate = candidate_offsets[{}] + left_row;\n      if (!enabled[left_candidate]) continue;\n      unsigned int left_resource = (unsigned int)({left_resource});\n      for (unsigned long long right_row = 0; right_row < row_counts[{right_global}]; ++right_row) {{\n        unsigned long long right_candidate = candidate_offsets[{}] + right_row;\n        if (!enabled[right_candidate]) continue;\n        unsigned int right_resource = (unsigned int)({right_resource});\n        if (left_resource != right_resource) continue;\n        status[0] = 4ULL; status[1] = left_candidate; status[2] = right_candidate; return;\n      }}\n    }}\n  }}", left.box_index, left.rule_id, right.rule_id).unwrap();
                     }
                 }
             }
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned char* wins, const unsigned long long* status) {\n  unsigned long long self_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (self_candidate >= candidate_count || status[0] != 0ULL) return;\n  wins[self_candidate] = enabled[self_candidate];\n  if (!enabled[self_candidate]) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned char* wins, const unsigned long long* status) {\n  unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (local_candidate >= candidate_count || status[0] != 0ULL) return;\n  unsigned long long self_candidate = candidate_begin + local_candidate;\n  wins[self_candidate] = enabled[self_candidate];\n  if (!enabled[self_candidate]) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -1230,6 +1522,50 @@ impl<'a> Generator<'a> {
     }
 
     fn emit_apply_kernel(&self, out: &mut String) -> Result<(), CudaError> {
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, unsigned int box_index, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        for validated in self.model.transitions() {
+            let transition = &self.model.model().boxes[validated.box_index].transitions
+                [validated.transition_index];
+            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table = &self.model.model().boxes[validated.box_index].tables[table_index];
+            let global_table = self.global_table(validated.box_index, table_index);
+            let rows = Rows::State {
+                box_index: validated.box_index,
+                table_index,
+            };
+            writeln!(out, "  if (box_index == {}U) {{ int any_winner = 0; for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) any_winner |= wins[candidate_offsets[{}] + row] != 0; if (any_winner) {{", validated.box_index, validated.rule_id).unwrap();
+            let identity = format!("candidate_offsets[{}] + row", validated.rule_id);
+            for effect in &transition.effects {
+                let Effect::SetAttr { attr, value } = effect;
+                let attr_index = attr_index(table, attr)?;
+                let ty = Ty::from(&table.attrs[attr_index].ty);
+                self.emit_expr_validation(
+                    out,
+                    value,
+                    rows,
+                    Some(&ty),
+                    "state",
+                    &format!("row_counts[{global_table}]"),
+                    ValidationTarget::Status {
+                        code: 5,
+                        identity: &identity,
+                    },
+                )?;
+                let rendered = self.render(value, rows, Some(&ty), "state", "row")?.0;
+                match &ty {
+                    Ty::Enum(variants) => writeln!(out, "    for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ local_error = 0U; unsigned long long value = (unsigned long long)({rendered}); if (local_error) {{ status[0] = 5ULL; status[1] = candidate_offsets[{}] + row; return; }} if (value >= {}ULL) {{ status[0] = 6ULL; status[1] = candidate_offsets[{}] + row; return; }} }}", validated.rule_id, variants.len(), validated.rule_id).unwrap(),
+                    Ty::Ref(target) => {
+                        let target_index = self.table_index(validated.box_index, target)?;
+                        let target_global = self.global_table(validated.box_index, target_index);
+                        writeln!(out, "    for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ local_error = 0U; unsigned long long value = (unsigned long long)({rendered}); if (local_error) {{ status[0] = 5ULL; status[1] = candidate_offsets[{}] + row; return; }} if (value >= row_counts[{target_global}]) {{ status[0] = 7ULL; status[1] = candidate_offsets[{}] + row; return; }} }}", validated.rule_id, validated.rule_id).unwrap();
+                    }
+                    _ => {}
+                }
+            }
+            out.push_str("  } }\n");
+        }
+        out.push_str("}\n");
+
         out.push_str("\nextern \"C\" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned long long owner_count, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  for (unsigned long long i = 0; i < owner_count; ++i) owners[i] = -1;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
@@ -1242,30 +1578,32 @@ impl<'a> Generator<'a> {
                 table_index,
             };
             writeln!(out, "  {{ int any_winner = 0; for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) any_winner |= wins[candidate_offsets[{}] + row] != 0; if (any_winner) {{", validated.rule_id).unwrap();
+            writeln!(out, "    for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ unsigned long long candidate = candidate_offsets[{}] + row; if (!wins[candidate]) continue;", validated.rule_id).unwrap();
             for effect in &transition.effects {
                 let Effect::SetAttr { attr, value } = effect;
                 let attr_index = attr_index(table, attr)?;
                 let ty = Ty::from(&table.attrs[attr_index].ty);
                 let column = self.column(validated.box_index, table_index, attr_index);
                 let rendered = self.render(value, rows, Some(&ty), "state", "row")?.0;
-                writeln!(out, "    for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ local_error = 0; {} value = ({})({rendered}); if (local_error) {{ status[0] = 5ULL; status[1] = candidate_offsets[{}] + row; return; }}", ty.cuda(), ty.cuda(), validated.rule_id).unwrap();
+                out.push_str("      {\n");
+                writeln!(out, "      local_error = 0U; {} value = ({})({rendered}); if (local_error) {{ status[0] = 5ULL; status[1] = candidate; return; }}", ty.cuda(), ty.cuda()).unwrap();
                 match &ty {
-                    Ty::Enum(variants) => writeln!(out, "      if ((unsigned long long)value >= {}ULL) {{ status[0] = 6ULL; status[1] = candidate_offsets[{}] + row; return; }}", variants.len(), validated.rule_id).unwrap(),
+                    Ty::Enum(variants) => writeln!(out, "      if ((unsigned long long)value >= {}ULL) {{ status[0] = 6ULL; status[1] = candidate; return; }}", variants.len()).unwrap(),
                     Ty::Ref(target) => {
                         let target_index = self.table_index(validated.box_index, target)?;
                         let target_global = self.global_table(validated.box_index, target_index);
-                        writeln!(out, "      if ((unsigned long long)value >= row_counts[{target_global}]) {{ status[0] = 7ULL; status[1] = candidate_offsets[{}] + row; return; }}", validated.rule_id).unwrap();
+                        writeln!(out, "      if ((unsigned long long)value >= row_counts[{target_global}]) {{ status[0] = 7ULL; status[1] = candidate; return; }}").unwrap();
                     }
                     _ => {}
                 }
-                writeln!(out, "      unsigned long long candidate = candidate_offsets[{}] + row; if (wins[candidate]) {{ unsigned long long owner = write_offsets[{column}] + row; if (owners[owner] != -1) {{ status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = {}ULL; return; }} owners[owner] = (int){}U;", validated.rule_id, validated.rule_id, validated.rule_id).unwrap();
+                writeln!(out, "      {{ unsigned long long owner = write_offsets[{column}] + row; if (owners[owner] != -1) {{ status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = {}ULL; return; }} owners[owner] = (int){}U;", validated.rule_id, validated.rule_id).unwrap();
                 match ty {
                     Ty::Real => out.push_str("        owner_values[owner] = (unsigned long long)__double_as_longlong(value);\n"),
                     _ => out.push_str("        owner_values[owner] = (unsigned long long)value;\n"),
                 }
-                out.push_str("      }\n    }\n");
+                out.push_str("      }\n      }\n");
             }
-            out.push_str("  }\n  }\n");
+            out.push_str("    }\n  }\n  }\n");
         }
         out.push_str("}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_apply_effects(unsigned char* next_state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned long long* write_offsets, const int* owners, const unsigned long long* owner_values, unsigned long long owner_count, const unsigned long long* status) {\n  unsigned long long owner = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (owner >= owner_count || status[0] != 0ULL || owners[owner] == -1) return;\n");
@@ -1288,6 +1626,84 @@ impl<'a> Generator<'a> {
     }
 
     fn emit_output_kernel(&self, out: &mut String) -> Result<(), CudaError> {
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        for wire in &self.model.model().wires {
+            let from_box = self
+                .model
+                .model()
+                .boxes
+                .iter()
+                .position(|entry| entry.name == wire.from.r#box)
+                .ok_or_else(|| codegen("wire source box disappeared"))?;
+            let to_box = self
+                .model
+                .model()
+                .boxes
+                .iter()
+                .position(|entry| entry.name == wire.to.r#box)
+                .ok_or_else(|| codegen("wire target box disappeared"))?;
+            let output = self.model.model().boxes[from_box]
+                .outputs
+                .iter()
+                .find(|entry| entry.name == wire.from.port)
+                .ok_or_else(|| codegen("wire output disappeared"))?;
+            let to_port_index = self.port_index(to_box, &wire.to.port)?;
+            let sembla_ir::OutputBuilder::PerTable { table, fields } = &output.builder;
+            let table_index = self.table_index(from_box, table)?;
+            let global_table = self.global_table(from_box, table_index);
+            let rows = Rows::State {
+                box_index: from_box,
+                table_index,
+            };
+            for (field_index, field) in fields.iter().enumerate() {
+                let target_field = self.input_field(to_box, to_port_index, field_index);
+                let ty = Ty::from(&output.schema[field_index].ty);
+                let identity = target_field.to_string();
+                let target = ValidationTarget::Status {
+                    code: 9,
+                    identity: &identity,
+                };
+                if let Some(filter) = &field.filter {
+                    self.emit_expr_validation(
+                        out,
+                        filter,
+                        rows,
+                        Some(&Ty::Bool),
+                        "state",
+                        &format!("row_counts[{global_table}]"),
+                        target,
+                    )?;
+                }
+                if let AggOp::Sum { value } = &field.op {
+                    self.emit_expr_validation(
+                        out,
+                        value,
+                        rows,
+                        Some(&ty),
+                        "state",
+                        &format!("row_counts[{global_table}]"),
+                        target,
+                    )?;
+                }
+                if ty == Ty::Int {
+                    let selected = if let Some(filter) = &field.filter {
+                        self.render(filter, rows, Some(&Ty::Bool), "state", "row")?
+                            .0
+                    } else {
+                        "1".to_owned()
+                    };
+                    let value = match &field.op {
+                        AggOp::Count => "1LL".to_owned(),
+                        AggOp::Sum { value } => {
+                            self.render(value, rows, Some(&ty), "state", "row")?.0
+                        }
+                    };
+                    writeln!(out, "    {{ long long result = 0LL; for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ local_error = 0U; int selected = {selected}; long long value = (long long)({value}); if (local_error) {{ status[0] = 9ULL; status[1] = {target_field}ULL; return; }} if (selected) {{ result = sembla_add_i64(result, value, error); if (local_error) {{ status[0] = 9ULL; status[1] = {target_field}ULL; return; }} }} }} }}").unwrap();
+                }
+            }
+        }
+        out.push_str("}\n");
+
         out.push_str("\nextern \"C\" __global__ void sembla_prepare_outputs(unsigned long long* next_input_counts, unsigned long long port_count, unsigned char* output_errors, unsigned long long error_count) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  for (unsigned long long i = 0; i < port_count; ++i) next_input_counts[i] = 0ULL;\n  for (unsigned long long i = 0; i < error_count; ++i) output_errors[i] = 0U;\n");
         for wire in &self.model.model().wires {
             let to_box = self
@@ -1302,7 +1718,7 @@ impl<'a> Generator<'a> {
             writeln!(out, "  next_input_counts[{to_port}] = 1ULL;").unwrap();
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_build_output_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, unsigned long long* output_partials, unsigned char* output_errors) {\n  unsigned long long field = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_build_output_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, unsigned long long* output_partials, unsigned char* output_errors, const unsigned long long* status) {\n  unsigned long long field = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (status[0] != 0ULL) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for wire in &self.model.model().wires {
             let from_box = self
                 .model
@@ -1790,7 +2206,7 @@ mod tests {
         assert!(generated.source.contains("status[0] = 10ULL"));
         assert!(generated
             .source
-            .contains("self_candidate = (unsigned long long)blockIdx.x"));
+            .contains("self_candidate = candidate_begin + local_candidate"));
         assert!(generated.source.contains("sembla_prepare_effects"));
         assert!(generated.source.contains("owner_values[owner]"));
     }
@@ -1842,12 +2258,15 @@ mod tests {
     fn shared_aggregate_is_staged_for_schedule_and_output() {
         let generated = generate(&shared_schedule_output_aggregate_model()).unwrap();
         assert_eq!(generated.aggregate_group_tables.len(), 1);
+        assert_eq!(generated.state_aggregate_indices, [0]);
         assert_eq!(generated.schedule_aggregate_indices, [0]);
         assert_eq!(generated.schedule_aggregate_indices_by_rule, [vec![0]]);
         assert!(generated.effect_aggregate_indices.is_empty());
         assert_eq!(generated.output_aggregate_indices, [0]);
-        assert!(generated.source.contains("status[1] = aggregate_index"));
-        assert!(generated.source.contains("status[1] = field"));
+        assert!(generated
+            .source
+            .contains("aggregate_facts[aggregate_index] = code"));
+        assert!(generated.source.contains("status[1] = 0ULL"));
     }
 
     #[test]
@@ -1857,7 +2276,7 @@ mod tests {
         assert!(generated.source.contains("sembla_finish_outputs"));
         assert!(generated
             .source
-            .contains("self_candidate = (unsigned long long)blockIdx.x"));
+            .contains("self_candidate = candidate_begin + local_candidate"));
         assert!(generated
             .source
             .contains("owner = (unsigned long long)blockIdx.x"));

@@ -82,7 +82,7 @@ extern "C" __global__ void sembla_mark_effect_aggregates(const unsigned long lon
   for (unsigned long long i = 0; i < aggregate_count; ++i) active[i] = 0U;
 }
 
-extern "C" __global__ void sembla_build_aggregate_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, unsigned int aggregate_index, const unsigned char* aggregate_active, unsigned char require_active, unsigned char* partials, const unsigned long long* agg_offsets, unsigned char* aggregate_errors) {
+extern "C" __global__ void sembla_build_aggregate_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, unsigned int aggregate_index, const unsigned char* aggregate_active, unsigned char require_active, unsigned char* partials, const unsigned long long* agg_offsets, unsigned char* aggregate_errors) {
   unsigned int worker = blockIdx.x * blockDim.x + threadIdx.x;
   if (worker != 0U || (require_active && !aggregate_active[aggregate_index])) return;
   unsigned char local_error = 0; unsigned char* error = &local_error;
@@ -109,30 +109,49 @@ extern "C" __global__ void sembla_finish_aggregates(const unsigned char* partial
   if (aggregate_index == 1U && group < row_counts[1]) { const long long* base = (const long long*)(partials + agg_offsets[1] * 2ULL); long long* result = (long long*)(aggs + agg_offsets[1]); result[group] = base[group]; }
 }
 
-extern "C" __global__ void sembla_check_aggregate_errors(unsigned char* errors, unsigned long long count, unsigned long long aggregate_index, unsigned long long* status) {
+extern "C" __global__ void sembla_record_aggregate_errors(unsigned char* errors, unsigned long long count, unsigned long long aggregate_index, unsigned char* aggregate_facts) {
   if (blockIdx.x != 0 || threadIdx.x != 0) return;
   unsigned char code = 0U;
   for (unsigned long long i = 0; i < count; ++i) { if (code == 0U && errors[i]) code = errors[i]; errors[i] = 0U; }
-  if (status[0] == 0ULL && code != 0U) { status[0] = (unsigned long long)code; status[1] = aggregate_index; }
+  aggregate_facts[aggregate_index] = code;
 }
 
-extern "C" __global__ void sembla_transition_00000000(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors) {
+extern "C" __global__ void sembla_validate_transition(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, unsigned long long* status) {
+  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
+  unsigned char local_error = 0U; unsigned char* error = &local_error;
+  if (rule_id == 0U) {
+    if (aggregate_facts[0] != 0U) {
+      status[0] = (unsigned long long)aggregate_facts[0]; status[1] = 0ULL; return;
+    }
+    if (aggregate_facts[1] != 0U) {
+      status[0] = (unsigned long long)aggregate_facts[1]; status[1] = 1ULL; return;
+    }
+    return;
+  }
+  if (rule_id == 1U) {
+    return;
+  }
+}
+
+extern "C" __global__ void sembla_transition_00000000(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors, const unsigned long long* status) {
   unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  if (status[0] != 0ULL) return;
   if (row >= row_counts[0]) return;
   unsigned long long candidate = candidate_offsets[0] + row;
   unsigned char local_error = 0; unsigned char* error = &local_error;
   int guard = (((*((const unsigned short*)(state + column_offsets[0]) + (unsigned long long)(row)))) == 0U);
   errors[candidate * 2ULL] = local_error;
   local_error = 0;
-  double lambda = (double)(((double)((*((const double*)(params + 0ULL)))) * (double)(((double)((*((const long long*)(aggs + agg_offsets[0]) + (unsigned long long)((*((const unsigned int*)(state + column_offsets[1]) + (unsigned long long)(row))))))) / (double)((*((const long long*)(aggs + agg_offsets[1]) + (unsigned long long)((*((const unsigned int*)(state + column_offsets[1]) + (unsigned long long)(row)))))))))));
+  double lambda = (double)(([&]() { double sembla_left = (double)((*((const double*)(params + 0ULL)))); if (*error) return 0.0; double sembla_right = (double)(([&]() { double sembla_left = (double)((*((const long long*)(aggs + agg_offsets[0]) + (unsigned long long)((*((const unsigned int*)(state + column_offsets[1]) + (unsigned long long)(row))))))); if (*error) return 0.0; double sembla_right = (double)((*((const long long*)(aggs + agg_offsets[1]) + (unsigned long long)((*((const unsigned int*)(state + column_offsets[1]) + (unsigned long long)(row))))))); if (*error) return 0.0; return sembla_left / sembla_right; }())); if (*error) return 0.0; return sembla_left * sembla_right; }()));
   errors[candidate * 2ULL + 1ULL] = local_error;
   double time = sembla_exp(seed, tick, 0U, (unsigned int)row, 0U, lambda);
   times[candidate] = time;
   enabled[candidate] = (unsigned char)(errors[candidate * 2ULL] == 0U && errors[candidate * 2ULL + 1ULL] == 0U && guard && lambda > 0.0 && time < dt);
 }
 
-extern "C" __global__ void sembla_transition_00000001(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors) {
+extern "C" __global__ void sembla_transition_00000001(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors, const unsigned long long* status) {
   unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  if (status[0] != 0ULL) return;
   if (row >= row_counts[0]) return;
   unsigned long long candidate = candidate_offsets[1] + row;
   unsigned char local_error = 0; unsigned char* error = &local_error;
@@ -157,17 +176,29 @@ extern "C" __global__ void sembla_validate_claims(const unsigned char* state, co
   unsigned char local_error = 0; unsigned char* error = &local_error;
 }
 
-extern "C" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned long long* status) {
+extern "C" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned int box_index, unsigned long long* status) {
   if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
   unsigned char local_error = 0; unsigned char* error = &local_error;
 }
 
-extern "C" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned char* wins, const unsigned long long* status) {
-  unsigned long long self_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
-  if (self_candidate >= candidate_count || status[0] != 0ULL) return;
+extern "C" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned char* wins, const unsigned long long* status) {
+  unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  if (local_candidate >= candidate_count || status[0] != 0ULL) return;
+  unsigned long long self_candidate = candidate_begin + local_candidate;
   wins[self_candidate] = enabled[self_candidate];
   if (!enabled[self_candidate]) return;
   unsigned char local_error = 0; unsigned char* error = &local_error;
+}
+
+extern "C" __global__ void sembla_validate_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, unsigned int box_index, unsigned long long* status) {
+  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
+  unsigned char local_error = 0U; unsigned char* error = &local_error;
+  if (box_index == 0U) { int any_winner = 0; for (unsigned long long row = 0; row < row_counts[0]; ++row) any_winner |= wins[candidate_offsets[0] + row] != 0; if (any_winner) {
+    for (unsigned long long row = 0; row < row_counts[0]; ++row) { local_error = 0U; unsigned long long value = (unsigned long long)(1U); if (local_error) { status[0] = 5ULL; status[1] = candidate_offsets[0] + row; return; } if (value >= 3ULL) { status[0] = 6ULL; status[1] = candidate_offsets[0] + row; return; } }
+  } }
+  if (box_index == 0U) { int any_winner = 0; for (unsigned long long row = 0; row < row_counts[0]; ++row) any_winner |= wins[candidate_offsets[1] + row] != 0; if (any_winner) {
+    for (unsigned long long row = 0; row < row_counts[0]; ++row) { local_error = 0U; unsigned long long value = (unsigned long long)(2U); if (local_error) { status[0] = 5ULL; status[1] = candidate_offsets[1] + row; return; } if (value >= 3ULL) { status[0] = 6ULL; status[1] = candidate_offsets[1] + row; return; } }
+  } }
 }
 
 extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned long long owner_count, unsigned long long* status) {
@@ -175,19 +206,25 @@ extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, co
   for (unsigned long long i = 0; i < owner_count; ++i) owners[i] = -1;
   unsigned char local_error = 0; unsigned char* error = &local_error;
   { int any_winner = 0; for (unsigned long long row = 0; row < row_counts[0]; ++row) any_winner |= wins[candidate_offsets[0] + row] != 0; if (any_winner) {
-    for (unsigned long long row = 0; row < row_counts[0]; ++row) { local_error = 0; unsigned short value = (unsigned short)(1U); if (local_error) { status[0] = 5ULL; status[1] = candidate_offsets[0] + row; return; }
-      if ((unsigned long long)value >= 3ULL) { status[0] = 6ULL; status[1] = candidate_offsets[0] + row; return; }
-      unsigned long long candidate = candidate_offsets[0] + row; if (wins[candidate]) { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = 0ULL; return; } owners[owner] = (int)0U;
+    for (unsigned long long row = 0; row < row_counts[0]; ++row) { unsigned long long candidate = candidate_offsets[0] + row; if (!wins[candidate]) continue;
+      {
+      local_error = 0U; unsigned short value = (unsigned short)(1U); if (local_error) { status[0] = 5ULL; status[1] = candidate; return; }
+      if ((unsigned long long)value >= 3ULL) { status[0] = 6ULL; status[1] = candidate; return; }
+      { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = 0ULL; return; } owners[owner] = (int)0U;
         owner_values[owner] = (unsigned long long)value;
+      }
       }
     }
   }
   }
   { int any_winner = 0; for (unsigned long long row = 0; row < row_counts[0]; ++row) any_winner |= wins[candidate_offsets[1] + row] != 0; if (any_winner) {
-    for (unsigned long long row = 0; row < row_counts[0]; ++row) { local_error = 0; unsigned short value = (unsigned short)(2U); if (local_error) { status[0] = 5ULL; status[1] = candidate_offsets[1] + row; return; }
-      if ((unsigned long long)value >= 3ULL) { status[0] = 6ULL; status[1] = candidate_offsets[1] + row; return; }
-      unsigned long long candidate = candidate_offsets[1] + row; if (wins[candidate]) { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = 1ULL; return; } owners[owner] = (int)1U;
+    for (unsigned long long row = 0; row < row_counts[0]; ++row) { unsigned long long candidate = candidate_offsets[1] + row; if (!wins[candidate]) continue;
+      {
+      local_error = 0U; unsigned short value = (unsigned short)(2U); if (local_error) { status[0] = 5ULL; status[1] = candidate; return; }
+      if ((unsigned long long)value >= 3ULL) { status[0] = 6ULL; status[1] = candidate; return; }
+      { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = 1ULL; return; } owners[owner] = (int)1U;
         owner_values[owner] = (unsigned long long)value;
+      }
       }
     }
   }
@@ -203,14 +240,20 @@ extern "C" __global__ void sembla_apply_effects(unsigned char* next_state, const
     *((unsigned int*)(next_state + column_offsets[1]) + row) = (unsigned int)owner_values[owner]; return; }
 }
 
+extern "C" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status) {
+  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
+  unsigned char local_error = 0U; unsigned char* error = &local_error;
+}
+
 extern "C" __global__ void sembla_prepare_outputs(unsigned long long* next_input_counts, unsigned long long port_count, unsigned char* output_errors, unsigned long long error_count) {
   if (blockIdx.x != 0 || threadIdx.x != 0) return;
   for (unsigned long long i = 0; i < port_count; ++i) next_input_counts[i] = 0ULL;
   for (unsigned long long i = 0; i < error_count; ++i) output_errors[i] = 0U;
 }
 
-extern "C" __global__ void sembla_build_output_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, unsigned long long* output_partials, unsigned char* output_errors) {
+extern "C" __global__ void sembla_build_output_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, unsigned long long* output_partials, unsigned char* output_errors, const unsigned long long* status) {
   unsigned long long field = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  if (status[0] != 0ULL) return;
   unsigned char local_error = 0; unsigned char* error = &local_error;
 }
 

@@ -1,0 +1,19 @@
+## Review — APPROVED
+
+- **Correct:** Acceptance criterion 1 passes. `cargo build --workspace`, `cargo test --workspace`, `cargo test -p sembla-cuda --features cuda`, formatting, and CUDA-feature clippy all succeeded. Deterministic generation and the SIR golden check are exercised in `crates/sembla-cuda/src/codegen.rs:2138-2284`.
+- **Correct:** Criterion 2 has the required ignored device/CPU Philox-vector comparison at `crates/sembla-cuda/tests/gpu_philox.rs:27-57`.
+- **Correct:** Criterion 3 has ignored 100k/200-tick SIR, two-box `sir_policy`, and canonical-model oracle comparisons at `crates/sembla-cuda/tests/gpu_oracle.rs:47-90`.
+- **Correct:** Criterion 4 repeatability is covered at `crates/sembla-cuda/tests/gpu_oracle.rs:92-98`.
+- **Correct:** Criterion 5 is locally tested with the frozen no-device diagnostic at `crates/sembla-cuda/tests/absence.rs:3-15`; production probing maps `CUDA_ERROR_NO_DEVICE` at `crates/sembla-cuda/src/backend.rs:1230-1244`.
+- **Correct:** Criterion 6 is satisfied honestly: criteria 2–4 are explicitly unanswered in `crates/sembla-cuda/GPU-STATUS.md:3-17`, with the remote runbook and script referenced.
+- **Correct:** CUDA construction uses NVRTC with C++14, precise division, FTZ disabled, and FMA contraction disabled at `crates/sembla-cuda/src/backend.rs:120-152`. A macro-stubbed C++14 syntax check of the generated SIR fixture also passed.
+- **Correct:** ABI launch argument order matches generated signatures across transition validation/execution, per-box resolution/effect validation, aggregate publication, and output publication at `crates/sembla-cuda/src/backend.rs:426-826` and `crates/sembla-cuda/src/codegen.rs:1144-1800`.
+- **Correct:** The revised per-box ordering mirrors CPU `stage_box`: transitions are scheduled, resolved, and effect-validated before advancing boxes (`backend.rs:474-669` versus `sembla-runtime/src/executor.rs:633-801`). Effect-column errors are validated before global duplicate-write detection.
+- **Correct:** Aggregate errors are recorded as deferred facts and surfaced in recursive CPU expression order (`codegen.rs:585-749`, `1144-1213`). Prospective output aggregates use `next_state` before output validation (`backend.rs:715-773`).
+- **Correct:** Checked operands are sequenced with C++14 lambdas (`codegen.rs:804-891`); reductions retain ascending CPU row order (`codegen.rs:1185-1203`, `1721-1798`), conflict ties remain lexicographic, and effect scatters use deterministic owner slots without result-bearing atomics.
+- **Correct:** State and wire buffers remain device-resident and only swap after successful status download (`backend.rs:822-842`); hash download policy is controlled by `HashMode` at `backend.rs:383-405`.
+- **Correct:** No CPU execution fallback exists. The only CPU use during construction validates initial schema/ranges (`backend.rs:115-118`); feature-off and unavailable-device paths return explicit errors.
+
+- **Note:** `GeneratedCuda::effect_aggregate_indices` still claims post-resolution evaluation at `crates/sembla-cuda/src/codegen.rs:27-28`, while effect aggregates now belong to `state_aggregate_indices`. The obsolete `sembla_mark_effect_aggregates` kernel and active buffer remain at `codegen.rs:1124-1143` and `backend.rs:227-229`. This is dead/misleading metadata, not a semantic blocker.
+- **Note:** Requested `/Users/ian/projects/sembla/plan.md` and `progress.md` do not exist. Review proceeded from the PRD, diff, implementation, and tests.
+- **Note:** Criteria 2–4 remain intentionally unanswered until the documented GPU run; this is permitted by criterion 6 and is not represented as a pass.

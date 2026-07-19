@@ -47,16 +47,18 @@ pub struct CudaBackend {
     stream: std::sync::Arc<cudarc::driver::CudaStream>,
     transition_functions: Vec<CudaFunction>,
     reset_status: CudaFunction,
-    mark_effect_aggregates: CudaFunction,
     build_aggregate_partials: CudaFunction,
     finish_aggregates: CudaFunction,
-    check_aggregate_errors: CudaFunction,
+    record_aggregate_errors: CudaFunction,
+    validate_transition: CudaFunction,
     check_errors: CudaFunction,
     validate_claims: CudaFunction,
     validate_claim_compatibility: CudaFunction,
     resolve_conflicts: CudaFunction,
+    validate_effects: CudaFunction,
     prepare_effects: CudaFunction,
     apply_effects: CudaFunction,
+    validate_outputs: CudaFunction,
     prepare_outputs: CudaFunction,
     build_output_partials: CudaFunction,
     finish_outputs: CudaFunction,
@@ -75,6 +77,7 @@ pub struct CudaBackend {
     aggregates: CudaSlice<u8>,
     aggregate_partials: CudaSlice<u8>,
     aggregate_errors: CudaSlice<u8>,
+    aggregate_facts: CudaSlice<u8>,
     aggregate_active: CudaSlice<u8>,
     aggregate_offsets: CudaSlice<u64>,
     candidate_offsets: CudaSlice<u64>,
@@ -166,16 +169,18 @@ impl CudaBackend {
                 .map_err(|error| CudaError::Driver(error.to_string()))
         };
         let reset_status = load("sembla_reset_status")?;
-        let mark_effect_aggregates = load("sembla_mark_effect_aggregates")?;
         let build_aggregate_partials = load("sembla_build_aggregate_partials")?;
         let finish_aggregates = load("sembla_finish_aggregates")?;
-        let check_aggregate_errors = load("sembla_check_aggregate_errors")?;
+        let record_aggregate_errors = load("sembla_record_aggregate_errors")?;
+        let validate_transition = load("sembla_validate_transition")?;
         let check_errors = load("sembla_check_candidate_errors")?;
         let validate_claims = load("sembla_validate_claims")?;
         let validate_claim_compatibility = load("sembla_validate_claim_compatibility")?;
         let resolve_conflicts = load("sembla_resolve_conflicts")?;
+        let validate_effects = load("sembla_validate_effects")?;
         let prepare_effects = load("sembla_prepare_effects")?;
         let apply_effects = load("sembla_apply_effects")?;
+        let validate_outputs = load("sembla_validate_outputs")?;
         let prepare_outputs = load("sembla_prepare_outputs")?;
         let build_output_partials = load("sembla_build_output_partials")?;
         let finish_outputs = load("sembla_finish_outputs")?;
@@ -215,6 +220,9 @@ impl CudaBackend {
             .map_err(driver_error)?;
         let aggregate_errors = stream
             .alloc_zeros::<u8>((layout.aggregate_max_groups + 2).max(2))
+            .map_err(driver_error)?;
+        let aggregate_facts = stream
+            .alloc_zeros::<u8>(generated.aggregate_group_tables.len().max(1))
             .map_err(driver_error)?;
         let aggregate_active = stream
             .alloc_zeros::<u8>(generated.aggregate_group_tables.len().max(1))
@@ -266,16 +274,18 @@ impl CudaBackend {
             stream,
             transition_functions,
             reset_status,
-            mark_effect_aggregates,
             build_aggregate_partials,
             finish_aggregates,
-            check_aggregate_errors,
+            record_aggregate_errors,
+            validate_transition,
             check_errors,
             validate_claims,
             validate_claim_compatibility,
             resolve_conflicts,
+            validate_effects,
             prepare_effects,
             apply_effects,
+            validate_outputs,
             prepare_outputs,
             build_output_partials,
             finish_outputs,
@@ -294,6 +304,7 @@ impl CudaBackend {
             aggregates,
             aggregate_partials,
             aggregate_errors,
+            aggregate_facts,
             aggregate_active,
             aggregate_offsets,
             candidate_offsets,
@@ -415,15 +426,111 @@ impl CudaBackend {
                 .arg(&aggregate_error_count);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
+        // Build all tick-start aggregates without committing errors. Each
+        // aggregate leaves a device error fact which the ordered validators
+        // surface only when the CPU evaluator would first reach that node.
         let require_active = 0_u8;
-        for (index, transition) in self.model.transitions().iter().enumerate() {
-            let aggregate_slots = self.generated.schedule_aggregate_indices_by_rule[index].clone();
-            for aggregate_slot in aggregate_slots {
-                let group_table = self.generated.aggregate_group_tables[aggregate_slot];
-                let aggregate_index = u32::try_from(aggregate_slot).map_err(|_| {
-                    CudaError::InvalidInput("aggregate count exceeds u32".to_owned())
+        for aggregate_slot in self.generated.state_aggregate_indices.clone() {
+            let group_table = self.generated.aggregate_group_tables[aggregate_slot];
+            let aggregate_index = u32::try_from(aggregate_slot)
+                .map_err(|_| CudaError::InvalidInput("aggregate count exceeds u32".to_owned()))?;
+            let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+            args.arg(&self.state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.inputs)
+                .arg(&self.input_offsets)
+                .arg(&self.input_counts)
+                .arg(&self.params)
+                .arg(&self.aggregates)
+                .arg(&self.aggregate_facts)
+                .arg(&aggregate_index)
+                .arg(&self.aggregate_active)
+                .arg(&require_active)
+                .arg(&mut self.aggregate_partials)
+                .arg(&self.aggregate_offsets)
+                .arg(&mut self.aggregate_errors);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+            let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
+                CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
+            })?;
+            if groups != 0 {
+                let mut args = self.stream.launch_builder(&self.finish_aggregates);
+                args.arg(&self.aggregate_partials)
+                    .arg(&self.row_counts)
+                    .arg(&aggregate_index)
+                    .arg(&self.aggregate_active)
+                    .arg(&require_active)
+                    .arg(&mut self.aggregates)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&mut self.aggregate_errors);
+                unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
+                    .map_err(driver_error)?;
+            }
+            let aggregate_identity = u64::from(aggregate_index);
+            let mut args = self.stream.launch_builder(&self.record_aggregate_errors);
+            args.arg(&mut self.aggregate_errors)
+                .arg(&aggregate_error_count)
+                .arg(&aggregate_identity)
+                .arg(&mut self.aggregate_facts);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
+
+        // Mirror stage_box: schedule, resolve, and validate winning effects
+        // for one box before any expression in the following box is reached.
+        for box_index in 0..self.model.model().boxes.len() {
+            let transition_positions = self
+                .model
+                .transitions()
+                .iter()
+                .enumerate()
+                .filter_map(|(index, transition)| {
+                    (transition.box_index == box_index).then_some((index, transition))
+                })
+                .collect::<Vec<_>>();
+
+            for (index, transition) in &transition_positions {
+                let rule_id = transition.rule_id;
+                {
+                    let mut args = self.stream.launch_builder(&self.validate_transition);
+                    args.arg(&self.state)
+                        .arg(&self.column_offsets)
+                        .arg(&self.row_counts)
+                        .arg(&self.inputs)
+                        .arg(&self.input_offsets)
+                        .arg(&self.input_counts)
+                        .arg(&self.params)
+                        .arg(&self.aggregates)
+                        .arg(&self.aggregate_facts)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&self.candidate_offsets)
+                        .arg(&rule_id)
+                        .arg(&mut self.status);
+                    unsafe { args.launch(one) }.map_err(driver_error)?;
+                }
+
+                let model_transition = &self.model.model().boxes[transition.box_index].transitions
+                    [transition.transition_index];
+                let table_index = self.model.model().boxes[transition.box_index]
+                    .tables
+                    .iter()
+                    .position(|table| table.name == model_transition.table)
+                    .expect("validated transition table");
+                let global_table = global_table(&self.model, transition.box_index, table_index);
+                let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
+                    CudaError::InvalidInput(format!(
+                        "rule {} row count exceeds u32 entity IDs",
+                        transition.rule_id
+                    ))
                 })?;
-                let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+                if rows == 0 {
+                    continue;
+                }
+                let dt = self.model.model().dt;
+                let tick = self.next_tick;
+                let mut args = self
+                    .stream
+                    .launch_builder(&self.transition_functions[*index]);
                 args.arg(&self.state)
                     .arg(&self.column_offsets)
                     .arg(&self.row_counts)
@@ -432,130 +539,97 @@ impl CudaBackend {
                     .arg(&self.input_counts)
                     .arg(&self.params)
                     .arg(&self.aggregates)
-                    .arg(&aggregate_index)
-                    .arg(&self.aggregate_active)
-                    .arg(&require_active)
-                    .arg(&mut self.aggregate_partials)
                     .arg(&self.aggregate_offsets)
-                    .arg(&mut self.aggregate_errors);
-                unsafe { args.launch(LaunchConfig::for_num_elems(1)) }.map_err(driver_error)?;
-                let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
-                    CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
+                    .arg(&self.candidate_offsets)
+                    .arg(&self.seed)
+                    .arg(&tick)
+                    .arg(&dt)
+                    .arg(&mut self.enabled)
+                    .arg(&mut self.times)
+                    .arg(&mut self.candidate_errors)
+                    .arg(&self.status);
+                unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+
+                let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
+                    CudaError::InvalidInput("rule id exceeds host index width".to_owned())
                 })?;
-                if groups != 0 {
-                    let mut args = self.stream.launch_builder(&self.finish_aggregates);
-                    args.arg(&self.aggregate_partials)
-                        .arg(&self.row_counts)
-                        .arg(&aggregate_index)
-                        .arg(&self.aggregate_active)
-                        .arg(&require_active)
-                        .arg(&mut self.aggregates)
-                        .arg(&self.aggregate_offsets)
-                        .arg(&mut self.aggregate_errors);
-                    unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
-                        .map_err(driver_error)?;
-                }
-                let aggregate_identity = u64::from(aggregate_index);
-                let mut args = self.stream.launch_builder(&self.check_aggregate_errors);
-                args.arg(&mut self.aggregate_errors)
-                    .arg(&aggregate_error_count)
-                    .arg(&aggregate_identity)
+                let candidate_begin = self.layout.candidate_offsets[rule_index];
+                let candidate_count = u64::from(rows);
+                let mut args = self.stream.launch_builder(&self.check_errors);
+                args.arg(&self.candidate_errors)
+                    .arg(&candidate_begin)
+                    .arg(&candidate_count)
+                    .arg(&mut self.status);
+                unsafe { args.launch(one) }.map_err(driver_error)?;
+
+                let mut args = self.stream.launch_builder(&self.validate_claims);
+                args.arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.inputs)
+                    .arg(&self.input_offsets)
+                    .arg(&self.input_counts)
+                    .arg(&self.params)
+                    .arg(&self.aggregates)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&self.candidate_offsets)
+                    .arg(&rule_id)
+                    .arg(&self.enabled)
                     .arg(&mut self.status);
                 unsafe { args.launch(one) }.map_err(driver_error)?;
             }
-            let model_transition = &self.model.model().boxes[transition.box_index].transitions
-                [transition.transition_index];
-            let table_index = self.model.model().boxes[transition.box_index]
-                .tables
-                .iter()
-                .position(|table| table.name == model_transition.table)
-                .expect("validated transition table");
-            let global_table = global_table(&self.model, transition.box_index, table_index);
-            let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
-                CudaError::InvalidInput(format!(
-                    "rule {} row count exceeds u32 entity IDs",
-                    transition.rule_id
-                ))
-            })?;
-            if rows == 0 {
-                continue;
+
+            let box_index_u32 = u32::try_from(box_index)
+                .map_err(|_| CudaError::InvalidInput("box count exceeds u32".to_owned()))?;
+            {
+                let mut args = self
+                    .stream
+                    .launch_builder(&self.validate_claim_compatibility);
+                args.arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.inputs)
+                    .arg(&self.input_offsets)
+                    .arg(&self.input_counts)
+                    .arg(&self.params)
+                    .arg(&self.aggregates)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&self.candidate_offsets)
+                    .arg(&self.enabled)
+                    .arg(&box_index_u32)
+                    .arg(&mut self.status);
+                unsafe { args.launch(one) }.map_err(driver_error)?;
             }
-            let dt = self.model.model().dt;
-            let tick = self.next_tick;
-            let mut args = self
-                .stream
-                .launch_builder(&self.transition_functions[index]);
-            args.arg(&self.state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&self.aggregates)
-                .arg(&self.aggregate_offsets)
-                .arg(&self.candidate_offsets)
-                .arg(&self.seed)
-                .arg(&tick)
-                .arg(&dt)
-                .arg(&mut self.enabled)
-                .arg(&mut self.times)
-                .arg(&mut self.candidate_errors);
-            unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
 
-            let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
-                CudaError::InvalidInput("rule id exceeds host index width".to_owned())
-            })?;
-            let candidate_begin = self.layout.candidate_offsets[rule_index];
-            let candidate_count = u64::from(rows);
-            let mut args = self.stream.launch_builder(&self.check_errors);
-            args.arg(&self.candidate_errors)
-                .arg(&candidate_begin)
-                .arg(&candidate_count)
-                .arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
-
-            let rule_id = transition.rule_id;
-            let mut args = self.stream.launch_builder(&self.validate_claims);
-            args.arg(&self.state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&self.aggregates)
-                .arg(&self.aggregate_offsets)
-                .arg(&self.candidate_offsets)
-                .arg(&rule_id)
-                .arg(&self.enabled)
-                .arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
-        }
-        {
-            let mut args = self
-                .stream
-                .launch_builder(&self.validate_claim_compatibility);
-            args.arg(&self.state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&self.aggregates)
-                .arg(&self.aggregate_offsets)
-                .arg(&self.candidate_offsets)
-                .arg(&self.enabled)
-                .arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
-        }
-        {
-            let count = self.layout.candidate_count as u64;
-            let launch_count = u32::try_from(self.layout.candidate_count).map_err(|_| {
-                CudaError::InvalidInput("candidate count exceeds CUDA launch capacity".to_owned())
-            })?;
-            if launch_count != 0 {
+            let mut candidate_begin = 0_u64;
+            let mut candidate_count = 0_u64;
+            if let Some((_, first)) = transition_positions.first() {
+                let rule_index = usize::try_from(first.rule_id).map_err(|_| {
+                    CudaError::InvalidInput("rule id exceeds host index width".to_owned())
+                })?;
+                candidate_begin = self.layout.candidate_offsets[rule_index];
+                for (_, transition) in &transition_positions {
+                    let model_transition = &self.model.model().boxes[transition.box_index]
+                        .transitions[transition.transition_index];
+                    let table_index = self.model.model().boxes[transition.box_index]
+                        .tables
+                        .iter()
+                        .position(|table| table.name == model_transition.table)
+                        .expect("validated transition table");
+                    let global_table = global_table(&self.model, transition.box_index, table_index);
+                    candidate_count = candidate_count
+                        .checked_add(self.layout.row_counts[global_table])
+                        .ok_or_else(|| {
+                            CudaError::InvalidInput("box candidate count overflow".to_owned())
+                        })?;
+                }
+            }
+            if candidate_count != 0 {
+                let launch_count = u32::try_from(candidate_count).map_err(|_| {
+                    CudaError::InvalidInput(
+                        "box candidate count exceeds CUDA launch capacity".to_owned(),
+                    )
+                })?;
                 let mut args = self.stream.launch_builder(&self.resolve_conflicts);
                 args.arg(&self.state)
                     .arg(&self.column_offsets)
@@ -567,7 +641,8 @@ impl CudaBackend {
                     .arg(&self.aggregates)
                     .arg(&self.aggregate_offsets)
                     .arg(&self.candidate_offsets)
-                    .arg(&count)
+                    .arg(&candidate_begin)
+                    .arg(&candidate_count)
                     .arg(&self.enabled)
                     .arg(&self.times)
                     .arg(&mut self.wins)
@@ -575,63 +650,23 @@ impl CudaBackend {
                 unsafe { args.launch(LaunchConfig::for_num_elems(launch_count)) }
                     .map_err(driver_error)?;
             }
-        }
-        if !self.generated.effect_aggregate_indices.is_empty() {
-            let aggregate_count = self.generated.aggregate_group_tables.len() as u64;
-            let mut args = self.stream.launch_builder(&self.mark_effect_aggregates);
-            args.arg(&self.row_counts)
+
+            let mut args = self.stream.launch_builder(&self.validate_effects);
+            args.arg(&self.state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.inputs)
+                .arg(&self.input_offsets)
+                .arg(&self.input_counts)
+                .arg(&self.params)
+                .arg(&self.aggregates)
+                .arg(&self.aggregate_facts)
+                .arg(&self.aggregate_offsets)
                 .arg(&self.candidate_offsets)
                 .arg(&self.wins)
-                .arg(&mut self.aggregate_active)
-                .arg(&aggregate_count);
+                .arg(&box_index_u32)
+                .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
-
-            let require_active = 1_u8;
-            for &aggregate_slot in &self.generated.effect_aggregate_indices {
-                let group_table = self.generated.aggregate_group_tables[aggregate_slot];
-                let aggregate_index = u32::try_from(aggregate_slot).map_err(|_| {
-                    CudaError::InvalidInput("aggregate count exceeds u32".to_owned())
-                })?;
-                let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
-                args.arg(&self.state)
-                    .arg(&self.column_offsets)
-                    .arg(&self.row_counts)
-                    .arg(&self.inputs)
-                    .arg(&self.input_offsets)
-                    .arg(&self.input_counts)
-                    .arg(&self.params)
-                    .arg(&self.aggregates)
-                    .arg(&aggregate_index)
-                    .arg(&self.aggregate_active)
-                    .arg(&require_active)
-                    .arg(&mut self.aggregate_partials)
-                    .arg(&self.aggregate_offsets)
-                    .arg(&mut self.aggregate_errors);
-                unsafe { args.launch(LaunchConfig::for_num_elems(1)) }.map_err(driver_error)?;
-                let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
-                    CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
-                })?;
-                if groups != 0 {
-                    let mut args = self.stream.launch_builder(&self.finish_aggregates);
-                    args.arg(&self.aggregate_partials)
-                        .arg(&self.row_counts)
-                        .arg(&aggregate_index)
-                        .arg(&self.aggregate_active)
-                        .arg(&require_active)
-                        .arg(&mut self.aggregates)
-                        .arg(&self.aggregate_offsets)
-                        .arg(&mut self.aggregate_errors);
-                    unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
-                        .map_err(driver_error)?;
-                }
-                let aggregate_identity = u64::from(aggregate_index);
-                let mut args = self.stream.launch_builder(&self.check_aggregate_errors);
-                args.arg(&mut self.aggregate_errors)
-                    .arg(&aggregate_error_count)
-                    .arg(&aggregate_identity)
-                    .arg(&mut self.status);
-                unsafe { args.launch(one) }.map_err(driver_error)?;
-            }
         }
         self.stream
             .memcpy_dtod(&self.state, &mut self.next_state)
@@ -690,6 +725,7 @@ impl CudaBackend {
                 .arg(&self.input_counts)
                 .arg(&self.params)
                 .arg(&self.aggregates)
+                .arg(&self.aggregate_facts)
                 .arg(&aggregate_index)
                 .arg(&self.aggregate_active)
                 .arg(&require_active)
@@ -714,10 +750,25 @@ impl CudaBackend {
                     .map_err(driver_error)?;
             }
             let aggregate_identity = u64::from(aggregate_index);
-            let mut args = self.stream.launch_builder(&self.check_aggregate_errors);
+            let mut args = self.stream.launch_builder(&self.record_aggregate_errors);
             args.arg(&mut self.aggregate_errors)
                 .arg(&aggregate_error_count)
                 .arg(&aggregate_identity)
+                .arg(&mut self.aggregate_facts);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
+        {
+            let mut args = self.stream.launch_builder(&self.validate_outputs);
+            args.arg(&self.next_state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.inputs)
+                .arg(&self.input_offsets)
+                .arg(&self.input_counts)
+                .arg(&self.params)
+                .arg(&self.aggregates)
+                .arg(&self.aggregate_facts)
+                .arg(&self.aggregate_offsets)
                 .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
@@ -749,7 +800,8 @@ impl CudaBackend {
                 .arg(&self.aggregates)
                 .arg(&self.aggregate_offsets)
                 .arg(&mut self.output_partials)
-                .arg(&mut self.output_errors);
+                .arg(&mut self.output_errors)
+                .arg(&self.status);
             unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
                 .map_err(driver_error)?;
             let field_count_u64 = u64::from(field_count);
