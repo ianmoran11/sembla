@@ -39,9 +39,11 @@ impl PhiloxCoordinate {
 }
 
 #[cfg(feature = "cuda")]
-pub use backend::{CudaBackend, CudaRunResult, HashMode};
+pub use backend::{CudaBackend, CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
 #[cfg(not(feature = "cuda"))]
-pub use backend_stub::{CudaBackend, CudaRunResult, HashMode};
+pub use backend_stub::{
+    CudaBackend, CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode,
+};
 
 /// The version of the Sembla CUDA crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

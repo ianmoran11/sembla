@@ -194,6 +194,16 @@ fn empty_column(ty: &AttrType) -> ColumnData {
     }
 }
 
+fn column_matches_type(column: &ColumnData, ty: &AttrType) -> bool {
+    matches!(
+        (column, ty),
+        (ColumnData::Real(_), AttrType::Real)
+            | (ColumnData::Int(_), AttrType::Int)
+            | (ColumnData::Enum(_), AttrType::Enum { .. })
+            | (ColumnData::Ref(_), AttrType::Ref { .. })
+    )
+}
+
 /// A fixed-population, double-buffered state store.
 ///
 /// Tables are retained in box-major IR declaration order and columns in
@@ -340,6 +350,53 @@ impl StateStore {
 
     pub(crate) fn replace_inputs(&mut self, inputs: Vec<InputTable>) {
         self.inputs = inputs;
+    }
+
+    /// Replaces input tables while reconstructing a read-only snapshot from an
+    /// external execution backend. The schema and declaration order must match
+    /// the validated model-derived inputs already owned by this store.
+    pub fn replace_backend_inputs(&mut self, inputs: Vec<InputTable>) -> Result<(), StateError> {
+        if inputs.len() != self.inputs.len() {
+            return Err(StateError::new(format!(
+                "backend snapshot supplied {} input tables, expected {}",
+                inputs.len(),
+                self.inputs.len()
+            )));
+        }
+        for (expected, actual) in self.inputs.iter().zip(&inputs) {
+            if expected.box_name != actual.box_name
+                || expected.port_name != actual.port_name
+                || expected.schema != actual.schema
+                || actual.columns.len() != actual.schema.len()
+                || actual
+                    .columns
+                    .iter()
+                    .zip(&actual.schema)
+                    .any(|(column, attr)| {
+                        column.len() != actual.row_count
+                            || !column_matches_type(column, &attr.ty)
+                            || matches!(
+                                (column, &attr.ty),
+                                (ColumnData::Enum(values), AttrType::Enum { variants })
+                                    if values.iter().any(|value| usize::from(*value) >= variants.len())
+                            )
+                            || matches!(
+                                (column, &attr.ty),
+                                (ColumnData::Ref(values), AttrType::Ref { table })
+                                    if self.current.tables.iter()
+                                        .find(|target| target.box_name == actual.box_name && target.name == *table)
+                                        .map_or(true, |target| values.iter().any(|value| usize::try_from(*value).map_or(true, |value| value >= target.row_count)))
+                            )
+                    })
+            {
+                return Err(StateError::new(format!(
+                    "backend input snapshot for '{}.{}' does not match the validated schema",
+                    actual.box_name, actual.port_name
+                )));
+            }
+        }
+        self.inputs = inputs;
+        Ok(())
     }
 
     fn prepare_next(&mut self) -> Result<(), StateError> {

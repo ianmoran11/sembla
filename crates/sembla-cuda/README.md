@@ -70,6 +70,13 @@ follow that runbook's validation and destruction steps. Correctness results are
 valid on any compatible CUDA GPU. Performance claims are valid only on verified
 full-rate hardware, following [`spikes/precision/README.md`](../../spikes/precision/README.md).
 
+The CLI differential workflow is documented in
+[`docs/cuda-differential-harness.md`](../../docs/cuda-differential-harness.md)
+and its clean-checkout evidence runner is
+[`scripts/run-differential-corpus.sh`](scripts/run-differential-corpus.sh).
+CUDA transitions remain device-executed; the CLI's downloaded committed-state
+mirror is used only for read-only view and byte formatting.
+
 Current implementation-time GPU status is recorded in
 [`GPU-STATUS.md`](GPU-STATUS.md). An absent GPU is always reported as
 **unanswered**, never as a simulated pass.

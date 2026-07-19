@@ -228,3 +228,22 @@ draw. Independent simulation seeds reserve `rule_id = 0xfffffffe`, use the
 replica index as `tick`, and set `entity_id = draw_idx = 0`; Philox output lane
 0 supplies the low 32 bits and lane 1 the high 32 bits of the derived `u64`.
 Thus extending K also never changes an earlier replica seed or result.
+
+## CUDA backend and differential check
+
+Request the native-`f64` backend explicitly; an unavailable device or toolkit
+is a nonzero error and never falls back to CPU:
+
+```sh
+cargo run --release -p sembla-cli --features cuda -- run \
+  examples/sir.json --population pop.bin --seed 77 --ticks 200 \
+  --backend cuda --out results-cuda.csv
+```
+
+The CUDA sidecar records `backend=cuda-native-f64`, `precision=f64`,
+`fell_back=false`, and nonempty `gpu_model` and `driver_version` fields.
+`verify-run` reads that identity and replays CUDA rather than substituting the
+CPU oracle.
+
+For CPU-oracle differential testing and the hardware policy, see
+[`docs/cuda-differential-harness.md`](../cuda-differential-harness.md).

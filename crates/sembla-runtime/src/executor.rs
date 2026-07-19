@@ -362,7 +362,7 @@ fn execute_tick(
     // Observation is deliberately evaluated only after commit and receives an
     // immutable store. It cannot consume RNG coordinates, stage writes, or
     // influence conflict resolution or scheduling.
-    let views = evaluate_views(model, state, params)?;
+    let views = observe_views(model, state, params)?;
 
     let mut fired = model
         .transitions()
@@ -403,7 +403,12 @@ fn execute_tick(
     })
 }
 
-fn evaluate_views(
+/// Evaluates declaration-ordered views from an already committed state.
+///
+/// Alternate execution backends use this observation-only entry point after
+/// reconstructing a read-only host snapshot; it never schedules transitions,
+/// consumes RNG coordinates, or mutates state.
+pub fn observe_views(
     model: &ValidatedModel,
     state: &StateStore,
     params: &ParamEnv,

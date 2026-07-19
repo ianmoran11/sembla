@@ -4,7 +4,7 @@ use cudarc::driver::{CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKer
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::state::{ColumnData, StateStore, TableInit};
+use sembla_runtime::state::{ColumnData, ColumnInit, InputTable, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
@@ -20,6 +20,20 @@ pub enum HashMode {
 pub struct CudaRunResult {
     pub final_state_hash: [u8; 32],
     pub per_tick_state_hashes: Vec<[u8; 32]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CudaDeviceIdentity {
+    pub gpu_model: String,
+    pub driver_version: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct CudaTickObservation {
+    pub tick: u32,
+    pub state: StateStore,
+    pub fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
+    pub deferred_per_resource_table: Vec<(String, usize)>,
 }
 
 #[derive(Debug)]
@@ -85,6 +99,7 @@ pub struct CudaBackend {
     times: CudaSlice<f64>,
     candidate_errors: CudaSlice<u8>,
     wins: CudaSlice<u8>,
+    deferred: CudaSlice<u8>,
     write_offsets: CudaSlice<u64>,
     owners: CudaSlice<i32>,
     owner_values: CudaSlice<u64>,
@@ -94,6 +109,7 @@ pub struct CudaBackend {
     seed: u64,
     next_tick: u32,
     hash_mode: HashMode,
+    device_identity: CudaDeviceIdentity,
 }
 
 impl CudaBackend {
@@ -133,6 +149,21 @@ impl CudaBackend {
         let generated = generate(model)?;
         let dump_path = generated.dump_if_requested()?;
         let context = CudaContext::new(0).map_err(|error| CudaError::Driver(error.to_string()))?;
+        let gpu_model = context
+            .name()
+            .map_err(|error| CudaError::Driver(error.to_string()))?;
+        let mut driver_version = 0_i32;
+        let driver_result =
+            unsafe { cudarc::driver::sys::cuDriverGetVersion(&mut driver_version as *mut i32) };
+        if driver_result != cudarc::driver::sys::CUresult::CUDA_SUCCESS {
+            return Err(CudaError::Driver(format!(
+                "cuDriverGetVersion failed with {driver_result:?}"
+            )));
+        }
+        let device_identity = CudaDeviceIdentity {
+            gpu_model,
+            driver_version: format_cuda_driver_version(driver_version),
+        };
         let options = CompileOptions {
             ftz: Some(false),
             prec_div: Some(true),
@@ -249,6 +280,12 @@ impl CudaBackend {
         let wins = stream
             .alloc_zeros::<u8>(candidate_len)
             .map_err(driver_error)?;
+        let deferred_len = candidate_len
+            .checked_mul(layout.row_counts.len().max(1))
+            .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?;
+        let deferred = stream
+            .alloc_zeros::<u8>(deferred_len)
+            .map_err(driver_error)?;
         let write_offsets = stream
             .memcpy_stod(&nonempty(&layout.write_offsets))
             .map_err(driver_error)?;
@@ -312,6 +349,7 @@ impl CudaBackend {
             times,
             candidate_errors,
             wins,
+            deferred,
             write_offsets,
             owners,
             owner_values,
@@ -321,11 +359,79 @@ impl CudaBackend {
             seed,
             next_tick: 0,
             hash_mode,
+            device_identity,
         })
     }
 
     pub fn generated(&self) -> &GeneratedCuda {
         &self.generated
+    }
+
+    pub fn device_identity(&self) -> &CudaDeviceIdentity {
+        &self.device_identity
+    }
+
+    /// Executes one tick on CUDA and downloads a read-only observation snapshot.
+    /// State remains resident on the device for subsequent ticks.
+    pub fn run_tick_observed(&mut self) -> Result<CudaTickObservation, CudaError> {
+        let tick = self.next_tick;
+        self.execute_tick()?;
+        let wins = self.stream.memcpy_dtov(&self.wins).map_err(driver_error)?;
+        let deferred = self
+            .stream
+            .memcpy_dtov(&self.deferred)
+            .map_err(driver_error)?;
+        let mut fired_per_box = Vec::with_capacity(self.model.model().boxes.len());
+        for (box_index, model_box) in self.model.model().boxes.iter().enumerate() {
+            let mut fired = Vec::with_capacity(model_box.transitions.len());
+            for transition in self
+                .model
+                .transitions()
+                .iter()
+                .filter(|transition| transition.box_index == box_index)
+            {
+                let rule = transition.rule_id as usize;
+                let begin = self.layout.candidate_offsets[rule] as usize;
+                let end = self
+                    .layout
+                    .candidate_offsets
+                    .get(rule + 1)
+                    .copied()
+                    .map(|value| value as usize)
+                    .unwrap_or(self.layout.candidate_count);
+                fired.push((
+                    transition.rule_id,
+                    wins[begin..end].iter().filter(|value| **value != 0).count(),
+                ));
+            }
+            fired_per_box.push((model_box.name.clone(), fired));
+        }
+        let table_count = self.layout.row_counts.len();
+        let qualify = self.model.model().boxes.len() > 1;
+        let mut deferred_per_resource_table = Vec::new();
+        let mut global_table = 0;
+        for model_box in &self.model.model().boxes {
+            for table in &model_box.tables {
+                let count = (0..self.layout.candidate_count)
+                    .filter(|candidate| deferred[candidate * table_count + global_table] != 0)
+                    .count();
+                if count != 0 {
+                    let name = if qualify {
+                        format!("{}.{}", model_box.name, table.name)
+                    } else {
+                        table.name.clone()
+                    };
+                    deferred_per_resource_table.push((name, count));
+                }
+                global_table += 1;
+            }
+        }
+        Ok(CudaTickObservation {
+            tick,
+            state: self.download_state_store()?,
+            fired_per_box,
+            deferred_per_resource_table,
+        })
     }
 
     /// Evaluates checked coordinate Philox vectors on the device. This is a
@@ -630,6 +736,7 @@ impl CudaBackend {
                         "box candidate count exceeds CUDA launch capacity".to_owned(),
                     )
                 })?;
+                let resource_table_count = self.layout.row_counts.len() as u64;
                 let mut args = self.stream.launch_builder(&self.resolve_conflicts);
                 args.arg(&self.state)
                     .arg(&self.column_offsets)
@@ -643,9 +750,11 @@ impl CudaBackend {
                     .arg(&self.candidate_offsets)
                     .arg(&candidate_begin)
                     .arg(&candidate_count)
+                    .arg(&resource_table_count)
                     .arg(&self.enabled)
                     .arg(&self.times)
                     .arg(&mut self.wins)
+                    .arg(&mut self.deferred)
                     .arg(&self.status);
                 unsafe { args.launch(LaunchConfig::for_num_elems(launch_count)) }
                     .map_err(driver_error)?;
@@ -836,6 +945,30 @@ impl CudaBackend {
         Ok(())
     }
 
+    fn download_state_store(&self) -> Result<StateStore, CudaError> {
+        let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
+        let inputs = self
+            .stream
+            .memcpy_dtov(&self.inputs)
+            .map_err(driver_error)?;
+        let input_counts = self
+            .stream
+            .memcpy_dtov(&self.input_counts)
+            .map_err(driver_error)?;
+        let initial = unpack_state(&self.model, &self.layout, &state);
+        let mut store = StateStore::new(&self.model, initial)
+            .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
+        store
+            .replace_backend_inputs(unpack_inputs(
+                &self.model,
+                &self.layout,
+                &inputs,
+                &input_counts,
+            ))
+            .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
+        Ok(store)
+    }
+
     fn download_hash(&self) -> Result<[u8; 32], CudaError> {
         let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
         let inputs = self
@@ -853,6 +986,119 @@ impl CudaBackend {
             &inputs,
             &input_counts,
         ))
+    }
+}
+
+fn format_cuda_driver_version(version: i32) -> String {
+    format!("{}.{}", version / 1000, (version % 1000) / 10)
+}
+
+fn unpack_state(model: &ValidatedModel, layout: &Layout, bytes: &[u8]) -> Vec<TableInit> {
+    let mut tables = Vec::new();
+    let mut global_table = 0;
+    let mut column = 0;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let rows = layout.row_counts[global_table] as usize;
+            let columns = table
+                .attrs
+                .iter()
+                .map(|attr| {
+                    let data = read_column(
+                        bytes,
+                        layout.column_offsets[column] as usize,
+                        rows,
+                        &attr.ty,
+                    );
+                    column += 1;
+                    ColumnInit::new(&attr.name, data)
+                })
+                .collect();
+            tables.push(TableInit::new(&model_box.name, &table.name, rows, columns));
+            global_table += 1;
+        }
+    }
+    tables
+}
+
+fn unpack_inputs(
+    model: &ValidatedModel,
+    layout: &Layout,
+    bytes: &[u8],
+    counts: &[u64],
+) -> Vec<InputTable> {
+    let mut tables = Vec::new();
+    let mut field = 0;
+    for (port_flat, (box_index, port_index)) in layout.ports.iter().copied().enumerate() {
+        let model_box = &model.model().boxes[box_index];
+        let port = &model_box.inputs[port_index];
+        let rows = counts[port_flat] as usize;
+        let columns = port
+            .schema
+            .iter()
+            .map(|attr| {
+                let data = read_column(bytes, layout.input_offsets[field] as usize, rows, &attr.ty);
+                field += 1;
+                data
+            })
+            .collect();
+        tables.push(InputTable {
+            box_name: model_box.name.clone(),
+            port_name: port.name.clone(),
+            schema: port.schema.clone(),
+            row_count: rows,
+            columns,
+        });
+    }
+    tables
+}
+
+fn read_column(bytes: &[u8], offset: usize, rows: usize, ty: &AttrType) -> ColumnData {
+    match ty {
+        AttrType::Real => ColumnData::Real(
+            (0..rows)
+                .map(|row| {
+                    f64::from_bits(u64::from_le_bytes(
+                        bytes[offset + row * 8..offset + row * 8 + 8]
+                            .try_into()
+                            .unwrap(),
+                    ))
+                })
+                .collect(),
+        ),
+        AttrType::Int => ColumnData::Int(
+            (0..rows)
+                .map(|row| {
+                    i64::from_le_bytes(
+                        bytes[offset + row * 8..offset + row * 8 + 8]
+                            .try_into()
+                            .unwrap(),
+                    )
+                })
+                .collect(),
+        ),
+        AttrType::Enum { .. } => ColumnData::Enum(
+            (0..rows)
+                .map(|row| {
+                    u16::from_le_bytes(
+                        bytes[offset + row * 2..offset + row * 2 + 2]
+                            .try_into()
+                            .unwrap(),
+                    )
+                })
+                .collect(),
+        ),
+        AttrType::Ref { .. } => ColumnData::Ref(
+            (0..rows)
+                .map(|row| {
+                    u32::from_le_bytes(
+                        bytes[offset + row * 4..offset + row * 4 + 4]
+                            .try_into()
+                            .unwrap(),
+                    )
+                })
+                .collect(),
+        ),
     }
 }
 

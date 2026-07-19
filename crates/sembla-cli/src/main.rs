@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use sembla_cuda::{CudaBackend, HashMode};
 use sembla_ir::{AttrType, ParamType, ParamValue};
 use sembla_runtime::eval::{ParamEnv, ParamOverride};
 use sembla_runtime::executor::{self, ObservationValue, SummaryValue};
@@ -12,7 +13,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -71,10 +72,28 @@ fn run(arguments: &[String]) -> i32 {
             verify_run(manifest_path, model_path, options)
         }
         [command, arguments @ ..] if command == "compare" => compare_command(arguments),
+        [command, arguments @ ..] if command == "diff-backends" => diff_backends_command(arguments),
         _ => {
             eprintln!("{USAGE}");
             2
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum BackendSelection {
+    #[default]
+    Cpu,
+    Cuda,
+}
+
+fn parse_backend(value: &str) -> Result<BackendSelection, String> {
+    match value {
+        "cpu" => Ok(BackendSelection::Cpu),
+        "cuda" => Ok(BackendSelection::Cuda),
+        _ => Err(format!(
+            "invalid backend '{value}' (expected 'cpu' or 'cuda')"
+        )),
     }
 }
 
@@ -86,6 +105,7 @@ struct RunOptions {
     out: Option<String>,
     dt: Option<f64>,
     params: Option<String>,
+    backend: BackendSelection,
 }
 
 fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
@@ -95,6 +115,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
     let mut out = None;
     let mut dt = None;
     let mut params = None;
+    let mut backend = None;
     let mut index = 0;
     while index < flags.len() {
         let flag = flags[index].as_str();
@@ -121,6 +142,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
                 set_once(&mut dt, value, flag)?;
             }
             "--params" => set_once(&mut params, value.clone(), flag)?,
+            "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
             _ => return Err(format!("unknown run flag '{flag}'")),
         }
         index += 2;
@@ -132,6 +154,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
         out,
         dt,
         params,
+        backend: backend.unwrap_or_default(),
     })
 }
 
@@ -146,6 +169,7 @@ struct SweepOptions {
     out: String,
     params: Option<String>,
     export_pairs: Option<String>,
+    backend: BackendSelection,
 }
 
 fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
@@ -158,6 +182,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
     let mut theta_file = None;
     let mut noise_mode = None;
     let mut export_pairs = None;
+    let mut backend = None;
     let mut index = 0;
     while index < flags.len() {
         let flag = flags[index].as_str();
@@ -192,6 +217,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
             "--out" => set_once(&mut out, value.clone(), flag)?,
             "--params" => set_once(&mut params, value.clone(), flag)?,
             "--export-pairs" => set_once(&mut export_pairs, value.clone(), flag)?,
+            "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
             _ => return Err(format!("unknown sweep flag '{flag}'")),
         }
         index += 2;
@@ -215,6 +241,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
         params,
         export_pairs,
+        backend: backend.unwrap_or_default(),
     })
 }
 
@@ -266,6 +293,7 @@ struct CompareOptions {
     out: String,
     params_a: Option<String>,
     params_b: Option<String>,
+    backend: BackendSelection,
 }
 
 fn compare_command(arguments: &[String]) -> i32 {
@@ -310,6 +338,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
     let mut out = None;
     let mut params_a = None;
     let mut params_b = None;
+    let mut backend = None;
     for pair in flags.chunks_exact(2) {
         let flag = pair[0].as_str();
         let value = pair[1].clone();
@@ -325,6 +354,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
             "--out" => set_once(&mut out, value, flag)?,
             "--params-a" => set_once(&mut params_a, value, flag)?,
             "--params-b" => set_once(&mut params_b, value, flag)?,
+            "--backend" => set_once(&mut backend, parse_backend(&value)?, flag)?,
             _ => return Err(format!("unknown compare flag '{flag}'")),
         }
     }
@@ -345,6 +375,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
         out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
         params_a,
         params_b,
+        backend: backend.unwrap_or_default(),
     })
 }
 
@@ -499,34 +530,10 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
             &SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?,
         )?,
     };
-    let mut state = StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
     let params = resolve_params(&model, options.params.as_deref())?;
-
-    if let Some(out) = options.out.as_deref() {
-        let hashes = run_results(
-            &model,
-            &mut state,
-            &params,
-            options.seed,
-            options.ticks,
-            out,
-        )?;
-        let mut run_manifest = manifest::RunManifest::new(
-            manifest::ManifestKind::Run,
-            options.seed,
-            options.ticks,
-            population_source,
-            population_sha256,
-        );
-        run_manifest.model = Some(model.model().name.clone());
-        run_manifest.dt = Some(model.model().dt);
-        run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
-        run_manifest.resolved_theta = manifest::resolved_theta(&params);
-        run_manifest.results_sha256 = Some(hashes.results_sha256);
-        run_manifest.final_state_sha256 = Some(hashes.final_state_sha256);
-        run_manifest.observation_sha256 = Some(hashes.observation_sha256);
-        manifest::write(&manifest::sidecar_path(out), &run_manifest)
-    } else {
+    if options.out.is_none() && options.backend == BackendSelection::Cpu {
+        let mut state =
+            StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
         let report = executor::run(&model, &mut state, &params, options.seed, options.ticks)
             .map_err(|error| format!("{path}: {error}"))?;
         for tick in report.ticks {
@@ -537,6 +544,69 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
                         tick.tick, box_name, rule_id, fired
                     );
                 }
+            }
+        }
+        return Ok(());
+    }
+    let execution = execute_backend_output(
+        &model,
+        initial,
+        &params,
+        options.seed,
+        options.ticks,
+        options.backend,
+    )?;
+
+    if let Some(out) = options.out.as_deref() {
+        std::fs::write(out, execution.output.csv.as_bytes())
+            .map_err(|error| format!("{out}: {error}"))?;
+        let summaries = summaries_path(out);
+        std::fs::write(&summaries, execution.output.summaries_csv.as_bytes())
+            .map_err(|error| format!("{}: {error}", summaries.display()))?;
+        let hashes = execution_hashes(&execution.output, &execution.state);
+        println!(
+            "results_sha256={} final_state_sha256={} observation_sha256={}",
+            hashes.results_sha256, hashes.final_state_sha256, hashes.observation_sha256
+        );
+        let mut run_manifest = manifest::RunManifest::new(
+            manifest::ManifestKind::Run,
+            options.seed,
+            options.ticks,
+            population_source,
+            population_sha256,
+        );
+        run_manifest.model = Some(model.model().name.clone());
+        run_manifest.dt = Some(model.model().dt);
+        run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
+        run_manifest.backend_identity = Some(execution.identity);
+        run_manifest.resolved_theta = manifest::resolved_theta(&params);
+        run_manifest.results_sha256 = Some(hashes.results_sha256);
+        run_manifest.final_state_sha256 = Some(hashes.final_state_sha256);
+        run_manifest.observation_sha256 = Some(hashes.observation_sha256);
+        manifest::write(&manifest::sidecar_path(out), &run_manifest)
+    } else {
+        for (tick, row) in execution.output.series.rows.iter().enumerate() {
+            for transition in model.transitions() {
+                let model_box = &model.model().boxes[transition.box_index];
+                let declaration = &model_box.transitions[transition.transition_index];
+                let plain = format!("fired_{}", declaration.name);
+                let qualified = format!("fired:{}.{}", model_box.name, declaration.name);
+                let column = execution
+                    .output
+                    .series
+                    .columns
+                    .iter()
+                    .position(|name| name == &plain || name == &qualified)
+                    .ok_or_else(|| {
+                        format!("missing firing output for rule {}", transition.rule_id)
+                    })?;
+                println!(
+                    "tick={} box={} rule_id={} fired={}",
+                    tick,
+                    model_box.name,
+                    transition.rule_id,
+                    row[column].as_usize("firing output")?
+                );
             }
         }
         Ok(())
@@ -803,14 +873,24 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             (None, Some(population)) => initializers_from_population(&model, population)?,
             _ => return Err("invalid sweep population source".to_owned()),
         };
-        let mut state =
-            StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
         let execution_seed = match options.noise_mode {
             manifest::NoiseMode::Crn => options.seed,
             manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
         };
-        let output =
-            run_results_output(&model, &mut state, &params, execution_seed, options.ticks)?;
+        let execution = execute_backend_output(
+            &model,
+            initial,
+            &params,
+            execution_seed,
+            options.ticks,
+            options.backend,
+        )?;
+        if draw == 0 {
+            run_manifest.backend_identity = Some(execution.identity.clone());
+        } else if run_manifest.backend_identity.as_ref() != Some(&execution.identity) {
+            return Err("backend device identity changed during sweep".to_owned());
+        }
+        let output = execution.output;
         if let Some(columns) = &reported_columns {
             if columns != &output.series.columns {
                 return Err(format!(
@@ -830,7 +910,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 &summary_columns,
             )?;
         }
-        let hashes = execution_hashes(&output, &state);
+        let hashes = execution_hashes(&output, &execution.state);
         run_manifest.executions.push(manifest::ManifestExecution {
             k: draw,
             seed: Some(execution_seed),
@@ -1139,31 +1219,46 @@ struct RunOutput {
     series: ReportedSeries,
     summaries: Vec<SummaryValue>,
     summaries_csv: String,
+    per_tick_hashes: Vec<[u8; 32]>,
 }
 
 fn summaries_path(output: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(format!("{output}.summaries.csv"))
 }
 
-fn run_results(
+struct BackendRunOutput {
+    output: RunOutput,
+    state: StateStore,
+    identity: manifest::BackendIdentity,
+    per_tick_hashes: Vec<[u8; 32]>,
+    elapsed: std::time::Duration,
+}
+
+fn execute_backend_output(
     model: &sembla_ir::ValidatedModel,
-    state: &mut StateStore,
+    initial: Vec<TableInit>,
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
-    out: &str,
-) -> Result<ExecutionHashes, String> {
-    let output = run_results_output(model, state, params, seed, ticks)?;
-    std::fs::write(out, output.csv.as_bytes()).map_err(|error| format!("{out}: {error}"))?;
-    let summaries = summaries_path(out);
-    std::fs::write(&summaries, output.summaries_csv.as_bytes())
-        .map_err(|error| format!("{}: {error}", summaries.display()))?;
-    let hashes = execution_hashes(&output, state);
-    println!(
-        "results_sha256={} final_state_sha256={} observation_sha256={}",
-        hashes.results_sha256, hashes.final_state_sha256, hashes.observation_sha256
-    );
-    Ok(hashes)
+    backend: BackendSelection,
+) -> Result<BackendRunOutput, String> {
+    match backend {
+        BackendSelection::Cpu => {
+            let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
+            let started = std::time::Instant::now();
+            let output = run_results_output(model, &mut state, params, seed, ticks)?;
+            let elapsed = started.elapsed();
+            let per_tick_hashes = output.per_tick_hashes.clone();
+            Ok(BackendRunOutput {
+                output,
+                state,
+                identity: manifest::BackendIdentity::cpu_oracle(),
+                per_tick_hashes,
+                elapsed,
+            })
+        }
+        BackendSelection::Cuda => run_results_output_cuda(model, initial, params, seed, ticks),
+    }
 }
 
 fn execution_hashes(output: &RunOutput, state: &StateStore) -> ExecutionHashes {
@@ -1252,6 +1347,7 @@ fn run_results_output(
     let mut csv = String::new();
     let mut rows = Vec::with_capacity(ticks as usize);
     let mut tick_reports = Vec::with_capacity(ticks as usize);
+    let mut per_tick_hashes = Vec::with_capacity(ticks as usize);
     csv.push_str("# params=");
     csv.push_str(&canonical_params(params)?);
     csv.push('\n');
@@ -1366,6 +1462,7 @@ fn run_results_output(
         csv.push('\n');
         rows.push(row);
         tick_reports.push(report);
+        per_tick_hashes.push(state.state_hash());
     }
     let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
     let summaries_csv = summaries_csv(&summaries);
@@ -1377,6 +1474,194 @@ fn run_results_output(
         },
         summaries,
         summaries_csv,
+        per_tick_hashes,
+    })
+}
+
+fn run_results_output_cuda(
+    model: &sembla_ir::ValidatedModel,
+    initial: Vec<TableInit>,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+) -> Result<BackendRunOutput, String> {
+    let mut state = StateStore::new(model, initial.clone()).map_err(|error| error.to_string())?;
+    let mut backend = CudaBackend::new(model, initial, params, seed, HashMode::EveryTick)
+        .map_err(|error| error.to_string())?;
+    let device = backend.device_identity().clone();
+    let identity =
+        manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
+    let mut hashes = Vec::with_capacity(ticks as usize);
+    let has_views = model
+        .model()
+        .boxes
+        .iter()
+        .any(|model_box| !model_box.views.is_empty());
+    let enums = (!has_views).then(|| generic_enum_descriptors(model));
+    let firings = generic_firing_descriptors(model);
+    let mut csv = String::new();
+    let mut rows = Vec::with_capacity(ticks as usize);
+    let mut tick_reports = Vec::with_capacity(ticks as usize);
+    csv.push_str("# params=");
+    csv.push_str(&canonical_params(params)?);
+    csv.push('\n');
+    csv.push_str(&format!("# dt={}\n", model.model().dt));
+
+    let mut headers = vec!["tick".to_owned()];
+    if has_views {
+        headers.extend(
+            model
+                .model()
+                .boxes
+                .iter()
+                .flat_map(|model_box| model_box.views.iter().map(|view| view.name.clone())),
+        );
+    } else {
+        for descriptor in enums.as_deref().unwrap_or_default() {
+            for variant in &descriptor.variants {
+                headers.push(format!(
+                    "count:{}.{}.{}={variant}",
+                    descriptor.box_name, descriptor.table_name, descriptor.attr_name
+                ));
+            }
+        }
+    }
+    for descriptor in &firings {
+        if has_views {
+            headers.push(format!("fired_{}", descriptor.transition_name));
+        } else {
+            headers.push(format!(
+                "fired:{}.{}",
+                descriptor.box_name, descriptor.transition_name
+            ));
+        }
+    }
+    headers.push("deferred_total".to_owned());
+    csv.push_str(
+        &headers
+            .iter()
+            .map(|header| csv_field(header))
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+    csv.push('\n');
+
+    let started = std::time::Instant::now();
+    for tick in 0..ticks {
+        let observation = backend
+            .run_tick_observed()
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        state = observation.state;
+        hashes.push(state.state_hash());
+        let views = executor::observe_views(model, &state, params)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let fired = model
+            .transitions()
+            .iter()
+            .map(|transition| {
+                let count = observation
+                    .fired_per_box
+                    .iter()
+                    .flat_map(|(_, rules)| rules)
+                    .find(|(rule_id, _)| *rule_id == transition.rule_id)
+                    .map_or(0, |(_, count)| *count);
+                (transition.rule_id, count)
+            })
+            .collect();
+        let report = executor::TickReport {
+            tick,
+            views,
+            fired,
+            fired_per_box: observation.fired_per_box,
+            deferred_per_resource_table: observation.deferred_per_resource_table,
+            aggregate_builds: 0,
+        };
+        let mut row = Vec::with_capacity(headers.len() - 1);
+        if has_views {
+            row.extend(
+                report
+                    .views
+                    .iter()
+                    .map(|view| ReportedValue::from(view.value)),
+            );
+        } else {
+            let snapshot = state.snapshot();
+            for descriptor in enums.as_deref().unwrap_or_default() {
+                let values = snapshot
+                    .enum_values(
+                        &descriptor.box_name,
+                        &descriptor.table_name,
+                        &descriptor.attr_name,
+                    )
+                    .map_err(|error| error.to_string())?;
+                let mut counts = vec![0_usize; descriptor.variants.len()];
+                for value in values {
+                    let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
+                        format!(
+                            "invalid enum index {value} for {}.{}.{} with {} variants",
+                            descriptor.box_name,
+                            descriptor.table_name,
+                            descriptor.attr_name,
+                            descriptor.variants.len()
+                        )
+                    })?;
+                    *slot += 1;
+                }
+                row.extend(counts.into_iter().map(ReportedValue::Unsigned));
+            }
+        }
+        for descriptor in &firings {
+            let (reported_rule_id, fired) = report
+                .fired
+                .get(descriptor.rule_id as usize)
+                .ok_or_else(|| {
+                    format!(
+                        "tick {tick}: internal firing report has no rule {}",
+                        descriptor.rule_id
+                    )
+                })?;
+            if *reported_rule_id != descriptor.rule_id {
+                return Err(format!(
+                    "tick {tick}: internal firing report rule mismatch: expected {}, found {}",
+                    descriptor.rule_id, reported_rule_id
+                ));
+            }
+            row.push(ReportedValue::Unsigned(*fired));
+        }
+        row.push(ReportedValue::Unsigned(
+            report
+                .deferred_per_resource_table
+                .iter()
+                .map(|(_, count)| count)
+                .sum(),
+        ));
+        csv.push_str(&tick.to_string());
+        for value in &row {
+            csv.push(',');
+            csv.push_str(&value.csv());
+        }
+        csv.push('\n');
+        rows.push(row);
+        tick_reports.push(report);
+    }
+    let elapsed = started.elapsed();
+    let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
+    let summaries_csv = summaries_csv(&summaries);
+    Ok(BackendRunOutput {
+        output: RunOutput {
+            csv,
+            series: ReportedSeries {
+                columns: headers.into_iter().skip(1).collect(),
+                rows,
+            },
+            summaries,
+            summaries_csv,
+            per_tick_hashes: hashes.clone(),
+        },
+        state,
+        identity,
+        per_tick_hashes: hashes,
+        elapsed,
     })
 }
 
@@ -1518,13 +1803,25 @@ fn verify_run_result(
     let model = sembla_ir::validate(raw_model).map_err(|error| format!("{model_path}: {error}"))?;
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
-    let expected_base = manifest::RunManifest::new(
+    let backend = match recorded
+        .backend_identity
+        .as_ref()
+        .map(|identity| identity.backend.as_str())
+    {
+        Some("cpu-oracle") => BackendSelection::Cpu,
+        Some("cuda-native-f64") => BackendSelection::Cuda,
+        other => return Err(format!("manifest has unsupported backend {other:?}")),
+    };
+    let mut expected_base = manifest::RunManifest::new(
         recorded.manifest_kind,
         recorded.seed,
         recorded.ticks,
         population_source.clone(),
         population_sha256.clone(),
     );
+    expected_base
+        .backend_identity
+        .clone_from(&recorded.backend_identity);
     let mut differences = Vec::new();
 
     compare_field(
@@ -1588,10 +1885,21 @@ fn verify_run_result(
                 );
             }
             let params = params_from_manifest(&model, &recorded.resolved_theta)?;
-            let mut state = initialized_state(&model, &options.population, model_path)?;
-            let output =
-                run_results_output(&model, &mut state, &params, recorded.seed, recorded.ticks)?;
-            let actual = execution_hashes(&output, &state);
+            let execution = execute_backend_output(
+                &model,
+                initialized_tables(&model, &options.population)?,
+                &params,
+                recorded.seed,
+                recorded.ticks,
+                backend,
+            )?;
+            compare_field(
+                "backend_identity",
+                &recorded.backend_identity,
+                &Some(execution.identity.clone()),
+                &mut differences,
+            );
+            let actual = execution_hashes(&execution.output, &execution.state);
             compare_field(
                 "results_sha256",
                 &recorded.results_sha256,
@@ -1655,15 +1963,21 @@ fn verify_run_result(
                     );
                 }
                 let params = params_from_manifest(&model, &execution.resolved_theta)?;
-                let mut state = initialized_state(&model, &options.population, model_path)?;
-                let output = run_results_output(
+                let replay = execute_backend_output(
                     &model,
-                    &mut state,
+                    initialized_tables(&model, &options.population)?,
                     &params,
                     execution.seed.unwrap_or(recorded.seed),
                     recorded.ticks,
+                    backend,
                 )?;
-                let actual = execution_hashes(&output, &state);
+                compare_field(
+                    "backend_identity",
+                    &recorded.backend_identity,
+                    &Some(replay.identity.clone()),
+                    &mut differences,
+                );
+                let actual = execution_hashes(&replay.output, &replay.state);
                 compare_field(
                     &format!("executions[{}].results_sha256", execution.k),
                     &execution.results_sha256,
@@ -1691,11 +2005,10 @@ fn verify_run_result(
     }
 }
 
-fn initialized_state(
+fn initialized_tables(
     model: &sembla_ir::ValidatedModel,
     population_spec: &str,
-    model_path: &str,
-) -> Result<StateStore, String> {
+) -> Result<Vec<TableInit>, String> {
     let initial = match population_spec.parse::<usize>() {
         Ok(population) => initialize_population(model, population),
         Err(_) => initializers_from_population(
@@ -1703,7 +2016,7 @@ fn initialized_state(
             &SyntheticPopulation::read(population_spec).map_err(|error| error.to_string())?,
         )?,
     };
-    StateStore::new(model, initial).map_err(|error| format!("{model_path}: {error}"))
+    Ok(initial)
 }
 
 fn params_from_manifest(
@@ -1773,6 +2086,7 @@ struct CompareTick {
 struct CompareArmOutcome {
     ticks: Vec<CompareTick>,
     hashes: ExecutionHashes,
+    identity: manifest::BackendIdentity,
 }
 
 fn compare_result(options: CompareOptions) -> Result<(), String> {
@@ -1790,6 +2104,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
         &population,
         options.seed,
         options.ticks,
+        options.backend,
     )?;
     let arm_b = compare_arm(
         &model_b,
@@ -1797,6 +2112,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
         &population,
         options.seed,
         options.ticks,
+        options.backend,
     )?;
 
     let mut csv = String::new();
@@ -1849,6 +2165,10 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
         population_source,
         population_sha256,
     );
+    run_manifest.backend_identity = Some(arm_a.identity.clone());
+    if arm_a.identity != arm_b.identity {
+        return Err("backend device identity changed between compare arms".to_owned());
+    }
     run_manifest.results_sha256 = Some(compare_sha256.clone());
     for (k, scenario, model, params, arm) in [
         (0, "arm_a", &model_a, &params_a, &arm_a),
@@ -1878,10 +2198,11 @@ fn compare_arm(
     population: &SyntheticPopulation,
     seed: u64,
     ticks: u32,
+    backend: BackendSelection,
 ) -> Result<CompareArmOutcome, String> {
     let initial = initializers_from_population(model, population)?;
-    let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
-    let output = run_results_output(model, &mut state, params, seed, ticks)?;
+    let execution = execute_backend_output(model, initial, params, seed, ticks, backend)?;
+    let output = execution.output;
     let column = |name: &str| {
         output
             .series
@@ -1917,8 +2238,204 @@ fn compare_arm(
         .collect::<Result<Vec<_>, String>>()?;
     Ok(CompareArmOutcome {
         ticks,
-        hashes: execution_hashes(&output, &state),
+        hashes: execution_hashes(&output, &execution.state),
+        identity: execution.identity,
     })
+}
+
+#[derive(Clone, Debug)]
+struct DiffOptions {
+    models: Vec<String>,
+    population: String,
+    seed: u64,
+    ticks: u32,
+    dt: Option<f64>,
+    params: Option<String>,
+}
+
+fn diff_backends_command(arguments: &[String]) -> i32 {
+    match parse_diff_options(arguments).and_then(diff_backends) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
+    let all_examples = arguments
+        .first()
+        .is_some_and(|value| value == "--all-examples");
+    let (model, flags) = if all_examples {
+        (None, &arguments[1..])
+    } else {
+        let model = arguments
+            .first()
+            .ok_or_else(|| "diff-backends requires a model path or --all-examples".to_owned())?;
+        (Some(model.clone()), &arguments[1..])
+    };
+    if flags.len() % 2 != 0 {
+        return Err("diff-backends flags require values".to_owned());
+    }
+    let mut population = None;
+    let mut seed = None;
+    let mut ticks = None;
+    let mut dt = None;
+    let mut params = None;
+    for pair in flags.chunks_exact(2) {
+        match pair[0].as_str() {
+            "--population" => set_once(&mut population, pair[1].clone(), "--population")?,
+            "--seed" => set_once(&mut seed, parse_number(&pair[1], "--seed")?, "--seed")?,
+            "--ticks" => set_once(&mut ticks, parse_number(&pair[1], "--ticks")?, "--ticks")?,
+            "--dt" => {
+                let value: f64 = parse_number(&pair[1], "--dt")?;
+                if !value.is_finite() || value <= 0.0 {
+                    return Err("'--dt' must be finite and greater than zero".to_owned());
+                }
+                set_once(&mut dt, value, "--dt")?;
+            }
+            "--params" => set_once(&mut params, pair[1].clone(), "--params")?,
+            flag => return Err(format!("unknown diff-backends flag '{flag}'")),
+        }
+    }
+    if all_examples && params.is_some() {
+        return Err("'--params' is only valid for a single diff-backends model".to_owned());
+    }
+    let models = if let Some(model) = model {
+        vec![model]
+    } else {
+        let mut paths = std::fs::read_dir("examples")
+            .map_err(|error| format!("examples: {error}"))?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("json"))
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        paths.sort();
+        paths
+    };
+    let population = population.unwrap_or_else(|| "100".to_owned());
+    if all_examples && population.parse::<usize>().is_err() {
+        return Err("'--all-examples' requires a numeric '--population'".to_owned());
+    }
+    Ok(DiffOptions {
+        models,
+        population,
+        seed: seed.unwrap_or(1),
+        ticks: ticks.unwrap_or(10),
+        dt,
+        params,
+    })
+}
+
+fn diff_backends(options: DiffOptions) -> Result<(), String> {
+    for path in &options.models {
+        let mut raw_model = read_model(path)?;
+        if let Some(dt) = options.dt {
+            raw_model.dt = dt;
+        }
+        let model = sembla_ir::validate(raw_model).map_err(|error| format!("{path}: {error}"))?;
+        let params = resolve_params(&model, options.params.as_deref())?;
+        let initial = match options.population.parse::<usize>() {
+            Ok(population) => initialize_population(&model, population),
+            Err(_) => initializers_from_population(
+                &model,
+                &SyntheticPopulation::read(&options.population)
+                    .map_err(|error| error.to_string())?,
+            )?,
+        };
+        let cpu = execute_backend_output(
+            &model,
+            initial.clone(),
+            &params,
+            options.seed,
+            options.ticks,
+            BackendSelection::Cpu,
+        )?;
+        let cuda = execute_backend_output(
+            &model,
+            initial,
+            &params,
+            options.seed,
+            options.ticks,
+            BackendSelection::Cuda,
+        )?;
+        if let Some((tick, (cpu_hash, cuda_hash))) = cpu
+            .per_tick_hashes
+            .iter()
+            .zip(&cuda.per_tick_hashes)
+            .enumerate()
+            .find(|(_, (cpu, cuda))| cpu != cuda)
+        {
+            return Err(format!(
+                "{}: first divergence at tick {tick}: cpu={} cuda={}",
+                path,
+                hex(cpu_hash),
+                hex(cuda_hash)
+            ));
+        }
+        if cpu.per_tick_hashes.len() != cuda.per_tick_hashes.len() {
+            return Err(format!("{path}: per-tick hash sequence lengths differ"));
+        }
+        let cpu_final = cpu.state.state_hash();
+        let cuda_final = cuda.state.state_hash();
+        if cpu_final != cuda_final {
+            return Err(format!(
+                "{path}: final state differs: cpu={} cuda={}",
+                hex(&cpu_final),
+                hex(&cuda_final)
+            ));
+        }
+        if cpu.output.csv.as_bytes() != cuda.output.csv.as_bytes() {
+            if let Some(tick) = cpu
+                .output
+                .series
+                .rows
+                .iter()
+                .zip(&cuda.output.series.rows)
+                .position(|(cpu_row, cuda_row)| {
+                    cpu_row.len() != cuda_row.len()
+                        || cpu_row
+                            .iter()
+                            .zip(cuda_row)
+                            .any(|(cpu_value, cuda_value)| cpu_value.csv() != cuda_value.csv())
+                })
+            {
+                return Err(format!(
+                    "{}: first divergence at tick {tick}: cpu={} cuda={}; results bytes differ",
+                    path,
+                    hex(&cpu.per_tick_hashes[tick]),
+                    hex(&cuda.per_tick_hashes[tick])
+                ));
+            }
+            return Err(format!(
+                "{path}: results metadata bytes differ after matching state hashes"
+            ));
+        }
+        if cpu.output.summaries_csv.as_bytes() != cuda.output.summaries_csv.as_bytes() {
+            return Err(format!(
+                "{path}: summaries bytes differ after matching state hashes"
+            ));
+        }
+        let rate = |elapsed: std::time::Duration| {
+            if elapsed.as_secs_f64() == 0.0 {
+                0.0
+            } else {
+                f64::from(options.ticks) / elapsed.as_secs_f64()
+            }
+        };
+        println!(
+            "model={} verdict=equal cpu_ticks_per_sec={:.3} cuda_ticks_per_sec={:.3}",
+            path,
+            rate(cpu.elapsed),
+            rate(cuda.elapsed)
+        );
+    }
+    if options.models.len() > 1 {
+        println!("corpus_verdict=equal models={}", options.models.len());
+    }
+    Ok(())
 }
 
 fn canonical_params(params: &ParamEnv) -> Result<String, String> {
@@ -1985,7 +2502,10 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 
 #[cfg(test)]
 mod tests {
-    use super::{csv_field, initialize_population, run, run_results_output, VERSION};
+    use super::{
+        csv_field, initialize_population, parse_backend, parse_diff_options, run,
+        run_results_output, BackendSelection, VERSION,
+    };
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
     fn load(source: &str) -> sembla_ir::ValidatedModel {
@@ -2005,6 +2525,37 @@ mod tests {
     #[test]
     fn invalid_usage_is_nonzero() {
         assert_eq!(run(&[]), 2);
+    }
+
+    #[test]
+    fn backend_and_differential_run_options_are_strict() {
+        assert_eq!(parse_backend("cpu").unwrap(), BackendSelection::Cpu);
+        assert_eq!(parse_backend("cuda").unwrap(), BackendSelection::Cuda);
+        assert!(parse_backend("auto").is_err());
+
+        let options = parse_diff_options(&[
+            "model.json".to_owned(),
+            "--population".to_owned(),
+            "10".to_owned(),
+            "--seed".to_owned(),
+            "2".to_owned(),
+            "--ticks".to_owned(),
+            "3".to_owned(),
+            "--dt".to_owned(),
+            "0.5".to_owned(),
+            "--params".to_owned(),
+            "params.json".to_owned(),
+        ])
+        .unwrap();
+        assert_eq!(options.dt, Some(0.5));
+        assert_eq!(options.params.as_deref(), Some("params.json"));
+        assert!(parse_diff_options(&[
+            "--all-examples".to_owned(),
+            "--params".to_owned(),
+            "params.json".to_owned(),
+        ])
+        .unwrap_err()
+        .contains("single diff-backends model"));
     }
 
     #[test]

@@ -7,9 +7,14 @@ edition.workspace = true
 name = "sembla"
 path = "src/main.rs"
 
+[features]
+default = []
+cuda = ["sembla-cuda/cuda"]
+
 [dependencies]
 sembla-ir = { path = "../sembla-ir" }
 sembla-runtime = { path = "../sembla-runtime" }
+sembla-cuda = { path = "../sembla-cuda" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = "0.10"

@@ -181,10 +181,11 @@ extern "C" __global__ void sembla_validate_claim_compatibility(const unsigned ch
   unsigned char local_error = 0; unsigned char* error = &local_error;
 }
 
-extern "C" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned char* wins, const unsigned long long* status) {
+extern "C" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const double* times, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {
   unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   if (local_candidate >= candidate_count || status[0] != 0ULL) return;
   unsigned long long self_candidate = candidate_begin + local_candidate;
+  for (unsigned long long table = 0; table < resource_table_count; ++table) deferred[self_candidate * resource_table_count + table] = 0U;
   wins[self_candidate] = enabled[self_candidate];
   if (!enabled[self_candidate]) return;
   unsigned char local_error = 0; unsigned char* error = &local_error;

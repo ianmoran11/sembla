@@ -1420,7 +1420,7 @@ impl<'a> Generator<'a> {
             }
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned char* wins, const unsigned long long* status) {\n  unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (local_candidate >= candidate_count || status[0] != 0ULL) return;\n  unsigned long long self_candidate = candidate_begin + local_candidate;\n  wins[self_candidate] = enabled[self_candidate];\n  if (!enabled[self_candidate]) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const double* times, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {\n  unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (local_candidate >= candidate_count || status[0] != 0ULL) return;\n  unsigned long long self_candidate = candidate_begin + local_candidate;\n  for (unsigned long long table = 0; table < resource_table_count; ++table) deferred[self_candidate * resource_table_count + table] = 0U;\n  wins[self_candidate] = enabled[self_candidate];\n  if (!enabled[self_candidate]) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -1499,7 +1499,9 @@ impl<'a> Generator<'a> {
                         writeln!(out, "      if ({better}) {{ best_key_{claim_index} = {other_key}; best_rule_{claim_index} = {}U; best_entity_{claim_index} = (unsigned int)other_row; }}\n    }}", other.rule_id).unwrap();
                     }
                 }
-                writeln!(out, "    if (best_rule_{claim_index} != {}U || best_entity_{claim_index} != (unsigned int)row) wins[self_candidate] = 0;", validated.rule_id).unwrap();
+                let target_table = self.table_index(validated.box_index, &target_name)?;
+                let target_global = self.global_table(validated.box_index, target_table);
+                writeln!(out, "    if (best_rule_{claim_index} != {}U || best_entity_{claim_index} != (unsigned int)row) {{ wins[self_candidate] = 0; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }}", validated.rule_id).unwrap();
             }
             out.push_str("  }\n");
         }

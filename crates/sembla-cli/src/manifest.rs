@@ -134,6 +134,10 @@ pub struct BackendIdentity {
     pub backend: String,
     pub fell_back: bool,
     pub precision: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub gpu_model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub driver_version: Option<String>,
 }
 
 impl BackendIdentity {
@@ -142,6 +146,18 @@ impl BackendIdentity {
             backend: "cpu-oracle".to_owned(),
             precision: "f64".to_owned(),
             fell_back: false,
+            gpu_model: None,
+            driver_version: None,
+        }
+    }
+
+    pub fn cuda_native_f64(gpu_model: String, driver_version: String) -> Self {
+        Self {
+            backend: "cuda-native-f64".to_owned(),
+            precision: "f64".to_owned(),
+            fell_back: false,
+            gpu_model: Some(gpu_model),
+            driver_version: Some(driver_version),
         }
     }
 }
@@ -315,6 +331,8 @@ pub fn write_pairs_metadata(path: &Path, metadata: &PairsMetadata) -> Result<(),
 }
 
 pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
+    let value = serde_json::to_value(manifest).map_err(|error| error.to_string())?;
+    validate_backend_identity_tuple(&value)?;
     validate_observation_tuple(manifest)?;
     validate_algorithms(manifest)?;
     let bytes = to_canonical_json(manifest)?;
@@ -435,7 +453,42 @@ fn validate_backend_identity_tuple(value: &serde_json::Value) -> Result<(), Stri
             missing.join(", ")
         ));
     }
-    Ok(())
+    let backend = object.get("backend").and_then(serde_json::Value::as_str);
+    let precision = object.get("precision").and_then(serde_json::Value::as_str);
+    let fell_back = object.get("fell_back").and_then(serde_json::Value::as_bool);
+    let gpu_model = object.get("gpu_model");
+    let driver_version = object.get("driver_version");
+    match backend {
+        Some("cpu-oracle")
+            if precision == Some("f64")
+                && fell_back == Some(false)
+                && gpu_model.is_none()
+                && driver_version.is_none() =>
+        {
+            Ok(())
+        }
+        Some("cuda-native-f64")
+            if precision == Some("f64")
+                && fell_back == Some(false)
+                && gpu_model
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|value| !value.is_empty())
+                && driver_version
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|value| !value.is_empty()) =>
+        {
+            Ok(())
+        }
+        Some("cuda-native-f64") => Err(
+            "cuda backend identity requires non-empty gpu_model and driver_version fields"
+                .to_owned(),
+        ),
+        Some("cpu-oracle") => Err(
+            "cpu backend identity must be f64, must not fall back, and must not contain GPU fields"
+                .to_owned(),
+        ),
+        other => Err(format!("unsupported manifest backend identity {other:?}")),
+    }
 }
 
 fn validate_theta_source_tuple(value: &serde_json::Value) -> Result<(), String> {
@@ -537,7 +590,9 @@ pub fn hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{read, to_canonical_json, ManifestKind, PopulationSource, RunManifest};
+    use super::{
+        read, to_canonical_json, BackendIdentity, ManifestKind, PopulationSource, RunManifest,
+    };
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_file(label: &str) -> std::path::PathBuf {
@@ -658,6 +713,30 @@ mod tests {
         let error = read(&path).unwrap_err();
         assert!(error.contains("backend_identity tuple"), "{error}");
         assert!(error.contains("fell_back"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_rejects_partial_cuda_backend_identity() {
+        let path = temp_file("partial-cuda-backend");
+        let mut manifest = RunManifest::new(
+            ManifestKind::Run,
+            1,
+            2,
+            PopulationSource::Numeric(10),
+            "abc".to_owned(),
+        );
+        manifest.backend_identity = Some(BackendIdentity {
+            backend: "cuda-native-f64".to_owned(),
+            precision: "f64".to_owned(),
+            fell_back: false,
+            gpu_model: Some("GPU".to_owned()),
+            driver_version: None,
+        });
+        manifest.observation_sha256 = Some("observation".to_owned());
+        std::fs::write(&path, to_canonical_json(&manifest).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("gpu_model and driver_version"), "{error}");
         let _ = std::fs::remove_file(path);
     }
 

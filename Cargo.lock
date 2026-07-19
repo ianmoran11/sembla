@@ -115,6 +115,7 @@ dependencies = [
 name = "sembla-cli"
 version = "0.3.0"
 dependencies = [
+ "sembla-cuda",
  "sembla-ir",
  "sembla-runtime",
  "serde",
