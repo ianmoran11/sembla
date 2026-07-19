@@ -491,7 +491,10 @@ this is the thesis that makes the Lean/semantics investment pay rent.
 
 ### Theorem targets (deferred proofs, specified now)
 
-1. Group-by lumping rewrite correctness (§7 example).
+1. Group-by lumping rewrite correctness (§7 example) — 1a proved (2026-07,
+   `frontend/Sembla/LumpingProof.lean`: `groupedCount_eq_naiveCount`) —
+   specification-level plans over the ℕ-counting fragment; 1b, binding the
+   theorem to the deep-embedding evaluator, remains open.
 2. Refactoring invariance: re-drawing box boundaries preserves semantics
    (consequence of uniform one-tick delay).
 3. Composition laws: the operad-algebra axioms for box wiring.

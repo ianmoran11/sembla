@@ -318,8 +318,10 @@ runs alongside the milestones and is never a release blocker. Suggested order,
 cheapest-useful first:
 
 1. **Group-by lumping rewrite correctness** (§7 example) — the flagship
-   optimization = certified equivalence. Best first proof: concrete, high-value,
-   directly motivates the Lean investment.
+   optimization = certified equivalence; 1a proved (2026-07,
+   `frontend/Sembla/LumpingProof.lean`: `groupedCount_eq_naiveCount`) —
+   specification-level plans over the ℕ-counting fragment; 1b, binding the
+   theorem to the deep-embedding evaluator, remains open.
 2. **Refactoring invariance** — re-drawing box boundaries preserves semantics
    (consequence of uniform one-tick delay). Naturally paired with v0.3's general
    composition work.

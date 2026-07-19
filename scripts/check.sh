@@ -5,6 +5,7 @@ cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 
+bash frontend/scripts/check-proofs.sh
 bash scripts/check-lean.sh
 
 if ! grep -Eq '^libm[[:space:]]*=[[:space:]]*"=[0-9]+\.[0-9]+\.[0-9]+"[[:space:]]*$' \

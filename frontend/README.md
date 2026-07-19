@@ -18,6 +18,27 @@ Lake resolves Lean's standard library plus pinned ProofWidgets4, the package's
 only direct external dependency. ProofWidgets inherits Batteries transitively;
 both revisions are recorded in `lake-manifest.json`.
 
+## Proofs
+
+`Sembla.LumpingProof` proves `groupedCount_eq_naiveCount`, exact agreement of
+the grouped and naive coworker-count plans, and `plan_rewrite_congr`, which
+transports that equality through any per-row function of the count. This is
+theorem target 1a at the specification level, not a theorem about the
+deep-embedding evaluator; target 1b remains open.
+
+From the repository root, build the proof library with:
+
+```sh
+cd frontend && lake build
+```
+
+Run each check from the repository root:
+
+```sh
+bash frontend/scripts/check-proofs.sh
+./scripts/check.sh
+```
+
 ## DSL
 
 `Sembla.DSL` provides one enclosing, multi-pass `model%` elaborator that

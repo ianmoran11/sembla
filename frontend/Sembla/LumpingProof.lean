@@ -9,7 +9,7 @@ the model to the deep-embedded IR evaluator, so target 1b remains open as
 stated in `docs/prds-proof-track/README.md`.
 
 Implementation note: kernel dependency inspection reports `[propext,
-Quot.sound]` for each of the three results below, within the folder README's
+Quot.sound]` for each of the four results below, within the folder README's
 allowed set.
 -/
 
@@ -59,6 +59,17 @@ theorem groupedCount_eq_naiveCount (table : List Person) (i : Nat) :
   cases table[i]? with
   | none => rfl
   | some p => exact lookupTotal_groupTotals table p.employer
+
+/-- Transport: any per-row function of the coworker count — a hazard, a
+probability, any downstream expression — is unchanged by the rewrite. With
+coordinate-keyed randomness (DESIGN.md §4.2), identical hazard inputs give
+identical draws, so the executed distributions coincide; that final step is
+an argument about the runtime's RNG discipline, recorded here as
+documentation, not formalized. -/
+theorem plan_rewrite_congr {α : Type} (f : Nat → α)
+    (table : List Person) (i : Nat) :
+    f (groupedCount table i) = f (naiveCount table i) := by
+  rw [groupedCount_eq_naiveCount]
 
 end Lumping
 end Sembla
