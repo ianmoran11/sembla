@@ -1,15 +1,13 @@
 use std::mem;
 
-use cudarc::driver::{
-    CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKernelArg,
-};
+use cudarc::driver::{CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKernelArg};
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::eval::ParamEnv;
 use sembla_runtime::state::{ColumnData, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
-use crate::{generate, CudaAvailability, CudaError, GeneratedCuda};
+use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HashMode {
@@ -30,13 +28,13 @@ struct Layout {
     column_offsets: Vec<u64>,
     state_len: usize,
     ports: Vec<(usize, usize)>,
-    input_fields: Vec<(usize, usize, usize)>,
     input_offsets: Vec<u64>,
     input_len: usize,
     candidate_offsets: Vec<u64>,
     candidate_count: usize,
     aggregate_offsets: Vec<u64>,
     aggregate_len: usize,
+    aggregate_max_groups: usize,
     write_offsets: Vec<u64>,
     owner_count: usize,
 }
@@ -48,11 +46,22 @@ pub struct CudaBackend {
     layout: Layout,
     stream: std::sync::Arc<cudarc::driver::CudaStream>,
     transition_functions: Vec<CudaFunction>,
-    build_aggregates: CudaFunction,
+    reset_status: CudaFunction,
+    mark_effect_aggregates: CudaFunction,
+    build_aggregate_partials: CudaFunction,
+    finish_aggregates: CudaFunction,
+    check_aggregate_errors: CudaFunction,
     check_errors: CudaFunction,
+    validate_claims: CudaFunction,
+    validate_claim_compatibility: CudaFunction,
     resolve_conflicts: CudaFunction,
+    prepare_effects: CudaFunction,
     apply_effects: CudaFunction,
-    build_outputs: CudaFunction,
+    prepare_outputs: CudaFunction,
+    build_output_partials: CudaFunction,
+    finish_outputs: CudaFunction,
+    check_output_errors: CudaFunction,
+    philox_vectors_kernel: CudaFunction,
     state: CudaSlice<u8>,
     next_state: CudaSlice<u8>,
     column_offsets: CudaSlice<u64>,
@@ -64,6 +73,9 @@ pub struct CudaBackend {
     next_input_counts: CudaSlice<u64>,
     params: CudaSlice<u8>,
     aggregates: CudaSlice<u8>,
+    aggregate_partials: CudaSlice<u8>,
+    aggregate_errors: CudaSlice<u8>,
+    aggregate_active: CudaSlice<u8>,
     aggregate_offsets: CudaSlice<u64>,
     candidate_offsets: CudaSlice<u64>,
     enabled: CudaSlice<u8>,
@@ -72,6 +84,9 @@ pub struct CudaBackend {
     wins: CudaSlice<u8>,
     write_offsets: CudaSlice<u64>,
     owners: CudaSlice<i32>,
+    owner_values: CudaSlice<u64>,
+    output_partials: CudaSlice<u64>,
+    output_errors: CudaSlice<u8>,
     status: CudaSlice<u64>,
     seed: u64,
     next_tick: u32,
@@ -79,6 +94,13 @@ pub struct CudaBackend {
 }
 
 impl CudaBackend {
+    /// Applies the same explicit availability gate used by [`Self::new`].
+    /// This seam makes no-device behavior testable without depending on the
+    /// machine running the test and never constructs another backend.
+    pub fn check_availability(availability: CudaAvailability) -> Result<(), CudaError> {
+        availability.require()
+    }
+
     /// Constructs the single native-f64 CUDA path. Driver/device/toolkit
     /// absence is an error; this API never constructs the CPU oracle.
     pub fn new(
@@ -92,15 +114,13 @@ impl CudaBackend {
         if !driver_library {
             return Err(CudaError::DriverMissing);
         }
-        let device_count = CudaContext::device_count()
-            .map_err(|error| CudaError::Driver(error.to_string()))?;
+        let device_count = classify_device_count(CudaContext::device_count())?;
         let nvrtc_library = unsafe { cudarc::nvrtc::sys::is_culib_present() };
-        CudaAvailability {
+        Self::check_availability(CudaAvailability {
             driver_library,
             device_count: usize::try_from(device_count).unwrap_or(0),
             nvrtc_library,
-        }
-        .require()?;
+        })?;
 
         // Reuse the oracle's public constructor solely to validate initial
         // schema/ranges. It is dropped before CUDA construction and never runs.
@@ -145,18 +165,27 @@ impl CudaBackend {
                 .load_function(name)
                 .map_err(|error| CudaError::Driver(error.to_string()))
         };
-        let build_aggregates = load("sembla_build_aggregates")?;
+        let reset_status = load("sembla_reset_status")?;
+        let mark_effect_aggregates = load("sembla_mark_effect_aggregates")?;
+        let build_aggregate_partials = load("sembla_build_aggregate_partials")?;
+        let finish_aggregates = load("sembla_finish_aggregates")?;
+        let check_aggregate_errors = load("sembla_check_aggregate_errors")?;
         let check_errors = load("sembla_check_candidate_errors")?;
+        let validate_claims = load("sembla_validate_claims")?;
+        let validate_claim_compatibility = load("sembla_validate_claim_compatibility")?;
         let resolve_conflicts = load("sembla_resolve_conflicts")?;
+        let prepare_effects = load("sembla_prepare_effects")?;
         let apply_effects = load("sembla_apply_effects")?;
-        let build_outputs = load("sembla_build_outputs")?;
+        let prepare_outputs = load("sembla_prepare_outputs")?;
+        let build_output_partials = load("sembla_build_output_partials")?;
+        let finish_outputs = load("sembla_finish_outputs")?;
+        let check_output_errors = load("sembla_check_output_errors")?;
+        let philox_vectors_kernel = load("sembla_philox_vectors")?;
 
         let layout = build_layout(model, &initial_tables, &generated)?;
         let state_bytes = pack_initial_state(model, &initial_tables, &layout)?;
         let params_bytes = pack_params(model, params)?;
-        let state = stream
-            .memcpy_stod(&state_bytes)
-            .map_err(driver_error)?;
+        let state = stream.memcpy_stod(&state_bytes).map_err(driver_error)?;
         let next_state = stream.clone_dtod(&state).map_err(driver_error)?;
         let column_offsets = stream
             .memcpy_stod(&nonempty(&layout.column_offsets))
@@ -181,6 +210,15 @@ impl CudaBackend {
         let aggregates = stream
             .memcpy_stod(&vec![0_u8; layout.aggregate_len.max(1)])
             .map_err(driver_error)?;
+        let aggregate_partials = stream
+            .memcpy_stod(&vec![0_u8; layout.aggregate_len.max(1) * 2])
+            .map_err(driver_error)?;
+        let aggregate_errors = stream
+            .alloc_zeros::<u8>((layout.aggregate_max_groups + 2).max(2))
+            .map_err(driver_error)?;
+        let aggregate_active = stream
+            .alloc_zeros::<u8>(generated.aggregate_group_tables.len().max(1))
+            .map_err(driver_error)?;
         let aggregate_offsets = stream
             .memcpy_stod(&nonempty(&layout.aggregate_offsets))
             .map_err(driver_error)?;
@@ -188,15 +226,36 @@ impl CudaBackend {
             .memcpy_stod(&nonempty(&layout.candidate_offsets))
             .map_err(driver_error)?;
         let candidate_len = layout.candidate_count.max(1);
-        let enabled = stream.alloc_zeros::<u8>(candidate_len).map_err(driver_error)?;
-        let times = stream.alloc_zeros::<f64>(candidate_len).map_err(driver_error)?;
-        let candidate_errors = stream.alloc_zeros::<u8>(candidate_len).map_err(driver_error)?;
-        let wins = stream.alloc_zeros::<u8>(candidate_len).map_err(driver_error)?;
+        let enabled = stream
+            .alloc_zeros::<u8>(candidate_len)
+            .map_err(driver_error)?;
+        let times = stream
+            .alloc_zeros::<f64>(candidate_len)
+            .map_err(driver_error)?;
+        let candidate_error_len = candidate_len.checked_mul(2).ok_or_else(|| {
+            CudaError::InvalidInput("candidate error buffer size overflow".to_owned())
+        })?;
+        let candidate_errors = stream
+            .alloc_zeros::<u8>(candidate_error_len)
+            .map_err(driver_error)?;
+        let wins = stream
+            .alloc_zeros::<u8>(candidate_len)
+            .map_err(driver_error)?;
         let write_offsets = stream
             .memcpy_stod(&nonempty(&layout.write_offsets))
             .map_err(driver_error)?;
         let owners = stream
             .alloc_zeros::<i32>(layout.owner_count.max(1))
+            .map_err(driver_error)?;
+        let owner_values = stream
+            .alloc_zeros::<u64>(layout.owner_count.max(1))
+            .map_err(driver_error)?;
+        let output_field_count = layout.input_offsets.len().max(1);
+        let output_partials = stream
+            .alloc_zeros::<u64>(output_field_count * 2)
+            .map_err(driver_error)?;
+        let output_errors = stream
+            .alloc_zeros::<u8>(output_field_count * 3)
             .map_err(driver_error)?;
         let status = stream.alloc_zeros::<u64>(4).map_err(driver_error)?;
 
@@ -206,11 +265,22 @@ impl CudaBackend {
             layout,
             stream,
             transition_functions,
-            build_aggregates,
+            reset_status,
+            mark_effect_aggregates,
+            build_aggregate_partials,
+            finish_aggregates,
+            check_aggregate_errors,
             check_errors,
+            validate_claims,
+            validate_claim_compatibility,
             resolve_conflicts,
+            prepare_effects,
             apply_effects,
-            build_outputs,
+            prepare_outputs,
+            build_output_partials,
+            finish_outputs,
+            check_output_errors,
+            philox_vectors_kernel,
             state,
             next_state,
             column_offsets,
@@ -222,6 +292,9 @@ impl CudaBackend {
             next_input_counts,
             params,
             aggregates,
+            aggregate_partials,
+            aggregate_errors,
+            aggregate_active,
             aggregate_offsets,
             candidate_offsets,
             enabled,
@@ -230,6 +303,9 @@ impl CudaBackend {
             wins,
             write_offsets,
             owners,
+            owner_values,
+            output_partials,
+            output_errors,
             status,
             seed,
             next_tick: 0,
@@ -239,6 +315,68 @@ impl CudaBackend {
 
     pub fn generated(&self) -> &GeneratedCuda {
         &self.generated
+    }
+
+    /// Evaluates checked coordinate Philox vectors on the device. This is a
+    /// test/diagnostic surface for proving that the device implementation is
+    /// bit-identical to `sembla_runtime::rng::draw_u32x4`.
+    pub fn philox_vectors(
+        &self,
+        coordinates: &[PhiloxCoordinate],
+    ) -> Result<Vec<[u32; 4]>, CudaError> {
+        if coordinates.is_empty() {
+            return Ok(Vec::new());
+        }
+        let count = u32::try_from(coordinates.len()).map_err(|_| {
+            CudaError::InvalidInput("Philox vector count exceeds u32 capacity".to_owned())
+        })?;
+        let seeds = coordinates
+            .iter()
+            .map(|value| value.seed)
+            .collect::<Vec<_>>();
+        let ticks = coordinates
+            .iter()
+            .map(|value| value.tick)
+            .collect::<Vec<_>>();
+        let rules = coordinates
+            .iter()
+            .map(|value| value.rule_id)
+            .collect::<Vec<_>>();
+        let entities = coordinates
+            .iter()
+            .map(|value| value.entity_id)
+            .collect::<Vec<_>>();
+        let draws = coordinates
+            .iter()
+            .map(|value| value.draw_index)
+            .collect::<Vec<_>>();
+        let seeds = self.stream.memcpy_stod(&seeds).map_err(driver_error)?;
+        let ticks = self.stream.memcpy_stod(&ticks).map_err(driver_error)?;
+        let rules = self.stream.memcpy_stod(&rules).map_err(driver_error)?;
+        let entities = self.stream.memcpy_stod(&entities).map_err(driver_error)?;
+        let draws = self.stream.memcpy_stod(&draws).map_err(driver_error)?;
+        let output_len = coordinates
+            .len()
+            .checked_mul(4)
+            .ok_or_else(|| CudaError::InvalidInput("Philox output size overflow".to_owned()))?;
+        let mut output = self
+            .stream
+            .alloc_zeros::<u32>(output_len)
+            .map_err(driver_error)?;
+        let mut args = self.stream.launch_builder(&self.philox_vectors_kernel);
+        args.arg(&seeds)
+            .arg(&ticks)
+            .arg(&rules)
+            .arg(&entities)
+            .arg(&draws)
+            .arg(&mut output)
+            .arg(&count);
+        unsafe { args.launch(LaunchConfig::for_num_elems(count)) }.map_err(driver_error)?;
+        let output = self.stream.memcpy_dtov(&output).map_err(driver_error)?;
+        Ok(output
+            .chunks_exact(4)
+            .map(|words| [words[0], words[1], words[2], words[3]])
+            .collect())
     }
 
     pub fn run(&mut self, ticks: u32) -> Result<CudaRunResult, CudaError> {
@@ -269,21 +407,62 @@ impl CudaBackend {
             block_dim: (1, 1, 1),
             shared_mem_bytes: 0,
         };
+        let aggregate_error_count = (self.layout.aggregate_max_groups + 2) as u64;
         {
-            let mut args = self.stream.launch_builder(&self.build_aggregates);
-            args.arg(&self.state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&mut self.aggregates)
-                .arg(&self.aggregate_offsets)
-                .arg(&mut self.status);
+            let mut args = self.stream.launch_builder(&self.reset_status);
+            args.arg(&mut self.status)
+                .arg(&mut self.aggregate_errors)
+                .arg(&aggregate_error_count);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
+        let require_active = 0_u8;
         for (index, transition) in self.model.transitions().iter().enumerate() {
+            let aggregate_slots = self.generated.schedule_aggregate_indices_by_rule[index].clone();
+            for aggregate_slot in aggregate_slots {
+                let group_table = self.generated.aggregate_group_tables[aggregate_slot];
+                let aggregate_index = u32::try_from(aggregate_slot).map_err(|_| {
+                    CudaError::InvalidInput("aggregate count exceeds u32".to_owned())
+                })?;
+                let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+                args.arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.inputs)
+                    .arg(&self.input_offsets)
+                    .arg(&self.input_counts)
+                    .arg(&self.params)
+                    .arg(&self.aggregates)
+                    .arg(&aggregate_index)
+                    .arg(&self.aggregate_active)
+                    .arg(&require_active)
+                    .arg(&mut self.aggregate_partials)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&mut self.aggregate_errors);
+                unsafe { args.launch(LaunchConfig::for_num_elems(1)) }.map_err(driver_error)?;
+                let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
+                    CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
+                })?;
+                if groups != 0 {
+                    let mut args = self.stream.launch_builder(&self.finish_aggregates);
+                    args.arg(&self.aggregate_partials)
+                        .arg(&self.row_counts)
+                        .arg(&aggregate_index)
+                        .arg(&self.aggregate_active)
+                        .arg(&require_active)
+                        .arg(&mut self.aggregates)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&mut self.aggregate_errors);
+                    unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
+                        .map_err(driver_error)?;
+                }
+                let aggregate_identity = u64::from(aggregate_index);
+                let mut args = self.stream.launch_builder(&self.check_aggregate_errors);
+                args.arg(&mut self.aggregate_errors)
+                    .arg(&aggregate_error_count)
+                    .arg(&aggregate_identity)
+                    .arg(&mut self.status);
+                unsafe { args.launch(one) }.map_err(driver_error)?;
+            }
             let model_transition = &self.model.model().boxes[transition.box_index].transitions
                 [transition.transition_index];
             let table_index = self.model.model().boxes[transition.box_index]
@@ -323,18 +502,21 @@ impl CudaBackend {
                 .arg(&mut self.times)
                 .arg(&mut self.candidate_errors);
             unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
-        }
-        {
-            let count = self.layout.candidate_count as u64;
+
+            let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
+                CudaError::InvalidInput("rule id exceeds host index width".to_owned())
+            })?;
+            let candidate_begin = self.layout.candidate_offsets[rule_index];
+            let candidate_count = u64::from(rows);
             let mut args = self.stream.launch_builder(&self.check_errors);
             args.arg(&self.candidate_errors)
-                .arg(&count)
+                .arg(&candidate_begin)
+                .arg(&candidate_count)
                 .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
-        }
-        {
-            let count = self.layout.candidate_count as u64;
-            let mut args = self.stream.launch_builder(&self.resolve_conflicts);
+
+            let rule_id = transition.rule_id;
+            let mut args = self.stream.launch_builder(&self.validate_claims);
             args.arg(&self.state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
@@ -345,21 +527,119 @@ impl CudaBackend {
                 .arg(&self.aggregates)
                 .arg(&self.aggregate_offsets)
                 .arg(&self.candidate_offsets)
-                .arg(&count)
+                .arg(&rule_id)
                 .arg(&self.enabled)
-                .arg(&self.times)
-                .arg(&mut self.wins)
                 .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
+        {
+            let mut args = self
+                .stream
+                .launch_builder(&self.validate_claim_compatibility);
+            args.arg(&self.state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.inputs)
+                .arg(&self.input_offsets)
+                .arg(&self.input_counts)
+                .arg(&self.params)
+                .arg(&self.aggregates)
+                .arg(&self.aggregate_offsets)
+                .arg(&self.candidate_offsets)
+                .arg(&self.enabled)
+                .arg(&mut self.status);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
+        {
+            let count = self.layout.candidate_count as u64;
+            let launch_count = u32::try_from(self.layout.candidate_count).map_err(|_| {
+                CudaError::InvalidInput("candidate count exceeds CUDA launch capacity".to_owned())
+            })?;
+            if launch_count != 0 {
+                let mut args = self.stream.launch_builder(&self.resolve_conflicts);
+                args.arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.inputs)
+                    .arg(&self.input_offsets)
+                    .arg(&self.input_counts)
+                    .arg(&self.params)
+                    .arg(&self.aggregates)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&self.candidate_offsets)
+                    .arg(&count)
+                    .arg(&self.enabled)
+                    .arg(&self.times)
+                    .arg(&mut self.wins)
+                    .arg(&self.status);
+                unsafe { args.launch(LaunchConfig::for_num_elems(launch_count)) }
+                    .map_err(driver_error)?;
+            }
+        }
+        if !self.generated.effect_aggregate_indices.is_empty() {
+            let aggregate_count = self.generated.aggregate_group_tables.len() as u64;
+            let mut args = self.stream.launch_builder(&self.mark_effect_aggregates);
+            args.arg(&self.row_counts)
+                .arg(&self.candidate_offsets)
+                .arg(&self.wins)
+                .arg(&mut self.aggregate_active)
+                .arg(&aggregate_count);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+
+            let require_active = 1_u8;
+            for &aggregate_slot in &self.generated.effect_aggregate_indices {
+                let group_table = self.generated.aggregate_group_tables[aggregate_slot];
+                let aggregate_index = u32::try_from(aggregate_slot).map_err(|_| {
+                    CudaError::InvalidInput("aggregate count exceeds u32".to_owned())
+                })?;
+                let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+                args.arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.inputs)
+                    .arg(&self.input_offsets)
+                    .arg(&self.input_counts)
+                    .arg(&self.params)
+                    .arg(&self.aggregates)
+                    .arg(&aggregate_index)
+                    .arg(&self.aggregate_active)
+                    .arg(&require_active)
+                    .arg(&mut self.aggregate_partials)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&mut self.aggregate_errors);
+                unsafe { args.launch(LaunchConfig::for_num_elems(1)) }.map_err(driver_error)?;
+                let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
+                    CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
+                })?;
+                if groups != 0 {
+                    let mut args = self.stream.launch_builder(&self.finish_aggregates);
+                    args.arg(&self.aggregate_partials)
+                        .arg(&self.row_counts)
+                        .arg(&aggregate_index)
+                        .arg(&self.aggregate_active)
+                        .arg(&require_active)
+                        .arg(&mut self.aggregates)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&mut self.aggregate_errors);
+                    unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
+                        .map_err(driver_error)?;
+                }
+                let aggregate_identity = u64::from(aggregate_index);
+                let mut args = self.stream.launch_builder(&self.check_aggregate_errors);
+                args.arg(&mut self.aggregate_errors)
+                    .arg(&aggregate_error_count)
+                    .arg(&aggregate_identity)
+                    .arg(&mut self.status);
+                unsafe { args.launch(one) }.map_err(driver_error)?;
+            }
         }
         self.stream
             .memcpy_dtod(&self.state, &mut self.next_state)
             .map_err(driver_error)?;
         {
             let owner_count = self.layout.owner_count as u64;
-            let mut args = self.stream.launch_builder(&self.apply_effects);
+            let mut args = self.stream.launch_builder(&self.prepare_effects);
             args.arg(&self.state)
-                .arg(&mut self.next_state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
                 .arg(&self.inputs)
@@ -372,13 +652,93 @@ impl CudaBackend {
                 .arg(&self.wins)
                 .arg(&self.write_offsets)
                 .arg(&mut self.owners)
+                .arg(&mut self.owner_values)
                 .arg(&owner_count)
+                .arg(&mut self.status);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
+        if self.layout.owner_count != 0 {
+            let owner_count = self.layout.owner_count as u64;
+            let launch_count = u32::try_from(self.layout.owner_count).map_err(|_| {
+                CudaError::InvalidInput("write-owner count exceeds CUDA launch capacity".to_owned())
+            })?;
+            let mut args = self.stream.launch_builder(&self.apply_effects);
+            args.arg(&mut self.next_state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.write_offsets)
+                .arg(&self.owners)
+                .arg(&self.owner_values)
+                .arg(&owner_count)
+                .arg(&self.status);
+            unsafe { args.launch(LaunchConfig::for_num_elems(launch_count)) }
+                .map_err(driver_error)?;
+        }
+        // Moore outputs observe prospective state, so rebuild only aggregates
+        // reachable from wired output expressions against next_state.
+        let require_active = 0_u8;
+        for &aggregate_slot in &self.generated.output_aggregate_indices {
+            let group_table = self.generated.aggregate_group_tables[aggregate_slot];
+            let aggregate_index = u32::try_from(aggregate_slot)
+                .map_err(|_| CudaError::InvalidInput("aggregate count exceeds u32".to_owned()))?;
+            let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+            args.arg(&self.next_state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.inputs)
+                .arg(&self.input_offsets)
+                .arg(&self.input_counts)
+                .arg(&self.params)
+                .arg(&self.aggregates)
+                .arg(&aggregate_index)
+                .arg(&self.aggregate_active)
+                .arg(&require_active)
+                .arg(&mut self.aggregate_partials)
+                .arg(&self.aggregate_offsets)
+                .arg(&mut self.aggregate_errors);
+            unsafe { args.launch(LaunchConfig::for_num_elems(1)) }.map_err(driver_error)?;
+            let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
+                CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
+            })?;
+            if groups != 0 {
+                let mut args = self.stream.launch_builder(&self.finish_aggregates);
+                args.arg(&self.aggregate_partials)
+                    .arg(&self.row_counts)
+                    .arg(&aggregate_index)
+                    .arg(&self.aggregate_active)
+                    .arg(&require_active)
+                    .arg(&mut self.aggregates)
+                    .arg(&self.aggregate_offsets)
+                    .arg(&mut self.aggregate_errors);
+                unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
+                    .map_err(driver_error)?;
+            }
+            let aggregate_identity = u64::from(aggregate_index);
+            let mut args = self.stream.launch_builder(&self.check_aggregate_errors);
+            args.arg(&mut self.aggregate_errors)
+                .arg(&aggregate_error_count)
+                .arg(&aggregate_identity)
                 .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
         {
             let port_count = self.layout.ports.len() as u64;
-            let mut args = self.stream.launch_builder(&self.build_outputs);
+            let field_count = self.layout.input_offsets.len() as u64;
+            let error_count = field_count.saturating_mul(3).max(3);
+            let mut args = self.stream.launch_builder(&self.prepare_outputs);
+            args.arg(&mut self.next_input_counts)
+                .arg(&port_count)
+                .arg(&mut self.output_errors)
+                .arg(&error_count);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
+        if !self.layout.input_offsets.is_empty() {
+            let field_count = u32::try_from(self.layout.input_offsets.len()).map_err(|_| {
+                CudaError::InvalidInput(
+                    "output field count exceeds CUDA launch capacity".to_owned(),
+                )
+            })?;
+            let mut args = self.stream.launch_builder(&self.build_output_partials);
             args.arg(&self.next_state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
@@ -388,14 +748,29 @@ impl CudaBackend {
                 .arg(&self.params)
                 .arg(&self.aggregates)
                 .arg(&self.aggregate_offsets)
+                .arg(&mut self.output_partials)
+                .arg(&mut self.output_errors);
+            unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
+                .map_err(driver_error)?;
+            let field_count_u64 = u64::from(field_count);
+            let mut args = self.stream.launch_builder(&self.finish_outputs);
+            args.arg(&self.output_partials)
+                .arg(&field_count_u64)
                 .arg(&mut self.next_inputs)
                 .arg(&self.input_offsets)
-                .arg(&mut self.next_input_counts)
-                .arg(&port_count)
+                .arg(&mut self.output_errors);
+            unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
+                .map_err(driver_error)?;
+            let mut args = self.stream.launch_builder(&self.check_output_errors);
+            args.arg(&self.output_errors)
+                .arg(&field_count_u64)
                 .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
-        let status = self.stream.memcpy_dtov(&self.status).map_err(driver_error)?;
+        let status = self
+            .stream
+            .memcpy_dtov(&self.status)
+            .map_err(driver_error)?;
         if status[0] != 0 {
             return Err(device_status(&status));
         }
@@ -411,7 +786,10 @@ impl CudaBackend {
 
     fn download_hash(&self) -> Result<[u8; 32], CudaError> {
         let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
-        let inputs = self.stream.memcpy_dtov(&self.inputs).map_err(driver_error)?;
+        let inputs = self
+            .stream
+            .memcpy_dtov(&self.inputs)
+            .map_err(driver_error)?;
         let input_counts = self
             .stream
             .memcpy_dtov(&self.input_counts)
@@ -423,6 +801,18 @@ impl CudaBackend {
             &inputs,
             &input_counts,
         ))
+    }
+}
+
+fn classify_device_count(
+    result: Result<i32, cudarc::driver::DriverError>,
+) -> Result<i32, CudaError> {
+    match result {
+        Ok(count) => Ok(count),
+        Err(cudarc::driver::DriverError(cudarc::driver::sys::CUresult::CUDA_ERROR_NO_DEVICE)) => {
+            Err(CudaError::NoDevice)
+        }
+        Err(error) => Err(CudaError::Driver(error.to_string())),
     }
 }
 
@@ -447,6 +837,7 @@ fn device_status(status: &[u64]) -> CudaError {
             status[1], status[2], status[3]
         ),
         9 => format!("wire output field {} overflowed Int", status[1]),
+        10 => format!("candidate {} claim expression overflowed Int", status[1]),
         code => format!("unknown device status {code}"),
     };
     CudaError::DeviceExecution(message)
@@ -469,11 +860,10 @@ fn build_layout(
     let mut column_offsets = Vec::new();
     let mut state_len = 0;
     let mut ports = Vec::new();
-    let mut input_fields = Vec::new();
     let mut input_offsets = Vec::new();
     let mut input_len = 0;
     let mut write_offsets = Vec::new();
-    let mut owner_count = 0;
+    let mut owner_count = 0_usize;
 
     for (box_index, model_box) in model.model().boxes.iter().enumerate() {
         for (table_index, table) in model_box.tables.iter().enumerate() {
@@ -483,12 +873,21 @@ fn build_layout(
                 state_len = align8(state_len);
                 column_offsets.push(state_len as u64);
                 state_len = state_len
-                    .checked_add(initial.row_count.checked_mul(type_size(&table.attrs[attr_index].ty)).ok_or_else(|| CudaError::InvalidInput("state byte size overflow".to_owned()))?)
-                    .ok_or_else(|| CudaError::InvalidInput("state byte size overflow".to_owned()))?;
+                    .checked_add(
+                        initial
+                            .row_count
+                            .checked_mul(type_size(&table.attrs[attr_index].ty))
+                            .ok_or_else(|| {
+                                CudaError::InvalidInput("state byte size overflow".to_owned())
+                            })?,
+                    )
+                    .ok_or_else(|| {
+                        CudaError::InvalidInput("state byte size overflow".to_owned())
+                    })?;
                 write_offsets.push(owner_count as u64);
-                owner_count = owner_count
-                    .checked_add(initial.row_count)
-                    .ok_or_else(|| CudaError::InvalidInput("write-owner size overflow".to_owned()))?;
+                owner_count = owner_count.checked_add(initial.row_count).ok_or_else(|| {
+                    CudaError::InvalidInput("write-owner size overflow".to_owned())
+                })?;
                 let _ = (box_index, table_index, attr_index);
             }
         }
@@ -496,12 +895,13 @@ fn build_layout(
             ports.push((box_index, port_index));
             for field_index in 0..port.schema.len() {
                 input_len = align8(input_len);
-                input_fields.push((box_index, port_index, field_index));
                 input_offsets.push(input_len as u64);
                 // v0.1 outputs are one-row aggregate tables.
                 input_len = input_len
                     .checked_add(type_size(&port.schema[field_index].ty))
-                    .ok_or_else(|| CudaError::InvalidInput("input byte size overflow".to_owned()))?;
+                    .ok_or_else(|| {
+                        CudaError::InvalidInput("input byte size overflow".to_owned())
+                    })?;
             }
         }
     }
@@ -512,8 +912,8 @@ fn build_layout(
     let mut candidate_count = 0_usize;
     for transition in model.transitions() {
         candidate_offsets.push(candidate_count as u64);
-        let declaration = &model.model().boxes[transition.box_index].transitions
-            [transition.transition_index];
+        let declaration =
+            &model.model().boxes[transition.box_index].transitions[transition.transition_index];
         let table_index = model.model().boxes[transition.box_index]
             .tables
             .iter()
@@ -527,11 +927,17 @@ fn build_layout(
 
     let mut aggregate_offsets = Vec::new();
     let mut aggregate_len = 0_usize;
+    let mut aggregate_max_groups = 0_usize;
     for table in &generated.aggregate_group_tables {
+        aggregate_max_groups = aggregate_max_groups.max(row_counts[*table] as usize);
         aggregate_len = align8(aggregate_len);
         aggregate_offsets.push(aggregate_len as u64);
         aggregate_len = aggregate_len
-            .checked_add((row_counts[*table] as usize).checked_mul(8).ok_or_else(|| CudaError::InvalidInput("aggregate size overflow".to_owned()))?)
+            .checked_add(
+                (row_counts[*table] as usize)
+                    .checked_mul(8)
+                    .ok_or_else(|| CudaError::InvalidInput("aggregate size overflow".to_owned()))?,
+            )
             .ok_or_else(|| CudaError::InvalidInput("aggregate size overflow".to_owned()))?;
     }
 
@@ -540,13 +946,13 @@ fn build_layout(
         column_offsets,
         state_len,
         ports,
-        input_fields,
         input_offsets,
         input_len,
         candidate_offsets,
         candidate_count,
         aggregate_offsets,
         aggregate_len: aggregate_len.max(1),
+        aggregate_max_groups,
         write_offsets,
         owner_count,
     })
@@ -567,11 +973,17 @@ fn pack_initial_state(
                     .columns
                     .iter()
                     .find(|entry| entry.name == attr.name)
-                    .ok_or_else(|| CudaError::InvalidInput(format!(
-                        "{}.{}.{} has no initializer",
-                        model_box.name, table.name, attr.name
-                    )))?;
-                write_column(&mut bytes, layout.column_offsets[column] as usize, &data.data);
+                    .ok_or_else(|| {
+                        CudaError::InvalidInput(format!(
+                            "{}.{}.{} has no initializer",
+                            model_box.name, table.name, attr.name
+                        ))
+                    })?;
+                write_column(
+                    &mut bytes,
+                    layout.column_offsets[column] as usize,
+                    &data.data,
+                );
                 column += 1;
             }
         }
@@ -756,4 +1168,19 @@ fn type_size(ty: &AttrType) -> usize {
 
 fn align8(value: usize) -> usize {
     (value + 7) & !7
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use super::classify_device_count;
+    use crate::CudaError;
+    use cudarc::driver::{sys::CUresult, DriverError};
+
+    #[test]
+    fn production_device_probe_maps_cuda_no_device() {
+        assert_eq!(
+            classify_device_count(Err(DriverError(CUresult::CUDA_ERROR_NO_DEVICE))),
+            Err(CudaError::NoDevice)
+        );
+    }
 }

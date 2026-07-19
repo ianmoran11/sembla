@@ -19,9 +19,9 @@ pub enum CudaError {
 impl fmt::Display for CudaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FeatureDisabled => f.write_str(
-                "cuda backend unavailable: crate built without the 'cuda' feature",
-            ),
+            Self::FeatureDisabled => {
+                f.write_str("cuda backend unavailable: crate built without the 'cuda' feature")
+            }
             Self::DriverMissing => {
                 f.write_str("cuda backend unavailable: CUDA driver library not found")
             }

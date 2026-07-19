@@ -676,14 +676,14 @@ fn cache_distinguishes_ieee_structure_and_uses_explicit_tick_scopes() {
 }
 
 #[test]
-fn sum_uses_canonical_target_row_order_and_is_repeatable() {
-    let model = validated_model(3, 1);
+fn sum_uses_sequential_row_order_and_is_repeatable() {
+    let model = validated_model(4, 1);
     let store = state(
         &model,
-        vec![1.0e16, -1.0e16, 1.0],
-        vec![0, 0, 0],
-        vec![0, 0, 0],
-        vec![0, 0, 0],
+        vec![1.0e16, 1.0, -1.0e16, 1.0],
+        vec![0, 0, 0, 0],
+        vec![0, 0, 0, 0],
+        vec![0, 0, 0, 0],
         1,
     );
     let expr = Expr::Agg {
@@ -704,6 +704,7 @@ fn sum_uses_canonical_target_row_order_and_is_repeatable() {
     let mut second_cache = AggCache::new(&model, &snapshot, &params);
     let second = evaluate(&expr, &model, &store, &params, &mut second_cache);
 
-    assert_eq!(first, ValueColumn::Real(vec![1.0; 3]));
+    // Canonical CPU schedule is one ascending-row left fold.
+    assert_eq!(first, ValueColumn::Real(vec![1.0; 4]));
     assert_eq!(second, first);
 }

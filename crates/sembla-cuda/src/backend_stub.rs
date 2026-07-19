@@ -2,7 +2,7 @@ use sembla_ir::ValidatedModel;
 use sembla_runtime::eval::ParamEnv;
 use sembla_runtime::state::TableInit;
 
-use crate::CudaError;
+use crate::{CudaAvailability, CudaError, PhiloxCoordinate};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HashMode {
@@ -23,6 +23,11 @@ pub struct CudaRunResult {
 pub struct CudaBackend;
 
 impl CudaBackend {
+    /// Applies the same explicit availability gate exposed by the CUDA build.
+    pub fn check_availability(availability: CudaAvailability) -> Result<(), CudaError> {
+        availability.require()
+    }
+
     pub fn new(
         _model: &ValidatedModel,
         _initial_tables: Vec<TableInit>,
@@ -30,6 +35,13 @@ impl CudaBackend {
         _seed: u64,
         _hash_mode: HashMode,
     ) -> Result<Self, CudaError> {
+        Err(CudaError::FeatureDisabled)
+    }
+
+    pub fn philox_vectors(
+        &self,
+        _coordinates: &[PhiloxCoordinate],
+    ) -> Result<Vec<[u32; 4]>, CudaError> {
         Err(CudaError::FeatureDisabled)
     }
 
