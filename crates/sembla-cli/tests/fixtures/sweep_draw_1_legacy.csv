@@ -1,4 +1,4 @@
-# params={"beta":0.9314483034328018,"gamma":0.09042461221358002}
+# params={"beta":0.9314483034328018,"gamma":0.09042461221358}
 # dt=0.25
 tick,S,I,R,fired_infect,fired_recover,deferred_total
 0,75,5,0,1,0,0

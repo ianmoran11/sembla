@@ -4,8 +4,12 @@
 //! randomness: `rule_id = u32::MAX`, `tick = draw_index`, `entity_id` is the
 //! parameter declaration index, and `draw_idx` is internal to the sampler.
 //! Uniform uses counter 0. Normal uses Box--Muller with counters 0 and 1, and
-//! LogNormal exponentiates that same Normal draw. The mapping is frozen by the
-//! tests in `tests/prior.rs`; extending a sweep cannot alter an earlier draw.
+//! LogNormal exponentiates that same Normal draw. The transcendental operations
+//! use the exactly pinned pure-Rust `libm` implementation so their bits do not
+//! depend on the platform C library. Square root remains `f64::sqrt`: unlike
+//! transcendentals, IEEE-754 square root is exactly rounded and portable. The
+//! mapping is frozen by the tests in `tests/prior.rs`; extending a sweep cannot
+//! alter an earlier draw.
 
 use std::error::Error;
 use std::fmt;
@@ -39,8 +43,9 @@ impl Error for PriorError {}
 /// Samples one real-valued prior at the reserved parameter coordinates.
 ///
 /// Normal draws use the cosine branch of Box--Muller:
-/// `z = sqrt(-2 ln(u0)) * cos(2 pi u1)`. This exact choice and lane ordering
-/// are part of the deterministic sweep contract.
+/// `z = sqrt(-2 ln(u0)) * cos(2 pi u1)`. `ln`, `cos`, and LogNormal's `exp`
+/// come from the exactly pinned `libm` crate. This exact choice and lane
+/// ordering are part of the deterministic sweep contract.
 pub fn sample_prior(
     prior: &Prior,
     seed: u64,
@@ -63,10 +68,11 @@ pub fn sample_prior(
         PriorFamily::Normal | PriorFamily::LogNormal => {
             let u0 = coordinate_uniform(seed, draw_index, parameter_index, 0);
             let u1 = coordinate_uniform(seed, draw_index, parameter_index, 1);
-            let standard = (-2.0 * u0.ln()).sqrt() * (2.0 * std::f64::consts::PI * u1).cos();
+            let standard =
+                (-2.0 * libm::log(u0)).sqrt() * libm::cos(2.0 * std::f64::consts::PI * u1);
             let normal = first + second * standard;
             if prior.family == PriorFamily::LogNormal {
-                normal.exp()
+                libm::exp(normal)
             } else {
                 normal
             }

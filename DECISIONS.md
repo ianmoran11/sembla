@@ -639,6 +639,41 @@ in milliseconds, so posterior-conditioned behavior widgets can query the flow
 without re-simulating — a latency path that did not exist when behavior
 widgets were gated solely on runtime speed.
 
+### G6. Parameter-sampler transcendentals are software-pinned
+
+*(Adopted 2026-07-19.)*
+
+**Consideration.** CI's first cross-platform run found a one-ULP difference in
+a frozen LogNormal draw between macOS/aarch64 and Linux/x86_64. Platform C
+libraries do not promise identical `ln`, `cos`, or `exp` results, while θ
+portability is load-bearing for the NPE workflow: training pairs generated on
+a GPU host must contain exactly the same θ as the corresponding development
+sweep.
+
+**Rationale.** The cold parameter-draw path uses the pure-Rust `libm` crate,
+pinned to an exact version, for `ln`, `cos`, and `exp`. This is narrow
+Level-B-style software pinning where its cost is immaterial; `sqrt` remains the
+standard-library operation because IEEE-754 square root is exactly rounded.
+The dependency policy gains exactly one approved entry, `libm`, alongside
+`sha2`, and a source guard prevents new platform-backed transcendental method
+calls. A `libm` version bump is therefore a frozen-vector-breaking change.
+
+The source audit also found one pre-existing `f64::ln` in `rng::exp_f64`, used
+by result-bearing simulation racing clocks, contrary to the PRD's
+authoring-time scope statement. Pinning simulation transcendentals is outside
+this sampler-only change, so the guard records that exact call as its sole
+documented exemption rather than changing simulation outputs.
+
+The workspace gate contains two Rust legacy goldens that embed sampled θ bytes.
+This change regenerates exactly the affected draw and parameter-manifest
+fixtures so the sampler change remains independently testable; the broader
+Python/NPE fixture audit, reference-artifact regeneration, and cross-platform
+CI proof remain the downstream fixture PRD's responsibility.
+
+**Breaking change.** θ draws from sweeps generated before this commit are not
+bit-reproducible after it. No compatibility shim is provided; downstream
+fixtures are regenerated explicitly where their owning change requires it.
+
 ---
 
 ## H. Scope and sequencing (v0.1)

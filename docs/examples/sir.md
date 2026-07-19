@@ -221,7 +221,9 @@ contract.
 ticks, backend identity, flags, and component versions remain shared.
 
 Normal priors use the frozen cosine branch of Box--Muller; LogNormal draws are
-the exponential of that Normal draw. Parameter coordinates reserve
+the exponential of that Normal draw. As of 2026-07-19, their transcendental
+operations use an exactly pinned pure-Rust `libm`, so θ draws are
+platform-independent. Parameter coordinates reserve
 `rule_id = 0xffffffff`, use the draw index as `tick`, and the parameter's
 declaration index as `entity_id`, so extending K never changes an earlier θ
 draw. Independent simulation seeds reserve `rule_id = 0xfffffffe`, use the

@@ -45,7 +45,9 @@ fn sampler_mapping_is_bitwise_frozen() {
                 family: PriorFamily::LogNormal,
                 args: vec![-0.4, 0.3],
             },
-            [0x3fe1_6026_d087_5c2c, 0x3fe9_b6e6_f694_c9c1],
+            // The second probe was 0x3fe9_b6e6_f694_c9c1 with the previously
+            // frozen macOS/aarch64 platform libm; pinned libm produces ...c9c0.
+            [0x3fe1_6026_d087_5c2c, 0x3fe9_b6e6_f694_c9c0],
         ),
     ];
 

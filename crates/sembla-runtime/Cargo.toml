@@ -2,10 +2,12 @@
 name = "sembla-runtime"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
+libm = "=0.2.16"
 sembla-ir = { path = "../sembla-ir" }
 sha2 = "0.10"

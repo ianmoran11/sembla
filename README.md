@@ -47,6 +47,11 @@ state-count/firing CSV output. See
 the formulas, commands, output schema, initialization semantics, and honest
 expressiveness limits.
 
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
+[MIT license](LICENSE-MIT), at your option.
+
 ## Workspace layout
 
 - `crates/sembla-ir`: shared simulation IR types.

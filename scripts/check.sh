@@ -7,6 +7,12 @@ cargo test --workspace
 
 bash scripts/check-lean.sh
 
+if ! grep -Eq '^libm[[:space:]]*=[[:space:]]*"=[0-9]+\.[0-9]+\.[0-9]+"[[:space:]]*$' \
+    crates/sembla-runtime/Cargo.toml; then
+    echo 'sembla-runtime must pin libm with an exact =x.y.z requirement' >&2
+    exit 1
+fi
+
 # Philox remains local: Cargo-resolved dependency identities prevent aliases,
 # target tables, optional features, or workspace inheritance from bypassing
 # the approved direct-dependency policy.
@@ -20,7 +26,7 @@ unexpected_runtime_dependencies="$(
         --prefix none \
         --format '{p}' | \
         tail -n +2 | \
-        awk '$1 != "sembla-ir" && $1 != "sha2"'
+        awk '$1 != "sembla-ir" && $1 != "sha2" && $1 != "libm"'
 )"
 if [[ -n "$unexpected_runtime_dependencies" ]]; then
     echo "unapproved dependencies are forbidden in sembla-runtime; found:" >&2
