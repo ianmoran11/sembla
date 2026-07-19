@@ -1,5 +1,9 @@
 # Sembla
 
+[![CI](https://github.com/ianmoran11/sembla/actions/workflows/ci.yml/badge.svg)](https://github.com/ianmoran11/sembla/actions/workflows/ci.yml)
+
+CI builds, lints, and tests Rust and Lean, runs the reduced Python NPE smoke test on relevant changes, and byte-compares repeated CPU runs and sweeps for determinism.
+
 Sembla is a simulation framework with a Lean frontend and a deterministic Rust runtime. See [DESIGN.md](DESIGN.md) for the architecture and project scope.
 
 ## Build and test
