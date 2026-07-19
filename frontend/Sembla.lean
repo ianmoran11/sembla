@@ -7,4 +7,5 @@ import Sembla.WidgetDisplay
 import Sembla.WidgetTests
 import Sembla.ScientificTests
 import Sembla.Lumping
+import Sembla.LumpingProof
 import Sembla.LumpingTests
