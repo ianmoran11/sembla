@@ -49,6 +49,18 @@ bash calibration/npe/generate_data.sh
 python -m pytest calibration/npe/tests
 ```
 
+The reduced checked-in smoke fixtures are regenerated separately, through the
+same CLI exporter so their `pairs_sha256` sidecars are never hand-edited:
+
+```sh
+bash calibration/npe/regenerate_smoke_fixtures.sh
+```
+
+The curated committed reference evidence and the portable-sampler regeneration
+record are described in `calibration/npe/artifacts/README.md`. Raw per-draw
+sweeps, the population binary, and timestamped training logs remain reproducible
+intermediates and are ignored.
+
 The reference tests run the same training and SBC pipeline twice. The primary
 outputs are under `calibration/npe/artifacts/run/`; the repeated run is under
 `artifacts/repro-run/`. For a single manual run, the equivalent commands are:
