@@ -1,7 +1,7 @@
 {
   "runId": "2026-07-18T13-51-30-693Z",
   "startedAt": "2026-07-18T13:51:30.693Z",
-  "updatedAt": "2026-07-19T03:46:42.655Z",
+  "updatedAt": "2026-07-19T06:57:37.213Z",
   "cwd": "/Users/ian/projects/sembla",
   "runner": "piprd",
   "runDir": "/Users/ian/projects/sembla/docs/prds-npe-path",
@@ -17,13 +17,20 @@
     "/Users/ian/projects/sembla/docs/prds-npe-path/0009-differential-harness-selection.md",
     "/Users/ian/projects/sembla/docs/prds-npe-path/0010-ci.md"
   ],
-  "currentIndex": 7,
-  "approved": [],
-  "commits": [],
+  "currentIndex": 10,
+  "approved": [
+    "docs/prds-npe-path/0008-cuda-backend.md",
+    "docs/prds-npe-path/0009-differential-harness-selection.md",
+    "docs/prds-npe-path/0010-ci.md"
+  ],
+  "commits": [
+    "402993e",
+    "910f830",
+    "8681b4c"
+  ],
   "total": 10,
-  "status": "stopped",
+  "status": "complete",
   "stage": "review",
-  "attempt": 5,
-  "adviseEnabled": true,
-  "stoppedReason": "still needs revision after 5 attempt(s)"
+  "attempt": 1,
+  "adviseEnabled": true
 }
