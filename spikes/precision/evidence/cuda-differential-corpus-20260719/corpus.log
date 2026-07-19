@@ -1,0 +1,14 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends --all-examples --population 100 --seed 7 --ticks 20`
+model=examples/noisy_voter.json verdict=equal cpu_ticks_per_sec=40044.129 cuda_ticks_per_sec=4447.005
+model=examples/observations.json verdict=equal cpu_ticks_per_sec=76270.960 cuda_ticks_per_sec=11595.688
+model=examples/radioactive_decay_chain.json verdict=equal cpu_ticks_per_sec=96380.433 cuda_ticks_per_sec=7649.196
+model=examples/reversible_ctmc.json verdict=equal cpu_ticks_per_sec=110968.701 cuda_ticks_per_sec=7274.193
+model=examples/seirs_waning.json verdict=equal cpu_ticks_per_sec=54110.358 cuda_ticks_per_sec=4396.815
+model=examples/sir.json verdict=equal cpu_ticks_per_sec=58398.594 cuda_ticks_per_sec=5591.754
+model=examples/sir_policy.json verdict=equal cpu_ticks_per_sec=5.932 cuda_ticks_per_sec=1.408
+model=examples/sis_importation.json verdict=equal cpu_ticks_per_sec=60377.905 cuda_ticks_per_sec=5298.158
+model=examples/two_box.json verdict=equal cpu_ticks_per_sec=133048.609 cuda_ticks_per_sec=7825.446
+model=examples/two_box_merged.json verdict=equal cpu_ticks_per_sec=27363.749 cuda_ticks_per_sec=4658.293
+model=examples/two_state.json verdict=equal cpu_ticks_per_sec=121794.520 cuda_ticks_per_sec=7685.707
+corpus_verdict=equal models=11

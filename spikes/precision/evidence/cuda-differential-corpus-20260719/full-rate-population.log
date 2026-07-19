@@ -1,0 +1,5 @@
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+   Compiling sembla-cli v0.3.0 (/home/ubuntu/sembla/crates/sembla-cli)
+    Finished `release` profile [optimized] target(s) in 4.20s
+     Running `target/release/sembla synth-pop --persons 26000000 --employers 1300000 --initial-infected 100 --seed 77 --out target/sembla-differential-evidence/2026-07-19T12-19-04Z/full-rate-26m-population.bin`
+persons=26000000 employers=1300000 initial_infected=100 population=target/sembla-differential-evidence/2026-07-19T12-19-04Z/full-rate-26m-population.bin

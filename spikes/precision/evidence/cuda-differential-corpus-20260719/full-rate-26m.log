@@ -1,0 +1,3 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends examples/sir.json --population target/sembla-differential-evidence/2026-07-19T12-19-04Z/full-rate-26m-population.bin --seed 77 --ticks 1`
+model=examples/sir.json verdict=equal cpu_ticks_per_sec=0.247 cuda_ticks_per_sec=0.041
