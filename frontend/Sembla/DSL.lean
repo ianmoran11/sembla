@@ -19,6 +19,7 @@ structure SurfaceAttr where
   variantTokens : List (String × Syntax) := []
 
 structure SurfaceParam where
+  sourceName : String
   name : String
   token : Syntax
   default : TSyntax `term
@@ -108,12 +109,22 @@ structure SurfaceModel where
 declare_syntax_cat semblaAttr
 syntax "state" ident ":" "{" ident,* "}" : semblaAttr
 syntax "attr" ident ":" "Real" : semblaAttr
+syntax "attr" ident ":" "ℝ" : semblaAttr
 syntax "attr" ident ":" "Int" : semblaAttr
 syntax ident ":" "Real" : semblaAttr
+syntax ident ":" "ℝ" : semblaAttr
 syntax ident ":" "Int" : semblaAttr
 syntax "ref" ident ":" ident : semblaAttr
 
+declare_syntax_cat semblaRealTerm
+syntax scientific : semblaRealTerm
+syntax "-" scientific : semblaRealTerm
+syntax ident : semblaRealTerm
+syntax "(" term ")" : semblaRealTerm
+
 declare_syntax_cat semblaParam
+syntax "param" ident ":" "ℝ" ":=" term "~" "LogNormal" semblaRealTerm semblaRealTerm : semblaParam
+syntax "param" ident ":" "ℝ" ":=" term : semblaParam
 syntax "param" ident ":" "Real" ":=" term "prior" "LogNormal" "(" term "," term ")" : semblaParam
 syntax "param" ident ":" "Real" ":=" term : semblaParam
 
@@ -127,13 +138,17 @@ syntax:max "countBy " ident " (" semblaExpr ")" : semblaExpr
 syntax:max "sizeBy " ident : semblaExpr
 syntax:max "inputSum" ident "field" ident : semblaExpr
 syntax:70 semblaExpr:70 " * " semblaExpr:71 : semblaExpr
+syntax:70 semblaExpr:70 " · " semblaExpr:71 : semblaExpr
 syntax:70 semblaExpr:70 " / " semblaExpr:71 : semblaExpr
 syntax:65 semblaExpr:65 " + " semblaExpr:66 : semblaExpr
 syntax:65 semblaExpr:65 " - " semblaExpr:66 : semblaExpr
 syntax:55 semblaExpr:56 " = " semblaExpr:55 : semblaExpr
+syntax:55 semblaExpr:56 " ≠ " semblaExpr:55 : semblaExpr
 syntax:55 semblaExpr:56 " < " semblaExpr:55 : semblaExpr
+syntax:55 semblaExpr:56 " ≤ " semblaExpr:55 : semblaExpr
 syntax:55 semblaExpr:56 " > " semblaExpr:55 : semblaExpr
 syntax:40 semblaExpr:41 " && " semblaExpr:40 : semblaExpr
+syntax:40 semblaExpr:41 " ∧ " semblaExpr:40 : semblaExpr
 
 declare_syntax_cat semblaSet
 syntax ident ":=" ident : semblaSet
@@ -141,6 +156,9 @@ syntax ident ":=" num : semblaSet
 syntax ident ":=" scientific : semblaSet
 
 declare_syntax_cat semblaSystem
+syntax "system" ident "(" "rows" ":=" term ")" "where" "[" semblaAttr,* "]" : semblaSystem
+syntax "system" ident "(" ident ":=" str ")" "(" "rows" ":=" term ")"
+  "where" "[" semblaAttr,* "]" : semblaSystem
 syntax "system" ident "as" str "rows" "(" term ")" "where" "[" semblaAttr,* "]" : semblaSystem
 
 declare_syntax_cat semblaInput
@@ -199,7 +217,80 @@ syntax "box" ident "where"
 declare_syntax_cat semblaWire
 syntax "wire" ident ident "->" ident ident : semblaWire
 
-private def identText (stx : TSyntax `ident) : String := stx.getId.toString
+private def identText (stx : TSyntax `ident) : String := stx.getId.getString!
+
+private def isAsciiLower (c : Char) : Bool := 'a'.toNat ≤ c.toNat && c.toNat ≤ 'z'.toNat
+private def isAsciiUpper (c : Char) : Bool := 'A'.toNat ≤ c.toNat && c.toNat ≤ 'Z'.toNat
+private def isAsciiLetter (c : Char) : Bool := isAsciiLower c || isAsciiUpper c
+private def isAsciiDigit (c : Char) : Bool := '0'.toNat ≤ c.toNat && c.toNat ≤ '9'.toNat
+
+private def greekRuntimeComponent? : Char → Option String
+  | 'β' => some "beta"
+  | 'γ' => some "gamma"
+  | 'λ' => some "lambda"
+  | 'μ' => some "mu"
+  | 'σ' => some "sigma"
+  | 'τ' => some "tau"
+  | 'θ' => some "theta"
+  | _ => none
+
+private def snakeCaseAscii : Option Char → List Char → List Char
+  | _, [] => []
+  | previous, current :: rest =>
+      let previousStartsBoundary := match previous with
+        | some value => isAsciiLower value || isAsciiDigit value
+        | none => false
+      let acronymBoundary := match previous, rest with
+        | some value, next :: _ => isAsciiUpper value && isAsciiLower next
+        | _, _ => false
+      let boundary := isAsciiUpper current && (previousStartsBoundary || acronymBoundary)
+      (if boundary then ['_'] else []) ++ [current.toLower] ++
+        snakeCaseAscii (some current) rest
+
+/-- Derive the frozen runtime name from one accepted surface identifier. -/
+private def deriveRuntimeName (source : String) : Except String String := do
+  let chars := source.toList
+  let first ← match chars.head? with
+    | some value => pure value
+    | none => throw "identifier must not be empty"
+  if first == '_' then
+    throw s!"identifier '{source}' has an unsupported separator pattern"
+  unless isAsciiLetter first || (greekRuntimeComponent? first).isSome do
+    if isAsciiDigit first then
+      throw s!"identifier '{source}' must begin with an ASCII letter or documented Greek letter"
+    throw s!"identifier '{source}' contains unsupported character '{first}'"
+  let mut previousWasUnderscore := false
+  let mut expanded : List Char := []
+  for current in chars do
+    if current == '_' then
+      if previousWasUnderscore then
+        throw s!"identifier '{source}' has an unsupported separator pattern"
+      previousWasUnderscore := true
+      expanded := expanded ++ ['_']
+    else
+      previousWasUnderscore := false
+      if isAsciiLetter current || isAsciiDigit current then
+        expanded := expanded ++ [current]
+      else
+        match greekRuntimeComponent? current with
+        | some replacement => expanded := expanded ++ replacement.toList
+        | none => throw s!"identifier '{source}' contains unsupported character '{current}'"
+  if previousWasUnderscore then
+    throw s!"identifier '{source}' has an unsupported separator pattern"
+  pure (String.mk (snakeCaseAscii none expanded))
+
+private def deriveRuntimeNameAt (token : TSyntax `ident) : TermElabM String := do
+  match deriveRuntimeName (identText token) with
+  | .ok name => pure name
+  | .error message => throwErrorAt token message
+
+private def realSurfaceTerm (stx : TSyntax `semblaRealTerm) : TermElabM (TSyntax `term) := do
+  match stx with
+  | `(semblaRealTerm| $value:scientific) => `(term| $value)
+  | `(semblaRealTerm| -$value:scientific) => `(term| -$value)
+  | `(semblaRealTerm| $name:ident) => `(term| $name)
+  | `(semblaRealTerm| ($value:term)) => pure value
+  | _ => throwUnsupportedSyntax
 
 private def scientificText (stx : TSyntax `scientific) : Option String :=
   match stx.raw with
@@ -265,7 +356,8 @@ private def parseAttr (stx : TSyntax `semblaAttr) : TermElabM SurfaceAttr := do
         ty := .enum (variantTokens.map (·.1))
         nameToken := name.raw
         variantTokens := variantTokens }
-  | `(semblaAttr| attr $name:ident : Real) | `(semblaAttr| $name:ident : Real) =>
+  | `(semblaAttr| attr $name:ident : Real) | `(semblaAttr| $name:ident : Real)
+  | `(semblaAttr| attr $name:ident : ℝ) | `(semblaAttr| $name:ident : ℝ) =>
       pure { name := identText name, ty := .real, nameToken := name.raw }
   | `(semblaAttr| attr $name:ident : Int) | `(semblaAttr| $name:ident : Int) =>
       pure { name := identText name, ty := .int, nameToken := name.raw }
@@ -279,14 +371,29 @@ private def parseAttr (stx : TSyntax `semblaAttr) : TermElabM SurfaceAttr := do
 
 private def parseParam (stx : TSyntax `semblaParam) : TermElabM SurfaceParam := do
   match stx with
+  | `(semblaParam| param $name:ident : ℝ := $default:term ~ LogNormal
+        $a:semblaRealTerm $b:semblaRealTerm) =>
+      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, default,
+        some (← realSurfaceTerm a, ← realSurfaceTerm b)⟩
+  | `(semblaParam| param $name:ident : ℝ := $default:term) =>
+      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, default, none⟩
   | `(semblaParam| param $name:ident : Real := $default:term prior LogNormal($a:term, $b:term)) =>
-      pure ⟨identText name, name.raw, default, some (a, b)⟩
+      pure ⟨identText name, identText name, name.raw, default, some (a, b)⟩
   | `(semblaParam| param $name:ident : Real := $default:term) =>
-      pure ⟨identText name, name.raw, default, none⟩
+      pure ⟨identText name, identText name, name.raw, default, none⟩
   | _ => throwUnsupportedSyntax
 
 private def parseSystem (stx : TSyntax `semblaSystem) : TermElabM SurfaceSystem := do
   match stx with
+  | `(semblaSystem| system $logical:ident (rows := $size:term) where [$attrs:semblaAttr,*]) =>
+      pure ⟨identText logical, logical.raw, ← deriveRuntimeNameAt logical, logical.raw, size,
+        ← attrs.getElems.toList.mapM parseAttr⟩
+  | `(semblaSystem| system $logical:ident ($overrideKeyword:ident := $irName:str)
+        (rows := $size:term) where [$attrs:semblaAttr,*]) =>
+      unless identText overrideKeyword == "name" do
+        throwErrorAt overrideKeyword "expected 'name' table override"
+      pure ⟨identText logical, logical.raw, irName.getString, irName.raw, size,
+        ← attrs.getElems.toList.mapM parseAttr⟩
   | `(semblaSystem| system $logical:ident as $irName:str rows($size:term) where [$attrs:semblaAttr,*]) =>
       pure ⟨identText logical, logical.raw, irName.getString, irName.raw, size,
         ← attrs.getElems.toList.mapM parseAttr⟩
@@ -418,6 +525,15 @@ private def ensureUnique (kind : String) (entries : List (String × Syntax)) : T
     if seen.contains name then throwErrorAt token "duplicate {kind} '{name}'"
     seen := name :: seen
 
+private def ensureUniqueRuntimeNames (kind : String)
+    (entries : List (String × String × Syntax)) : TermElabM Unit := do
+  let mut seen : List (String × String) := []
+  for (runtimeName, sourceName, token) in entries do
+    match seen.find? (·.1 == runtimeName) with
+    | some (_, firstSource) => throwErrorAt token
+        "duplicate {kind} runtime name '{runtimeName}' for declarations '{firstSource}' and '{sourceName}'"
+    | none => seen := (runtimeName, sourceName) :: seen
+
 private def validateAttrs (kind : String) (attrs : List SurfaceAttr) : TermElabM Unit := do
   ensureUnique kind (attrs.map fun column => (column.name, column.nameToken))
   for column in attrs do
@@ -498,12 +614,21 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
       pure (← `(Expr.real $value), .real)
   | `(semblaExpr| parameter $name:ident) =>
       let value := identText name
-      unless paramCtx.any (·.name == value) do
-        throwErrorAt name "undeclared parameter '{value}'"
-      pure (← `(Expr.param $(Lean.quote value)), .real)
+      let paramDecl ← match paramCtx.find? (·.sourceName == value) with
+        | some found => pure found
+        | none => throwErrorAt name "undeclared parameter '{value}'"
+      pure (← `(Expr.param $(Lean.quote paramDecl.name)), .real)
   | `(semblaExpr| $name:ident) =>
-      let column ← lookupExprAttr name
-      pure (← `(Expr.selfAttr $(Lean.quote column.name)), column.ty)
+      let value := identText name
+      match attrs.find? (·.name == value), paramCtx.find? (·.sourceName == value) with
+      | some _, some _ => throwErrorAt name
+          "ambiguous identifier '{value}': both an attribute and parameter are in scope"
+      | some column, none => pure (← `(Expr.selfAttr $(Lean.quote column.name)), column.ty)
+      | none, some paramDecl => pure (← `(Expr.param $(Lean.quote paramDecl.name)), .real)
+      | none, none =>
+          match declaration with
+          | some context => throwErrorAt name "{context}: unknown state or attribute '{value}'"
+          | none => throwErrorAt name "unknown state or attribute '{value}'"
   | `(semblaExpr| countBy $fk:ident ($filter:semblaExpr)) =>
       let fkAttr ← lookupExprAttr fk
       match fkAttr.ty with
@@ -534,29 +659,19 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
               pure (← `(Expr.input $(Lean.quote portName)
                 (Aggregate.mk (AggOp.sum (Expr.selfAttr $(Lean.quote fieldName))) none)), inputField.ty)
   | `(semblaExpr| $lhs:semblaExpr * $rhs:semblaExpr) => elaborateNumericBinary "mul" lhs rhs recur
+  | `(semblaExpr| $lhs:semblaExpr · $rhs:semblaExpr) => elaborateNumericBinary "mul" lhs rhs recur
   | `(semblaExpr| $lhs:semblaExpr / $rhs:semblaExpr) => elaborateNumericBinary "div" lhs rhs recur
   | `(semblaExpr| $lhs:semblaExpr + $rhs:semblaExpr) => elaborateNumericBinary "add" lhs rhs recur
   | `(semblaExpr| $lhs:semblaExpr - $rhs:semblaExpr) => elaborateNumericBinary "sub" lhs rhs recur
   | `(semblaExpr| $lhs:semblaExpr = $rhs:semblaExpr) =>
-      match lhs, rhs with
-      | `(semblaExpr| $attrName:ident), `(semblaExpr| $variant:ident) =>
-          let column ← lookupExprAttr attrName
-          match column.ty with
-          | .enum variants =>
-              let variantName := identText variant
-              unless variants.contains variantName do
-                throwErrorAt variant "unknown variant '{variantName}' for attribute '{column.name}'"
-              pure (← `(Expr.enumIs $(Lean.quote column.name) $(Lean.quote variantName)), .bool)
-          | _ => elaborateComparison "eq" lhs rhs recur
-      | _, _ => elaborateComparison "eq" lhs rhs recur
+      elaborateEnumComparison "eq" lhs rhs recur
+  | `(semblaExpr| $lhs:semblaExpr ≠ $rhs:semblaExpr) =>
+      elaborateEnumComparison "ne" lhs rhs recur
   | `(semblaExpr| $lhs:semblaExpr < $rhs:semblaExpr) => elaborateComparison "lt" lhs rhs recur
+  | `(semblaExpr| $lhs:semblaExpr ≤ $rhs:semblaExpr) => elaborateComparison "le" lhs rhs recur
   | `(semblaExpr| $lhs:semblaExpr > $rhs:semblaExpr) => elaborateComparison "gt" lhs rhs recur
-  | `(semblaExpr| $lhs:semblaExpr && $rhs:semblaExpr) =>
-      let (left, leftTy) ← recur lhs
-      let (right, rightTy) ← recur rhs
-      if leftTy != .bool then throwErrorAt lhs "left operand of && must have type Bool"
-      if rightTy != .bool then throwErrorAt rhs "right operand of && must have type Bool"
-      pure (← `(Expr.and $left $right), .bool)
+  | `(semblaExpr| $lhs:semblaExpr && $rhs:semblaExpr) => elaborateAnd "&&" lhs rhs recur
+  | `(semblaExpr| $lhs:semblaExpr ∧ $rhs:semblaExpr) => elaborateAnd "∧" lhs rhs recur
   | _ => throwErrorAt stx "unsupported Sembla expression"
 where
   elaborateNumericBinary (kind : String) (lhs rhs : Syntax)
@@ -572,11 +687,41 @@ where
       | "add" => `(Expr.add $left $right)
       | _ => `(Expr.sub $left $right)
     pure (term, resultTy)
+  elaborateEnumComparison (kind : String) (lhs rhs : Syntax)
+      (recur : Syntax → TermElabM (TSyntax `term × SurfaceTy)) : TermElabM (TSyntax `term × SurfaceTy) := do
+    match lhs, rhs with
+    | `(semblaExpr| $attrName:ident), `(semblaExpr| $variant:ident) =>
+        let sourceName := identText attrName
+        match attrs.find? (·.name == sourceName) with
+        | some column =>
+            if paramCtx.any (·.sourceName == sourceName) then
+              throwErrorAt attrName
+                "ambiguous identifier '{sourceName}': both an attribute and parameter are in scope"
+            match column.ty with
+            | .enum variants =>
+                let variantName := identText variant
+                unless variants.contains variantName do
+                  throwErrorAt variant "unknown variant '{variantName}' for attribute '{column.name}'"
+                if kind == "eq" then
+                  pure (← `(Expr.enumIs $(Lean.quote column.name) $(Lean.quote variantName)), .bool)
+                else
+                  pure (← `(Expr.ne (Expr.selfAttr $(Lean.quote column.name))
+                    (Expr.enum $(Lean.quote variantName))), .bool)
+            | _ => elaborateComparison kind lhs rhs recur
+        | none => elaborateComparison kind lhs rhs recur
+    | _, _ => elaborateComparison kind lhs rhs recur
+  elaborateAnd (operatorName : String) (lhs rhs : Syntax)
+      (recur : Syntax → TermElabM (TSyntax `term × SurfaceTy)) : TermElabM (TSyntax `term × SurfaceTy) := do
+    let (left, leftTy) ← recur lhs
+    let (right, rightTy) ← recur rhs
+    if leftTy != .bool then throwErrorAt lhs "left operand of {operatorName} must have type Bool"
+    if rightTy != .bool then throwErrorAt rhs "right operand of {operatorName} must have type Bool"
+    pure (← `(Expr.and $left $right), .bool)
   elaborateComparison (kind : String) (lhs rhs : Syntax)
       (recur : Syntax → TermElabM (TSyntax `term × SurfaceTy)) : TermElabM (TSyntax `term × SurfaceTy) := do
     let (left, leftTy) ← recur lhs
     let (right, rightTy) ← recur rhs
-    if kind == "eq" then
+    if kind == "eq" || kind == "ne" then
       unless equalityCompatible leftTy rightTy do
         throwErrorAt rhs "comparison operands have incompatible types"
     else
@@ -584,7 +729,9 @@ where
         throwErrorAt rhs "ordered comparison operands must be numeric"
     let term ← match kind with
       | "eq" => `(Expr.eq $left $right)
+      | "ne" => `(Expr.ne $left $right)
       | "lt" => `(Sembla.IR.Expr.lt $left $right)
+      | "le" => `(Expr.le $left $right)
       | _ => `(Expr.gt $left $right)
     pure (term, .bool)
 
@@ -775,7 +922,8 @@ def elaborateSurfaceModel (surface : SurfaceModel)
 
   -- Pass one: validate the complete collected declaration graph.
   validateStep dt
-  ensureUnique "parameter" (paramCtx.map fun p => (p.name, p.token))
+  ensureUnique "parameter" (paramCtx.map fun p => (p.sourceName, p.token))
+  ensureUniqueRuntimeNames "parameter" (paramCtx.map fun p => (p.name, p.sourceName, p.token))
   for paramDecl in paramCtx do
     validateRealTerm paramDecl.default
     match paramDecl.prior with
@@ -786,7 +934,8 @@ def elaborateSurfaceModel (surface : SurfaceModel)
   ensureUnique "box" (boxCtxs.map fun b => (b.name, b.token))
   for boxCtx in boxCtxs do
     ensureUnique "system" (boxCtx.systems.map fun s => (s.logicalName, s.token))
-    ensureUnique "table" (boxCtx.systems.map fun s => (s.irName, s.irNameToken))
+    ensureUniqueRuntimeNames "table" (boxCtx.systems.map fun s =>
+      (s.irName, s.logicalName, s.irNameToken))
     for selected in boxCtx.systems do validateSize selected.size
     ensureUnique "input port" (boxCtx.inputs.map fun p => (p.name, p.token))
     ensureUnique "transition" (boxCtx.transitions.map fun t => (t.name, t.token))

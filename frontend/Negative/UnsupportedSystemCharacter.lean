@@ -1,0 +1,11 @@
+import Sembla.DSL
+open Sembla.IR Sembla.DSL
+
+def unsupportedSystemCharacter : Model := model% "negative" step(1.0) where
+  params []
+  boxes [box demo where
+    systems [system «café» (rows := 1) where []]
+    inputs []
+    transitions []
+    outputs []]
+  wires []
