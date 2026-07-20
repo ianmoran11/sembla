@@ -9,6 +9,7 @@ import Sembla.ScientificTests
 import Sembla.SurfaceKernelTests
 import Sembla.ReactionArrowTests
 import Sembla.FrequencyTests
+import Sembla.CommandFrontendTests
 import Sembla.Lumping
 import Sembla.LumpingProof
 import Sembla.LumpingTests

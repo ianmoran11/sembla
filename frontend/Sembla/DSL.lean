@@ -1,4 +1,5 @@
 import Lean.Elab.Term
+import Lean.Elab.Command
 import Sembla.IR
 import Sembla.WidgetDisplay
 
@@ -247,6 +248,111 @@ syntax "box" ident "where"
 
 declare_syntax_cat semblaWire
 syntax "wire" ident ident "->" ident ident : semblaWire
+
+/-- Command-only layout grammar. These nodes retain the user's tokens and are
+    collected directly into the shared surface graph below. -/
+declare_syntax_cat semblaCommandAttr
+syntax ident ":" "{" ident,* "}" : semblaCommandAttr
+syntax ident ":" "ℝ" : semblaCommandAttr
+syntax ident ":" "Int" : semblaCommandAttr
+syntax ident ":" ident : semblaCommandAttr
+
+declare_syntax_cat semblaCommandRows
+syntax num ident : semblaCommandRows
+syntax term : semblaCommandRows
+
+declare_syntax_cat semblaCommandSystem
+syntax "system" ident "(" "rows" ":=" semblaCommandRows ")" : semblaCommandSystem
+syntax "system" ident "(" ident ":=" str ")" "(" "rows" ":=" semblaCommandRows ")" : semblaCommandSystem
+syntax "system" ident "(" "rows" ":=" semblaCommandRows ")" "where"
+  many1Indent(ppLine semblaCommandAttr) : semblaCommandSystem
+syntax "system" ident "(" ident ":=" str ")" "(" "rows" ":=" semblaCommandRows ")" "where"
+  many1Indent(ppLine semblaCommandAttr) : semblaCommandSystem
+
+declare_syntax_cat semblaCommandInput
+syntax "input" ident "where" many1Indent(ppLine semblaCommandAttr) : semblaCommandInput
+
+declare_syntax_cat semblaCommandTransitionItem
+syntax "guard" semblaExpr : semblaCommandTransitionItem
+syntax "hazard" semblaExpr : semblaCommandTransitionItem
+syntax "set" semblaSet : semblaCommandTransitionItem
+
+declare_syntax_cat semblaCommandGeneralTransition
+syntax "transition" ident "on" ident "where"
+  many1Indent(ppLine semblaCommandTransitionItem) : semblaCommandGeneralTransition
+
+declare_syntax_cat semblaCommandOutputField
+syntax ident ":" "Int" ":=" "count" "where" semblaExpr : semblaCommandOutputField
+syntax ident ":" "ℝ" ":=" "count" "where" semblaExpr : semblaCommandOutputField
+syntax ident ":" "Int" ":=" "sum" "(" semblaExpr ")" : semblaCommandOutputField
+syntax ident ":" "ℝ" ":=" "sum" "(" semblaExpr ")" : semblaCommandOutputField
+-- Recovery-only count-with-value forms are rejected deliberately by the collector.
+syntax ident ":" "Int" ":=" "count" "(" semblaExpr ")" "where" semblaExpr : semblaCommandOutputField
+syntax ident ":" "ℝ" ":=" "count" "(" semblaExpr ")" "where" semblaExpr : semblaCommandOutputField
+
+declare_syntax_cat semblaCommandOutput
+syntax "output" ident "from" ident "where"
+  many1Indent(ppLine semblaCommandOutputField) : semblaCommandOutput
+
+declare_syntax_cat semblaCommandViewReduce
+syntax "sum" : semblaCommandViewReduce
+syntax "min" : semblaCommandViewReduce
+syntax "max" : semblaCommandViewReduce
+
+declare_syntax_cat semblaCommandView
+syntax "view" ident ":=" "count" ident : semblaCommandView
+syntax "view" ident ":=" "count" ident "where" semblaExpr : semblaCommandView
+syntax "view" ident ":=" "count" ident "using" semblaExpr : semblaCommandView
+syntax "view" ident ":=" "count" ident "where" semblaExpr "using" semblaExpr : semblaCommandView
+syntax "view" ident ":=" semblaCommandViewReduce ident : semblaCommandView
+syntax "view" ident ":=" semblaCommandViewReduce ident "where" semblaExpr : semblaCommandView
+syntax "view" ident ":=" semblaCommandViewReduce ident "using" semblaExpr : semblaCommandView
+syntax "view" ident ":=" semblaCommandViewReduce ident "where" semblaExpr
+  "using" semblaExpr : semblaCommandView
+
+declare_syntax_cat semblaCommandBoxItem
+syntax semblaCommandSystem : semblaCommandBoxItem
+syntax semblaCommandInput : semblaCommandBoxItem
+syntax semblaCommandGeneralTransition : semblaCommandBoxItem
+syntax semblaTransition : semblaCommandBoxItem
+syntax semblaCommandOutput : semblaCommandBoxItem
+syntax semblaCommandView : semblaCommandBoxItem
+syntax "contest" ident : semblaCommandBoxItem
+
+declare_syntax_cat semblaCommandBox
+syntax "box" ident "where" manyIndent(ppLine semblaCommandBoxItem) : semblaCommandBox
+
+declare_syntax_cat semblaCommandSummaryReduce
+syntax "sum" : semblaCommandSummaryReduce
+syntax "min" : semblaCommandSummaryReduce
+syntax "max" : semblaCommandSummaryReduce
+syntax "last" : semblaCommandSummaryReduce
+syntax "argmaxₜ" : semblaCommandSummaryReduce
+
+declare_syntax_cat semblaCommandSummary
+syntax "summary" ident ":=" semblaCommandSummaryReduce ident : semblaCommandSummary
+
+declare_syntax_cat semblaCommandModelItem
+syntax semblaParam : semblaCommandModelItem
+syntax semblaCommandBox : semblaCommandModelItem
+syntax semblaWire : semblaCommandModelItem
+syntax semblaCommandSummary : semblaCommandModelItem
+syntax "contest" ident : semblaCommandModelItem
+
+syntax (name := semblaModelCommand) "sembla_model" ident
+  "(" "dt" ":=" term ")" "where"
+  manyIndent(ppLine semblaCommandModelItem) : command
+syntax (name := semblaNamedModelCommand) "sembla_model" ident
+  "(" ident ":=" str ")" "(" "dt" ":=" term ")" "where"
+  manyIndent(ppLine semblaCommandModelItem) : command
+-- Recovery headers used only for a deliberate mandatory-dt diagnostic.
+syntax (name := semblaModelMissingDtCommand) "sembla_model" ident "where"
+  manyIndent(ppLine semblaCommandModelItem) : command
+syntax (name := semblaNamedModelMissingDtCommand) "sembla_model" ident
+  "(" ident ":=" str ")" "where"
+  manyIndent(ppLine semblaCommandModelItem) : command
+-- Recovery for a common dedented box declaration.
+syntax (name := semblaMisplacedSystemCommand) "system" ident "(" "rows" ":=" term ")" : command
 
 private def identText (stx : TSyntax `ident) : String := stx.getId.getString!
 
@@ -571,14 +677,288 @@ private def parseWire (stx : TSyntax `semblaWire) : TermElabM SurfaceWire := do
       pure ⟨fromBox, fromPort, toBox, toPort⟩
   | _ => throwUnsupportedSyntax
 
-private def collectLegacySurfaceModel (name : TSyntax `str) (dt : TSyntax `term)
+private def parseCommandAttr (stx : TSyntax `semblaCommandAttr) : TermElabM SurfaceAttr := do
+  match stx with
+  | `(semblaCommandAttr| $name:ident : { $variants:ident,* }) =>
+      let variantTokens := variants.getElems.toList.map fun variant =>
+        (identText variant, variant.raw)
+      pure {
+        name := identText name
+        ty := .enum (variantTokens.map (·.1))
+        nameToken := name.raw
+        variantTokens := variantTokens }
+  | `(semblaCommandAttr| $name:ident : ℝ) =>
+      pure { name := identText name, ty := .real, nameToken := name.raw }
+  | `(semblaCommandAttr| $name:ident : Int) =>
+      pure { name := identText name, ty := .int, nameToken := name.raw }
+  | `(semblaCommandAttr| $name:ident : $target:ident) =>
+      pure {
+        name := identText name
+        ty := .ref (identText target)
+        nameToken := name.raw
+        refTargetToken := some target.raw }
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandRows (stx : TSyntax `semblaCommandRows) :
+    TermElabM (TSyntax `term) := do
+  match stx.raw.getArgs with
+  | #[head, suffix] =>
+      let some prefixDigits := head.isNatLit?
+        | throwErrorAt head "row count must be a natural-number literal"
+      let suffixToken : TSyntax `ident := ⟨suffix⟩
+      let digits := toString prefixDigits ++ (identText suffixToken).replace "_" ""
+      pure ⟨Syntax.mkNumLit digits (SourceInfo.fromRef stx.raw true)⟩
+  | _ =>
+      match stx with
+      | `(semblaCommandRows| $value:term) => pure value
+      | _ => throwUnsupportedSyntax
+
+private def parseCommandSystem (stx : TSyntax `semblaCommandSystem) :
+    TermElabM SurfaceSystem := do
+  match stx with
+  | `(semblaCommandSystem| system $logical:ident (rows := $size:semblaCommandRows)) =>
+      pure ⟨identText logical, logical.raw, ← deriveRuntimeNameAt logical, logical.raw,
+        ← parseCommandRows size, []⟩
+  | `(semblaCommandSystem| system $logical:ident ($overrideKeyword:ident := $irName:str)
+        (rows := $size:semblaCommandRows)) =>
+      unless identText overrideKeyword == "name" do
+        throwErrorAt overrideKeyword "expected 'name' table override"
+      pure ⟨identText logical, logical.raw, irName.getString, irName.raw,
+        ← parseCommandRows size, []⟩
+  | `(semblaCommandSystem| system $logical:ident
+        (rows := $size:semblaCommandRows) where $attrs:semblaCommandAttr*) =>
+      pure ⟨identText logical, logical.raw, ← deriveRuntimeNameAt logical, logical.raw,
+        ← parseCommandRows size, ← attrs.toList.mapM parseCommandAttr⟩
+  | `(semblaCommandSystem| system $logical:ident ($overrideKeyword:ident := $irName:str)
+        (rows := $size:semblaCommandRows) where $attrs:semblaCommandAttr*) =>
+      unless identText overrideKeyword == "name" do
+        throwErrorAt overrideKeyword "expected 'name' table override"
+      pure ⟨identText logical, logical.raw, irName.getString, irName.raw,
+        ← parseCommandRows size, ← attrs.toList.mapM parseCommandAttr⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandInput (stx : TSyntax `semblaCommandInput) :
+    TermElabM SurfaceInput := do
+  match stx with
+  | `(semblaCommandInput| input $name:ident where $attrs:semblaCommandAttr*) =>
+      pure ⟨identText name, name.raw, ← attrs.toList.mapM parseCommandAttr⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandGeneralTransition
+    (stx : TSyntax `semblaCommandGeneralTransition) : TermElabM SurfaceTransition := do
+  match stx with
+  | `(semblaCommandGeneralTransition| transition $name:ident on $selectedToken:ident where
+        $items:semblaCommandTransitionItem*) =>
+      let mut guardExpr : Option (TSyntax `semblaExpr) := none
+      let mut hazardExpr : Option (TSyntax `semblaExpr) := none
+      let mut assignments : List (TSyntax `semblaSet) := []
+      for item in items do
+        match item with
+        | `(semblaCommandTransitionItem| guard $expression:semblaExpr) =>
+            if guardExpr.isSome then
+              throwErrorAt item "general transition '{identText name}' has duplicate guard"
+            guardExpr := some expression
+        | `(semblaCommandTransitionItem| hazard $expression:semblaExpr) =>
+            if hazardExpr.isSome then
+              throwErrorAt item "general transition '{identText name}' has duplicate hazard"
+            hazardExpr := some expression
+        | `(semblaCommandTransitionItem| set $assignment:semblaSet) =>
+            assignments := assignments ++ [assignment]
+        | _ => throwUnsupportedSyntax
+      let resolvedGuard ← guardExpr.getDM
+        (throwErrorAt name "general transition '{identText name}' requires exactly one guard")
+      let resolvedHazard ← hazardExpr.getDM
+        (throwErrorAt name "general transition '{identText name}' requires exactly one hazard")
+      if assignments.isEmpty then
+        throwErrorAt name "general transition '{identText name}' requires at least one set effect"
+      pure ⟨identText name, name.raw,
+        .general selectedToken resolvedGuard resolvedHazard assignments⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandOutputField (stx : TSyntax `semblaCommandOutputField) :
+    TermElabM (SurfaceAttr × SurfaceOutputField) := do
+  match stx with
+  | `(semblaCommandOutputField| $name:ident : Int := count where $filter:semblaExpr) =>
+      pure ({ name := identText name, ty := .int, nameToken := name.raw },
+        ⟨identText name, name.raw, "count", none, some filter⟩)
+  | `(semblaCommandOutputField| $name:ident : ℝ := count where $filter:semblaExpr) =>
+      pure ({ name := identText name, ty := .real, nameToken := name.raw },
+        ⟨identText name, name.raw, "count", none, some filter⟩)
+  | `(semblaCommandOutputField| $name:ident : Int := sum ($value:semblaExpr)) =>
+      pure ({ name := identText name, ty := .int, nameToken := name.raw },
+        ⟨identText name, name.raw, "sum", some value, none⟩)
+  | `(semblaCommandOutputField| $name:ident : ℝ := sum ($value:semblaExpr)) =>
+      pure ({ name := identText name, ty := .real, nameToken := name.raw },
+        ⟨identText name, name.raw, "sum", some value, none⟩)
+  | `(semblaCommandOutputField| $name:ident : Int := count
+        ($_value:semblaExpr) where $_filter:semblaExpr)
+  | `(semblaCommandOutputField| $name:ident : ℝ := count
+        ($_value:semblaExpr) where $_filter:semblaExpr) =>
+      throwErrorAt name "count output field '{identText name}' cannot declare a value expression"
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandOutput (stx : TSyntax `semblaCommandOutput) :
+    TermElabM SurfaceOutput := do
+  match stx with
+  | `(semblaCommandOutput| output $name:ident from $selectedToken:ident where
+        $fieldSyntax:semblaCommandOutputField*) =>
+      let parsedFields ← fieldSyntax.toList.mapM parseCommandOutputField
+      pure ⟨identText name, name.raw, parsedFields.map (·.1), selectedToken,
+        parsedFields.map (·.2)⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandViewReduce (stx : TSyntax `semblaCommandViewReduce) :
+    TermElabM String := do
+  match stx with
+  | `(semblaCommandViewReduce| sum) => pure "sum"
+  | `(semblaCommandViewReduce| min) => pure "min"
+  | `(semblaCommandViewReduce| max) => pure "max"
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandView (stx : TSyntax `semblaCommandView) : TermElabM SurfaceView := do
+  match stx with
+  | `(semblaCommandView| view $name:ident := count $selectedToken:ident) =>
+      pure ⟨identText name, name.raw, selectedToken, none, none, "count"⟩
+  | `(semblaCommandView| view $name:ident := count $selectedToken:ident where
+        $filter:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, none, "count"⟩
+  | `(semblaCommandView| view $name:ident := count $selectedToken:ident using
+        $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, none, some value, "count"⟩
+  | `(semblaCommandView| view $name:ident := count $selectedToken:ident where
+        $filter:semblaExpr using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, some value, "count"⟩
+  | `(semblaCommandView| view $name:ident := sum $selectedToken:ident) =>
+      pure ⟨identText name, name.raw, selectedToken, none, none, "sum"⟩
+  | `(semblaCommandView| view $name:ident := min $selectedToken:ident) =>
+      pure ⟨identText name, name.raw, selectedToken, none, none, "min"⟩
+  | `(semblaCommandView| view $name:ident := max $selectedToken:ident) =>
+      pure ⟨identText name, name.raw, selectedToken, none, none, "max"⟩
+  | `(semblaCommandView| view $name:ident := sum $selectedToken:ident where $filter:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, none, "sum"⟩
+  | `(semblaCommandView| view $name:ident := min $selectedToken:ident where $filter:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, none, "min"⟩
+  | `(semblaCommandView| view $name:ident := max $selectedToken:ident where $filter:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, none, "max"⟩
+  | `(semblaCommandView| view $name:ident := sum $selectedToken:ident using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, none, some value, "sum"⟩
+  | `(semblaCommandView| view $name:ident := min $selectedToken:ident using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, none, some value, "min"⟩
+  | `(semblaCommandView| view $name:ident := max $selectedToken:ident using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, none, some value, "max"⟩
+  | `(semblaCommandView| view $name:ident := sum $selectedToken:ident where
+        $filter:semblaExpr using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, some value, "sum"⟩
+  | `(semblaCommandView| view $name:ident := min $selectedToken:ident where
+        $filter:semblaExpr using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, some value, "min"⟩
+  | `(semblaCommandView| view $name:ident := max $selectedToken:ident where
+        $filter:semblaExpr using $value:semblaExpr) =>
+      pure ⟨identText name, name.raw, selectedToken, some filter, some value, "max"⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandSummaryReduce (stx : TSyntax `semblaCommandSummaryReduce) :
+    TermElabM String := do
+  match stx with
+  | `(semblaCommandSummaryReduce| sum) => pure "sum"
+  | `(semblaCommandSummaryReduce| min) => pure "min"
+  | `(semblaCommandSummaryReduce| max) => pure "max"
+  | `(semblaCommandSummaryReduce| last) => pure "last"
+  | `(semblaCommandSummaryReduce| argmaxₜ) => pure "argmax_tick"
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandSummary (stx : TSyntax `semblaCommandSummary) :
+    TermElabM SurfaceSummary := do
+  let finish (name endpoint : TSyntax `ident) (reducerName : String) := do
+    match endpoint.getId.components with
+    | [boxName, viewName] =>
+        let boxToken := Lean.mkIdentFrom endpoint boxName
+        let viewTokenBase := Lean.mkIdentFrom endpoint viewName
+        let viewToken : TSyntax `ident := match endpoint.raw.getHeadInfo with
+          | .original leading position trailing endPosition =>
+              let viewPosition := String.Pos.mk
+                (position.byteIdx + boxName.getString!.utf8ByteSize + 1)
+              let emptyLeading := Substring.mk leading.str viewPosition viewPosition
+              ⟨viewTokenBase.raw.setInfo
+                (.original emptyLeading viewPosition trailing endPosition)⟩
+          | _ => viewTokenBase
+        pure ⟨identText name, name.raw, boxToken, viewToken, reducerName⟩
+    | _ => throwErrorAt endpoint "summary source must have the form 'box.view'"
+  match stx with
+  | `(semblaCommandSummary| summary $name:ident := sum $endpoint:ident) =>
+      finish name endpoint "sum"
+  | `(semblaCommandSummary| summary $name:ident := min $endpoint:ident) =>
+      finish name endpoint "min"
+  | `(semblaCommandSummary| summary $name:ident := max $endpoint:ident) =>
+      finish name endpoint "max"
+  | `(semblaCommandSummary| summary $name:ident := last $endpoint:ident) =>
+      finish name endpoint "last"
+  | `(semblaCommandSummary| summary $name:ident := argmaxₜ $endpoint:ident) =>
+      finish name endpoint "argmax_tick"
+  | _ => throwUnsupportedSyntax
+
+private def parseCommandBox (stx : TSyntax `semblaCommandBox) : TermElabM SurfaceBox := do
+  match stx with
+  | `(semblaCommandBox| box $name:ident where $items:semblaCommandBoxItem*) =>
+      let mut systemDecls : List SurfaceSystem := []
+      let mut inputDecls : List SurfaceInput := []
+      let mut transitionDecls : List SurfaceTransition := []
+      let mut outputDecls : List SurfaceOutput := []
+      let mut viewDecls : List SurfaceView := []
+      for item in items do
+        match item with
+        | `(semblaCommandBoxItem| $decl:semblaCommandSystem) =>
+            systemDecls := systemDecls ++ [← parseCommandSystem decl]
+        | `(semblaCommandBoxItem| $decl:semblaCommandInput) =>
+            inputDecls := inputDecls ++ [← parseCommandInput decl]
+        | `(semblaCommandBoxItem| $decl:semblaCommandGeneralTransition) =>
+            transitionDecls := transitionDecls ++ [← parseCommandGeneralTransition decl]
+        | `(semblaCommandBoxItem| $decl:semblaTransition) =>
+            transitionDecls := transitionDecls ++ [← parseTransition decl]
+        | `(semblaCommandBoxItem| $decl:semblaCommandOutput) =>
+            outputDecls := outputDecls ++ [← parseCommandOutput decl]
+        | `(semblaCommandBoxItem| $decl:semblaCommandView) =>
+            viewDecls := viewDecls ++ [← parseCommandView decl]
+        | `(semblaCommandBoxItem| contest $unsupported:ident) =>
+            throwErrorAt unsupported "unsupported Sembla box declaration '{identText unsupported}'"
+        | _ => throwUnsupportedSyntax
+      pure ⟨identText name, name.raw, systemDecls, inputDecls, transitionDecls, outputDecls, viewDecls⟩
+  | _ => throwUnsupportedSyntax
+
+private def collectCommandSurfaceModel (declaration : TSyntax `ident)
+    (runtimeOverride : Option (TSyntax `str)) (stepWidth : TSyntax `term)
+    (items : List (TSyntax `semblaCommandModelItem)) : TermElabM SurfaceModel := do
+  let mut paramDecls : List SurfaceParam := []
+  let mut boxDecls : List SurfaceBox := []
+  let mut wireDecls : List SurfaceWire := []
+  let mut summaryDecls : List SurfaceSummary := []
+  for item in items do
+    match item with
+    | `(semblaCommandModelItem| $decl:semblaParam) =>
+        paramDecls := paramDecls ++ [← parseParam decl]
+    | `(semblaCommandModelItem| $decl:semblaCommandBox) =>
+        boxDecls := boxDecls ++ [← parseCommandBox decl]
+    | `(semblaCommandModelItem| $decl:semblaWire) =>
+        wireDecls := wireDecls ++ [← parseWire decl]
+    | `(semblaCommandModelItem| $decl:semblaCommandSummary) =>
+        summaryDecls := summaryDecls ++ [← parseCommandSummary decl]
+    | `(semblaCommandModelItem| contest $unsupported:ident) =>
+        throwErrorAt unsupported "unsupported Sembla model declaration '{identText unsupported}'"
+    | _ => throwUnsupportedSyntax
+  let runtimeName ← match runtimeOverride with
+    | some value => pure (value.getString, value.raw)
+    | none => pure (← deriveRuntimeNameAt declaration, declaration.raw)
+  pure ⟨identText declaration, declaration.raw, some runtimeName, stepWidth,
+    paramDecls, boxDecls, wireDecls, summaryDecls⟩
+
+private def collectLegacySurfaceModel (name : TSyntax `str) (stepWidth : TSyntax `term)
     (paramDecls : List (TSyntax `semblaParam)) (boxDecls : List (TSyntax `semblaBox))
     (wireDecls : List (TSyntax `semblaWire))
     (summaryBlock : Option (TSyntax `semblaSummaryBlock)) : TermElabM SurfaceModel := do
   let summaryCtx ← match summaryBlock with
     | some declarations => parseSummaryBlock declarations
     | none => pure []
-  pure ⟨name.getString, name.raw, none, dt,
+  pure ⟨name.getString, name.raw, none, stepWidth,
     ← paramDecls.mapM parseParam,
     ← boxDecls.mapM parseBox,
     ← wireDecls.mapM parseWire,
@@ -1173,9 +1553,9 @@ private unsafe def evalModelUnsafe (expr : Lean.Expr) : TermElabM Model :=
 @[implemented_by evalModelUnsafe]
 private opaque evalModel (expr : Lean.Expr) : TermElabM Model
 
-private def modelTerm (name : String) (dt : TSyntax `term)
+private def modelTerm (name : String) (stepWidth : TSyntax `term)
     (params boxes wires summaryTerms : Array (TSyntax `term)) : TermElabM (TSyntax `term) :=
-  `(Model.mk $(Lean.quote name) $dt [$params,*] [$boxes,*] [$wires,*] [$summaryTerms,*])
+  `(Model.mk $(Lean.quote name) $stepWidth [$params,*] [$boxes,*] [$wires,*] [$summaryTerms,*])
 
 /-- Internal shared path for validation, IR emission, one-time evaluation, and
     widget attachment.  Surface frontends should only collect `SurfaceModel`
@@ -1186,14 +1566,14 @@ def elaborateSurfaceModel (surface : SurfaceModel)
   let modelName := match surface.runtimeName with
     | some runtime => runtime.1
     | none => surface.declarationName
-  let dt := surface.dt
+  let stepWidth := surface.dt
   let paramCtx := surface.params
   let boxCtxs := surface.boxes
   let wireCtx := surface.wires
   let summaryCtx := surface.summaries
 
   -- Pass one: validate the complete collected declaration graph.
-  validateStep dt
+  validateStep stepWidth
   ensureUnique "parameter" (paramCtx.map fun p => (p.sourceName, p.token))
   ensureUniqueRuntimeNames "parameter" (paramCtx.map fun p => (p.name, p.sourceName, p.token))
   for paramDecl in paramCtx do
@@ -1285,7 +1665,7 @@ def elaborateSurfaceModel (surface : SurfaceModel)
   for summaryDecl in summaryCtx do
     summaryTerms := summaryTerms.push (← summaryTerm boxCtxs summaryDecl)
 
-  let result ← modelTerm modelName dt paramTerms boxTerms wireTerms summaryTerms
+  let result ← modelTerm modelName stepWidth paramTerms boxTerms wireTerms summaryTerms
   let elaborated ← elaborateTerm result
   synthesizeSyntheticMVarsNoPostponing
   let modelValue ← evalModel elaborated
@@ -1305,13 +1685,77 @@ def elaborateSurfaceModel (surface : SurfaceModel)
 
   pure elaborated
 
-elab "model%" name:str "step" "(" dt:term ")" "where"
+elab "model%" name:str "step" "(" stepWidth:term ")" "where"
     "params" "[" paramDecls:semblaParam,* "]"
     "boxes" "[" boxDecls:semblaBox,* "]"
     "wires" "[" wireDecls:semblaWire,* "]"
     summaryBlock:(semblaSummaryBlock)? : term => do
-  let surface ← collectLegacySurfaceModel name dt
+  let surface ← collectLegacySurfaceModel name stepWidth
     paramDecls.getElems.toList boxDecls.getElems.toList wireDecls.getElems.toList summaryBlock
   elaborateSurfaceModel surface fun result => elabTerm result none
+
+private def defineCommandModel (declaration : TSyntax `ident)
+    (runtimeOverride : Option (TSyntax `str)) (stepWidth : TSyntax `term)
+    (items : List (TSyntax `semblaCommandModelItem)) : Command.CommandElabM Unit := do
+  let currentNamespace ← getCurrNamespace
+  let declarationName := currentNamespace ++ declaration.getId
+  checkNotAlreadyDeclared declarationName
+  Command.runTermElabM fun _ => Term.withDeclName declarationName do
+    let surface ← collectCommandSurfaceModel declaration runtimeOverride stepWidth items
+    let value ← elaborateSurfaceModel surface fun result =>
+      elabTerm result (some (mkConst ``Model))
+    let value ← instantiateMVars value
+    let modelDeclaration : Declaration := .defnDecl {
+      name := declarationName
+      levelParams := []
+      type := mkConst ``Model
+      value := value
+      hints := .regular 0
+      safety := .safe }
+    Term.ensureNoUnassignedMVars modelDeclaration
+    addAndCompile modelDeclaration
+    Term.addTermInfo' declaration (mkConst declarationName) (isBinder := true)
+
+@[command_elab semblaModelCommand] private def elabSemblaModel : Command.CommandElab := fun stx => do
+  match stx with
+  | `(command| sembla_model $declaration:ident (dt := $stepWidth:term) where
+        $items:semblaCommandModelItem*) =>
+      defineCommandModel declaration none stepWidth items.toList
+  | _ => throwUnsupportedSyntax
+
+@[command_elab semblaNamedModelCommand] private def elabNamedSemblaModel :
+    Command.CommandElab := fun stx => do
+  match stx with
+  | `(command| sembla_model $declaration:ident
+        ($overrideKeyword:ident := $runtimeName:str) (dt := $stepWidth:term) where
+        $items:semblaCommandModelItem*) =>
+      unless identText overrideKeyword == "name" do
+        throwErrorAt overrideKeyword "expected 'name' model override"
+      defineCommandModel declaration (some runtimeName) stepWidth items.toList
+  | _ => throwUnsupportedSyntax
+
+@[command_elab semblaModelMissingDtCommand] private def elabMissingSemblaDt :
+    Command.CommandElab := fun stx => do
+  match stx with
+  | `(command| sembla_model $declaration:ident where
+        $_items:semblaCommandModelItem*) =>
+      throwErrorAt declaration "sembla_model requires '(dt := <positive decimal>)'"
+  | _ => throwUnsupportedSyntax
+
+@[command_elab semblaNamedModelMissingDtCommand] private def elabNamedMissingSemblaDt :
+    Command.CommandElab := fun stx => do
+  match stx with
+  | `(command| sembla_model $declaration:ident
+        ($_overrideKeyword:ident := $_runtimeName:str) where
+        $_items:semblaCommandModelItem*) =>
+      throwErrorAt declaration "sembla_model requires '(dt := <positive decimal>)'"
+  | _ => throwUnsupportedSyntax
+
+@[command_elab semblaMisplacedSystemCommand] private def elabMisplacedSemblaSystem :
+    Command.CommandElab := fun stx => do
+  match stx with
+  | `(command| system $name:ident (rows := $_size:term)) =>
+      throwErrorAt name "system declaration must be indented inside a sembla_model box"
+  | _ => throwUnsupportedSyntax
 
 end Sembla.DSL

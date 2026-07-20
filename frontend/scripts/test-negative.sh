@@ -170,10 +170,182 @@ check_failure_exact Negative/FrequencyMissingKey.lean \
 check_failure_exact Negative/FrequencyMissingParentheses.lean \
   "Negative/FrequencyMissingParentheses.lean:12:48: error: frequency syntax requires parentheses around the predicate: use 'freq (<predicate>) over <ref>'"
 
+check_failure_exact Negative/CommandArrowAmbiguity.lean \
+  "Negative/CommandArrowAmbiguity.lean:9:4: error: multiple compatible systems for reaction 't': A, B; add 'on System'"
+
+check_failure_exact Negative/CommandArrowNoCompatibleSystem.lean \
+  "Negative/CommandArrowNoCompatibleSystem.lean:7:4: error: no compatible system for reaction 't' among systems: A; add 'on System'"
+
+check_failure_exact Negative/CommandArrowMultipleStateAttributes.lean \
+  "Negative/CommandArrowMultipleStateAttributes.lean:8:13: error: system 'A' has multiple enum state attributes: first, second; add 'attribute:'"
+
+check_failure_exact Negative/CommandCountOutputWithValue.lean \
+  "Negative/CommandCountOutputWithValue.lean:8:6: error: count output field 'n' cannot declare a value expression"
+
+check_failure_exact Negative/CommandCountViewWithValue.lean \
+  "Negative/CommandCountViewWithValue.lean:7:9: error: view 'v' with reduce count cannot declare a value expression"
+
+check_failure_exact Negative/CommandDuplicateAttribute.lean \
+  "Negative/CommandDuplicateAttribute.lean:7:6: error: duplicate attribute 'value'"
+
+check_failure_exact Negative/CommandDuplicateBox.lean \
+  "Negative/CommandDuplicateBox.lean:6:6: error: duplicate box 'b'"
+
+check_failure_exact Negative/CommandDuplicateGuard.lean \
+  "Negative/CommandDuplicateGuard.lean:9:6: error: general transition 't' has duplicate guard"
+
+check_failure_exact Negative/CommandDuplicateHazard.lean \
+  "Negative/CommandDuplicateHazard.lean:10:6: error: general transition 't' has duplicate hazard"
+
+check_failure_exact Negative/CommandDuplicateInputPort.lean \
+  "Negative/CommandDuplicateInputPort.lean:8:10: error: duplicate input port 'p'"
+
+check_failure_exact Negative/CommandDuplicateModel.lean \
+  "Negative/CommandDuplicateModel.lean:5:0: error: 'Same' has already been declared"
+
+check_failure_exact Negative/CommandDuplicateOutputPort.lean \
+  "Negative/CommandDuplicateOutputPort.lean:9:11: error: duplicate output port 'p'"
+
+check_failure_exact Negative/CommandDuplicateParameter.lean \
+  "Negative/CommandDuplicateParameter.lean:5:8: error: duplicate parameter 'a'"
+
+check_failure_exact Negative/CommandDuplicateSummary.lean \
+  "Negative/CommandDuplicateSummary.lean:8:10: error: duplicate summary 's'"
+
+check_failure_exact Negative/CommandDuplicateSystem.lean \
+  "Negative/CommandDuplicateSystem.lean:6:11: error: duplicate system 'A'"
+
+check_failure_exact Negative/CommandDuplicateTable.lean \
+  "Negative/CommandDuplicateTable.lean:6:22: error: duplicate table runtime name 'same' for declarations 'A' and 'B'"
+
+check_failure_exact Negative/CommandDuplicateTransition.lean \
+  "Negative/CommandDuplicateTransition.lean:8:4: error: duplicate transition 'one'"
+
+check_failure_exact Negative/CommandDuplicateView.lean \
+  "Negative/CommandDuplicateView.lean:7:9: error: duplicate view 'v'"
+
+check_failure_exact Negative/CommandDuplicateWireTarget.lean \
+  "Negative/CommandDuplicateWireTarget.lean:14:16: error: duplicate wire target 'b.p'"
+
+check_failure_exact Negative/CommandMisplacedSystem.lean \
+  "Negative/CommandMisplacedSystem.lean:3:7: error: system declaration must be indented inside a sembla_model box"
+
+check_failure_exact Negative/CommandMissingDt.lean \
+  "Negative/CommandMissingDt.lean:3:13: error: sembla_model requires '(dt := <positive decimal>)'"
+
+check_failure_exact Negative/CommandMissingGuard.lean \
+  "Negative/CommandMissingGuard.lean:7:15: error: general transition 't' requires exactly one guard"
+
+check_failure_exact Negative/CommandMissingHazard.lean \
+  "Negative/CommandMissingHazard.lean:7:15: error: general transition 't' requires exactly one hazard"
+
+check_failure_exact Negative/CommandNoEffects.lean \
+  "Negative/CommandNoEffects.lean:7:15: error: general transition 't' requires at least one set effect"
+
+check_failure_exact Negative/CommandNonCountWithoutUsing.lean \
+  "Negative/CommandNonCountWithoutUsing.lean:7:9: error: view 'v' with reduce sum must declare a value expression"
+
+check_failure_exact Negative/CommandOutOfRangeDt.lean \
+  "Negative/CommandOutOfRangeDt.lean:3:27: error: decimal literal is outside the supported finite f64 range"
+
+check_failure_exact Negative/CommandUnknownOutputField.lean \
+  "Negative/CommandUnknownOutputField.lean:8:24: error: unknown state or attribute 'missing'"
+
+check_failure_exact Negative/CommandUnknownOutputSource.lean \
+  "Negative/CommandUnknownOutputSource.lean:6:18: error: unknown system 'Missing'"
+
+check_failure_exact Negative/CommandUnknownRef.lean \
+  "Negative/CommandUnknownRef.lean:6:15: error: unknown reference target 'Missing'"
+
+check_failure_exact Negative/CommandUnknownSummaryView.lean \
+  "Negative/CommandUnknownSummaryView.lean:7:21: error: summary 's' refers to undeclared view 'b.missing'"
+
+check_failure_exact Negative/CommandUnknownTransitionAttribute.lean \
+  "Negative/CommandUnknownTransitionAttribute.lean:8:12: error: unknown state or attribute 'missing'"
+
+check_failure_exact Negative/CommandUnknownTransitionInput.lean \
+  "Negative/CommandUnknownTransitionInput.lean:9:22: error: unknown input port 'missing'"
+
+check_failure_exact Negative/CommandUnknownTransitionParameter.lean \
+  "Negative/CommandUnknownTransitionParameter.lean:9:23: error: undeclared parameter 'missing'"
+
+check_failure_exact Negative/CommandUnknownTransitionSystem.lean \
+  "Negative/CommandUnknownTransitionSystem.lean:7:20: error: unknown system 'Missing'"
+
+check_failure_exact Negative/CommandUnknownViewSource.lean \
+  "Negative/CommandUnknownViewSource.lean:6:20: error: view 'v' refers to unknown table 'Missing'"
+
+check_failure_exact Negative/CommandUnknownViewValue.lean \
+  "Negative/CommandUnknownViewValue.lean:7:26: error: view 'v': unknown state or attribute 'missing'"
+
+check_failure_exact Negative/CommandUnknownWireEndpoint.lean \
+  "Negative/CommandUnknownWireEndpoint.lean:10:9: error: unknown output port 'a.missing'"
+
+check_failure_exact Negative/CommandUnsupportedDeclaration.lean \
+  "Negative/CommandUnsupportedDeclaration.lean:5:12: error: unsupported Sembla box declaration 'race'"
+
+check_failure_exact Negative/CommandWireSchemaMismatch.lean \
+  "Negative/CommandWireSchemaMismatch.lean:13:16: error: wire schema mismatch for 'a.p' -> 'b.p'"
+
+check_failure_exact Negative/CommandWrongEffectType.lean \
+  "Negative/CommandWrongEffectType.lean:10:15: error: effect value has incompatible type"
+
+check_failure_exact Negative/CommandWrongGuardType.lean \
+  "Negative/CommandWrongGuardType.lean:8:12: error: guard has type Int; expected Bool"
+
+check_failure_exact Negative/CommandWrongHazardType.lean \
+  "Negative/CommandWrongHazardType.lean:9:13: error: hazard has type Int; expected Real"
+
+check_failure_exact Negative/CommandWrongOutputFilterType.lean \
+  "Negative/CommandWrongOutputFilterType.lean:8:29: error: output filter must have type Bool"
+
+check_failure_exact Negative/CommandWrongOutputType.lean \
+  "Negative/CommandWrongOutputType.lean:8:6: error: count output field 'n' must have type Int"
+
+check_failure_exact Negative/CommandWrongViewFilterType.lean \
+  "Negative/CommandWrongViewFilterType.lean:7:28: error: view 'v' filter has type Int; expected Bool"
+
+check_failure_exact Negative/CommandWrongViewType.lean \
+  "Negative/CommandWrongViewType.lean:7:26: error: view 'v' value has type Enum; expected Real or Int"
+
+check_failure_exact Negative/CommandZeroDt.lean \
+  "Negative/CommandZeroDt.lean:3:27: error: tick width must be greater than zero"
+
+check_failure_exact Negative/CommandDuplicateEnumVariant.lean \
+  "Negative/CommandDuplicateEnumVariant.lean:6:17: error: duplicate enum variant 'X'"
+
+check_failure_exact Negative/CommandEmptyEnum.lean \
+  "Negative/CommandEmptyEnum.lean:6:6: error: enum attribute 'mode' must declare at least one variant"
+
+check_failure_exact Negative/CommandNonNumericInputSum.lean \
+  "Negative/CommandNonNumericInputSum.lean:11:30: error: input sum field 'p.mode' must be numeric"
+
+check_failure_exact Negative/CommandOutputSumTypeMismatch.lean \
+  "Negative/CommandOutputSumTypeMismatch.lean:8:24: error: output sum value has incompatible type"
+
+check_failure_exact Negative/CommandOversizedRows.lean \
+  "Negative/CommandOversizedRows.lean:5:22: error: row count exceeds the IR u64 range"
+
+check_failure_exact Negative/CommandGroupedOversizedRows.lean \
+  "Negative/CommandGroupedOversizedRows.lean:5:22: error: row count exceeds the IR u64 range"
+
+check_failure_exact Negative/CommandRefEffect.lean \
+  "Negative/CommandRefEffect.lean:12:10: error: writes to Ref attributes require resource claims, which are not supported by this DSL"
+
+check_failure_exact Negative/CommandUnknownSummaryBox.lean \
+  "Negative/CommandUnknownSummaryBox.lean:7:19: error: summary 's' refers to unknown box 'missing'"
+
+check_failure_exact Negative/CommandUnknownWireBox.lean \
+  "Negative/CommandUnknownWireBox.lean:8:7: error: unknown wire source box 'missing'"
+
+check_failure_exact Negative/CommandUnsupportedModelDeclaration.lean \
+  "Negative/CommandUnsupportedModelDeclaration.lean:4:10: error: unsupported Sembla model declaration 'race'"
+
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
 lake env lean Positive/ObservationOrder.lean
 lake env lean Positive/OptionBBindersNames.lean
 lake env lean Sembla/ReactionArrowTests.lean
 lake env lean Sembla/FrequencyTests.lean
+lake env lean Sembla/CommandFrontendTests.lean
 echo "Lean positioned negative and positive elaboration tests passed"
