@@ -119,6 +119,30 @@ shut in `sembla-ir`. If the Lean frontend is ever swapped out (§A5), the new
 frontend inherits the obligation — which is the correct place for the cost to
 land, since it is the frontend that promises the modeler this safety.
 
+### A7. Command-style mathematical syntax is the human surface
+
+*(Adopted 2026-07-20; implementation record in
+`docs/design/surface-syntax-options.md`.)*
+
+**Consideration.** The original `model%` syntax was a dependable semantic
+kernel, but its nested category lists, keyword-marked references, and quoted
+wire names made complete models read like construction data rather than
+mathematics. Any replacement still had to preserve literal JSON bytes, stable
+rule/effect order, positioned diagnostics, legacy models, and the
+frontend-agnostic IR boundary.
+
+**Rationale.** Human-authored models use indentation-structured `sembla_model`
+commands with real parameter bindings and tilde priors (B), reaction arrows
+(A), and keyed `freq` notation (C(ii)). These are layered adapters to one
+surface-model elaboration kernel: migration is accepted only when the emitted
+IR is byte-identical. Runtime model/table names derive through a frozen
+snake-case and Greek-transliteration contract, with explicit `(name := "…")`
+overrides and collision diagnostics. `model%` remains the supported
+compatibility/kernel form and direct IR constructors remain the machine-writer
+path. Keyed comprehensions with row binders (C(i)) are deferred until a real
+model requires them; a do-notation builder (E) is rejected/deferred for human
+authoring because imperative construction is not the mathematical surface.
+
 ---
 
 ## B. State and data model

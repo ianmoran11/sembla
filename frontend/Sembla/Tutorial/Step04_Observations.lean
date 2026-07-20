@@ -13,38 +13,28 @@ namespace Sembla.Tutorial.Step04
 
 open Sembla.IR Sembla.DSL
 
-/-- Workplace SIR with non-feedback observations and run-level summaries. -/
-def observedWorkplaceSIR : Model := model% "tutorial_04_observed_workplace_sir" step(0.25) where
-  params [
-    param beta : Real := 0.8 prior LogNormal(-0.2231435513142097, 0.25),
-    param gamma : Real := 0.1 prior LogNormal(-2.302585092994046, 0.25)]
-  boxes [
-    box population where
-      systems [
-        system Person as "person" rows(1000) where [
-          state health : {S, I, R},
-          ref employer : Employer],
-        system Employer as "employer" rows(50) where []]
-      inputs []
-      transitions [
-        transition infect on Person where
-          guard health = S
-          hazard parameter beta *
-            (countBy employer (health = I) / sizeBy employer)
-          set [health := I],
-        transition recover on Person where
-          guard health = I
-          hazard parameter gamma
-          set [health := R]]
-      outputs []
-      views [
-        view susceptible from Person where health = S reduce count,
-        view infectious from Person where health = I reduce count,
-        view recovered from Person where health = R reduce count]]
-  wires []
-  summaries [
-    summary peak_infectious from population view infectious reduce max,
-    summary peak_tick from population view infectious reduce argmax_tick]
+/- Workplace SIR with non-feedback observations and run-level summaries. -/
+sembla_model observedWorkplaceSIR
+    (name := "tutorial_04_observed_workplace_sir")
+    (dt := 0.25) where
+  param β : ℝ := 0.8 ~ LogNormal (-0.2231435513142097) 0.25
+  param γ : ℝ := 0.1 ~ LogNormal (-2.302585092994046) 0.25
+
+  box population where
+    system Person (rows := 1_000) where
+      health : {S, I, R}
+      employer : Employer
+    system Employer (rows := 50)
+
+    infect on Person : health: S →[β · freq (health = I) over employer] I
+    recover on Person : health: I →[γ] R
+
+    view susceptible := count Person where health = S
+    view infectious := count Person where health = I
+    view recovered := count Person where health = R
+
+  summary peak_infectious := max population.infectious
+  summary peak_tick := argmaxₜ population.infectious
 
 #guard observedWorkplaceSIR.boxes.map (fun modelBox => modelBox.views.map (·.name)) ==
   [["susceptible", "infectious", "recovered"]]

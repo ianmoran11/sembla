@@ -10,7 +10,7 @@ import Sembla.Demos.Proofs
 
 This root imports a curated, build-checked tutorial suite:
 
-* `Sembla.Demos.Modeling` — the complete supported `model%` authoring surface;
+* `Sembla.Demos.Modeling` — the complete public `sembla_model` command surface;
 * `Sembla.Demos.DeepIR` — lower-level IR data, expressions, priors, and contests;
 * `Sembla.Demos.CanonicalModels` — all eight shipped scientific models;
 * `Sembla.Demos.Serialization` — exact JSON and the Rust export boundary;

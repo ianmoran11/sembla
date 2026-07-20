@@ -14,70 +14,69 @@ state. Views remain observation-only; explicit ports and wires carry feedback.
 The feedback carries a restriction amount, not a multiplier. Empty tick-zero
 input sums to `0`, so `1 - 0 = 1` is neutral. A concrete population file must
 initialize the controller as `mode = Open` and `restriction = 0.0`; the runtime
-owns those row values because `rows(1)` is only a size hint.
+owns those row values because `(rows := 1)` is only a size hint.
 -/
 
 namespace Sembla.Tutorial.Step05
 
 open Sembla.IR Sembla.DSL
 
-/-- Composed workplace SIR with typed, one-tick-delayed policy feedback. -/
-def policyFeedbackSIR : Model := model% "tutorial_05_policy_feedback_sir" step(0.25) where
-  params [
-    param beta : Real := 0.8 prior LogNormal(-0.2231435513142097, 0.25),
-    param gamma : Real := 0.1 prior LogNormal(-2.302585092994046, 0.25)]
-  boxes [
-    box population where
-      systems [
-        system Person as "person" rows(1000) where [
-          state health : {S, I, R},
-          ref employer : Employer],
-        system Employer as "employer" rows(50) where []]
-      inputs [
-        input restriction_modifier {restriction : Real}]
-      transitions [
-        transition infect on Person where
-          guard health = S
-          hazard parameter beta *
-            (countBy employer (health = I) / sizeBy employer) *
-            (1.0 - inputSum restriction_modifier field restriction)
-          set [health := I],
-        transition recover on Person where
-          guard health = I
-          hazard parameter gamma
-          set [health := R]]
-      outputs [
-        output infection_count {infected : Int} from Person fields [
-          field infected := count where health = I]]
-      views [
-        view susceptible from Person where health = S reduce count,
-        view infectious from Person where health = I reduce count,
-        view recovered from Person where health = R reduce count],
-    box policy where
-      systems [
-        system Controller as "controller" rows(1) where [
-          state mode : {Open, Restricted},
-          attr restriction : Real]]
-      inputs [
-        input infection_count {infected : Int}]
-      transitions [
-        transition restrict on Controller where
-          guard mode = Open && inputSum infection_count field infected > 100
-          hazard 1e300
-          set [mode := Restricted, restriction := 0.6],
-        transition reopen on Controller where
-          guard mode = Restricted && inputSum infection_count field infected < 25
-          hazard 1e300
-          set [mode := Open, restriction := 0.0]]
-      outputs [
-        output restriction_modifier {restriction : Real} from Controller fields [
-          field restriction := sum (restriction)]]]
-  wires [
-    wire population infection_count -> policy infection_count,
-    wire policy restriction_modifier -> population restriction_modifier]
-  summaries [
-    summary peak_infectious from population view infectious reduce max,
-    summary peak_tick from population view infectious reduce argmax_tick]
+/- Composed workplace SIR with typed, one-tick-delayed policy feedback. -/
+sembla_model policyFeedbackSIR
+    (name := "tutorial_05_policy_feedback_sir")
+    (dt := 0.25) where
+  param β : ℝ := 0.8 ~ LogNormal (-0.2231435513142097) 0.25
+  param γ : ℝ := 0.1 ~ LogNormal (-2.302585092994046) 0.25
+
+  box population where
+    system Person (rows := 1_000) where
+      health : {S, I, R}
+      employer : Employer
+    system Employer (rows := 50)
+
+    input restriction_modifier where
+      restriction : ℝ
+
+    infect on Person : health: S →[
+      β · freq (health = I) over employer ·
+        (1.0 - inputSum restriction_modifier field restriction)
+    ] I
+    recover on Person : health: I →[γ] R
+
+    output infection_count from Person where
+      infected : Int := count where health = I
+
+    view susceptible := count Person where health = S
+    view infectious := count Person where health = I
+    view recovered := count Person where health = R
+
+  box policy where
+    system Controller (rows := 1) where
+      mode : {Open, Restricted}
+      restriction : ℝ
+
+    input infection_count where
+      infected : Int
+
+    transition restrict on Controller where
+      guard mode = Open ∧ inputSum infection_count field infected > 100
+      hazard 1e300
+      set mode := Restricted
+      set restriction := 0.6
+
+    transition reopen on Controller where
+      guard mode = Restricted ∧ inputSum infection_count field infected < 25
+      hazard 1e300
+      set mode := Open
+      set restriction := 0.0
+
+    output restriction_modifier from Controller where
+      restriction : ℝ := sum (restriction)
+
+  wire population infection_count -> policy infection_count
+  wire policy restriction_modifier -> population restriction_modifier
+  summary peak_infectious := max population.infectious
+  summary peak_tick := argmaxₜ population.infectious
 
 #guard policyFeedbackSIR.boxes.map (·.name) == ["population", "policy"]
 #guard policyFeedbackSIR.wires.length == 2

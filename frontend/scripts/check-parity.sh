@@ -14,6 +14,15 @@ canonical_models=(
 )
 
 canonical_aliases=(
+  "Sembla.Models.sir|sir.json"
+  "Sembla/Models/sir|sir.json"
+  "sirPolicy|sir_policy.json"
+  "sir_policy|sir_policy.json"
+  "Sembla.Models.sir_policy|sir_policy.json"
+  "Sembla/Models/sirPolicy|sir_policy.json"
+  "Sembla/Models/sir_policy|sir_policy.json"
+  "Sembla.Models.observations|observations.json"
+  "Sembla/Models/observations|observations.json"
   "reversibleCtmc|reversible_ctmc.json"
   "Sembla.Models.reversibleCtmc|reversible_ctmc.json"
   "Sembla.Models.reversible_ctmc|reversible_ctmc.json"
@@ -70,7 +79,11 @@ done
 alias_index=0
 for specification in "${canonical_aliases[@]}"; do
   IFS='|' read -r _ file <<<"$specification"
-  "$sembla" diff-ir "examples/$file" "$tmp/alias-$alias_index-$file"
+  checked="examples/$file"
+  exported="$tmp/alias-$alias_index-$file"
+  "$sembla" validate "$exported"
+  cmp "$checked" "$exported"
+  "$sembla" diff-ir "$checked" "$exported"
   alias_index=$((alias_index + 1))
 done
 for specification in "${canonical_models[@]}"; do
