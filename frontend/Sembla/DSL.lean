@@ -146,6 +146,12 @@ syntax:max scientific : semblaExpr
 syntax:max "(" semblaExpr ")" : semblaExpr
 syntax:max "countBy " ident " (" semblaExpr ")" : semblaExpr
 syntax:max "sizeBy " ident : semblaExpr
+syntax:max "freq" "(" semblaExpr ")" "over" ident : semblaExpr
+-- Recovery forms exist only to replace generic parser failures with teaching diagnostics.
+syntax:max "freq" "(" semblaExpr ")" "over" : semblaExpr
+syntax:max "freq" "(" semblaExpr ")" : semblaExpr
+syntax:max "freq" ident "=" ident "over" ident : semblaExpr
+syntax:max "freq" ident "over" ident : semblaExpr
 syntax:max "inputSum" ident "field" ident : semblaExpr
 syntax:70 semblaExpr:70 " * " semblaExpr:71 : semblaExpr
 syntax:70 semblaExpr:70 " · " semblaExpr:71 : semblaExpr
@@ -652,19 +658,55 @@ private def attrTerm (boxCtx : SurfaceBox) (column : SurfaceAttr) : TermElabM (T
       | some found => `(Attr.mk $name (AttrType.ref $(Lean.quote found.irName)))
   | .bool => throwErrorAt column.nameToken "Boolean state columns are not part of IR v0.1"
 
+private def frequencyRowLocalMessage : String :=
+  "frequency predicates are row-local; aggregates join on declared Ref keys only"
+
+private partial def validateFrequencyPredicate (stx : Syntax) : TermElabM Unit := do
+  match stx with
+  | `(semblaExpr| inputSum $_port:ident field $_field:ident)
+  | `(semblaExpr| countBy $_countKey:ident ($_filter:semblaExpr))
+  | `(semblaExpr| sizeBy $_sizeKey:ident)
+  | `(semblaExpr| freq ($_nested:semblaExpr) over $_freqKey:ident) =>
+      throwErrorAt stx frequencyRowLocalMessage
+  | _ =>
+      for child in stx.getArgs do
+        validateFrequencyPredicate child
+
+private def frequencyKey (tableCtx : SurfaceSystem) (token : TSyntax `ident) :
+    TermElabM SurfaceAttr := do
+  let name := identText token
+  let column ← match tableCtx.attrs.find? (·.name == name) with
+    | some found => pure found
+    | none => throwErrorAt token
+        "unknown frequency key attribute '{name}' on system '{tableCtx.logicalName}'"
+  match column.ty with
+  | .ref _ => pure column
+  | actual => throwErrorAt token
+      "frequency key attribute '{name}' on system '{tableCtx.logicalName}' must have type Ref; found {typeName actual}"
+
+private def keyedCountTerm (tableCtx : SurfaceSystem) (key : SurfaceAttr)
+    (filter : TSyntax `term) : TermElabM (TSyntax `term) :=
+  `(Expr.agg AggOp.count $(Lean.quote tableCtx.irName) $(Lean.quote key.name)
+    $(Lean.quote key.name) $filter)
+
 private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List SurfaceAttr)
     (paramCtx : List SurfaceParam) (inputCtx : List SurfaceInput) (stx : Syntax)
-    (declaration : Option String := none) : TermElabM (TSyntax `term × SurfaceTy) := do
+    (declaration : Option String := none) (frequencyPredicate : Bool := false) :
+    TermElabM (TSyntax `term × SurfaceTy) := do
   let recur := fun expression =>
-    elaborateExpr tableCtx attrs paramCtx inputCtx expression declaration
+    elaborateExpr tableCtx attrs paramCtx inputCtx expression declaration frequencyPredicate
   let lookupExprAttr := fun (token : TSyntax `ident) => do
     let name := identText token
     match attrs.find? (·.name == name) with
     | some found => pure found
     | none =>
-        match declaration with
-        | some context => throwErrorAt token "{context}: unknown state or attribute '{name}'"
-        | none => throwErrorAt token "unknown state or attribute '{name}'"
+        if frequencyPredicate then
+          throwErrorAt token
+            "unknown row attribute '{name}' in frequency predicate; {frequencyRowLocalMessage}"
+        else
+          match declaration with
+          | some context => throwErrorAt token "{context}: unknown state or attribute '{name}'"
+          | none => throwErrorAt token "unknown state or attribute '{name}'"
   match stx with
   | `(semblaExpr| ($inner:semblaExpr)) => recur inner
   | `(semblaExpr| $value:num) => pure (← `(Expr.int $value), .int)
@@ -675,7 +717,12 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
       let value := identText name
       let paramDecl ← match paramCtx.find? (·.sourceName == value) with
         | some found => pure found
-        | none => throwErrorAt name "undeclared parameter '{value}'"
+        | none =>
+            if frequencyPredicate then
+              throwErrorAt name
+                "unknown model parameter '{value}' in frequency predicate; {frequencyRowLocalMessage}"
+            else
+              throwErrorAt name "undeclared parameter '{value}'"
       pure (← `(Expr.param $(Lean.quote paramDecl.name)), .real)
   | `(semblaExpr| $name:ident) =>
       let value := identText name
@@ -685,9 +732,33 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
       | some column, none => pure (← `(Expr.selfAttr $(Lean.quote column.name)), column.ty)
       | none, some paramDecl => pure (← `(Expr.param $(Lean.quote paramDecl.name)), .real)
       | none, none =>
-          match declaration with
-          | some context => throwErrorAt name "{context}: unknown state or attribute '{value}'"
-          | none => throwErrorAt name "unknown state or attribute '{value}'"
+          if frequencyPredicate then
+            throwErrorAt name
+              "unknown row attribute or model parameter '{value}' in frequency predicate; {frequencyRowLocalMessage}"
+          else
+            match declaration with
+            | some context => throwErrorAt name "{context}: unknown state or attribute '{value}'"
+            | none => throwErrorAt name "unknown state or attribute '{value}'"
+  | `(semblaExpr| freq ($predicate:semblaExpr) over $key:ident) =>
+      let keyAttr ← frequencyKey tableCtx key
+      validateFrequencyPredicate predicate
+      let (predicateTerm, predicateTy) ←
+        elaborateExpr tableCtx attrs paramCtx inputCtx predicate declaration true
+      unless predicateTy == .bool do
+        throwErrorAt predicate
+          "frequency predicate has type {typeName predicateTy}; expected Bool"
+      let numerator ← keyedCountTerm tableCtx keyAttr predicateTerm
+      let trueTerm ← `(Expr.bool true)
+      let denominator ← keyedCountTerm tableCtx keyAttr trueTerm
+      pure (← `(Expr.div $numerator $denominator), .real)
+  | `(semblaExpr| freq ($_predicate:semblaExpr) over)
+  | `(semblaExpr| freq ($_predicate:semblaExpr)) =>
+      throwErrorAt stx
+        "frequency syntax requires a key: use 'freq (<predicate>) over <ref>'"
+  | `(semblaExpr| freq $_lhs:ident = $_rhs:ident over $_key:ident)
+  | `(semblaExpr| freq $_value:ident over $_key:ident) =>
+      throwErrorAt stx
+        "frequency syntax requires parentheses around the predicate: use 'freq (<predicate>) over <ref>'"
   | `(semblaExpr| countBy $fk:ident ($filter:semblaExpr)) =>
       let fkAttr ← lookupExprAttr fk
       match fkAttr.ty with
@@ -695,15 +766,14 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
       | _ => throwErrorAt fk "countBy key '{identText fk}' must be a Ref attribute"
       let (filterTerm, filterTy) ← recur filter
       if filterTy != .bool then throwErrorAt filter "aggregate filter must have type Bool"
-      pure (← `(Expr.agg AggOp.count $(Lean.quote tableCtx.irName) $(Lean.quote fkAttr.name)
-        $(Lean.quote fkAttr.name) $filterTerm), .int)
+      pure (← keyedCountTerm tableCtx fkAttr filterTerm, .int)
   | `(semblaExpr| sizeBy $fk:ident) =>
       let fkAttr ← lookupExprAttr fk
       match fkAttr.ty with
       | .ref _ => pure ()
       | _ => throwErrorAt fk "sizeBy key '{identText fk}' must be a Ref attribute"
-      pure (← `(Expr.agg AggOp.count $(Lean.quote tableCtx.irName) $(Lean.quote fkAttr.name)
-        $(Lean.quote fkAttr.name) (Expr.bool true)), .int)
+      let trueTerm ← `(Expr.bool true)
+      pure (← keyedCountTerm tableCtx fkAttr trueTerm, .int)
   | `(semblaExpr| inputSum $port:ident field $column:ident) =>
       let portName := identText port
       let fieldName := identText column

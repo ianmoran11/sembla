@@ -145,9 +145,35 @@ check_failure_exact Negative/ArrowExtraEffects.lean \
 check_failure_exact Negative/ArrowExtraGuard.lean \
   "Negative/ArrowExtraGuard.lean:10:55: error: reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
 
+check_failure_exact Negative/UnknownFrequencyKey.lean \
+  "Negative/UnknownFrequencyKey.lean:10:71: error: unknown frequency key attribute 'missing' on system 'Person'"
+check_failure_exact Negative/RealFrequencyKey.lean \
+  "Negative/RealFrequencyKey.lean:10:71: error: frequency key attribute 'risk' on system 'Person' must have type Ref; found Real"
+check_failure_exact Negative/IntFrequencyKey.lean \
+  "Negative/IntFrequencyKey.lean:10:71: error: frequency key attribute 'visits' on system 'Person' must have type Ref; found Int"
+check_failure_exact Negative/EnumFrequencyKey.lean \
+  "Negative/EnumFrequencyKey.lean:10:71: error: frequency key attribute 'health' on system 'Person' must have type Ref; found Enum"
+check_failure_exact Negative/NonBooleanFrequencyPredicate.lean \
+  "Negative/NonBooleanFrequencyPredicate.lean:12:54: error: frequency predicate has type Real; expected Bool"
+check_failure_exact Negative/UnknownFrequencyRowAttribute.lean \
+  "Negative/UnknownFrequencyRowAttribute.lean:12:54: error: unknown row attribute or model parameter 'missing' in frequency predicate; frequency predicates are row-local; aggregates join on declared Ref keys only"
+check_failure_exact Negative/InputAggregateFrequencyPredicate.lean \
+  "Negative/InputAggregateFrequencyPredicate.lean:12:54: error: frequency predicates are row-local; aggregates join on declared Ref keys only"
+check_failure_exact Negative/RelationalAggregateFrequencyPredicate.lean \
+  "Negative/RelationalAggregateFrequencyPredicate.lean:12:54: error: frequency predicates are row-local; aggregates join on declared Ref keys only"
+check_failure_exact Negative/SizeAggregateFrequencyPredicate.lean \
+  "Negative/SizeAggregateFrequencyPredicate.lean:12:54: error: frequency predicates are row-local; aggregates join on declared Ref keys only"
+check_failure_exact Negative/NestedFrequencyPredicate.lean \
+  "Negative/NestedFrequencyPredicate.lean:12:54: error: frequency predicates are row-local; aggregates join on declared Ref keys only"
+check_failure_exact Negative/FrequencyMissingKey.lean \
+  "Negative/FrequencyMissingKey.lean:10:48: error: frequency syntax requires a key: use 'freq (<predicate>) over <ref>'"
+check_failure_exact Negative/FrequencyMissingParentheses.lean \
+  "Negative/FrequencyMissingParentheses.lean:12:48: error: frequency syntax requires parentheses around the predicate: use 'freq (<predicate>) over <ref>'"
+
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
 lake env lean Positive/ObservationOrder.lean
 lake env lean Positive/OptionBBindersNames.lean
 lake env lean Sembla/ReactionArrowTests.lean
+lake env lean Sembla/FrequencyTests.lean
 echo "Lean positioned negative and positive elaboration tests passed"
