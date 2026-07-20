@@ -120,8 +120,34 @@ check_failure_exact Negative/UnknownEnumNeVariant.lean \
 check_failure_exact Negative/IncompatibleEnumScalarNe.lean \
   "Negative/IncompatibleEnumScalarNe.lean:10:21: error: comparison operands have incompatible types"
 
+check_failure_exact Negative/UnknownArrowSourceVariant.lean \
+  "Negative/UnknownArrowSourceVariant.lean:10:44: error: unknown source variant 'X' for state attribute 'health'"
+check_failure_exact Negative/UnknownArrowDestinationVariant.lean \
+  "Negative/UnknownArrowDestinationVariant.lean:10:53: error: unknown destination variant 'X' for state attribute 'health'"
+check_failure_exact Negative/SplitArrowVariants.lean \
+  "Negative/SplitArrowVariants.lean:12:45: error: source variant 'S' occurs in state columns first, but destination variant 'I' occurs in second; reaction endpoints must belong to the same state attribute"
+check_failure_exact Negative/UnknownArrowSystem.lean \
+  "Negative/UnknownArrowSystem.lean:10:27: error: unknown system 'Missing'"
+check_failure_exact Negative/UnknownArrowStateAttribute.lean \
+  "Negative/UnknownArrowStateAttribute.lean:10:36: error: unknown state or attribute 'missing'"
+check_failure_exact Negative/NonEnumArrowStateAttribute.lean \
+  "Negative/NonEnumArrowStateAttribute.lean:12:36: error: reaction state attribute 'score' must have type Enum"
+check_failure_exact Negative/NoInferredArrowSystem.lean \
+  "Negative/NoInferredArrowSystem.lean:12:17: error: no compatible system for reaction 'infect' among systems: Person, Controller; add 'on System'"
+check_failure_exact Negative/MultipleInferredArrowSystems.lean \
+  "Negative/MultipleInferredArrowSystems.lean:12:17: error: multiple compatible systems for reaction 'infect': Person, Animal; add 'on System'"
+check_failure_exact Negative/MultipleArrowStateAttributes.lean \
+  "Negative/MultipleArrowStateAttributes.lean:12:36: error: system 'Person' has multiple enum state attributes: health, mode; add 'attribute:'"
+check_failure_exact Negative/NonRealArrowHazard.lean \
+  "Negative/NonRealArrowHazard.lean:10:48: error: hazard has type Int; expected Real"
+check_failure_exact Negative/ArrowExtraEffects.lean \
+  "Negative/ArrowExtraEffects.lean:10:55: error: reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+check_failure_exact Negative/ArrowExtraGuard.lean \
+  "Negative/ArrowExtraGuard.lean:10:55: error: reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
 lake env lean Positive/ObservationOrder.lean
 lake env lean Positive/OptionBBindersNames.lean
+lake env lean Sembla/ReactionArrowTests.lean
 echo "Lean positioned negative and positive elaboration tests passed"

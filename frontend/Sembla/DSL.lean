@@ -38,13 +38,23 @@ structure SurfaceSystem where
   size : TSyntax `term
   attrs : List SurfaceAttr
 
+inductive SurfaceTransitionBody where
+  | general
+      (system : TSyntax `ident)
+      (guard : TSyntax `semblaExpr)
+      (hazard : TSyntax `semblaExpr)
+      (sets : List (TSyntax `semblaSet))
+  | reaction
+      (system : Option (TSyntax `ident))
+      (stateAttr : Option (TSyntax `ident))
+      (source : TSyntax `ident)
+      (hazard : TSyntax `semblaExpr)
+      (destination : TSyntax `ident)
+
 structure SurfaceTransition where
   name : String
   token : Syntax
-  system : TSyntax `ident
-  guard : TSyntax `semblaExpr
-  hazard : TSyntax `semblaExpr
-  sets : List (TSyntax `semblaSet)
+  body : SurfaceTransitionBody
 
 structure SurfaceOutputField where
   name : String
@@ -164,9 +174,24 @@ syntax "system" ident "as" str "rows" "(" term ")" "where" "[" semblaAttr,* "]" 
 declare_syntax_cat semblaInput
 syntax "input" ident "{" semblaAttr,* "}" : semblaInput
 
+declare_syntax_cat semblaArrowTail
+syntax "guard" semblaExpr : semblaArrowTail
+syntax "set" "[" semblaSet,* "]" : semblaArrowTail
+
 declare_syntax_cat semblaTransition
 syntax "transition" ident "on" ident "where" "guard" semblaExpr "hazard" semblaExpr
   "set" "[" semblaSet,* "]" : semblaTransition
+syntax ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
+syntax ident "on" ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
+syntax ident ":" ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
+syntax ident "on" ident ":" ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
+syntax ident ":" ident "→" "[" semblaExpr "]" ident semblaArrowTail : semblaTransition
+syntax ident "on" ident ":" ident "→" "[" semblaExpr "]" ident
+  semblaArrowTail : semblaTransition
+syntax ident ":" ident ":" ident "→" "[" semblaExpr "]" ident
+  semblaArrowTail : semblaTransition
+syntax ident "on" ident ":" ident ":" ident "→" "[" semblaExpr "]" ident
+  semblaArrowTail : semblaTransition
 
 declare_syntax_cat semblaOutputField
 syntax "field" ident ":=" "count" "where" semblaExpr : semblaOutputField
@@ -409,7 +434,41 @@ private def parseTransition (stx : TSyntax `semblaTransition) : TermElabM Surfac
   match stx with
   | `(semblaTransition| transition $name:ident on $onSystem:ident where
         guard $guardExpr:semblaExpr hazard $hazardExpr:semblaExpr set [$assignments:semblaSet,*]) =>
-      pure ⟨identText name, name.raw, onSystem, guardExpr, hazardExpr, assignments.getElems.toList⟩
+      pure ⟨identText name, name.raw,
+        .general onSystem guardExpr hazardExpr assignments.getElems.toList⟩
+  | `(semblaTransition| $name:ident : $source:ident → [$hazardExpr:semblaExpr]
+        $destination:ident) =>
+      pure ⟨identText name, name.raw,
+        .reaction none none source hazardExpr destination⟩
+  | `(semblaTransition| $name:ident on $onSystem:ident : $source:ident →
+        [$hazardExpr:semblaExpr] $destination:ident) =>
+      pure ⟨identText name, name.raw,
+        .reaction (some onSystem) none source hazardExpr destination⟩
+  | `(semblaTransition| $name:ident : $stateAttr:ident : $source:ident →
+        [$hazardExpr:semblaExpr] $destination:ident) =>
+      pure ⟨identText name, name.raw,
+        .reaction none (some stateAttr) source hazardExpr destination⟩
+  | `(semblaTransition| $name:ident on $onSystem:ident : $stateAttr:ident :
+        $source:ident → [$hazardExpr:semblaExpr] $destination:ident) =>
+      pure ⟨identText name, name.raw,
+        .reaction (some onSystem) (some stateAttr) source hazardExpr destination⟩
+  | `(semblaTransition| $_name:ident : $_source:ident → [$_hazardExpr:semblaExpr]
+        $_destination:ident $tail:semblaArrowTail) =>
+      throwErrorAt tail
+        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+  | `(semblaTransition| $_name:ident on $_onSystem:ident : $_source:ident →
+        [$_hazardExpr:semblaExpr] $_destination:ident $tail:semblaArrowTail) =>
+      throwErrorAt tail
+        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+  | `(semblaTransition| $_name:ident : $_stateAttr:ident : $_source:ident →
+        [$_hazardExpr:semblaExpr] $_destination:ident $tail:semblaArrowTail) =>
+      throwErrorAt tail
+        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+  | `(semblaTransition| $_name:ident on $_onSystem:ident : $_stateAttr:ident :
+        $_source:ident → [$_hazardExpr:semblaExpr] $_destination:ident
+        $tail:semblaArrowTail) =>
+      throwErrorAt tail
+        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
   | _ => throwUnsupportedSyntax
 
 private def parseOutputField (stx : TSyntax `semblaOutputField) : TermElabM SurfaceOutputField := do
@@ -735,55 +794,198 @@ where
       | _ => `(Expr.gt $left $right)
     pure (term, .bool)
 
+private def enumAttrs (selected : SurfaceSystem) : List SurfaceAttr :=
+  selected.attrs.filter fun column =>
+    match column.ty with
+    | .enum _ => true
+    | _ => false
+
+private def attrHasVariant (column : SurfaceAttr) (variant : String) : Bool :=
+  match column.ty with
+  | .enum variants => variants.contains variant
+  | _ => false
+
+private def commaNames (names : List String) : String :=
+  names |> String.intercalate ", "
+
+structure ResolvedReaction where
+  selected : SurfaceSystem
+  stateAttr : SurfaceAttr
+  source : String
+  destination : String
+
+private def resolveReaction (boxCtx : SurfaceBox) (transitionName : String)
+    (transitionToken : Syntax) (systemToken : Option (TSyntax `ident))
+    (attributeToken : Option (TSyntax `ident)) (sourceToken : TSyntax `ident)
+    (destinationToken : TSyntax `ident) : TermElabM ResolvedReaction := do
+  let sourceName := identText sourceToken
+  let destinationName := identText destinationToken
+  let selected ← match systemToken with
+    | some token => lookupSystem boxCtx token
+    | none =>
+        let candidates := boxCtx.systems.filter fun candidate =>
+          match attributeToken with
+          | some token =>
+              let attributeName := identText token
+              candidate.attrs.any fun column =>
+                column.name == attributeName &&
+                  attrHasVariant column sourceName && attrHasVariant column destinationName
+          | none =>
+              let columns := enumAttrs candidate
+              columns.any fun column =>
+                attrHasVariant column sourceName && attrHasVariant column destinationName
+        let candidates := match candidates, attributeToken with
+          | [], some token =>
+              let attributeName := identText token
+              let named := boxCtx.systems.filter fun (candidate : SurfaceSystem) =>
+                candidate.attrs.any fun column =>
+                  column.name == attributeName &&
+                    match column.ty with | .enum _ => true | _ => false
+              match named with
+              | [only] => [only]
+              | _ => []
+          | found, _ => found
+        match candidates with
+        | [only] => pure only
+        | [] =>
+            let considered := commaNames
+              (boxCtx.systems.map fun candidate => candidate.logicalName)
+            let considered := if considered.isEmpty then "<none>" else considered
+            throwErrorAt transitionToken
+              "no compatible system for reaction '{transitionName}' among systems: {considered}; add 'on System'"
+        | many =>
+            throwErrorAt transitionToken
+              "multiple compatible systems for reaction '{transitionName}': {commaNames (many.map fun candidate => candidate.logicalName)}; add 'on System'"
+  let stateAttr ← match attributeToken with
+    | some token =>
+        let column ← lookupAttr selected.attrs token
+        match column.ty with
+        | .enum _ => pure column
+        | _ => throwErrorAt token
+            "reaction state attribute '{column.name}' must have type Enum"
+    | none =>
+        let columns := enumAttrs selected
+        match columns with
+        | [] => throwErrorAt sourceToken
+            "system '{selected.logicalName}' has no enum state attributes; add 'attribute:'"
+        | [only] => pure only
+        | many =>
+            let sourceColumns := many.filter (attrHasVariant · sourceName)
+            let destinationColumns := many.filter (attrHasVariant · destinationName)
+            let sameColumn := many.any fun column =>
+              attrHasVariant column sourceName && attrHasVariant column destinationName
+            if !sameColumn && !sourceColumns.isEmpty && !destinationColumns.isEmpty then
+              throwErrorAt destinationToken
+                "source variant '{sourceName}' occurs in state columns {commaNames (sourceColumns.map (·.name))}, but destination variant '{destinationName}' occurs in {commaNames (destinationColumns.map (·.name))}; reaction endpoints must belong to the same state attribute"
+            throwErrorAt sourceToken
+              "system '{selected.logicalName}' has multiple enum state attributes: {commaNames (many.map (·.name))}; add 'attribute:'"
+  let variants := match stateAttr.ty with
+    | .enum values => values
+    | _ => []
+  unless variants.contains sourceName do
+    throwErrorAt sourceToken
+      "unknown source variant '{sourceName}' for state attribute '{stateAttr.name}'"
+  unless variants.contains destinationName do
+    throwErrorAt destinationToken
+      "unknown destination variant '{destinationName}' for state attribute '{stateAttr.name}'"
+  pure ⟨selected, stateAttr, sourceName, destinationName⟩
+
+private def selectedSystemForTransition (boxCtx : SurfaceBox)
+    (transitionDecl : SurfaceTransition) : TermElabM SurfaceSystem := do
+  match transitionDecl.body with
+  | .general onSystem _ _ _ => lookupSystem boxCtx onSystem
+  | .reaction onSystem stateAttr source _ destination =>
+      return (← resolveReaction boxCtx transitionDecl.name transitionDecl.token
+        onSystem stateAttr source destination).selected
+
+structure ResolvedTransitionBody where
+  selected : SurfaceSystem
+  guardTerm : TSyntax `term
+  hazardSyntax : TSyntax `semblaExpr
+  effectTerms : Array (TSyntax `term)
+
+/-- Shared identifier-assignment validation for expanded transitions and
+    reaction arrows.  Reactions retain their original destination token while
+    using the same enum-membership, Ref-write, and value-type checks. -/
+private def identifierEffectTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
+    (selected : SurfaceSystem) (attrName value : TSyntax `ident) :
+    TermElabM (TSyntax `term) := do
+  let destination ← lookupAttr selected.attrs attrName
+  match destination.ty with
+  | .ref _ => throwErrorAt attrName
+      "writes to Ref attributes require resource claims, which are not supported by this DSL"
+  | _ => pure ()
+  let valueName := identText value
+  let valueTerm ← match destination.ty with
+    | .enum variants =>
+        unless variants.contains valueName do
+          throwErrorAt value "unknown variant '{valueName}' for attribute '{destination.name}'"
+        `(Expr.enum $(Lean.quote valueName))
+    | _ =>
+        let (term, actualTy) ←
+          elaborateExpr selected selected.attrs paramCtx boxCtx.inputs value
+        unless sameType destination.ty actualTy do
+          throwErrorAt value "effect value has incompatible type"
+        pure term
+  `(Effect.setAttr $(Lean.quote destination.name) $valueTerm)
+
+private def resolveTransitionBody (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
+    (transitionDecl : SurfaceTransition) : TermElabM ResolvedTransitionBody := do
+  match transitionDecl.body with
+  | .reaction onSystem stateAttr source hazardExpr destination =>
+      let resolved ← resolveReaction boxCtx transitionDecl.name transitionDecl.token
+        onSystem stateAttr source destination
+      let guardTerm ← `(Expr.enumIs $(Lean.quote resolved.stateAttr.name)
+        $(Lean.quote resolved.source))
+      let attrName := stateAttr.getD ⟨resolved.stateAttr.nameToken⟩
+      let effectTerm ← identifierEffectTerm paramCtx boxCtx resolved.selected attrName destination
+      pure ⟨resolved.selected, guardTerm, hazardExpr, #[effectTerm]⟩
+  | .general onSystem guardExpr hazardExpr assignments =>
+      let selected ← lookupSystem boxCtx onSystem
+      let (guardTerm, guardTy) ←
+        elaborateExpr selected selected.attrs paramCtx boxCtx.inputs guardExpr
+      if guardTy != .bool then
+        throwErrorAt guardExpr "guard has type {typeName guardTy}; expected Bool"
+      let mut effects : Array (TSyntax `term) := #[]
+      for assignment in assignments do
+        match assignment with
+        | `(semblaSet| $attrName:ident := $value:ident) =>
+            effects := effects.push
+              (← identifierEffectTerm paramCtx boxCtx selected attrName value)
+        | `(semblaSet| $attrName:ident := $value:num) =>
+            let destination ← lookupAttr selected.attrs attrName
+            match destination.ty with
+            | .ref _ => throwErrorAt attrName
+                "writes to Ref attributes require resource claims, which are not supported by this DSL"
+            | _ => pure ()
+            unless sameType destination.ty .int do
+              throwErrorAt value "effect value has incompatible type"
+            effects := effects.push
+              (← `(Effect.setAttr $(Lean.quote destination.name) (Expr.int $value)))
+        | `(semblaSet| $attrName:ident := $value:scientific) =>
+            validateScientific value false
+            let destination ← lookupAttr selected.attrs attrName
+            match destination.ty with
+            | .ref _ => throwErrorAt attrName
+                "writes to Ref attributes require resource claims, which are not supported by this DSL"
+            | _ => pure ()
+            unless sameType destination.ty .real do
+              throwErrorAt value "effect value has incompatible type"
+            effects := effects.push
+              (← `(Effect.setAttr $(Lean.quote destination.name) (Expr.real $value)))
+        | _ => throwUnsupportedSyntax
+      pure ⟨selected, guardTerm, hazardExpr, effects⟩
+
 private def transitionTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
     (transitionDecl : SurfaceTransition) : TermElabM (TSyntax `term) := do
-  let selected ← lookupSystem boxCtx transitionDecl.system
-  let (guardTerm, guardTy) ← elaborateExpr selected selected.attrs paramCtx boxCtx.inputs transitionDecl.guard
-  if guardTy != .bool then
-    throwErrorAt transitionDecl.guard "guard has type {typeName guardTy}; expected Bool"
-  let (hazardTerm, hazardTy) ← elaborateExpr selected selected.attrs paramCtx boxCtx.inputs transitionDecl.hazard
+  let resolved ← resolveTransitionBody paramCtx boxCtx transitionDecl
+  let (hazardTerm, hazardTy) ← elaborateExpr resolved.selected resolved.selected.attrs
+    paramCtx boxCtx.inputs resolved.hazardSyntax
   unless hazardTy == .real do
-    throwErrorAt transitionDecl.hazard "hazard has type {typeName hazardTy}; expected Real"
-  let mut effects : Array (TSyntax `term) := #[]
-  for assignment in transitionDecl.sets do
-    match assignment with
-    | `(semblaSet| $attrName:ident := $value:ident) =>
-        let destination ← lookupAttr selected.attrs attrName
-        match destination.ty with
-        | .ref _ => throwErrorAt attrName
-            "writes to Ref attributes require resource claims, which are not supported by this DSL"
-        | _ => pure ()
-        let valueName := identText value
-        let valueTerm ← match destination.ty with
-          | .enum variants =>
-              unless variants.contains valueName do
-                throwErrorAt value "unknown variant '{valueName}' for attribute '{destination.name}'"
-              `(Expr.enum $(Lean.quote valueName))
-          | _ =>
-              let (term, actualTy) ← elaborateExpr selected selected.attrs paramCtx boxCtx.inputs value
-              unless sameType destination.ty actualTy do
-                throwErrorAt value "effect value has incompatible type"
-              pure term
-        effects := effects.push (← `(Effect.setAttr $(Lean.quote destination.name) $valueTerm))
-    | `(semblaSet| $attrName:ident := $value:num) =>
-        let destination ← lookupAttr selected.attrs attrName
-        match destination.ty with
-        | .ref _ => throwErrorAt attrName
-            "writes to Ref attributes require resource claims, which are not supported by this DSL"
-        | _ => pure ()
-        unless sameType destination.ty .int do throwErrorAt value "effect value has incompatible type"
-        effects := effects.push (← `(Effect.setAttr $(Lean.quote destination.name) (Expr.int $value)))
-    | `(semblaSet| $attrName:ident := $value:scientific) =>
-        validateScientific value false
-        let destination ← lookupAttr selected.attrs attrName
-        match destination.ty with
-        | .ref _ => throwErrorAt attrName
-            "writes to Ref attributes require resource claims, which are not supported by this DSL"
-        | _ => pure ()
-        unless sameType destination.ty .real do throwErrorAt value "effect value has incompatible type"
-        effects := effects.push (← `(Effect.setAttr $(Lean.quote destination.name) (Expr.real $value)))
-    | _ => throwUnsupportedSyntax
-  `(Transition.mk $(Lean.quote transitionDecl.name) $(Lean.quote selected.irName)
+    throwErrorAt resolved.hazardSyntax "hazard has type {typeName hazardTy}; expected Real"
+  let guardTerm := resolved.guardTerm
+  let effects := resolved.effectTerms
+  `(Transition.mk $(Lean.quote transitionDecl.name) $(Lean.quote resolved.selected.irName)
       $guardTerm $hazardTerm [$effects,*] [])
 
 private def outputTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
@@ -1025,9 +1227,9 @@ def elaborateSurfaceModel (surface : SurfaceModel)
       if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
         saveStateDiagram props selected.token
     for transitionDecl in boxCtx.transitions do
-      if let some selected := boxCtx.systems.find? (·.logicalName == identText transitionDecl.system) then
-        if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
-          saveStateDiagram props transitionDecl.token
+      let selected ← selectedSystemForTransition boxCtx transitionDecl
+      if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
+        saveStateDiagram props transitionDecl.token
       if let some props := hazardPanelProps? modelValue boxCtx.name transitionDecl.name then
         saveHazardPanel props transitionDecl.token
 
