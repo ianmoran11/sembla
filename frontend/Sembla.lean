@@ -9,3 +9,5 @@ import Sembla.ScientificTests
 import Sembla.Lumping
 import Sembla.LumpingProof
 import Sembla.LumpingTests
+import Sembla.Demos
+import Sembla.Tutorial
