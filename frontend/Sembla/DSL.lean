@@ -89,6 +89,19 @@ structure SurfaceWire where
   toBox : TSyntax `ident
   toPort : TSyntax `ident
 
+/-- The single collected input to the surface semantic kernel.  Frontends retain
+    their declaration token separately from optional runtime-name metadata so
+    diagnostics and future command syntax never need to reconstruct anchors. -/
+structure SurfaceModel where
+  declarationName : String
+  declarationToken : Syntax
+  runtimeName : Option (String × Syntax)
+  dt : TSyntax `term
+  params : List SurfaceParam
+  boxes : List SurfaceBox
+  wires : List SurfaceWire
+  summaries : List SurfaceSummary
+
 /-- Attribute declarations occur exactly once, inside their actual system or
     port declaration.  Transition and output contexts are derived from these
     declarations by the enclosing model elaborator. -/
@@ -385,6 +398,19 @@ private def parseWire (stx : TSyntax `semblaWire) : TermElabM SurfaceWire := do
   | `(semblaWire| wire $fromBox:ident $fromPort:ident -> $toBox:ident $toPort:ident) =>
       pure ⟨fromBox, fromPort, toBox, toPort⟩
   | _ => throwUnsupportedSyntax
+
+private def collectLegacySurfaceModel (name : TSyntax `str) (dt : TSyntax `term)
+    (paramDecls : List (TSyntax `semblaParam)) (boxDecls : List (TSyntax `semblaBox))
+    (wireDecls : List (TSyntax `semblaWire))
+    (summaryBlock : Option (TSyntax `semblaSummaryBlock)) : TermElabM SurfaceModel := do
+  let summaryCtx ← match summaryBlock with
+    | some declarations => parseSummaryBlock declarations
+    | none => pure []
+  pure ⟨name.getString, name.raw, none, dt,
+    ← paramDecls.mapM parseParam,
+    ← boxDecls.mapM parseBox,
+    ← wireDecls.mapM parseWire,
+    summaryCtx⟩
 
 private def ensureUnique (kind : String) (entries : List (String × Syntax)) : TermElabM Unit := do
   let mut seen : List String := []
@@ -728,19 +754,27 @@ private unsafe def evalModelUnsafe (expr : Lean.Expr) : TermElabM Model :=
 @[implemented_by evalModelUnsafe]
 private opaque evalModel (expr : Lean.Expr) : TermElabM Model
 
-elab "model%" name:str "step" "(" dt:term ")" "where"
-    "params" "[" paramDecls:semblaParam,* "]"
-    "boxes" "[" boxDecls:semblaBox,* "]"
-    "wires" "[" wireDecls:semblaWire,* "]"
-    summaryBlock:(semblaSummaryBlock)? : term => do
-  -- Pass one: collect every declaration and retain the original syntax tokens.
+private def modelTerm (name : String) (dt : TSyntax `term)
+    (params boxes wires summaryTerms : Array (TSyntax `term)) : TermElabM (TSyntax `term) :=
+  `(Model.mk $(Lean.quote name) $dt [$params,*] [$boxes,*] [$wires,*] [$summaryTerms,*])
+
+/-- Internal shared path for validation, IR emission, one-time evaluation, and
+    widget attachment.  Surface frontends should only collect `SurfaceModel`
+    and invoke this function; the individual IR-building helpers stay private.
+    The elaboration callback preserves Lean's active term-elaborator scope. -/
+def elaborateSurfaceModel (surface : SurfaceModel)
+    (elaborateTerm : TSyntax `term → TermElabM Lean.Expr) : TermElabM Lean.Expr := do
+  let modelName := match surface.runtimeName with
+    | some runtime => runtime.1
+    | none => surface.declarationName
+  let dt := surface.dt
+  let paramCtx := surface.params
+  let boxCtxs := surface.boxes
+  let wireCtx := surface.wires
+  let summaryCtx := surface.summaries
+
+  -- Pass one: validate the complete collected declaration graph.
   validateStep dt
-  let paramCtx ← paramDecls.getElems.toList.mapM parseParam
-  let boxCtxs ← boxDecls.getElems.toList.mapM parseBox
-  let wireCtx ← wireDecls.getElems.toList.mapM parseWire
-  let summaryCtx ← match summaryBlock with
-    | some declarations => parseSummaryBlock declarations
-    | none => pure []
   ensureUnique "parameter" (paramCtx.map fun p => (p.name, p.token))
   for paramDecl in paramCtx do
     validateRealTerm paramDecl.default
@@ -830,9 +864,8 @@ elab "model%" name:str "step" "(" dt:term ")" "where"
   for summaryDecl in summaryCtx do
     summaryTerms := summaryTerms.push (← summaryTerm boxCtxs summaryDecl)
 
-  let result ← `(Model.mk $name $dt [$paramTerms,*] [$boxTerms,*] [$wireTerms,*]
-    [$summaryTerms,*])
-  let elaborated ← elabTerm result none
+  let result ← modelTerm modelName dt paramTerms boxTerms wireTerms summaryTerms
+  let elaborated ← elaborateTerm result
   synthesizeSyntheticMVarsNoPostponing
   let modelValue ← evalModel elaborated
 
@@ -850,5 +883,14 @@ elab "model%" name:str "step" "(" dt:term ")" "where"
         saveHazardPanel props transitionDecl.token
 
   pure elaborated
+
+elab "model%" name:str "step" "(" dt:term ")" "where"
+    "params" "[" paramDecls:semblaParam,* "]"
+    "boxes" "[" boxDecls:semblaBox,* "]"
+    "wires" "[" wireDecls:semblaWire,* "]"
+    summaryBlock:(semblaSummaryBlock)? : term => do
+  let surface ← collectLegacySurfaceModel name dt
+    paramDecls.getElems.toList boxDecls.getElems.toList wireDecls.getElems.toList summaryBlock
+  elaborateSurfaceModel surface fun result => elabTerm result none
 
 end Sembla.DSL
