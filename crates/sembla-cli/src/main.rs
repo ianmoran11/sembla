@@ -13,7 +13,8 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
+const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla plan-hash <plan.json> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
+const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -30,6 +31,7 @@ fn run(arguments: &[String]) -> i32 {
             0
         }
         [command, path] if command == "validate" => validate_file(path),
+        [command, path] if command == "plan-hash" => plan_hash_file(path),
         [command, left, right] if command == "diff-ir" => diff_ir(left, right),
         [command, flags @ ..] if command == "synth-pop" => {
             let options = match parse_synth_options(flags) {
@@ -437,18 +439,104 @@ fn set_once<T>(slot: &mut Option<T>, value: T, flag: &str) -> Result<(), String>
     }
 }
 
-fn read_model(path: &str) -> Result<sembla_ir::Model, String> {
+fn read_input(path: &str) -> Result<(String, sembla_ir::ParsedInput), String> {
     let source = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
-    sembla_ir::parse_json(&source).map_err(|error| format!("{path}: {error}"))
+    let input = sembla_ir::parse_input(&source).map_err(|error| format!("{path}: {error}"))?;
+    Ok((source, input))
+}
+
+fn reject_plan_envelope(path: &str) -> Result<(), String> {
+    let Ok(source) = std::fs::read_to_string(path) else {
+        return Ok(());
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&source) else {
+        return Ok(());
+    };
+    if value
+        .as_object()
+        .is_some_and(|object| object.contains_key("schema_version"))
+    {
+        Err(format!("{path}: {PLAN_NOT_RUNNABLE}"))
+    } else {
+        Ok(())
+    }
+}
+
+fn read_model(path: &str) -> Result<sembla_ir::Model, String> {
+    match read_input(path)?.1 {
+        sembla_ir::ParsedInput::LegacyModel(model) => Ok(model),
+        sembla_ir::ParsedInput::Plan(_) => Err(format!("{path}: {PLAN_NOT_RUNNABLE}")),
+    }
 }
 
 fn read_validated(path: &str) -> Result<sembla_ir::ValidatedModel, String> {
     sembla_ir::validate(read_model(path)?).map_err(|error| format!("{path}: {error}"))
 }
 
+fn require_canonical_plan(path: &str, source: &str) -> Result<(), String> {
+    let value: serde_json::Value = serde_json::from_str(source)
+        .map_err(|error| format!("{path}: invalid JSON after plan parsing: {error}"))?;
+    let canonical = sembla_ir::to_canonical_string(&value)
+        .map_err(|error| format!("{path}: canonical serialization failed: {error}"))?;
+    if canonical == source {
+        Ok(())
+    } else {
+        Err(format!("{path}: plan file is not canonical"))
+    }
+}
+
+fn read_validated_plan(path: &str) -> Result<sembla_ir::ExecutablePlanV1, String> {
+    let (source, input) = read_input(path)?;
+    let sembla_ir::ParsedInput::Plan(plan) = input else {
+        return Err(format!("{path}: expected an executable plan envelope"));
+    };
+    sembla_ir::validate_plan(&plan).map_err(|error| format!("{path}: {error}"))?;
+    require_canonical_plan(path, &source)?;
+    Ok(plan)
+}
+
 fn validate_file(path: &str) -> i32 {
-    match read_validated(path) {
-        Ok(_) => 0,
+    let result = (|| -> Result<(), String> {
+        let (source, input) = read_input(path)?;
+        match input {
+            sembla_ir::ParsedInput::LegacyModel(model) => {
+                sembla_ir::validate(model).map_err(|error| format!("{path}: {error}"))?;
+            }
+            sembla_ir::ParsedInput::Plan(plan) => {
+                sembla_ir::validate_plan(&plan).map_err(|error| format!("{path}: {error}"))?;
+                require_canonical_plan(path, &source)?;
+            }
+        }
+        Ok(())
+    })();
+    match result {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn plan_hash_file(path: &str) -> i32 {
+    let result = (|| -> Result<(), String> {
+        let plan = read_validated_plan(path)?;
+        let semantic = sembla_ir::plan_semantic_hash(&plan)
+            .map_err(|error| format!("{path}: semantic hash failed: {error}"))?;
+        let envelope = sembla_ir::plan_envelope_hash(&plan)
+            .map_err(|error| format!("{path}: envelope hash failed: {error}"))?;
+        println!(
+            "semantic {} {} {}",
+            semantic.algorithm, semantic.domain, semantic.digest
+        );
+        println!(
+            "envelope {} {} {}",
+            envelope.algorithm, envelope.domain, envelope.digest
+        );
+        Ok(())
+    })();
+    match result {
+        Ok(()) => 0,
         Err(error) => {
             eprintln!("{error}");
             1
@@ -1770,6 +1858,10 @@ fn initializers_from_population(
 }
 
 fn verify_run(manifest_path: &str, model_path: &str, options: VerifyOptions) -> i32 {
+    if let Err(error) = reject_plan_envelope(model_path) {
+        eprintln!("{error}");
+        return 1;
+    }
     match verify_run_result(manifest_path, model_path, options) {
         Ok(count) => {
             println!("verified {count} execution(s)");
