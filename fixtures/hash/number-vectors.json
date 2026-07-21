@@ -1,0 +1,16 @@
+[
+  {"source":"-2.302585092994046","coefficient":-2302585092994046,"exponent":-15,"value":-2.302585092994046,"expected":"-2.302585092994046"},
+  {"source":"-0.2231435513142097","coefficient":-2231435513142097,"exponent":-16,"value":-0.2231435513142097,"expected":"-0.2231435513142097"},
+  {"source":"0.0","coefficient":0,"exponent":0,"value":0.0,"expected":"0.0"},
+  {"source":"1e-9","coefficient":1,"exponent":-9,"value":1e-9,"expected":"1e-9"},
+  {"source":"0.1","coefficient":1,"exponent":-1,"value":0.1,"expected":"0.1"},
+  {"source":"0.25","coefficient":25,"exponent":-2,"value":0.25,"expected":"0.25"},
+  {"source":"0.4","coefficient":4,"exponent":-1,"value":0.4,"expected":"0.4"},
+  {"source":"0.5","coefficient":5,"exponent":-1,"value":0.5,"expected":"0.5"},
+  {"source":"0.8","coefficient":8,"exponent":-1,"value":0.8,"expected":"0.8"},
+  {"source":"1.0","coefficient":10,"exponent":-1,"value":1.0,"expected":"1.0"},
+  {"source":"2.0","coefficient":20,"exponent":-1,"value":2.0,"expected":"2.0"},
+  {"source":"500.0","coefficient":5000,"exponent":-1,"value":500.0,"expected":"500.0"},
+  {"source":"1000000.0","coefficient":10000000,"exponent":-1,"value":1000000.0,"expected":"1000000.0"},
+  {"source":"1e300","coefficient":1,"exponent":300,"value":1e300,"expected":"1e+300"}
+]

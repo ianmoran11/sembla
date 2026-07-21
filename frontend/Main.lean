@@ -3,7 +3,7 @@ import Sembla
 open Sembla
 
 private def usage : String :=
-  "usage: sembla-export <sir|sir_policy|observations|reversible_ctmc|radioactive_decay_chain|sis_importation|seirs_waning|noisy_voter> <out.json>"
+  "usage: sembla-export [--plan] <sir|sir_policy|observations|reversible_ctmc|radioactive_decay_chain|sis_importation|seirs_waning|noisy_voter> <out.json>"
 
 private def lookupModel (name : String) : Option IR.Model :=
   match name with
@@ -35,6 +35,19 @@ private def lookupModel (name : String) : Option IR.Model :=
 
 def main (args : List String) : IO UInt32 := do
   match args with
+  | ["--plan", name, outputPath] =>
+      match lookupModel name with
+      | none =>
+          IO.eprintln s!"unknown model '{name}'\n{usage}"
+          pure 2
+      | some model =>
+          match PlanExport.directStablePlan model with
+          | .error message =>
+              IO.eprintln message
+              pure 1
+          | .ok plan =>
+              IO.FS.writeFile outputPath (PlanJson.renderPlan plan)
+              pure 0
   | [name, outputPath] =>
       match lookupModel name with
       | none =>

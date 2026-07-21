@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use sembla_ir::{parse_input, to_canonical_string, validate_plan, ParsedInput};
+
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -140,6 +142,48 @@ fn validate_accepts_legacy_two_box_and_canonical_plan() {
 }
 
 #[test]
+fn every_top_level_plan_fixture_is_valid_and_canonical() {
+    let directory = repository_path("fixtures/plans");
+    let mut plans = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".plan.json"))
+        })
+        .collect::<Vec<_>>();
+    plans.sort();
+    assert!(!plans.is_empty());
+
+    for path in plans {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("validate")
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let source = std::fs::read_to_string(&path).unwrap();
+        let ParsedInput::Plan(plan) = parse_input(&source).unwrap() else {
+            panic!("{} dispatched as a legacy model", path.display());
+        };
+        validate_plan(&plan).unwrap();
+        assert_eq!(
+            to_canonical_string(&plan).unwrap(),
+            source,
+            "{} is not byte-canonical",
+            path.display()
+        );
+    }
+}
+
+#[test]
 fn plan_hash_prints_the_two_frozen_records() {
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("plan-hash")
@@ -174,6 +218,64 @@ fn validate_rejects_noncanonical_plan_bytes() {
     assert!(String::from_utf8(output.stderr)
         .unwrap()
         .contains("plan file is not canonical"));
+}
+
+#[test]
+fn sir_plan_run_matches_the_checked_csv_golden_bitwise() {
+    let temp = std::env::temp_dir().join(format!(
+        "sembla-sir-plan-golden-{}-{}",
+        std::process::id(),
+        std::thread::current().name().unwrap_or("test")
+    ));
+    std::fs::create_dir_all(&temp).unwrap();
+    let expected_csv = std::fs::read(repository_path(
+        "fixtures/plans/goldens/sir.seed55.ticks8.csv",
+    ))
+    .unwrap();
+    let expected_summaries = std::fs::read(repository_path(
+        "fixtures/plans/goldens/sir.seed55.ticks8.csv.summaries.csv",
+    ))
+    .unwrap();
+
+    for repeat in ["first", "second"] {
+        let output_path = temp.join(format!("{repeat}.csv"));
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("run")
+            .arg(repository_path("fixtures/plans/sir.plan.json"))
+            .args([
+                "--population",
+                "16",
+                "--seed",
+                "55",
+                "--ticks",
+                "8",
+                "--out",
+            ])
+            .arg(&output_path)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.stderr.is_empty());
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            concat!(
+                "results_sha256=1f0069cbbd25894fefb3b9434a218d8f48fd2fdd2f574fbc81884ca478a19a4e ",
+                "final_state_sha256=ae3e613c5ac01cc72580ca4dbd7bb4a475b4e78c632eb1dc008b41015ca610f8 ",
+                "observation_sha256=d37275caa988bca0bf1a70c253e36edb6577c0150f5024fabcb4e606bec81ded\n"
+            )
+        );
+        assert_eq!(std::fs::read(&output_path).unwrap(), expected_csv);
+        assert_eq!(
+            std::fs::read(format!("{}.summaries.csv", output_path.display())).unwrap(),
+            expected_summaries
+        );
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
 }
 
 #[test]

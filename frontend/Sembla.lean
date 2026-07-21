@@ -2,8 +2,12 @@ import Sembla.IR
 import Sembla.Json
 import Sembla.Hash
 import Sembla.HashTests
+import Sembla.Plan
+import Sembla.PlanJson
+import Sembla.PlanExport
 import Sembla.DSL
 import Sembla.Models
+import Sembla.PlanTests
 import Sembla.CanonicalModelsTests
 import Sembla.Widgets
 import Sembla.WidgetDisplay

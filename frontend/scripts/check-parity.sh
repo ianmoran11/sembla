@@ -142,3 +142,12 @@ for stem in sir sir_policy; do
   cmp "$tmp/$stem-fixture.hashes" "$tmp/$stem-exported.hashes"
 done
 echo "Lean export, validation, canonical-byte/normalized parity, observation parity, and execution-hash parity passed"
+
+# --- PRD 0005: canonical direct-stable plan export parity (append-only) ---
+plan_models=(sir sir_policy observations)
+for model in "${plan_models[@]}"; do
+  (cd "$frontend_root" && lake exe sembla-export --plan "$model" "$tmp/$model.plan.json")
+  cmp "$repo_root/fixtures/plans/$model.plan.json" "$tmp/$model.plan.json"
+  "$sembla" validate "$tmp/$model.plan.json"
+done
+echo "Lean plan exports are byte-identical to Rust-canonical fixtures"

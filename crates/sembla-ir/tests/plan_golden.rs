@@ -219,6 +219,19 @@ fn two_box_plan_is_canonical_valid_and_hash_pinned() {
 }
 
 #[test]
+fn sir_plan_semantic_hash_matches_lean() {
+    let source = std::fs::read_to_string(repository_path("fixtures/plans/sir.plan.json")).unwrap();
+    let ParsedInput::Plan(plan) = parse_input(&source).unwrap() else {
+        panic!("Lean plan fixture dispatched as legacy");
+    };
+    validate_plan(&plan).unwrap();
+    assert_eq!(
+        plan_semantic_hash(&plan).unwrap().digest,
+        "b702a2188de78b47ff0a23510ad8c736b9d1e93a1b79662a821bd3f491cb53da"
+    );
+}
+
+#[test]
 fn sibling_plan_is_canonical_and_preserves_shared_rule_words() {
     let source = std::fs::read_to_string(repository_path(
         "fixtures/plans/two_box_plus_sibling.plan.json",
