@@ -122,6 +122,14 @@ impl ValidatedPlan {
     pub fn words_by_dense_rule_id(&self) -> &[u32] {
         &self.words_by_dense_rule_id
     }
+
+    /// Produces the executable model with stable plan words overlaid on the
+    /// existing dense transition ordinals.
+    pub fn model_with_rule_words(&self) -> ValidatedModel {
+        self.model
+            .clone()
+            .with_rule_words(&self.words_by_dense_rule_id)
+    }
 }
 
 /// Checks the reserved namespaces and pairwise distinctness of rule words.

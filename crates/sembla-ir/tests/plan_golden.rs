@@ -139,6 +139,37 @@ fn regenerate() {
 }
 
 #[test]
+#[ignore = "explicit PRD 0004 sibling-fixture regeneration only"]
+fn regenerate_plus_sibling() {
+    let source = std::fs::read_to_string(repository_path("examples/two_box.json")).unwrap();
+    let ParsedInput::LegacyModel(mut model) = parse_input(&source).unwrap() else {
+        panic!("legacy example dispatched as a plan");
+    };
+    let mut bystander = model
+        .boxes
+        .iter()
+        .find(|model_box| model_box.name == "controller")
+        .unwrap()
+        .clone();
+    "bystander".clone_into(&mut bystander.name);
+    bystander.inputs.clear();
+    bystander.outputs.clear();
+    bystander.transitions[0].guard = sembla_ir::Expr::Lt {
+        lhs: Box::new(sembla_ir::Expr::SelfAttr {
+            name: "modifier".to_owned(),
+        }),
+        rhs: Box::new(sembla_ir::Expr::Real { value: 0.5 }),
+    };
+    model.boxes.push(bystander);
+    canonicalize_model(&mut model);
+    let plan = build_direct_stable_plan(model);
+    validate_plan(&plan).unwrap();
+    let canonical = to_canonical_string(&plan).unwrap();
+    let fixture = repository_path("fixtures/plans/two_box_plus_sibling.plan.json");
+    std::fs::write(fixture, canonical.as_bytes()).unwrap();
+}
+
+#[test]
 fn two_box_plan_is_canonical_valid_and_hash_pinned() {
     let source =
         std::fs::read_to_string(repository_path("fixtures/plans/two_box.plan.json")).unwrap();
@@ -150,6 +181,15 @@ fn two_box_plan_is_canonical_valid_and_hash_pinned() {
     };
     let validated = validate_plan(&plan).unwrap();
     assert_eq!(validated.words_by_dense_rule_id().len(), 2);
+    let executable = validated.model_with_rule_words();
+    assert_eq!(
+        executable
+            .transitions()
+            .iter()
+            .map(|transition| (transition.rule_id, transition.rule_word))
+            .collect::<Vec<_>>(),
+        vec![(0, 1_866_690_995), (1, 2_501_600_445)]
+    );
 
     assert_eq!(
         plan_semantic_hash(&plan).unwrap(),
@@ -176,4 +216,37 @@ fn two_box_plan_is_canonical_valid_and_hash_pinned() {
         plan_semantic_hash(&plan).unwrap()
     );
     assert_ne!(plan_envelope_hash(&changed_origin).unwrap(), envelope_hash);
+}
+
+#[test]
+fn sibling_plan_is_canonical_and_preserves_shared_rule_words() {
+    let source = std::fs::read_to_string(repository_path(
+        "fixtures/plans/two_box_plus_sibling.plan.json",
+    ))
+    .unwrap();
+    let value: serde_json::Value = serde_json::from_str(&source).unwrap();
+    assert_eq!(to_canonical_string(&value).unwrap(), source);
+    let ParsedInput::Plan(plan) = parse_input(&source).unwrap() else {
+        panic!("versioned fixture dispatched as legacy");
+    };
+    let validated = validate_plan(&plan).unwrap();
+    let executable = validated.model_with_rule_words();
+    let shared = executable
+        .transitions()
+        .iter()
+        .filter_map(|transition| {
+            let model_box = &executable.model().boxes[transition.box_index];
+            (model_box.name == "controller" || model_box.name == "population")
+                .then_some((model_box.name.as_str(), transition.rule_word))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        shared,
+        vec![("controller", 1_866_690_995), ("population", 2_501_600_445)]
+    );
+    assert_eq!(
+        executable.model().boxes[0].name,
+        "bystander",
+        "the unrelated sibling must sort before both shared boxes"
+    );
 }

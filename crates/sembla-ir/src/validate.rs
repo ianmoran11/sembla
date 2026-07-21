@@ -51,12 +51,15 @@ impl From<ParamType> for ValueType {
     }
 }
 
-/// A transition annotated with its stable model-global declaration-order ID.
+/// A transition annotated with its dense ordinal and runtime identity word.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedTransition {
     pub box_index: usize,
     pub transition_index: usize,
+    /// Dense declaration-order ordinal used for indexing and diagnostics.
     pub rule_id: u32,
+    /// Philox coordinate word and deterministic conflict tie-break key.
+    pub rule_word: u32,
 }
 
 /// A semantically valid model plus metadata derived during validation.
@@ -85,6 +88,18 @@ impl ValidatedModel {
             .find(|rule| rule.box_index == box_index && rule.transition_index == transition_index)
             .map(|rule| rule.rule_id)
     }
+
+    pub(crate) fn with_rule_words(mut self, words: &[u32]) -> Self {
+        assert_eq!(
+            self.transitions.len(),
+            words.len(),
+            "validated rule-word overlay must cover every dense transition"
+        );
+        for (transition, &word) in self.transitions.iter_mut().zip(words) {
+            transition.rule_word = word;
+        }
+        self
+    }
 }
 
 /// Validates all references and expression types, then assigns rule IDs.
@@ -110,6 +125,8 @@ pub fn validate(model: Model) -> Result<ValidatedModel, ValidationError> {
                 box_index,
                 transition_index,
                 rule_id,
+                // Legacy models retain the exact positional RNG/tie-break identity.
+                rule_word: rule_id,
             });
         }
     }

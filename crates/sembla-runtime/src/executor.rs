@@ -168,7 +168,10 @@ impl From<StateError> for TickError {
 
 #[derive(Clone, Debug)]
 struct Candidate {
+    /// Dense ordinal retained for transition lookup, reports, and diagnostics.
     rule_id: u32,
+    /// Stable runtime identity used only for Philox and conflict tie-breaks.
+    rule_word: u32,
     table_index: usize,
     entity_id: u32,
     row: usize,
@@ -692,7 +695,7 @@ fn stage_box(
                 rule_id: validated.rule_id,
                 row,
             })?;
-            let race_time = exp_f64(seed, tick, validated.rule_id, entity_id, 0, lambda);
+            let race_time = exp_f64(seed, tick, validated.rule_word, entity_id, 0, lambda);
             if race_time.partial_cmp(&model.model().dt) != Some(Ordering::Less) {
                 continue;
             }
@@ -713,6 +716,7 @@ fn stage_box(
             }
             candidates.push(Candidate {
                 rule_id: validated.rule_id,
+                rule_word: validated.rule_word,
                 table_index,
                 entity_id,
                 row,
@@ -968,13 +972,13 @@ fn resolve_claims(
         (
             lhs_claim.table_index,
             lhs_claim.resource_row,
-            lhs_candidate.rule_id,
+            lhs_candidate.rule_word,
             lhs_candidate.entity_id,
         )
             .cmp(&(
                 rhs_claim.table_index,
                 rhs_claim.resource_row,
-                rhs_candidate.rule_id,
+                rhs_candidate.rule_word,
                 rhs_candidate.entity_id,
             ))
             .then(lhs.claim_index.cmp(&rhs.claim_index))
@@ -1074,8 +1078,8 @@ fn compare_instances(
         }
     };
     Ok(key_order.then_with(|| {
-        (lhs_candidate.rule_id, lhs_candidate.entity_id)
-            .cmp(&(rhs_candidate.rule_id, rhs_candidate.entity_id))
+        (lhs_candidate.rule_word, lhs_candidate.entity_id)
+            .cmp(&(rhs_candidate.rule_word, rhs_candidate.entity_id))
     }))
 }
 

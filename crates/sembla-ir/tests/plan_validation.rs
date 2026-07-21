@@ -192,6 +192,19 @@ struct RuleWordVector {
 }
 
 #[test]
+fn legacy_model_rule_words_equal_dense_ordinals() {
+    let source = std::fs::read_to_string(repository_path("examples/two_box.json")).unwrap();
+    let ParsedInput::LegacyModel(model) = parse_input(&source).unwrap() else {
+        panic!("legacy fixture dispatched as a plan")
+    };
+    let validated = sembla_ir::validate(model).unwrap();
+    assert!(validated
+        .transitions()
+        .iter()
+        .all(|transition| transition.rule_word == transition.rule_id));
+}
+
+#[test]
 fn rust_rule_words_match_the_cross_language_fixture() {
     let source = std::fs::read_to_string(repository_path("fixtures/hash/vectors.json")).unwrap();
     let vectors: HashVectors = serde_json::from_str(&source).unwrap();

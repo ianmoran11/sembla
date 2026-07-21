@@ -177,17 +177,46 @@ fn validate_rejects_noncanonical_plan_bytes() {
 }
 
 #[test]
-fn run_rejects_plan_envelopes_until_prd_0004() {
+fn run_accepts_plan_envelopes_on_cpu_and_rejects_cuda_and_dt_overrides() {
+    let plan = repository_path("fixtures/plans/two_box.plan.json");
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("run")
-        .arg(repository_path("fixtures/plans/two_box.plan.json"))
+        .arg(&plan)
         .args(["--seed", "1", "--ticks", "1", "--population", "1"])
         .output()
         .unwrap();
-    assert_eq!(output.status.code(), Some(1));
-    assert!(String::from_utf8(output.stderr)
-        .unwrap()
-        .contains("plan envelopes are not yet runnable; see PRD 0004"));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    for (flag, value, expected) in [
+        (
+            "--backend",
+            "cuda",
+            "plan envelopes run on the cpu backend only for now",
+        ),
+        (
+            "--dt",
+            "0.5",
+            "plan envelopes do not support --dt overrides",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("run")
+            .arg(&plan)
+            .args(["--seed", "1", "--ticks", "1", "--population", "1"])
+            .args([flag, value])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 #[test]

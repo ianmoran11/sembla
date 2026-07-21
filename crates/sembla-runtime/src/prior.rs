@@ -1,7 +1,7 @@
 //! Deterministic prior sampling for prior-predictive sweeps.
 //!
 //! Parameter draws use a namespace disjoint from transition and population
-//! randomness: `rule_id = u32::MAX`, `tick = draw_index`, `entity_id` is the
+//! randomness: `rule_word = u32::MAX`, `tick = draw_index`, `entity_id` is the
 //! parameter declaration index, and `draw_idx` is internal to the sampler.
 //! Uniform uses counter 0. Normal uses Box--Muller with counters 0 and 1, and
 //! LogNormal exponentiates that same Normal draw. The transcendental operations
@@ -19,7 +19,7 @@ use sembla_ir::{ParamType, ParamValue, Prior, PriorFamily, ValidatedModel};
 use crate::eval::{ParamEnv, ParamOverride};
 use crate::rng::uniform_f64;
 
-/// Reserved `rule_id` for parameter/prior draws.
+/// Reserved rule word for parameter/prior draws.
 pub const PRIOR_DRAW_RULE_ID: u32 = u32::MAX;
 
 /// A deterministic prior-sampling failure.

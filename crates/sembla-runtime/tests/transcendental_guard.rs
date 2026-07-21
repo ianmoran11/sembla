@@ -22,7 +22,7 @@ struct Exemption {
 const EXEMPTIONS: &[Exemption] = &[Exemption {
     path: "crates/sembla-runtime/src/rng.rs",
     method: "ln",
-    source: "-uniform_f64(seed, tick, rule_id, entity_id, draw_idx).ln() / lambda",
+    source: "-uniform_f64(seed, tick, rule_word, entity_id, draw_idx).ln() / lambda",
     reason: "existing racing-clock transform; simulation transcendental pinning is out of PRD 0001 scope",
 }];
 

@@ -1,12 +1,12 @@
 //! Coordinate-keyed Philox4x32-10 random draws.
 //!
-//! Every draw is a pure function of `(seed, tick, rule_id, entity_id,
+//! Every draw is a pure function of `(seed, tick, rule_word, entity_id,
 //! draw_idx)`, so evaluation order cannot change randomness. The exact packing
 //! is:
 //!
 //! - Philox key word 0 is `seed as u32` (`seed_lo`).
 //! - Philox key word 1 is `(seed >> 32) as u32` (`seed_hi`).
-//! - Counter words 0 through 3 are `tick`, `rule_id`, `entity_id`, and
+//! - Counter words 0 through 3 are `tick`, `rule_word`, `entity_id`, and
 //!   `draw_idx`, respectively.
 //!
 //! This coordinate contract provides common random numbers (CRN): identical
@@ -19,7 +19,7 @@ const PHILOX_W0: u32 = 0x9E37_79B9;
 const PHILOX_W1: u32 = 0xBB67_AE85;
 const PHILOX_ROUNDS: usize = 10;
 
-/// Reserved `rule_id` for deriving independent sweep-replica seeds.
+/// Reserved rule word for deriving independent sweep-replica seeds.
 ///
 /// Simulation transition IDs are strictly smaller and prior draws reserve
 /// [`crate::prior::PRIOR_DRAW_RULE_ID`] (`u32::MAX`), so all three namespaces
@@ -47,12 +47,12 @@ fn round(counter: [u32; 4], key: [u32; 2]) -> [u32; 4] {
 /// Returns one Philox4x32-10 block for the supplied coordinates.
 ///
 /// The 64-bit `seed` is packed into the two key words in low-then-high order.
-/// The four counter words are, in order, `tick`, `rule_id`, `entity_id`, and
+/// The four counter words are, in order, `tick`, `rule_word`, `entity_id`, and
 /// `draw_idx`. Philox is counter-based, so this function is pure and does not
 /// consume or update a stream.
 #[must_use]
-pub fn draw_u32x4(seed: u64, tick: u32, rule_id: u32, entity_id: u32, draw_idx: u32) -> [u32; 4] {
-    let mut counter = [tick, rule_id, entity_id, draw_idx];
+pub fn draw_u32x4(seed: u64, tick: u32, rule_word: u32, entity_id: u32, draw_idx: u32) -> [u32; 4] {
+    let mut counter = [tick, rule_word, entity_id, draw_idx];
     let mut key = [seed as u32, (seed >> 32) as u32];
 
     for round_index in 0..PHILOX_ROUNDS {
@@ -69,7 +69,7 @@ pub fn draw_u32x4(seed: u64, tick: u32, rule_id: u32, entity_id: u32, draw_idx: 
 /// Derives the simulation seed for independent-noise sweep replica `k`.
 ///
 /// This uses the frozen Philox coordinates `(master_seed, tick = k,
-/// rule_id = u32::MAX - 1, entity_id = 0, draw_idx = 0)`. Output lane 0 is
+/// rule_word = u32::MAX - 1, entity_id = 0, draw_idx = 0)`. Output lane 0 is
 /// the low 32 bits and lane 1 is the high 32 bits of the returned `u64`:
 /// `seed_k = u64(lane0) | (u64(lane1) << 32)`. The derivation depends only on
 /// the master seed and `k`, never on the sweep length or evaluation order.
@@ -87,8 +87,8 @@ pub fn derive_sweep_replica_seed(master_seed: u64, k: u32) -> u64 {
 /// case that could become `1.0` is clamped to the greatest representable value
 /// below one, preserving the documented open interval.
 #[must_use]
-pub fn uniform_f64(seed: u64, tick: u32, rule_id: u32, entity_id: u32, draw_idx: u32) -> f64 {
-    let lanes = draw_u32x4(seed, tick, rule_id, entity_id, draw_idx);
+pub fn uniform_f64(seed: u64, tick: u32, rule_word: u32, entity_id: u32, draw_idx: u32) -> f64 {
+    let lanes = draw_u32x4(seed, tick, rule_word, entity_id, draw_idx);
     let mantissa = (u64::from(lanes[0]) << 21) | (u64::from(lanes[1]) >> 11);
     mantissa_to_open_f64(mantissa)
 }
@@ -114,7 +114,7 @@ fn mantissa_to_open_f64(mantissa: u64) -> f64 {
 pub fn exp_f64(
     seed: u64,
     tick: u32,
-    rule_id: u32,
+    rule_word: u32,
     entity_id: u32,
     draw_idx: u32,
     lambda: f64,
@@ -122,7 +122,7 @@ pub fn exp_f64(
     if lambda <= 0.0 {
         f64::INFINITY
     } else {
-        -uniform_f64(seed, tick, rule_id, entity_id, draw_idx).ln() / lambda
+        -uniform_f64(seed, tick, rule_word, entity_id, draw_idx).ln() / lambda
     }
 }
 

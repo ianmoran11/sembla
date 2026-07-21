@@ -182,6 +182,23 @@ pub struct ManifestExecution {
     pub observation_sha256: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlanIdentityTuple {
+    pub plan_schema: String,
+    pub identity_scheme: String,
+    pub origin: String,
+    pub plan_semantic_hash: sembla_ir::HashRecordV1,
+    pub enabled_features: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LinkedSourceTuple {
+    pub source_hash: sembla_ir::HashRecordV1,
+    pub linker_semantics: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunManifest {
     pub backend_identity: Option<BackendIdentity>,
@@ -196,6 +213,8 @@ pub struct RunManifest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ir_hash: Option<String>,
     pub ir_hash_algorithm: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub linked_source: Option<LinkedSourceTuple>,
     pub manifest_kind: ManifestKind,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub noise_mode: Option<NoiseMode>,
@@ -208,6 +227,8 @@ pub struct RunManifest {
     pub population_hash_algorithm: String,
     pub population_sha256: String,
     pub population_source: PopulationSource,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub plan: Option<PlanIdentityTuple>,
     #[serde(default)]
     pub resolved_theta: BTreeMap<String, ResolvedValue>,
     pub results_hash_algorithm: String,
@@ -246,6 +267,7 @@ impl RunManifest {
             final_state_sha256: None,
             ir_hash: None,
             ir_hash_algorithm: HASH_ALGORITHM.to_owned(),
+            linked_source: None,
             manifest_kind: kind,
             noise_mode: None,
             model: None,
@@ -254,6 +276,7 @@ impl RunManifest {
             population_hash_algorithm: HASH_ALGORITHM.to_owned(),
             population_sha256,
             population_source,
+            plan: None,
             resolved_theta: BTreeMap::new(),
             results_hash_algorithm: HASH_ALGORITHM.to_owned(),
             results_sha256: None,
@@ -264,6 +287,39 @@ impl RunManifest {
             theta_source: None,
         }
     }
+}
+
+pub fn plan_identity_tuples(
+    plan: &sembla_ir::ExecutablePlanV1,
+) -> Result<(PlanIdentityTuple, Option<LinkedSourceTuple>), String> {
+    let semantic_hash = sembla_ir::plan_semantic_hash(plan)?;
+    let origin = match plan.origin {
+        sembla_ir::PlanOrigin::Linked => "linked",
+        sembla_ir::PlanOrigin::DirectStable => "direct_stable",
+    };
+    let linked_source = match plan.origin {
+        sembla_ir::PlanOrigin::Linked => {
+            let provenance = plan
+                .linked_provenance
+                .as_ref()
+                .expect("validated linked plan has provenance");
+            Some(LinkedSourceTuple {
+                source_hash: provenance.source_hash.clone(),
+                linker_semantics: provenance.linker.semantics.clone(),
+            })
+        }
+        sembla_ir::PlanOrigin::DirectStable => None,
+    };
+    Ok((
+        PlanIdentityTuple {
+            plan_schema: plan.schema_version.clone(),
+            identity_scheme: plan.identity_scheme.clone(),
+            origin: origin.to_owned(),
+            plan_semantic_hash: semantic_hash,
+            enabled_features: plan.identity.enabled_features.clone(),
+        },
+        linked_source,
+    ))
 }
 
 pub fn resolved_theta(params: &sembla_runtime::eval::ParamEnv) -> BTreeMap<String, ResolvedValue> {
@@ -333,7 +389,9 @@ pub fn write_pairs_metadata(path: &Path, metadata: &PairsMetadata) -> Result<(),
 pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
     let value = serde_json::to_value(manifest).map_err(|error| error.to_string())?;
     validate_backend_identity_tuple(&value)?;
+    validate_plan_identity_tuple_shape(&value)?;
     validate_observation_tuple(manifest)?;
+    validate_plan_identity_values(manifest)?;
     validate_algorithms(manifest)?;
     let bytes = to_canonical_json(manifest)?;
     std::fs::write(path, bytes.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))
@@ -347,12 +405,14 @@ pub fn read(path: &Path) -> Result<RunManifest, String> {
     validate_schema_versions(&value)?;
     validate_backend_identity_tuple(&value)?;
     validate_theta_source_tuple(&value)?;
+    validate_plan_identity_tuple_shape(&value)?;
     // Deserialize from the original bytes rather than through `Value`: the
     // latter can round an already-parsed f64 during `from_value`, which would
     // break exact replay of sampled sweep parameters.
     let manifest: RunManifest =
         serde_json::from_str(&source).map_err(|error| format!("{}: {error}", path.display()))?;
     validate_observation_tuple(&manifest)?;
+    validate_plan_identity_values(&manifest)?;
     validate_algorithms(&manifest)?;
     Ok(manifest)
 }
@@ -514,6 +574,187 @@ fn validate_theta_source_tuple(value: &serde_json::Value) -> Result<(), String> 
     Ok(())
 }
 
+fn tuple_object<'a>(
+    value: &'a serde_json::Value,
+    name: &str,
+    required: &[&str],
+) -> Result<Option<&'a serde_json::Map<String, serde_json::Value>>, String> {
+    let Some(tuple) = value.get(name) else {
+        return Ok(None);
+    };
+    let object = tuple.as_object().ok_or_else(|| {
+        format!("{name} tuple must be all-present or all-absent and must be an object")
+    })?;
+    let missing = required
+        .iter()
+        .copied()
+        .filter(|field| !object.contains_key(*field))
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(format!(
+            "{name} tuple must be all-present or all-absent; missing {}",
+            missing.join(", ")
+        ));
+    }
+    Ok(Some(object))
+}
+
+fn validate_hash_record_shape(
+    object: &serde_json::Map<String, serde_json::Value>,
+    tuple_name: &str,
+    field: &str,
+) -> Result<(), String> {
+    let record = object
+        .get(field)
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            format!(
+                "{tuple_name}.{field} tuple must be all-present or all-absent and must be an object"
+            )
+        })?;
+    let missing = ["algorithm", "domain", "digest"]
+        .into_iter()
+        .filter(|name| !record.contains_key(*name))
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        return Err(format!(
+            "{tuple_name}.{field} tuple must be all-present or all-absent; missing {}",
+            missing.join(", ")
+        ));
+    }
+    Ok(())
+}
+
+fn validate_plan_identity_tuple_shape(value: &serde_json::Value) -> Result<(), String> {
+    let plan = tuple_object(
+        value,
+        "plan",
+        &[
+            "plan_schema",
+            "identity_scheme",
+            "origin",
+            "plan_semantic_hash",
+            "enabled_features",
+        ],
+    )?;
+    if let Some(plan) = plan {
+        validate_hash_record_shape(plan, "plan", "plan_semantic_hash")?;
+    }
+    let linked = tuple_object(value, "linked_source", &["source_hash", "linker_semantics"])?;
+    if let Some(linked) = linked {
+        validate_hash_record_shape(linked, "linked_source", "source_hash")?;
+    }
+
+    match (
+        plan.and_then(|tuple| tuple.get("origin"))
+            .and_then(serde_json::Value::as_str),
+        linked.is_some(),
+    ) {
+        (None, true) if plan.is_none() => {
+            Err("linked_source tuple requires the complete plan tuple".to_owned())
+        }
+        (Some("linked"), false) => {
+            Err("linked plan tuple requires the complete linked_source tuple".to_owned())
+        }
+        (Some("direct_stable"), true) => {
+            Err("direct_stable plan tuple forbids linked_source".to_owned())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_hash_record(
+    field: &str,
+    record: &sembla_ir::HashRecordV1,
+    expected_domain: &str,
+) -> Result<(), String> {
+    if record.algorithm != HASH_ALGORITHM {
+        return Err(format!(
+            "unsupported {field}.algorithm '{}' (supported: '{HASH_ALGORITHM}')",
+            record.algorithm
+        ));
+    }
+    if record.domain != expected_domain {
+        return Err(format!(
+            "unsupported {field}.domain '{}' (supported: '{expected_domain}')",
+            record.domain
+        ));
+    }
+    if record.digest.len() != 64
+        || !record
+            .digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(format!(
+            "{field}.digest must be exactly 64 lowercase hexadecimal characters"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_plan_identity_values(manifest: &RunManifest) -> Result<(), String> {
+    let Some(plan) = &manifest.plan else {
+        if manifest.linked_source.is_some() {
+            return Err("linked_source tuple requires the complete plan tuple".to_owned());
+        }
+        return Ok(());
+    };
+    if manifest.manifest_kind != ManifestKind::Run {
+        return Err("plan identity tuple is supported only for run manifests".to_owned());
+    }
+    if plan.plan_schema != sembla_ir::EXECUTABLE_PLAN_SCHEMA {
+        return Err(format!(
+            "unsupported plan.plan_schema '{}' (supported: '{}')",
+            plan.plan_schema,
+            sembla_ir::EXECUTABLE_PLAN_SCHEMA
+        ));
+    }
+    if plan.identity_scheme != sembla_ir::STABLE_IDENTITY_SCHEME {
+        return Err(format!(
+            "unsupported plan.identity_scheme '{}' (supported: '{}')",
+            plan.identity_scheme,
+            sembla_ir::STABLE_IDENTITY_SCHEME
+        ));
+    }
+    if let Some(feature) = plan.enabled_features.first() {
+        return Err(format!(
+            "unsupported plan.enabled_features entry '{feature}'; V1 requires an empty list"
+        ));
+    }
+    validate_hash_record(
+        "plan.plan_semantic_hash",
+        &plan.plan_semantic_hash,
+        "sembla.plan-core/v1",
+    )?;
+
+    match (plan.origin.as_str(), &manifest.linked_source) {
+        ("direct_stable", None) => Ok(()),
+        ("direct_stable", Some(_)) => {
+            Err("direct_stable plan tuple forbids linked_source".to_owned())
+        }
+        ("linked", Some(linked)) => {
+            if linked.linker_semantics != "sembla.linker/v1" {
+                return Err(format!(
+                    "unsupported linked_source.linker_semantics '{}' (supported: 'sembla.linker/v1')",
+                    linked.linker_semantics
+                ));
+            }
+            validate_hash_record(
+                "linked_source.source_hash",
+                &linked.source_hash,
+                "sembla.source-artifact/v1",
+            )
+        }
+        ("linked", None) => {
+            Err("linked plan tuple requires the complete linked_source tuple".to_owned())
+        }
+        (origin, _) => Err(format!(
+            "unsupported plan.origin '{origin}' (supported: 'linked', 'direct_stable')"
+        )),
+    }
+}
+
 fn validate_observation_tuple(manifest: &RunManifest) -> Result<(), String> {
     let algorithm_present = manifest.observation_hash_algorithm.is_some();
     let top_level_present = manifest.observation_sha256.is_some();
@@ -626,6 +867,42 @@ mod tests {
         assert_eq!(
             hash,
             "5378796307535df3ec8d8b15a2e2dc5641419c3d3060cfe32238c0fa973f7aa3"
+        );
+    }
+
+    #[test]
+    fn linked_plan_identity_tuple_copies_validated_provenance() {
+        let sembla_ir::ParsedInput::Plan(mut plan) =
+            sembla_ir::parse_input(include_str!("../../../fixtures/plans/two_box.plan.json"))
+                .unwrap()
+        else {
+            panic!("fixture did not parse as a plan")
+        };
+        plan.origin = sembla_ir::PlanOrigin::Linked;
+        plan.linked_provenance = Some(sembla_ir::LinkedProvenanceV1 {
+            source_hash: sembla_ir::HashRecordV1 {
+                algorithm: "sha256".to_owned(),
+                domain: "sembla.source-artifact/v1".to_owned(),
+                digest: "0".repeat(64),
+            },
+            linker: sembla_ir::LinkerDescriptorV1 {
+                semantics: "sembla.linker/v1".to_owned(),
+                source_schema: "sembla.composition-source/v1".to_owned(),
+                plan_schema: "sembla.executable-plan/v1".to_owned(),
+                identity_scheme: "sembla.identity/stable-v1".to_owned(),
+                canonical_encoding: "sembla.canonical-json/v1".to_owned(),
+                source_map_schema: "sembla.source-map/v1".to_owned(),
+            },
+            source_map: serde_json::json!({}),
+        });
+        sembla_ir::validate_plan(&plan).unwrap();
+        let (identity, linked) = super::plan_identity_tuples(&plan).unwrap();
+        assert_eq!(identity.origin, "linked");
+        let linked = linked.unwrap();
+        assert_eq!(linked.linker_semantics, "sembla.linker/v1");
+        assert_eq!(
+            linked.source_hash,
+            plan.linked_provenance.unwrap().source_hash
         );
     }
 
@@ -751,6 +1028,91 @@ mod tests {
         let error = read(&path).unwrap_err();
         assert!(error.contains("theta_source tuple"), "{error}");
         assert!(error.contains("algorithm"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_rejects_partial_plan_and_linked_source_tuples() {
+        let path = temp_file("partial-plan-identity");
+        let complete_plan = serde_json::json!({
+            "plan_schema": "sembla.executable-plan/v1",
+            "identity_scheme": "sembla.identity/stable-v1",
+            "origin": "direct_stable",
+            "plan_semantic_hash": {
+                "algorithm": "sha256",
+                "domain": "sembla.plan-core/v1",
+                "digest": "0".repeat(64)
+            },
+            "enabled_features": []
+        });
+        for field in [
+            "plan_schema",
+            "identity_scheme",
+            "origin",
+            "plan_semantic_hash",
+            "enabled_features",
+        ] {
+            let mut plan = complete_plan.clone();
+            plan.as_object_mut().unwrap().remove(field);
+            let value = serde_json::json!({
+                "backend_identity": null,
+                "plan": plan,
+                "schema_versions": {"backend_identity": 1, "manifest": 1}
+            });
+            std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+            let error = read(&path).unwrap_err();
+            assert!(error.contains("plan tuple"), "{field}: {error}");
+            assert!(error.contains(field), "{field}: {error}");
+        }
+
+        let mut partial_hash = complete_plan.clone();
+        partial_hash["plan_semantic_hash"]
+            .as_object_mut()
+            .unwrap()
+            .remove("digest");
+        let value = serde_json::json!({
+            "backend_identity": null,
+            "plan": partial_hash,
+            "schema_versions": {"backend_identity": 1, "manifest": 1}
+        });
+        std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("plan.plan_semantic_hash tuple"), "{error}");
+        assert!(error.contains("digest"), "{error}");
+
+        let mut linked_plan = complete_plan;
+        linked_plan["origin"] = serde_json::json!("linked");
+        let value = serde_json::json!({
+            "backend_identity": null,
+            "plan": linked_plan,
+            "linked_source": {"linker_semantics": "sembla.linker/v1"},
+            "schema_versions": {"backend_identity": 1, "manifest": 1}
+        });
+        std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("linked_source tuple"), "{error}");
+        assert!(error.contains("source_hash"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_rejects_plan_linkage_shape_mismatches() {
+        let path = temp_file("plan-linkage-shape");
+        let value = serde_json::json!({
+            "backend_identity": null,
+            "linked_source": {
+                "source_hash": {
+                    "algorithm": "sha256",
+                    "domain": "sembla.source-artifact/v1",
+                    "digest": "0".repeat(64)
+                },
+                "linker_semantics": "sembla.linker/v1"
+            },
+            "schema_versions": {"backend_identity": 1, "manifest": 1}
+        });
+        std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("linked_source tuple requires"), "{error}");
         let _ = std::fs::remove_file(path);
     }
 

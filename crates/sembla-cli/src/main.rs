@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <path> | sembla plan-hash <plan.json> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -473,6 +473,43 @@ fn read_validated(path: &str) -> Result<sembla_ir::ValidatedModel, String> {
     sembla_ir::validate(read_model(path)?).map_err(|error| format!("{path}: {error}"))
 }
 
+struct RunInput {
+    model: sembla_ir::ValidatedModel,
+    plan: Option<sembla_ir::ExecutablePlanV1>,
+}
+
+fn read_run_input(path: &str, options: &RunOptions) -> Result<RunInput, String> {
+    let (source, input) = read_input(path)?;
+    match input {
+        sembla_ir::ParsedInput::LegacyModel(mut model) => {
+            if let Some(dt) = options.dt {
+                model.dt = dt;
+            }
+            let model = sembla_ir::validate(model).map_err(|error| format!("{path}: {error}"))?;
+            Ok(RunInput { model, plan: None })
+        }
+        sembla_ir::ParsedInput::Plan(plan) => {
+            let validated =
+                sembla_ir::validate_plan(&plan).map_err(|error| format!("{path}: {error}"))?;
+            require_canonical_plan(path, &source)?;
+            if options.dt.is_some() {
+                return Err(format!(
+                    "{path}: plan envelopes do not support --dt overrides; edit and re-canonicalize the plan instead"
+                ));
+            }
+            if options.backend == BackendSelection::Cuda {
+                return Err(format!(
+                    "{path}: plan envelopes run on the cpu backend only for now"
+                ));
+            }
+            Ok(RunInput {
+                model: validated.model_with_rule_words(),
+                plan: Some(plan),
+            })
+        }
+    }
+}
+
 fn require_canonical_plan(path: &str, source: &str) -> Result<(), String> {
     let value: serde_json::Value = serde_json::from_str(source)
         .map_err(|error| format!("{path}: invalid JSON after plan parsing: {error}"))?;
@@ -604,11 +641,7 @@ fn run_file(path: &str, options: RunOptions) -> i32 {
 }
 
 fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
-    let mut raw_model = read_model(path)?;
-    if let Some(dt) = options.dt {
-        raw_model.dt = dt;
-    }
-    let model = sembla_ir::validate(raw_model).map_err(|error| format!("{path}: {error}"))?;
+    let RunInput { model, plan } = read_run_input(path, &options)?;
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
     let initial = match options.population.parse::<usize>() {
@@ -671,6 +704,11 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         run_manifest.results_sha256 = Some(hashes.results_sha256);
         run_manifest.final_state_sha256 = Some(hashes.final_state_sha256);
         run_manifest.observation_sha256 = Some(hashes.observation_sha256);
+        if let Some(plan) = &plan {
+            let (plan_identity, linked_source) = manifest::plan_identity_tuples(plan)?;
+            run_manifest.plan = Some(plan_identity);
+            run_manifest.linked_source = linked_source;
+        }
         manifest::write(&manifest::sidecar_path(out), &run_manifest)
     } else {
         for (tick, row) in execution.output.series.rows.iter().enumerate() {
@@ -2595,8 +2633,8 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 #[cfg(test)]
 mod tests {
     use super::{
-        csv_field, initialize_population, parse_backend, parse_diff_options, run,
-        run_results_output, BackendSelection, VERSION,
+        csv_field, initialize_population, parse_backend, parse_diff_options, run, run_file_result,
+        run_results_output, BackendSelection, RunOptions, VERSION,
     };
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
@@ -2677,6 +2715,48 @@ mod tests {
             "B to A must still have a zero-valued column"
         );
         assert!(first.series.rows.last().unwrap()[1].as_usize("B").unwrap() > 0);
+    }
+
+    #[test]
+    fn plan_run_is_bitwise_deterministic_twice_in_process() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp = std::env::temp_dir().join(format!(
+            "sembla-plan-in-process-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&temp).unwrap();
+        let plan = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("fixtures/plans/two_box.plan.json");
+        let outputs = [temp.join("first.csv"), temp.join("second.csv")];
+        for output in &outputs {
+            run_file_result(
+                plan.to_str().unwrap(),
+                RunOptions {
+                    seed: 55,
+                    ticks: 40,
+                    population: "16".to_owned(),
+                    out: Some(output.to_str().unwrap().to_owned()),
+                    dt: None,
+                    params: None,
+                    backend: BackendSelection::Cpu,
+                },
+            )
+            .unwrap();
+        }
+        for suffix in ["", ".summaries.csv", ".manifest.json"] {
+            assert_eq!(
+                std::fs::read(format!("{}{suffix}", outputs[0].display())).unwrap(),
+                std::fs::read(format!("{}{suffix}", outputs[1].display())).unwrap(),
+                "plan run artifact '{suffix}' changed between in-process executions"
+            );
+        }
+        std::fs::remove_dir_all(temp).unwrap();
     }
 
     #[test]
