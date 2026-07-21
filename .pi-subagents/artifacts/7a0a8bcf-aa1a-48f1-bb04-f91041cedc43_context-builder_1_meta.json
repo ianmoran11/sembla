@@ -1,0 +1,28 @@
+{
+  "runId": "7a0a8bcf-aa1a-48f1-bb04-f91041cedc43",
+  "agent": "context-builder",
+  "task": "Design a documentation revision plan for /Users/ian/projects/sembla/docs/design/composition-options.md that adds syntax and concrete composed-system examples throughout—not just in one examples section. Review the full document and current repository syntax. Propose a running example (or small consistent family), exact insertion points by line/heading, what each snippet teaches, and how to label current vs proposed vs conceptual ACSet/Catlab notation. Ensure examples cover product, instances, wiring/delay, feedback, nesting/expose/hide, constrained product, synchronized families, heterogeneous schedulers, Options A-D lowering, source graph, laws, tests, and phases. Do not modify project/source files.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/ian/projects/sembla/.pi-subagents/artifacts/outputs/7a0a8bcf-aa1a-48f1-bb04-f91041cedc43/composition-examples/revision-plan.md\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.\n\n## Acceptance Contract\nAcceptance level: reviewed\nCompletion is not accepted from prose alone. End with a structured acceptance report.\n\nCriteria:\n- criterion-1: Implement the requested change without widening scope\n- criterion-2: Return evidence sufficient for an independent acceptance review\n\nRequired evidence: changed-files, tests-added, commands-run, validation-output, residual-risks, no-staged-files\n\nReview gate: required by reviewer.\n\nFinish with a fenced JSON block tagged `acceptance-report` in this shape:\nUse empty arrays when no items apply; array fields contain strings unless object entries are shown.\n```acceptance-report\n{\n  \"criteriaSatisfied\": [\n    {\n      \"id\": \"criterion-1\",\n      \"status\": \"satisfied\",\n      \"evidence\": \"specific proof\"\n    }\n  ],\n  \"changedFiles\": [\n    \"src/file.ts\"\n  ],\n  \"testsAddedOrUpdated\": [\n    \"test/file.test.ts\"\n  ],\n  \"commandsRun\": [\n    {\n      \"command\": \"command\",\n      \"result\": \"passed\",\n      \"summary\": \"short result\"\n    }\n  ],\n  \"validationOutput\": [\n    \"validation output or concise summary\"\n  ],\n  \"residualRisks\": [\n    \"none\"\n  ],\n  \"noStagedFiles\": true,\n  \"diffSummary\": \"short description of the diff\",\n  \"reviewFindings\": [\n    \"blocker: file.ts:12 - issue found, or no blockers\"\n  ],\n  \"manualNotes\": \"anything else the parent should know\"\n}\n```",
+  "exitCode": 0,
+  "model": "openai-codex/gpt-5.6-sol:medium",
+  "attemptedModels": [
+    "openai-codex/gpt-5.6-sol:medium"
+  ],
+  "modelAttempts": [
+    {
+      "model": "openai-codex/gpt-5.6-sol:medium",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 71640,
+        "output": 9923,
+        "cacheRead": 188928,
+        "cacheWrite": 0,
+        "cost": 0.750354,
+        "turns": 6
+      }
+    }
+  ],
+  "transcriptPath": "/Users/ian/projects/sembla/.pi-subagents/artifacts/7a0a8bcf-aa1a-48f1-bb04-f91041cedc43_context-builder_1_transcript.jsonl",
+  "skills": [],
+  "timestamp": 1784627559091
+}

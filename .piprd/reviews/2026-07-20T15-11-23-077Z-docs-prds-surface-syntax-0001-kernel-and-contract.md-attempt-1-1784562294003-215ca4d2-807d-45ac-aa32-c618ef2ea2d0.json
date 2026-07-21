@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-20T15:44:54.003Z",
+  "runId": "2026-07-20T15-11-23-077Z",
+  "prdPath": "docs/prds-surface-syntax/0001-kernel-and-contract.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-surface-syntax/0001-kernel-and-contract.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nNo blocking issues found.\n\n1. **Legacy compatibility:** `lake build` and positioned negative suite pass; baseline and post-refactor evidence are recorded.\n2. **Single kernel:** `SurfaceModel`, one validation/emission path, one `Model.mk` emitter, one evaluation, and widget attachment are centralized in `frontend/Sembla/DSL.lean`. `model%` is a thin adapter.\n3. **Ordering tests:** `frontend/Sembla/SurfaceKernelTests.lean` contains 21 guards covering every required order, including cross-box transitions and exact JSON. It is imported by `frontend/Sembla.lean`.\n4. **Parity:** Canonical-byte, CSV, summary, state-hash, output-hash, and execution parity pass.\n5. **Frozen scope:** No changes to examples, IR/JSON, manifests, Rust crates, or CI.\n6. **Required checks:** `lake build`, negative tests, parity, `./scripts/check.sh`, and `git diff --check` all pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All six acceptance criteria pass: the implementation has one token-retaining SurfaceModel and reusable semantic kernel, comprehensive imported ordering and exact-JSON guards, unchanged diagnostics and frozen files, and all required build, parity, full-suite, and whitespace checks are green.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All six acceptance criteria pass: the implementation has one token-retaining SurfaceModel and reusable semantic kernel, comprehensive imported ordering and exact-JSON guards, unchanged diagnostics and frozen files, and all required build, parity, full-suite, and whitespace checks are green.",
+    "raw": "## Assessment: APPROVED\n\nNo blocking issues found.\n\n1. **Legacy compatibility:** `lake build` and positioned negative suite pass; baseline and post-refactor evidence are recorded.\n2. **Single kernel:** `SurfaceModel`, one validation/emission path, one `Model.mk` emitter, one evaluation, and widget attachment are centralized in `frontend/Sembla/DSL.lean`. `model%` is a thin adapter.\n3. **Ordering tests:** `frontend/Sembla/SurfaceKernelTests.lean` contains 21 guards covering every required order, including cross-box transitions and exact JSON. It is imported by `frontend/Sembla.lean`.\n4. **Parity:** Canonical-byte, CSV, summary, state-hash, output-hash, and execution parity pass.\n5. **Frozen scope:** No changes to examples, IR/JSON, manifests, Rust crates, or CI.\n6. **Required checks:** `lake build`, negative tests, parity, `./scripts/check.sh`, and `git diff --check` all pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All six acceptance criteria pass: the implementation has one token-retaining SurfaceModel and reusable semantic kernel, comprehensive imported ordering and exact-JSON guards, unchanged diagnostics and frozen files, and all required build, parity, full-suite, and whitespace checks are green.\"}\n```",
+    "source": "json"
+  }
+}

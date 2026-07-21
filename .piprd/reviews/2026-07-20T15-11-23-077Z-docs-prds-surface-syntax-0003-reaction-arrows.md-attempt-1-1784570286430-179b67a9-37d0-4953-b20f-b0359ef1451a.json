@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-20T17:58:06.430Z",
+  "runId": "2026-07-20T15-11-23-077Z",
+  "prdPath": "docs/prds-surface-syntax/0003-reaction-arrows.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-surface-syntax/0003-reaction-arrows.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n1. **Four arrow forms and exact lowering:** Pass.\n2. **Structural, JSON, and widget twins:** Pass.\n3. **Deterministic inference:** Pass. The split-column defect is fixed, and the stronger regression twin proves later valid-system selection.\n4. **Exact negatives and self-loops:** Pass.\n5. **Legacy and canonical parity:** Pass.\n6. **Frozen scope:** Pass.\n7. **Required checks:** Build, diagnostic harness, parity, full suite, frozen-path check, and `git diff --check` all pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All seven acceptance criteria pass. The split-column inference defect is fixed by requiring one enum attribute to contain both endpoints, the split-first/later-valid regression twin proves complete-set selection, all structural/JSON/widget and exact diagnostic tests pass, canonical parity is unchanged, and every required repository check succeeds.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All seven acceptance criteria pass. The split-column inference defect is fixed by requiring one enum attribute to contain both endpoints, the split-first/later-valid regression twin proves complete-set selection, all structural/JSON/widget and exact diagnostic tests pass, canonical parity is unchanged, and every required repository check succeeds.",
+    "raw": "## Assessment: APPROVED\n\n1. **Four arrow forms and exact lowering:** Pass.\n2. **Structural, JSON, and widget twins:** Pass.\n3. **Deterministic inference:** Pass. The split-column defect is fixed, and the stronger regression twin proves later valid-system selection.\n4. **Exact negatives and self-loops:** Pass.\n5. **Legacy and canonical parity:** Pass.\n6. **Frozen scope:** Pass.\n7. **Required checks:** Build, diagnostic harness, parity, full suite, frozen-path check, and `git diff --check` all pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All seven acceptance criteria pass. The split-column inference defect is fixed by requiring one enum attribute to contain both endpoints, the split-first/later-valid regression twin proves complete-set selection, all structural/JSON/widget and exact diagnostic tests pass, canonical parity is unchanged, and every required repository check succeeds.\"}\n```",
+    "source": "json"
+  }
+}

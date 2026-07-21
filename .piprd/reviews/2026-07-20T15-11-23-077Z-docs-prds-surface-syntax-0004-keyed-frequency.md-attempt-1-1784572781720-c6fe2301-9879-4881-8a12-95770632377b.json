@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-20T18:39:41.720Z",
+  "runId": "2026-07-20T15-11-23-077Z",
+  "prdPath": "docs/prds-surface-syntax/0004-keyed-frequency.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-surface-syntax/0004-keyed-frequency.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n1. **Exact syntax and Ref-key validation:** Pass.\n2. **Exact IR lowering and byte-identical twins:** Pass.\n3. **Row-local restrictions and positioned diagnostics:** Pass.\n4. **Reaction-arrow and widget behavior:** Pass.\n5. **Legacy aggregates and canonical parity:** Pass.\n6. **Frozen scope and non-goals:** Pass.\n7. **Required checks:** Build, diagnostic harness, parity, full suite, frozen-path check, and `git diff --check` all pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All seven acceptance criteria pass: exact syntax and Ref-key typing, shared exact lowering, literal serialized JSON and structural twins, row-local restrictions with complete positioned diagnostics, reaction/widget behavior, legacy canonical parity, frozen scope, and every required repository check.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All seven acceptance criteria pass: exact syntax and Ref-key typing, shared exact lowering, literal serialized JSON and structural twins, row-local restrictions with complete positioned diagnostics, reaction/widget behavior, legacy canonical parity, frozen scope, and every required repository check.",
+    "raw": "## Assessment: APPROVED\n\n1. **Exact syntax and Ref-key validation:** Pass.\n2. **Exact IR lowering and byte-identical twins:** Pass.\n3. **Row-local restrictions and positioned diagnostics:** Pass.\n4. **Reaction-arrow and widget behavior:** Pass.\n5. **Legacy aggregates and canonical parity:** Pass.\n6. **Frozen scope and non-goals:** Pass.\n7. **Required checks:** Build, diagnostic harness, parity, full suite, frozen-path check, and `git diff --check` all pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All seven acceptance criteria pass: exact syntax and Ref-key typing, shared exact lowering, literal serialized JSON and structural twins, row-local restrictions with complete positioned diagnostics, reaction/widget behavior, legacy canonical parity, frozen scope, and every required repository check.\"}\n```",
+    "source": "json"
+  }
+}
