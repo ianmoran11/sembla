@@ -170,3 +170,16 @@ for fixture in "${linked_fixtures[@]}"; do
   "$sembla" validate "$tmp/$fixture.linked.plan.json"
 done
 echo "Lean product-linked plans are byte-identical to canonical fixtures"
+
+# --- PRD 0008: canonical delayed-wire source/plan parity (append-only) ---
+(cd "$frontend_root" && lake exe sembla-export --source ping_pong "$tmp/ping_pong.source.json")
+cmp "$repo_root/fixtures/composition-source/ping_pong.source.json" "$tmp/ping_pong.source.json"
+linked_wire_fixtures=(epidemic_policy ping_pong)
+for fixture in "${linked_wire_fixtures[@]}"; do
+  (cd "$frontend_root" && lake exe sembla-link \
+    "$repo_root/fixtures/composition-source/$fixture.source.json" \
+    --plan "$tmp/$fixture.linked.plan.json")
+  cmp "$repo_root/fixtures/plans/linked/$fixture.plan.json" "$tmp/$fixture.linked.plan.json"
+  "$sembla" validate "$tmp/$fixture.linked.plan.json"
+done
+echo "Lean delayed-wire source and linked plans are byte-identical to canonical fixtures"

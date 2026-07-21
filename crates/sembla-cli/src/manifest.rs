@@ -895,6 +895,32 @@ mod tests {
             },
             source_map: serde_json::json!({}),
         });
+        for (index, mailbox) in plan.identity.mailboxes.iter_mut().enumerate() {
+            mailbox.identity = sembla_ir::mailbox_identity(
+                &format!("occ:#wire:declared_{index}"),
+                &mailbox.source_box,
+                &mailbox.source_port,
+                &mailbox.target_box,
+                &mailbox.target_port,
+            );
+        }
+        plan.identity
+            .mailboxes
+            .sort_by(|left, right| left.identity.cmp(&right.identity));
+        let mailboxes = plan.identity.mailboxes.clone();
+        plan.model.wires.sort_by_key(|wire| {
+            mailboxes
+                .iter()
+                .find(|mailbox| {
+                    mailbox.source_box == wire.from.r#box
+                        && mailbox.source_port == wire.from.port
+                        && mailbox.target_box == wire.to.r#box
+                        && mailbox.target_port == wire.to.port
+                })
+                .unwrap()
+                .identity
+                .clone()
+        });
         sembla_ir::validate_plan(&plan).unwrap();
         let (identity, linked) = super::plan_identity_tuples(&plan).unwrap();
         assert_eq!(identity.origin, "linked");

@@ -32,6 +32,39 @@ fn input_error(relative: &str) -> String {
     }
 }
 
+fn two_box_plan() -> ExecutablePlanV1 {
+    let source =
+        std::fs::read_to_string(repository_path("fixtures/plans/two_box.plan.json")).unwrap();
+    let ParsedInput::Plan(plan) = parse_input(&source).unwrap() else {
+        panic!("versioned fixture dispatched as legacy");
+    };
+    plan
+}
+
+fn test_linked_provenance() -> LinkedProvenanceV1 {
+    LinkedProvenanceV1 {
+        source_hash: HashRecordV1 {
+            algorithm: "sha256".to_owned(),
+            domain: "sembla.source-artifact/v1".to_owned(),
+            digest: "0".repeat(64),
+        },
+        linker: LinkerDescriptorV1 {
+            semantics: "sembla.linker/v1".to_owned(),
+            source_schema: "sembla.composition-source/v1".to_owned(),
+            plan_schema: "sembla.executable-plan/v1".to_owned(),
+            identity_scheme: "sembla.identity/stable-v1".to_owned(),
+            canonical_encoding: "sembla.canonical-json/v1".to_owned(),
+            source_map_schema: "sembla.source-map/v1".to_owned(),
+        },
+        source_map: serde_json::json!({
+            "schema_version": "sembla.source-map/v1",
+            "leaves": [],
+            "boundary": [],
+            "hidden": []
+        }),
+    }
+}
+
 #[test]
 fn dispatch_uses_schema_version_presence() {
     let legacy = std::fs::read_to_string(repository_path("examples/two_box.json")).unwrap();
@@ -134,29 +167,52 @@ fn mailbox_identity_uses_the_frozen_format() {
 }
 
 #[test]
-fn linked_provenance_fields_are_frozen() {
-    let source =
-        std::fs::read_to_string(repository_path("fixtures/plans/two_box.plan.json")).unwrap();
-    let ParsedInput::Plan(mut plan): ParsedInput = parse_input(&source).unwrap() else {
-        panic!("versioned fixture dispatched as legacy");
-    };
+fn direct_stable_rejects_declared_linked_wire_occurrences() {
+    let mut plan = two_box_plan();
+    for (index, mailbox) in plan.identity.mailboxes.iter_mut().enumerate() {
+        mailbox.identity = mailbox_identity(
+            &format!("occ:#wire:declared_{index}"),
+            &mailbox.source_box,
+            &mailbox.source_port,
+            &mailbox.target_box,
+            &mailbox.target_port,
+        );
+    }
+    plan.identity
+        .mailboxes
+        .sort_by(|left, right| left.identity.cmp(&right.identity));
+    let error = validate_plan(&plan).unwrap_err();
+    assert!(error.path.starts_with("$.identity.mailboxes["));
+    assert!(error.message.contains("does not match"));
+}
+
+#[test]
+fn linked_rejects_direct_stable_synthesized_wire_occurrences() {
+    let mut plan = two_box_plan();
     plan.origin = PlanOrigin::Linked;
-    plan.linked_provenance = Some(LinkedProvenanceV1 {
-        source_hash: HashRecordV1 {
-            algorithm: "sha256".to_owned(),
-            domain: "sembla.source-artifact/v1".to_owned(),
-            digest: "0".repeat(64),
-        },
-        linker: LinkerDescriptorV1 {
-            semantics: "sembla.linker/v1".to_owned(),
-            source_schema: "sembla.composition-source/v1".to_owned(),
-            plan_schema: "sembla.executable-plan/v1".to_owned(),
-            identity_scheme: "sembla.identity/stable-v1".to_owned(),
-            canonical_encoding: "sembla.canonical-json/v1".to_owned(),
-            source_map_schema: "sembla.source-map/v1".to_owned(),
-        },
-        source_map: serde_json::json!({}),
-    });
+    plan.linked_provenance = Some(test_linked_provenance());
+    let error = validate_plan(&plan).unwrap_err();
+    assert!(error.path.starts_with("$.identity.mailboxes["));
+    assert!(error.message.contains("direct_stable synthesized form"));
+}
+
+#[test]
+fn linked_provenance_fields_are_frozen() {
+    let mut plan = two_box_plan();
+    plan.origin = PlanOrigin::Linked;
+    plan.linked_provenance = Some(test_linked_provenance());
+    for (index, mailbox) in plan.identity.mailboxes.iter_mut().enumerate() {
+        mailbox.identity = mailbox_identity(
+            &format!("occ:#wire:declared_{index}"),
+            &mailbox.source_box,
+            &mailbox.source_port,
+            &mailbox.target_box,
+            &mailbox.target_port,
+        );
+    }
+    plan.identity
+        .mailboxes
+        .sort_by(|left, right| left.identity.cmp(&right.identity));
     validate_plan(&plan).unwrap();
 
     let mut wrong_descriptor: ExecutablePlanV1 = plan.clone();

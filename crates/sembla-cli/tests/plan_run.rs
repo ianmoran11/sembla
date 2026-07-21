@@ -297,6 +297,162 @@ fn linked_product_preserves_population_views_firings_and_deferred_trace() {
 }
 
 #[test]
+fn linked_ping_pong_delivers_the_pulse_exactly_one_tick_later() {
+    let temp = temp_dir("linked-ping-pong");
+    let output = temp.join("ping-pong.csv");
+    let result = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(repository_path("fixtures/plans/linked/ping_pong.plan.json"))
+        .args(["--population", "1", "--seed", "55", "--ticks", "4", "--out"])
+        .arg(&output)
+        .output()
+        .unwrap();
+    assert_success(&result);
+
+    let (headers, rows) = csv_table(&std::fs::read(&output).unwrap());
+    let tick = headers.iter().position(|header| header == "tick").unwrap();
+    let seen = headers
+        .iter()
+        .position(|header| header == "seen_yes")
+        .unwrap();
+    assert_eq!(rows.len(), 4);
+    assert_eq!(rows[0][tick], "0");
+    assert_eq!(rows[0][seen], "0");
+    for (expected_tick, row) in rows.iter().enumerate().skip(1) {
+        assert_eq!(row[tick], expected_tick.to_string());
+        assert_eq!(row[seen], "1");
+    }
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn linked_epidemic_policy_run_pins_both_wire_delays_and_golden() {
+    let temp = temp_dir("linked-epidemic-policy");
+    let population = temp.join("population.bin");
+    let epidemic_output = temp.join("epidemic.csv");
+    let solo_output = temp.join("solo.csv");
+
+    let synth = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("synth-pop")
+        .args([
+            "--persons",
+            "1000",
+            "--employers",
+            "50",
+            "--initial-infected",
+            "600",
+            "--seed",
+            "12",
+            "--out",
+        ])
+        .arg(&population)
+        .output()
+        .unwrap();
+    assert_success(&synth);
+
+    let run_eight_ticks = |plan: &Path, output: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("run")
+            .arg(plan)
+            .arg("--population")
+            .arg(&population)
+            .args(["--seed", "55", "--ticks", "8", "--out"])
+            .arg(output)
+            .output()
+            .unwrap()
+    };
+    let epidemic = run_eight_ticks(
+        &repository_path("fixtures/plans/linked/epidemic_policy.plan.json"),
+        &epidemic_output,
+    );
+    let solo = run_eight_ticks(
+        &repository_path("fixtures/plans/linked/solo_population.plan.json"),
+        &solo_output,
+    );
+    assert_success(&epidemic);
+    assert_success(&solo);
+
+    assert_eq!(
+        std::fs::read(&epidemic_output).unwrap(),
+        std::fs::read(repository_path(
+            "fixtures/plans/goldens/epidemic_policy.seed55.ticks8.csv",
+        ))
+        .unwrap()
+    );
+    let hashes: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(repository_path(
+            "fixtures/plans/goldens/epidemic_policy.seed55.ticks8.hashes.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let expected_stdout = format!(
+        "results_sha256={} final_state_sha256={} observation_sha256={}\n",
+        hashes["results_sha256"].as_str().unwrap(),
+        hashes["final_state_sha256"].as_str().unwrap(),
+        hashes["observation_sha256"].as_str().unwrap(),
+    );
+    assert_eq!(epidemic.stdout, expected_stdout.as_bytes());
+
+    let plan: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(repository_path(
+            "fixtures/plans/linked/epidemic_policy.plan.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let mailboxes = plan["identity"]["mailboxes"].as_array().unwrap();
+    assert_eq!(mailboxes.len(), 2);
+    assert_ne!(mailboxes[0]["identity"], mailboxes[1]["identity"]);
+
+    let (epidemic_headers, epidemic_rows) = csv_table(&std::fs::read(&epidemic_output).unwrap());
+    let (solo_headers, solo_rows) = csv_table(&std::fs::read(&solo_output).unwrap());
+    let epidemic_column = |name: &str| {
+        epidemic_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap_or_else(|| panic!("missing epidemic column {name}"))
+    };
+    let solo_column = |name: &str| {
+        solo_headers
+            .iter()
+            .position(|header| header == name)
+            .unwrap_or_else(|| panic!("missing solo column {name}"))
+    };
+    let fired_restrict = epidemic_column("fired_restrict");
+    assert_eq!(epidemic_rows[0][fired_restrict], "0");
+    assert_eq!(
+        epidemic_rows
+            .iter()
+            .position(|row| row[fired_restrict] != "0"),
+        Some(1),
+        "infection count must reach policy after exactly one tick"
+    );
+
+    let population_columns = ["I", "R", "S", "fired_infect", "fired_recover"];
+    let projected = |row: &[String], name_to_index: &dyn Fn(&str) -> usize| {
+        population_columns
+            .iter()
+            .map(|name| row[name_to_index(name)].clone())
+            .collect::<Vec<_>>()
+    };
+    for tick in [0, 1] {
+        assert_eq!(
+            projected(&epidemic_rows[tick], &epidemic_column),
+            projected(&solo_rows[tick], &solo_column),
+            "return wire affected population too early at tick {tick}"
+        );
+    }
+    assert_ne!(
+        projected(&epidemic_rows[2], &epidemic_column),
+        projected(&solo_rows[2], &solo_column),
+        "restriction must reach population on the second hop at tick 2"
+    );
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
 fn legacy_run_manifest_matches_the_pre_prd_byte_baseline() {
     let temp = temp_dir("legacy-manifest");
     let output = temp.join("legacy.csv");

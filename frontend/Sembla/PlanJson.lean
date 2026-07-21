@@ -246,7 +246,10 @@ def modelToCJson (model : IR.Model) : CJson := obj [
   ("name", .str model.name), ("dt", .num model.dt),
   ("params", arr ((sortBy model.params (·.name)).map paramJson)),
   ("boxes", arr ((sortBy model.boxes (·.name)).map boxJson)),
-  ("wires", arr ((sortBy model.wires directMailboxIdentity).map wireJson)),
+  /- Wire ordering is origin-specific: direct-stable construction sorts by its
+     synthesized mailbox identities, while the linker sorts by declared wire
+     occurrences. Both constructors canonicalize before reaching this writer. -/
+  ("wires", arr (model.wires.map wireJson)),
   ("summaries", arr ((sortBy model.summaries (·.name)).map summaryJson))]
 
 private def originJson : Plan.PlanOrigin → CJson

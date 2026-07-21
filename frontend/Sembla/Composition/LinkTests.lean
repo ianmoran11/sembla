@@ -31,6 +31,15 @@ private def modifyRootComposite
         | .composite body => { definition with body := .composite (transform body) }
       else definition }
 
+private def modifyDefinitionPort
+    (source : CompositionSourceV1) (definitionId portId : String)
+    (transform : PortDeclV1 → PortDeclV1) : CompositionSourceV1 :=
+  { source with definitions := source.definitions.map fun definition =>
+      if definition.id.raw == definitionId then
+        { definition with ports := definition.ports.map fun port =>
+            if port.id.raw == portId then transform port else port }
+      else definition }
+
 private def modifyRootInstances
     (source : CompositionSourceV1) (transform : InstanceDeclV1 → InstanceDeclV1) :
     CompositionSourceV1 :=
@@ -179,16 +188,133 @@ private def sourceWithWire : CompositionSourceV1 :=
         targetPort := sid "port:infection_count"
         delayTicks := 1 }] }
 
-#guard codes sourceWithWire == [.unsupportedConstruct]
+#guard (linkedPlan? sourceWithWire).isSome
 
-private def wireErrorNamesPrd0008 : Bool :=
-  match linkV1 sourceWithWire (Json.render sourceWithWire) with
-  | .ok _ => false
-  | .error [error] => error.message ==
-      "wire 'wire:test' is unsupported by product linking; PRD 0008 adds wires"
-  | .error _ => false
+private def wireToMissingPort : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with «wires» := body.wires.map fun item =>
+        if item.id.raw == "wire:count_to_policy" then
+          { item with sourcePort := sid "port:missing" }
+        else item }
 
-#guard wireErrorNamesPrd0008
+private def outputToOutputWire : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with «wires» := body.wires.map fun item =>
+        if item.id.raw == "wire:count_to_policy" then
+          { id := item.id
+            sourceInstance := item.sourceInstance
+            sourcePort := item.sourcePort
+            targetInstance := sid "inst:population"
+            targetPort := sid "port:infection_count"
+            delayTicks := item.delayTicks }
+        else item }
+
+private def inputToInputWire : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with «wires» := body.wires.map fun item =>
+        if item.id.raw == "wire:count_to_policy" then
+          { id := item.id
+            sourceInstance := sid "inst:policy"
+            sourcePort := sid "port:infection_count"
+            targetInstance := item.targetInstance
+            targetPort := item.targetPort
+            delayTicks := item.delayTicks }
+        else item }
+
+private def wireSchemaNameMismatch : CompositionSourceV1 :=
+  modifyDefinitionPort epidemicPolicy "def:policy" "port:infection_count" fun port =>
+    { port with schema := [{ name := "cases", ty := .int }] }
+
+private def wireSchemaTypeMismatch : CompositionSourceV1 :=
+  modifyDefinitionPort epidemicPolicy "def:policy" "port:infection_count" fun port =>
+    { port with schema := [{ name := "infected", ty := .real }] }
+
+private def multiplyDrivenInput : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with «wires» := body.wires ++ [{
+        id := sid "wire:duplicate_count"
+        sourceInstance := sid "inst:population"
+        sourcePort := sid "port:infection_count"
+        targetInstance := sid "inst:policy"
+        targetPort := sid "port:infection_count"
+        delayTicks := 1 }] }
+
+private def reservedSynthesizedWireId : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with «wires» := body.wires.map fun item =>
+        if item.id.raw == "wire:count_to_policy" then
+          { item with id := sid "wire:to_policy_infection_count" }
+        else item }
+
+private def declaredWireOrderDiffersFromDirect : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with «wires» := body.wires.map fun item =>
+        if item.id.raw == "wire:count_to_policy" then
+          { item with id := sid "wire:z_count_to_policy" }
+        else if item.id.raw == "wire:restriction_to_population" then
+          { item with id := sid "wire:a_restriction_to_population" }
+        else item }
+
+private def linkedWireOrderUsesDeclarations : Bool :=
+  match linkedPlan? declaredWireOrderDiffersFromDirect with
+  | none => false
+  | some plan =>
+      plan.identity.mailboxes.map (·.identity) == [
+        "mbox:occ:#wire:a_restriction_to_population|occ:policy.port:restriction_modifier|occ:population.port:restriction_modifier",
+        "mbox:occ:#wire:z_count_to_policy|occ:population.port:infection_count|occ:policy.port:infection_count"] &&
+      plan.model.wires.map (fun item => item.target.box ++ "." ++ item.target.port) == [
+        "population.restriction_modifier", "policy.infection_count"]
+
+#guard linkedWireOrderUsesDeclarations
+
+private def wireToCompositeChild : CompositionSourceV1 :=
+  let root : ComponentDefinitionV1 := {
+    id := sid "def:composite_child_wire"
+    displayName := "Composite child wire"
+    parameterRequirements := ["beta", "gamma"]
+    ports := []
+    body := .composite {
+      instances := [
+        { id := sid "inst:region"
+          displayName := "Region"
+          definition := sid "def:epidemic_policy"
+          parameterBindings := [
+            { requirement := "beta", «parameter» := "beta" },
+            { requirement := "gamma", «parameter» := "gamma" }] },
+        { id := sid "inst:policy"
+          displayName := "Policy"
+          definition := sid "def:policy"
+          parameterBindings := [] }]
+      «wires» := [{
+        id := sid "wire:boundary"
+        sourceInstance := sid "inst:region"
+        sourcePort := sid "port:infection_count"
+        targetInstance := sid "inst:policy"
+        targetPort := sid "port:infection_count"
+        delayTicks := 1 }]
+      exposures := []
+      hiddenPorts := [] } }
+  { epidemicPolicy with
+    modelId := sid "model:composite_child_wire"
+    definitions := epidemicPolicy.definitions ++ [root]
+    rootDefinition := root.id }
+
+#guard codes wireToMissingPort == [.missingPort]
+#guard codes outputToOutputWire == [.directionMismatch]
+#guard codes inputToInputWire == [.directionMismatch]
+#guard codes wireSchemaNameMismatch == [.schemaMismatch]
+#guard codes wireSchemaTypeMismatch == [.schemaMismatch]
+#guard codes multiplyDrivenInput == [.multipleDrivers]
+#guard codes reservedSynthesizedWireId == [.reservedRuntimeIdentity]
+#guard codes wireToCompositeChild == [.missingPort]
+
+private def compositeChildErrorNamesPrd0009 : Bool :=
+  match linkErrors wireToCompositeChild with
+  | [error] => error.message ==
+      "wire 'wire:boundary' references composite child 'inst:region'; boundary wiring requires exposures (PRD 0009)"
+  | _ => false
+
+#guard compositeChildErrorNamesPrd0009
 
 private def sourceWithExposure : CompositionSourceV1 :=
   modifyRootComposite independentEpidemicPolicy fun body =>
@@ -204,7 +330,7 @@ private def exposureErrorNamesPrd0009 : Bool :=
   match linkV1 sourceWithExposure (Json.render sourceWithExposure) with
   | .ok _ => false
   | .error [error] => error.message ==
-      "exposure 'expose:test' is unsupported by product linking; PRD 0009 adds exposures"
+      "exposure 'expose:test' is unsupported by wire linking; PRD 0009 adds exposures"
   | .error _ => false
 
 #guard exposureErrorNamesPrd0009
@@ -216,6 +342,7 @@ private def sourceWithHiddenPort : CompositionSourceV1 :=
         port := sid "port:infection_count" }] }
 
 #guard codes sourceWithHiddenPort == [.unsupportedConstruct]
+#guard codes twoRegions == [.unsupportedConstruct, .unsupportedConstruct]
 
 private def sortedIndependentErrors : CompositionSourceV1 :=
   { sourceWithWire with
@@ -223,7 +350,7 @@ private def sortedIndependentErrors : CompositionSourceV1 :=
     requiredFeatures := ["future_feature"] }
 
 #guard codes sortedIndependentErrors == [
-  .unknownVersion, .unsupportedFeature, .unsupportedConstruct]
+  .unknownVersion, .unsupportedFeature]
 
 private def primitiveRoot : CompositionSourceV1 :=
   { soloPopulation with rootDefinition := sid "def:population" }
@@ -384,6 +511,93 @@ private def definitionOrderInsensitive : Bool :=
   | _, _ => false
 
 #guard definitionOrderInsensitive
+
+private def epidemicPolicyTwin : IR.Model := {
+  «name» := "epidemic_policy",
+  «dt» := epidemicPolicy.outerDt,
+  «params» := epidemicPolicy.parameters,
+  «boxes» := [
+    { populationBox with «name» := "population" },
+    { policyBox with «name» := "policy" }],
+  «wires» := [
+    { «source» := { «box» := "population", «port» := "infection_count" },
+      «target» := { «box» := "policy", «port» := "infection_count" } },
+    { «source» := { «box» := "policy", «port» := "restriction_modifier" },
+      «target» := { «box» := "population", «port» := "restriction_modifier" } }],
+  «summaries» := [] }
+
+private def semanticDigest (plan : Plan.ExecutablePlanV1) : String :=
+  let payload := (PlanJson.semanticPayloadToCJson plan).render
+  (Hash.hashRecord Plan.planCoreDomain payload.toUTF8).digest
+
+/-- Twin comparison payload frozen by PRD 0008: complete model and every
+    identity section except mailbox declarations. -/
+private def twinSectionBytes (plan : Plan.ExecutablePlanV1) : String :=
+  let withoutMailboxes := { plan with
+    identity := { plan.identity with mailboxes := [] } }
+  (PlanJson.semanticPayloadToCJson withoutMailboxes).render
+
+private def twinSectionDigest (plan : Plan.ExecutablePlanV1) : String :=
+  (Hash.hashRecord Plan.planCoreDomain (twinSectionBytes plan).toUTF8).digest
+
+private def sortedMailboxEndpoints (plan : Plan.ExecutablePlanV1) : List String :=
+  (plan.identity.mailboxes.map fun mailbox =>
+    mailbox.sourceBox ++ "|" ++ mailbox.sourcePort ++ "|" ++
+      mailbox.targetBox ++ "|" ++ mailbox.targetPort).mergeSort (· < ·)
+
+private def twinPlansAgree : Bool :=
+  match linkedPlan? epidemicPolicy, PlanExport.directStablePlan epidemicPolicyTwin with
+  | some linked, .ok direct =>
+      twinSectionBytes linked == twinSectionBytes direct &&
+      twinSectionDigest linked == twinSectionDigest direct &&
+      semanticDigest linked != semanticDigest direct &&
+      sortedMailboxEndpoints linked == sortedMailboxEndpoints direct &&
+      linked.identity.mailboxes.map (·.identity) != direct.identity.mailboxes.map (·.identity)
+  | _, _ => false
+
+#guard twinPlansAgree
+
+private def epidemicMailboxesPinned : Bool :=
+  match linkedPlan? epidemicPolicy with
+  | none => false
+  | some plan => plan.identity.mailboxes.map (·.identity) == [
+      "mbox:occ:#wire:count_to_policy|occ:population.port:infection_count|occ:policy.port:infection_count",
+      "mbox:occ:#wire:restriction_to_population|occ:policy.port:restriction_modifier|occ:population.port:restriction_modifier"]
+
+#guard epidemicMailboxesPinned
+
+private def repeatedWiredRegions : CompositionSourceV1 :=
+  let root : ComponentDefinitionV1 := {
+    id := sid "def:repeated_wired_regions"
+    displayName := "Repeated wired regions"
+    parameterRequirements := ["beta", "gamma"]
+    ports := []
+    body := .composite {
+      instances := ["north", "south"].map fun name => {
+        id := sid ("inst:" ++ name)
+        displayName := name
+        definition := sid "def:epidemic_policy"
+        parameterBindings := [
+          { requirement := "beta", «parameter» := "beta" },
+          { requirement := "gamma", «parameter» := "gamma" }] }
+      «wires» := []
+      exposures := []
+      hiddenPorts := [] } }
+  { epidemicPolicy with
+    modelId := sid "model:repeated_wired_regions"
+    definitions := epidemicPolicy.definitions ++ [root]
+    rootDefinition := root.id }
+
+private def repeatedWireOccurrencesDistinct : Bool :=
+  match linkedPlan? repeatedWiredRegions with
+  | none => false
+  | some plan => plan.identity.mailboxes.map (·.identity) == [
+      "mbox:occ:north#wire:count_to_policy|occ:north/population.port:infection_count|occ:north/policy.port:infection_count",
+      "mbox:occ:north#wire:restriction_to_population|occ:north/policy.port:restriction_modifier|occ:north/population.port:restriction_modifier",
+      "mbox:occ:south#wire:count_to_policy|occ:south/population.port:infection_count|occ:south/policy.port:infection_count",
+      "mbox:occ:south#wire:restriction_to_population|occ:south/policy.port:restriction_modifier|occ:south/population.port:restriction_modifier"]
+
+#guard repeatedWireOccurrencesDistinct
 
 mutual
   private partial def expressionContainsParameter (expected : String) : IR.Expr → Bool

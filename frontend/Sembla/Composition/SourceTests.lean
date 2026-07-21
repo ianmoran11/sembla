@@ -13,7 +13,7 @@ private def roundTrips (source : CompositionSourceV1) : Bool :=
 
 #guard Fixtures.corpus.map (·.1) == [
   "solo_population", "independent_epidemic_policy", "two_independent_regions",
-  "epidemic_policy", "two_regions", "regional_response"]
+  "epidemic_policy", "ping_pong", "two_regions", "regional_response"]
 #guard Fixtures.corpus.all fun entry => roundTrips entry.2
 private def fixtureIsWellFormed (source : CompositionSourceV1) : Bool :=
   match wellFormed source with

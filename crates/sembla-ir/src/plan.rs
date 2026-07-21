@@ -491,7 +491,12 @@ fn validate_mailboxes(plan: &ExecutablePlanV1) -> Result<(), ValidationError> {
                     ));
                 }
             }
-            PlanOrigin::Linked => validate_linked_mailbox_identity(entry, index)?,
+            PlanOrigin::Linked => validate_linked_mailbox_identity(
+                entry,
+                wire,
+                index,
+                plan.linked_provenance.is_some(),
+            )?,
         }
     }
     Ok(())
@@ -499,7 +504,9 @@ fn validate_mailboxes(plan: &ExecutablePlanV1) -> Result<(), ValidationError> {
 
 fn validate_linked_mailbox_identity(
     entry: &MailboxIdentityV1,
+    wire: &Wire,
     index: usize,
+    enforce_declared_form: bool,
 ) -> Result<(), ValidationError> {
     let path = format!("$.identity.mailboxes[{index}].identity");
     let rest = entry.identity.strip_prefix("mbox:").ok_or_else(|| {
@@ -525,6 +532,12 @@ fn validate_linked_mailbox_identity(
         return Err(plan_error(
             path,
             format!("invalid linked mailbox identity '{}'", entry.identity),
+        ));
+    }
+    if enforce_declared_form && wire_occurrence == direct_wire_occurrence(wire) {
+        return Err(plan_error(
+            path,
+            "linked mailbox identity must use its declared wire occurrence, not the direct_stable synthesized form",
         ));
     }
     Ok(())

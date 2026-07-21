@@ -21,6 +21,9 @@ private def infectionSchema : List IR.Attr := [
 private def restrictionSchema : List IR.Attr := [
   { name := "restriction", ty := .real }]
 
+private def pulseSchema : List IR.Attr := [
+  { name := "value", ty := .int }]
+
 mutual
   private partial def renameRestrictionExpr : IR.Expr → IR.Expr
     | .selfAttr name =>
@@ -77,10 +80,12 @@ private def adaptPolicy (modelBox : IR.Box) : IR.Box :=
         { item with schema := restrictionSchema, builder }
       else item }
 
-private def populationBox : IR.Box :=
+/-- The post-adaptation population leaf used by linker twin tests. -/
+def populationBox : IR.Box :=
   adaptPopulation ((Models.sirPolicy.boxes.get? 0).getD emptyBox)
 
-private def policyBox : IR.Box :=
+/-- The post-adaptation policy leaf used by linker twin tests. -/
+def policyBox : IR.Box :=
   adaptPolicy ((Models.sirPolicy.boxes.get? 1).getD emptyBox)
 
 private def populationDefinition : ComponentDefinitionV1 := {
@@ -187,6 +192,100 @@ private def epidemicDefinition : ComponentDefinitionV1 := {
 /-- The exposure-bearing family variant.  It intentionally keeps the same
     stable definition id while the plain epidemic-policy fixture above remains
     exposure-free for PRD 0008. -/
+private def pingDefinition : ComponentDefinitionV1 := {
+  id := sid "def:ping"
+  displayName := "Ping"
+  parameterRequirements := []
+  ports := [{
+    id := sid "port:pulse"
+    displayName := "Pulse"
+    direction := .output
+    schema := pulseSchema }]
+  body := .primitive {
+    tables := [{
+      name := "sender"
+      sizeHint := 1
+      attrs := [{ name := "phase", ty := .enum ["Idle", "Fire"] }] }]
+    «transitions» := [
+      { name := "arm"
+        table := "sender"
+        «guard» := .enumIs "phase" "Idle"
+        «hazard» := .real 1e300
+        effects := [.setAttr "phase" (.enum "Fire")]
+        contests := [] },
+      { name := "disarm"
+        table := "sender"
+        «guard» := .enumIs "phase" "Fire"
+        «hazard» := .real 1e300
+        effects := [.setAttr "phase" (.enum "Idle")]
+        contests := [] }]
+    «inputs» := []
+    «outputs» := [{
+      name := "pulse"
+      schema := pulseSchema
+      builder := .perTable "sender" [{
+        name := "value"
+        op := .count
+        filter := some (.enumIs "phase" "Fire") }] }]
+    «views» := [] } }
+
+private def pongDefinition : ComponentDefinitionV1 := {
+  id := sid "def:pong"
+  displayName := "Pong"
+  parameterRequirements := []
+  ports := [{
+    id := sid "port:pulse"
+    displayName := "Pulse"
+    direction := .input
+    schema := pulseSchema }]
+  body := .primitive {
+    tables := [{
+      name := "receiver"
+      sizeHint := 1
+      attrs := [{ name := "seen", ty := .enum ["No", "Yes"] }] }]
+    «transitions» := [{
+      name := "notice"
+      table := "receiver"
+      «guard» := .and
+        (.gt (.input "pulse" (.mk (.sum (.selfAttr "value")) none)) (.int 0))
+        (.enumIs "seen" "No")
+      «hazard» := .real 1e300
+      effects := [.setAttr "seen" (.enum "Yes")]
+      contests := [] }]
+    «inputs» := [{ name := "pulse", schema := pulseSchema }]
+    «outputs» := []
+    «views» := [{
+      name := "seen_yes"
+      table := "receiver"
+      filter := some (.enumIs "seen" "Yes")
+      value := none
+      «reduce» := .count }] } }
+
+private def pingPongDefinition : ComponentDefinitionV1 := {
+  id := sid "def:ping_pong"
+  displayName := "Ping pong"
+  parameterRequirements := []
+  ports := []
+  body := .composite {
+    instances := [
+      { id := sid "inst:ping"
+        displayName := "Ping"
+        definition := sid "def:ping"
+        parameterBindings := [] },
+      { id := sid "inst:pong"
+        displayName := "Pong"
+        definition := sid "def:pong"
+        parameterBindings := [] }]
+    «wires» := [{
+      id := sid "wire:pulse"
+      sourceInstance := sid "inst:ping"
+      sourcePort := sid "port:pulse"
+      targetInstance := sid "inst:pong"
+      targetPort := sid "port:pulse"
+      delayTicks := 1 }]
+    exposures := []
+    hiddenPorts := [] } }
+
 private def epidemicPolicyExposed : ComponentDefinitionV1 := {
   id := sid "def:epidemic_policy"
   displayName := "Epidemic policy"
@@ -260,6 +359,11 @@ def epidemicPolicy : CompositionSourceV1 :=
     [populationDefinition, policyDefinition, epidemicDefinition]
     "def:epidemic_policy"
 
+def pingPong : CompositionSourceV1 :=
+  mkSource "ping_pong" "Ping pong"
+    [pingDefinition, pongDefinition, pingPongDefinition]
+    "def:ping_pong"
+
 def twoRegions : CompositionSourceV1 :=
   let root : ComponentDefinitionV1 := {
     id := sid "def:two_regions"
@@ -308,6 +412,7 @@ def corpus : List (String × CompositionSourceV1) := [
   ("independent_epidemic_policy", independentEpidemicPolicy),
   ("two_independent_regions", twoIndependentRegions),
   ("epidemic_policy", epidemicPolicy),
+  ("ping_pong", pingPong),
   ("two_regions", twoRegions),
   ("regional_response", regionalResponse)]
 

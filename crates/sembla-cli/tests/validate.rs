@@ -199,7 +199,7 @@ fn every_linked_plan_is_valid_canonical_and_pins_its_source_hash() {
         })
         .collect::<Vec<_>>();
     plans.sort();
-    assert_eq!(plans.len(), 3);
+    assert_eq!(plans.len(), 5);
 
     for path in plans {
         let output = Command::new(env!("CARGO_BIN_EXE_sembla"))

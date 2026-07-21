@@ -58,17 +58,14 @@ private def constructErrors (source : CompositionSourceV1) : List LinkErrorV1 :=
     match definition.body with
     | .primitive _ => []
     | .composite body =>
-        let wireErrors := body.wires.map fun wire =>
-          mkError .unsupportedConstruct wire.id
-            s!"wire '{wire.id.raw}' is unsupported by product linking; PRD 0008 adds wires"
         let exposureErrors := body.exposures.map fun exposure =>
           mkError .unsupportedConstruct exposure.id
-            s!"exposure '{exposure.id.raw}' is unsupported by product linking; PRD 0009 adds exposures"
+            s!"exposure '{exposure.id.raw}' is unsupported by wire linking; PRD 0009 adds exposures"
         let hiddenErrors := body.hiddenPorts.map fun hidden =>
           mkError .unsupportedConstruct definition.id
-            s!"hidden port on '{definition.id.raw}' is unsupported by product linking; PRD 0009 adds hiding"
+            s!"hidden port on '{definition.id.raw}' is unsupported by wire linking; PRD 0009 adds hiding"
             [hidden.instance_, hidden.port]
-        wireErrors ++ exposureErrors ++ hiddenErrors).join
+        exposureErrors ++ hiddenErrors).join
   let rootPrimitive := match definition? source.definitions source.rootDefinition with
     | some { body := .primitive _, .. } =>
         [mkError .unsupportedConstruct source.rootDefinition
@@ -310,6 +307,147 @@ private partial def expandDefinition
       | some target => expandDefinition definitions target
           (chain ++ [idSlug "inst:" item.id]) (instancePath ++ [item.id])
           (resolvedBindings bindings item target)).join
+
+private structure ResolvedWireEndpoint where
+  instance_ : InstanceDeclV1
+  definition : ComponentDefinitionV1
+  port : PortDeclV1
+  boxName : String
+  occurrence : String
+
+private structure ExpandedWire where
+  modelWire : IR.Wire
+  declaration : StableId
+  wireOccurrence : String
+  sourceOccurrence : String
+  targetOccurrence : String
+  sourcePort : StableId
+  targetPort : StableId
+
+deriving Repr, BEq
+
+private structure WireResolution where
+  errors : List LinkErrorV1
+  wire : Option ExpandedWire
+
+private def resolveWireEndpoint
+    (definitions : List ComponentDefinitionV1) (owner : CompositeBodyV1)
+    (ownerChain : List String) (wire : WireDeclV1) (childId portId : StableId) :
+    Except LinkErrorV1 ResolvedWireEndpoint := do
+  let child ← match owner.instances.find? fun item => item.id == childId with
+    | some child => pure child
+    | none => throw (mkError .missingPort wire.id
+        s!"wire '{wire.id.raw}' references missing direct child '{childId.raw}'" [childId])
+  let childDefinition ← match definition? definitions child.definition with
+    | some childDefinition => pure childDefinition
+    | none => throw (mkError .missingPort wire.id
+        s!"wire '{wire.id.raw}' cannot resolve child definition '{child.definition.raw}'"
+        [child.id, child.definition])
+  match childDefinition.body with
+  | .composite _ =>
+      throw (mkError .missingPort wire.id
+        s!"wire '{wire.id.raw}' references composite child '{child.id.raw}'; boundary wiring requires exposures (PRD 0009)"
+        [child.id, childDefinition.id, portId])
+  | .primitive _ =>
+      let port ← match childDefinition.ports.find? fun candidate => candidate.id == portId with
+        | some port => pure port
+        | none => throw (mkError .missingPort wire.id
+            s!"wire '{wire.id.raw}' references missing port '{portId.raw}' on '{child.id.raw}'"
+            [child.id, childDefinition.id, portId])
+      let chain := ownerChain ++ [idSlug "inst:" child.id]
+      let boxName := String.intercalate "/" chain
+      pure {
+        instance_ := child
+        definition := childDefinition
+        port
+        boxName
+        occurrence := "occ:" ++ boxName }
+
+private def resolveWire
+    (definitions : List ComponentDefinitionV1) (owner : CompositeBodyV1)
+    (ownerChain : List String) (wire : WireDeclV1) : WireResolution :=
+  let source := resolveWireEndpoint definitions owner ownerChain wire
+    wire.sourceInstance wire.sourcePort
+  let target := resolveWireEndpoint definitions owner ownerChain wire
+    wire.targetInstance wire.targetPort
+  match source, target with
+  | .error sourceError, .error targetError => { errors := [sourceError, targetError], wire := none }
+  | .error sourceError, .ok _ => { errors := [sourceError], wire := none }
+  | .ok _, .error targetError => { errors := [targetError], wire := none }
+  | .ok source, .ok target =>
+      let directionErrors :=
+        (if source.port.direction == .output then [] else
+          [mkError .directionMismatch wire.id
+            s!"wire '{wire.id.raw}' source port '{wire.sourcePort.raw}' is not an output"
+            [source.instance_.id, source.definition.id, source.port.id]]) ++
+        (if target.port.direction == .input then [] else
+          [mkError .directionMismatch wire.id
+            s!"wire '{wire.id.raw}' target port '{wire.targetPort.raw}' is not an input"
+            [target.instance_.id, target.definition.id, target.port.id]])
+      let schemaErrors := if source.port.schema == target.port.schema then [] else
+        [mkError .schemaMismatch wire.id
+          s!"wire '{wire.id.raw}' schema mismatch: source {reprStr source.port.schema}; target {reprStr target.port.schema}"
+          [source.port.id, target.port.id]]
+      let errors := directionErrors ++ schemaErrors
+      if !errors.isEmpty then { errors, wire := none }
+      else
+        let ownerOccurrence := "occ:" ++ String.intercalate "/" ownerChain
+        let wireOccurrence := ownerOccurrence ++ "#wire:" ++ idSlug "wire:" wire.id
+        { errors := []
+          wire := some {
+            modelWire := {
+              source := { box := source.boxName, port := idSlug "port:" source.port.id }
+              target := { box := target.boxName, port := idSlug "port:" target.port.id } }
+            declaration := wire.id
+            wireOccurrence
+            sourceOccurrence := source.occurrence
+            targetOccurrence := target.occurrence
+            sourcePort := source.port.id
+            targetPort := target.port.id } }
+
+private partial def expandWires
+    (definitions : List ComponentDefinitionV1) (definition : ComponentDefinitionV1)
+    (chain : List String) : List LinkErrorV1 × List ExpandedWire :=
+  match definition.body with
+  | .primitive _ => ([], [])
+  | .composite body =>
+      let localResults := body.wires.map (resolveWire definitions body chain)
+      let nested := body.instances.map fun item =>
+        match definition? definitions item.definition with
+        | none => ([], [])
+        | some child => expandWires definitions child (chain ++ [idSlug "inst:" item.id])
+      ((localResults.map (·.errors)).join ++ (nested.map (·.1)).join,
+       localResults.filterMap (·.wire) ++ (nested.map (·.2)).join)
+
+private def wireTargetKey (wire : ExpandedWire) : String :=
+  wire.modelWire.target.box ++ "|" ++ wire.modelWire.target.port
+
+private def reservedWireIdentityErrors (wires : List ExpandedWire) : List LinkErrorV1 :=
+  wires.filterMap fun wire =>
+    let synthesized := "occ:#wire:to_" ++ wire.modelWire.target.box ++ "_" ++
+      wire.modelWire.target.port
+    if wire.wireOccurrence == synthesized then
+      some (mkError .reservedRuntimeIdentity wire.declaration
+        s!"wire id '{wire.declaration.raw}' is reserved because its linked occurrence collides with the direct_stable synthesized form")
+    else none
+
+private def multipleDriverErrors (wires : List ExpandedWire) : List LinkErrorV1 :=
+  (wires.map wireTargetKey).eraseDups.filterMap fun key =>
+    let drivers := sortBy (wires.filter fun wire => wireTargetKey wire == key) (·.wireOccurrence)
+    match drivers with
+    | first :: _ :: _ => some (mkError .multipleDrivers first.declaration
+        s!"multiple wires drive '{first.modelWire.target.box}.{first.modelWire.target.port}'"
+        (drivers.map (·.declaration)))
+    | _ => none
+
+private def expandedMailbox (wire : ExpandedWire) : Plan.MailboxIdentityV1 := {
+  identity := "mbox:" ++ wire.wireOccurrence ++ "|" ++
+    wire.sourceOccurrence ++ "." ++ wire.sourcePort.raw ++ "|" ++
+    wire.targetOccurrence ++ "." ++ wire.targetPort.raw
+  sourceBox := wire.modelWire.source.box
+  sourcePort := wire.modelWire.source.port
+  targetBox := wire.modelWire.target.box
+  targetPort := wire.modelWire.target.port }
 
 private def identityErrors
     (transitions : List Plan.TransitionIdentityV1) : List LinkErrorV1 :=
@@ -907,6 +1045,48 @@ private def modelBoxIrValid (model : IR.Model) (modelBox : IR.Box) : Bool :=
   modelBox.transitions.all (transitionSemanticallyValid model modelBox) &&
   modelBox.views.all (viewSemanticallyValid model modelBox)
 
+private def modelWireValid (model : IR.Model) (wire : IR.Wire) : Bool :=
+  match model.boxes.find? fun modelBox => modelBox.name == wire.source.box,
+        model.boxes.find? fun modelBox => modelBox.name == wire.target.box with
+  | some sourceBox, some targetBox =>
+      match sourceBox.outputs.find? fun output => output.name == wire.source.port,
+            targetBox.inputs.find? fun input => input.name == wire.target.port with
+      | some output, some input => output.schema == input.schema
+      | _, _ => false
+  | _, _ => false
+
+private def wireEndpointKey (wire : IR.Wire) : String :=
+  wire.source.box ++ "|" ++ wire.source.port ++ "|" ++
+    wire.target.box ++ "|" ++ wire.target.port
+
+private def mailboxEndpointKey (mailbox : Plan.MailboxIdentityV1) : String :=
+  mailbox.sourceBox ++ "|" ++ mailbox.sourcePort ++ "|" ++
+    mailbox.targetBox ++ "|" ++ mailbox.targetPort
+
+private def singleDriverValid (wires : List IR.Wire) : Bool :=
+  let targets := wires.map fun wire => wire.target.box ++ "|" ++ wire.target.port
+  targets.eraseDups.length == targets.length
+
+private def occurrenceChainValid (value : String) : Bool :=
+  if !value.startsWith "occ:" then false
+  else
+    let chain := value.drop 4
+    chain.isEmpty || (chain.splitOn "/").all PlanExport.isSlug
+
+private def linkedMailboxIdentityValid (mailbox : Plan.MailboxIdentityV1) : Bool :=
+  match mailbox.identity.splitOn "|" with
+  | [head, source, target] =>
+      if !head.startsWith "mbox:" then false
+      else
+        let wireOccurrence := head.drop 5
+        match wireOccurrence.splitOn "#wire:" with
+        | [ownerOccurrence, wireSlug] =>
+            occurrenceChainValid ownerOccurrence && PlanExport.isSlug wireSlug &&
+            source == "occ:" ++ mailbox.sourceBox ++ ".port:" ++ mailbox.sourcePort &&
+            target == "occ:" ++ mailbox.targetBox ++ ".port:" ++ mailbox.targetPort
+        | _ => false
+  | _ => false
+
 private def modelIrValid (model : IR.Model) : Bool :=
   let parameterNames := model.params.map (·.name)
   namesUnique parameterNames && model.params.all parameterSemanticallyValid &&
@@ -916,6 +1096,7 @@ private def modelIrValid (model : IR.Model) : Bool :=
   model.boxes.all (fun modelBox =>
     (modelBox.name.splitOn "/").all PlanExport.isSlug &&
     modelBoxIrValid model modelBox) &&
+  model.wires.all (modelWireValid model) && singleDriverValid model.wires &&
   namesUnique (model.summaries.map (·.name)) &&
   model.summaries.all (fun summary =>
     match model.boxes.find? fun modelBox => modelBox.name == summary.box with
@@ -951,7 +1132,13 @@ def planValidCheck (plan : Plan.ExecutablePlanV1) : Bool :=
   plan.identity.leaves == expectedLeaves &&
   plan.identity.transitions == expectedTransitions &&
   plan.identity.schedulerDomains == expectedScheduler &&
-  plan.identity.mailboxes.isEmpty && plan.model.wires.isEmpty &&
+  plan.identity.mailboxes == sortBy plan.identity.mailboxes (·.identity) &&
+  namesUnique (plan.identity.mailboxes.map (·.identity)) &&
+  plan.identity.mailboxes.all linkedMailboxIdentityValid &&
+  sortBy (plan.identity.mailboxes.map mailboxEndpointKey) id ==
+    sortBy (plan.model.wires.map wireEndpointKey) id &&
+  plan.model.wires.map wireEndpointKey ==
+    plan.identity.mailboxes.map mailboxEndpointKey &&
   modelIrValid plan.model &&
   plan.model.params == sortBy plan.model.params (·.name) &&
   plan.model.boxes == sortBy plan.model.boxes (·.name) &&
@@ -1007,6 +1194,12 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
     summaries := [] }
   let bindingTypeErrors := (leaves.map (leafParameterTypeErrors typeCheckModel)).join
   if !bindingTypeErrors.isEmpty then fail bindingTypeErrors
+  let (wireResolutionErrors, expandedWires) := expandWires source.definitions root []
+  if !wireResolutionErrors.isEmpty then fail wireResolutionErrors
+  let reservedWireErrors := reservedWireIdentityErrors expandedWires
+  if !reservedWireErrors.isEmpty then fail reservedWireErrors
+  let driverErrors := multipleDriverErrors expandedWires
+  if !driverErrors.isEmpty then fail driverErrors
   let identityLeaves := sortBy (leaves.map fun leaf =>
     { box := leaf.modelBox.name, occurrence := leaf.occurrence : Plan.LeafIdentityV1 }) (·.box)
   let transitions := sortBy ((leaves.map fun leaf => leaf.modelBox.transitions.map fun transition =>
@@ -1019,13 +1212,16 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
   if !wordErrors.isEmpty then fail wordErrors
   let (summaryErrors, summaries) := resolveSummaries source leaves
   if !summaryErrors.isEmpty then fail summaryErrors
+  let orderedExpandedWires := sortBy expandedWires fun wire =>
+    (expandedMailbox wire).identity
   let model : IR.Model := {
     name := idSlug "model:" source.modelId
     dt := source.outerDt
     params := sortBy source.parameters (·.name)
     boxes := sortBy (leaves.map (·.modelBox)) (·.name)
-    wires := []
+    wires := orderedExpandedWires.map (·.modelWire)
     summaries := sortBy summaries (·.name) }
+  let mailboxes := orderedExpandedWires.map expandedMailbox
   let sourceDigest := Hash.hashRecord Plan.sourceArtifactDomain sourceCanonicalBytes.toUTF8
   let sourceMap : SourceMapV1 := {
     schemaVersion := Plan.sourceMapSchema
@@ -1050,7 +1246,7 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
         leaves := identityLeaves.map (·.box) }]
       leaves := identityLeaves
       transitions
-      mailboxes := [] }
+      mailboxes }
     linkedProvenance := some {
       sourceHash := {
         algorithm := sourceDigest.algorithm
@@ -1077,7 +1273,7 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
         statistics := {
           leaves := identityLeaves.length
           transitions := transitions.length
-          mailboxes := 0 } } }
+          mailboxes := mailboxes.length } } }
   else
     fail [mkError .unsupportedConstruct source.modelId
       "linked model failed the executable-plan V1 validity check"]
