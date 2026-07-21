@@ -9,6 +9,9 @@ import Sembla.Composition.Source
 import Sembla.Composition.Json
 import Sembla.Composition.Fixtures
 import Sembla.Composition.SourceTests
+import Sembla.Composition.Errors
+import Sembla.Composition.Link
+import Sembla.Composition.LinkTests
 import Sembla.DSL
 import Sembla.Models
 import Sembla.PlanTests

@@ -1,6 +1,6 @@
 name = "sembla_frontend"
 version = "0.1.0"
-defaultTargets = ["Sembla", "sembla-export"]
+defaultTargets = ["Sembla", "sembla-export", "sembla-link"]
 
 [[require]]
 name = "proofwidgets"
@@ -13,3 +13,7 @@ name = "Sembla"
 [[lean_exe]]
 name = "sembla-export"
 root = "Main"
+
+[[lean_exe]]
+name = "sembla-link"
+root = "LinkMain"

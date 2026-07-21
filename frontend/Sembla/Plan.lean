@@ -1,4 +1,5 @@
 import Sembla.IR
+import Sembla.Composition.SourceMap
 
 namespace Sembla.Plan
 
@@ -39,15 +40,10 @@ structure LinkerDescriptorV1 where
   sourceMapSchema : String
 deriving Repr, BEq
 
-/-- PRD 0007 replaces this placeholder with the frozen source-map structure. -/
-inductive SourceMapPlaceholder where
-  | unavailable
-deriving Repr, BEq
-
 structure LinkedProvenanceV1 where
   sourceHash : HashRecordV1
   linker : LinkerDescriptorV1
-  sourceMap : SourceMapPlaceholder
+  sourceMap : Composition.SourceMapV1
 deriving Repr, BEq
 
 structure SchedulerDomainV1 where

@@ -1,7 +1,10 @@
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use sembla_ir::{parse_input, to_canonical_string, validate_plan, ParsedInput};
+use sembla_ir::{
+    domain_digest, parse_input, to_canonical_string, validate_plan, ParsedInput, PlanOrigin,
+};
 
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -180,6 +183,87 @@ fn every_top_level_plan_fixture_is_valid_and_canonical() {
             "{} is not byte-canonical",
             path.display()
         );
+    }
+}
+
+#[test]
+fn every_linked_plan_is_valid_canonical_and_pins_its_source_hash() {
+    let directory = repository_path("fixtures/plans/linked");
+    let mut plans = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".plan.json"))
+        })
+        .collect::<Vec<_>>();
+    plans.sort();
+    assert_eq!(plans.len(), 3);
+
+    for path in plans {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("validate")
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let plan_bytes = std::fs::read(&path).unwrap();
+        let plan_source = std::str::from_utf8(&plan_bytes).unwrap();
+        let ParsedInput::Plan(plan) = parse_input(plan_source).unwrap() else {
+            panic!("{} dispatched as a legacy model", path.display());
+        };
+        validate_plan(&plan).unwrap();
+        assert_eq!(plan.origin, PlanOrigin::Linked);
+        assert_eq!(to_canonical_string(&plan).unwrap().as_bytes(), plan_bytes);
+
+        let fixture = path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .strip_suffix(".plan.json")
+            .unwrap();
+        let source_bytes = std::fs::read(repository_path(format!(
+            "fixtures/composition-source/{fixture}.source.json"
+        )))
+        .unwrap();
+        let digest = domain_digest("sembla.source-artifact/v1", &source_bytes)
+            .iter()
+            .fold(String::with_capacity(64), |mut output, byte| {
+                write!(&mut output, "{byte:02x}").unwrap();
+                output
+            });
+        let provenance = plan.linked_provenance.as_ref().unwrap();
+        assert_eq!(provenance.source_hash.algorithm, "sha256");
+        assert_eq!(provenance.source_hash.domain, "sembla.source-artifact/v1");
+        assert_eq!(provenance.source_hash.digest, digest);
+        assert_eq!(
+            provenance.source_map["schema_version"],
+            "sembla.source-map/v1"
+        );
+        assert!(provenance.source_map["boundary"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(provenance.source_map["hidden"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        let source_leaves = provenance.source_map["leaves"].as_array().unwrap();
+        assert_eq!(source_leaves.len(), plan.identity.leaves.len());
+        for leaf in source_leaves {
+            assert!(leaf["occurrence"].as_str().is_some());
+            assert!(leaf["definition"].as_str().is_some());
+            assert!(leaf["instance_path"].as_array().is_some());
+            assert!(leaf["display_path"].as_str().is_some());
+        }
     }
 }
 

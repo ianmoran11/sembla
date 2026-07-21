@@ -29,13 +29,13 @@ fn summaries(output: &Path) -> PathBuf {
     PathBuf::from(format!("{}.summaries.csv", output.display()))
 }
 
-fn run(model: &Path, output: &Path) -> Output {
+fn run_with_population(model: &Path, output: &Path, population: &str) -> Output {
     Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("run")
         .arg(model)
         .args([
             "--population",
-            "16",
+            population,
             "--seed",
             "55",
             "--ticks",
@@ -45,6 +45,10 @@ fn run(model: &Path, output: &Path) -> Output {
         .arg(output)
         .output()
         .unwrap()
+}
+
+fn run(model: &Path, output: &Path) -> Output {
+    run_with_population(model, output, "16")
 }
 
 fn assert_success(output: &Output) {
@@ -221,6 +225,72 @@ fn sibling_insertion_preserves_every_shared_output_trace() {
         assert_eq!(
             base_shared, sibling_shared,
             "shared trace changed at tick {tick}"
+        );
+    }
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn linked_product_preserves_population_views_firings_and_deferred_trace() {
+    let temp = temp_dir("linked-product");
+    let solo_output = temp.join("solo.csv");
+    let product_output = temp.join("product.csv");
+    // The CLI population flag applies to the first canonical box.  Using the
+    // authored population size preserves the population leaf in both plans;
+    // the product's independent policy leaf cannot affect its trace.
+    let solo = run_with_population(
+        &repository_path("fixtures/plans/linked/solo_population.plan.json"),
+        &solo_output,
+        "1000",
+    );
+    let product = run_with_population(
+        &repository_path("fixtures/plans/linked/independent_epidemic_policy.plan.json"),
+        &product_output,
+        "1000",
+    );
+    assert_success(&solo);
+    assert_success(&product);
+
+    let (solo_headers, solo_rows) = csv_table(&std::fs::read(solo_output).unwrap());
+    let (product_headers, product_rows) = csv_table(&std::fs::read(product_output).unwrap());
+    assert_eq!(solo_rows.len(), 40);
+    assert_eq!(product_rows.len(), 40);
+
+    let population_columns = [
+        "tick",
+        "I",
+        "R",
+        "S",
+        "fired_infect",
+        "fired_recover",
+        "deferred_total",
+    ];
+    let indices = |headers: &[String]| {
+        population_columns
+            .iter()
+            .map(|column| {
+                headers
+                    .iter()
+                    .position(|header| header == column)
+                    .unwrap_or_else(|| panic!("missing population trace column {column}"))
+            })
+            .collect::<Vec<_>>()
+    };
+    let solo_indices = indices(&solo_headers);
+    let product_indices = indices(&product_headers);
+
+    for (tick, (solo_row, product_row)) in solo_rows.iter().zip(&product_rows).enumerate() {
+        let solo_population = solo_indices
+            .iter()
+            .map(|&index| solo_row[index].as_str())
+            .collect::<Vec<_>>();
+        let product_population = product_indices
+            .iter()
+            .map(|&index| product_row[index].as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            solo_population, product_population,
+            "population product trace changed at tick {tick}"
         );
     }
     std::fs::remove_dir_all(temp).unwrap();

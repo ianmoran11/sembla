@@ -159,3 +159,14 @@ for fixture in "${source_fixtures[@]}"; do
   cmp "$repo_root/fixtures/composition-source/$fixture.source.json" "$tmp/$fixture.source.json"
 done
 echo "Lean composition-source exports are byte-identical to canonical fixtures"
+
+# --- PRD 0007: canonical product-linker plan parity (append-only) ---
+linked_fixtures=(solo_population independent_epidemic_policy two_independent_regions)
+for fixture in "${linked_fixtures[@]}"; do
+  (cd "$frontend_root" && lake exe sembla-link \
+    "$repo_root/fixtures/composition-source/$fixture.source.json" \
+    --plan "$tmp/$fixture.linked.plan.json")
+  cmp "$repo_root/fixtures/plans/linked/$fixture.plan.json" "$tmp/$fixture.linked.plan.json"
+  "$sembla" validate "$tmp/$fixture.linked.plan.json"
+done
+echo "Lean product-linked plans are byte-identical to canonical fixtures"

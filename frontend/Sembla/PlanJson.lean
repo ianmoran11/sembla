@@ -260,9 +260,20 @@ private def linkerJson (linker : Plan.LinkerDescriptorV1) : CJson := obj [
   ("plan_schema", .str linker.planSchema), ("identity_scheme", .str linker.identityScheme),
   ("canonical_encoding", .str linker.canonicalEncoding),
   ("source_map_schema", .str linker.sourceMapSchema)]
+private def sourceMapLeafJson (leaf : Composition.SourceMapLeafV1) : CJson := obj [
+  ("occurrence", .str leaf.occurrence),
+  ("definition", .str leaf.definition),
+  ("instance_path", arr (leaf.instancePath.map CJson.str)),
+  ("display_path", .str leaf.displayPath)]
+private def sourceMapJson (sourceMap : Composition.SourceMapV1) : CJson := obj [
+  ("schema_version", .str sourceMap.schemaVersion),
+  ("leaves", arr ((sortBy sourceMap.leaves (·.occurrence)).map sourceMapLeafJson)),
+  ("boundary", arr (sourceMap.boundary.map CJson.str)),
+  ("hidden", arr (sourceMap.hidden.map CJson.str))]
 private def provenanceJson (provenance : Plan.LinkedProvenanceV1) : CJson := obj [
   ("source_hash", hashRecordJson provenance.sourceHash),
-  ("linker", linkerJson provenance.linker), ("source_map", .null)]
+  ("linker", linkerJson provenance.linker),
+  ("source_map", sourceMapJson provenance.sourceMap)]
 private def schedulerJson (domain : Plan.SchedulerDomainV1) : CJson := obj [
   ("id", .str domain.id), ("algorithm", .str domain.algorithm),
   ("leaves", arr (domain.leaves.map CJson.str))]
