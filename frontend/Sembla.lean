@@ -1,5 +1,7 @@
 import Sembla.IR
 import Sembla.Json
+import Sembla.Hash
+import Sembla.HashTests
 import Sembla.DSL
 import Sembla.Models
 import Sembla.CanonicalModelsTests
