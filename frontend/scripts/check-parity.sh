@@ -151,3 +151,11 @@ for model in "${plan_models[@]}"; do
   "$sembla" validate "$tmp/$model.plan.json"
 done
 echo "Lean plan exports are byte-identical to Rust-canonical fixtures"
+
+# --- PRD 0006: canonical composition-source export parity (append-only) ---
+source_fixtures=(solo_population independent_epidemic_policy two_independent_regions epidemic_policy two_regions regional_response)
+for fixture in "${source_fixtures[@]}"; do
+  (cd "$frontend_root" && lake exe sembla-export --source "$fixture" "$tmp/$fixture.source.json")
+  cmp "$repo_root/fixtures/composition-source/$fixture.source.json" "$tmp/$fixture.source.json"
+done
+echo "Lean composition-source exports are byte-identical to canonical fixtures"

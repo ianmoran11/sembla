@@ -5,6 +5,10 @@ import Sembla.HashTests
 import Sembla.Plan
 import Sembla.PlanJson
 import Sembla.PlanExport
+import Sembla.Composition.Source
+import Sembla.Composition.Json
+import Sembla.Composition.Fixtures
+import Sembla.Composition.SourceTests
 import Sembla.DSL
 import Sembla.Models
 import Sembla.PlanTests
