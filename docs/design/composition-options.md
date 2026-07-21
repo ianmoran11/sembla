@@ -2,6 +2,9 @@
 
 **Status:** Design options / discussion note, 2026-07-21. No option in this
 note is implemented merely by being described here.
+Option D was selected and recorded in DECISIONS.md §J;
+option-d-architecture.md plus docs/prds-composition/README.md supersede this
+note's open decisions.
 
 **Scope:** Reusable systems/boxes, parallel product, wiring and feedback,
 nesting and encapsulation, transition behavior under composition, constrained

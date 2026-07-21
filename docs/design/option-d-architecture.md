@@ -3,6 +3,8 @@
 **Status:** Proposed architecture detail, 2026-07-21. This document selects and
 specifies the recommended shape of Option D for review. It does not implement
 composition syntax, change the runtime, or supersede a decision record.
+Accepted 2026-07-21 as amended by docs/prds-composition/README.md and
+DECISIONS.md §J; the README's amendments win over this document.
 
 **Scope:** The serialized composition-source representation, canonical Lean 4
 linker, flat executable plan, semantics and proof boundary, stable identities,

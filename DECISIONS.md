@@ -855,3 +855,183 @@ with checked-in golden fixtures and round-trip tests. The first run of 0002
 sets the contract; everything downstream (especially the Lean parity check in
 0010) builds against it. Flagged for a human glance before 0010, because it
 is the one artifact whose first draft becomes permanent.
+
+## J. Composition and the Option D architecture (accepted 2026-07-21)
+
+### J1. Option D pipeline accepted
+
+**Decision.** Composition uses serialized composition source → one canonical
+Lean 4 linker → a versioned flat executable plan → Rust validation and
+execution. The first release is limited to the architecture document's Phases
+0–4: decisions, the plan envelope and stable identity, composition source, the
+linker with product, wires, and nesting, specification statements, surface
+syntax, and the artifact bundle. Recursive runtime hierarchy is rejected
+because it would force hierarchy into validation, addressing, scheduling,
+execution, hashing, reporting, and fixtures while risking distinct flat and
+hierarchical semantics. A free composition AST as the executable contract is
+also rejected because every runtime and backend would need an interpreter for
+generality beyond the concrete model needs. Algebraic structure remains at the
+source layer, while execution has one canonical flat contract.
+
+### J2. Hash algorithm
+
+**Decision.** All new hashes use SHA-256 with domain separation:
+`SHA-256(domain-string ++ 0x00 ++ payload)`. Persisted hashes are records
+`{algorithm: "sha256", domain, digest}` with lowercase hex digests. blake3 is
+rejected because `sha2` is already the approved manifest dependency and
+`scripts/check.sh` enforces the dependency policy. One algorithm and explicit
+domains keep every persisted digest interpretable without adding a new
+cryptographic dependency.
+
+### J3. Stable identity grammar
+
+**Decision.** A **slug** is `[a-z][a-z0-9_]*` in ASCII, matching existing
+runtime snake_case names, with no leading digit or underscore. A **stable
+declaration ID** is `<kind>:<slug>` with the prefixes `model:`, `def:`,
+`inst:`, `port:`, `wire:`, and `expose:`, for example `def:population`, `inst:north`,
+`port:infection_count`, and `wire:count_to_policy`. A **transition local ID**
+is the transition's existing runtime `name` slug, which is already stable and
+referenced by `fired:` columns. An **occurrence ID** is `occ:` followed by the
+slash-joined chain of instance-ID slugs from the root definition: depth 1 is
+`occ:population`, nested examples are `occ:epidemic/population` and
+`occ:north/population`, and the root definition itself is the empty chain
+`occ:`. Occurrence chains are built from instance declaration IDs, never
+display names and never traversal positions. No identity is ever derived from
+a display name or a traversal position. A **transition occurrence
+identity** is `<occurrence-id>#<transition-name>`, for example
+`occ:population#infect` and `occ:north/population#infect`. A **wire occurrence
+identity** is `<owner-occurrence>#wire:<wire-slug>`, for example
+`occ:#wire:count_to_policy` for a root-owned wire and
+`occ:north#wire:count_to_policy` for the same wire inside instance `north`. A
+**mailbox identity** is
+`mbox:<wire-occurrence>|<source-occurrence>.<port-slug>|<target-occurrence>.<port-slug>`;
+including both endpoints disambiguates fan-out. A **plan leaf name** is the
+occurrence chain slugs joined by `/`, such as `population` or
+`epidemic/population`; because slugs contain no `/` or `.`, it cannot collide
+with existing `box.table.attr` report naming, and display names remain
+non-semantic source-map data.
+
+### J4. RNG strategy (doc open question 2 resolved)
+
+**Decision.** The Philox coordinate layout
+`[tick, rule_word, entity_id, draw_idx]` is unchanged. For versioned plans the
+`u32` rule word is content-addressed by the following frozen construction:
+
+```text
+rule_word = big-endian u32 of the first 4 bytes of
+  SHA-256( "sembla.rule-word/v1" ++ 0x00 ++ transition-occurrence-identity )
+```
+
+Words equal to `u32::MAX - 1` or `u32::MAX`, which are reserved sweep/prior
+namespaces, and any collision between two accepted identities are
+deterministic link/validation errors; identities are never reassigned. A
+persisted next-free registry is rejected because it is history-dependent and
+would let unrelated insertion order affect identity. Widening the coordinate
+is rejected because it would change the RNG format rather than preserve the
+existing Philox contract.
+
+### J5. Canonical JSON (`sembla.canonical-json/v1`)
+
+**Decision.** Every new composition source, executable plan, and bundle
+manifest uses UTF-8 with no BOM, no insignificant whitespace, and no trailing
+newline, so file bytes are exactly the canonical bytes. Object keys are sorted
+by byte-wise lexicographic order. Optional absent fields are omitted, never
+`null`, and related optional fields form all-present-or-all-absent tuples whose
+partial forms readers reject. Plan arrays use canonical order by stable
+identity—leaves by occurrence path, transitions by `(leaf, name)`, and
+wires/mailboxes by identity string—while source collections preserve author
+order. Strings escape only `"`, `\`, and control characters
+(`\b \t \n \f \r`, otherwise `\u00xx` lowercase), with every other character
+literal UTF-8, matching serde_json-style escaping. Integers use plain decimal
+without leading zeros or `+`; non-integer numerics use the existing Lean
+canonical model writer's exact conventions so values such as `dt: 0.25`
+round-trip through `serde_json` with its enabled `float_roundtrip` behavior.
+Versioned parsers reject unknown fields rather than assigning them inert or
+best-effort meanings.
+
+### J6. Version strings
+
+**Decision.** The required version strings and hash domains are frozen as
+follows and are part of the artifact contract.
+
+| Concern | String |
+|---|---|
+| Composition source schema | `sembla.composition-source/v1` |
+| Executable plan schema | `sembla.executable-plan/v1` |
+| Linker semantics | `sembla.linker/v1` |
+| Stable identity scheme | `sembla.identity/stable-v1` |
+| Legacy identity scheme | `sembla.identity/legacy-positional-v1` |
+| Canonical encoding | `sembla.canonical-json/v1` |
+| Source map schema | `sembla.source-map/v1` |
+| Hash domains | `sembla.source-artifact/v1`, `sembla.plan-core/v1`, `sembla.plan-envelope/v1`, `sembla.bundle-root/v1`, `sembla.rule-word/v1` |
+
+Unknown or missing required version strings are always rejected with a
+deterministic error, never interpreted by best effort. `required_features` and
+`enabled_features` must be present and exactly `[]` in V1; any entry is a
+deterministic rejection naming the feature.
+
+### J7. Plan origins and the legacy path
+
+**Decision.** Versioned plan envelopes have exactly two origins in V1:
+`linked` and `direct_stable`. Unversioned model JSON, including everything
+currently in `examples/`, is the envelope-free `legacy` path. That path keeps
+dense declaration-order rule IDs under the scheme name
+`sembla.identity/legacy-positional-v1`. Its behavior remains byte-identical
+forever and it is never silently upgraded. The architecture document's
+`normalized legacy` origin is deferred rather than accepted into V1. Keeping
+legacy outside the versioned envelope prevents a migration label from changing
+an existing compatibility contract.
+
+### J8. Parameter bindings (doc open question 5 resolved)
+
+**Decision.** An instance binds each component parameter requirement to a
+model-level parameter name, never a literal. Binding two instances to the same
+model parameter is explicit sharing. Distinct per-instance values require
+distinct model parameters. Literal bindings and an implicit per-instance
+parameter namespace are rejected because they would change parameter
+resolution and sharing semantics. The existing θ, `Param` resolution, priors,
+and sweep behavior are unchanged.
+
+### J9. `dt` and scheduler domains (doc open question 6 resolved)
+
+**Decision.** Components never declare `dt`; the root composition declares
+`outer_dt`. V1 has exactly one scheduler domain, `domain:global`, using the
+algorithm `tau_leap` and containing every leaf. Per-component time steps and
+heterogeneous scheduler domains are rejected because they require scheduling
+semantics outside this release. One root time step preserves the existing
+runtime's single global scheduling contract.
+
+### J10. Composition laws are byte-equality (doc open question 4 resolved)
+
+**Decision.** Plan collections are sorted by stable identity, so product
+associativity, product symmetry, alpha-renaming, and declaration-permutation
+laws are byte-equality of canonical plan cores. Isomorphism-only laws are
+rejected because canonical ordering supplies a stronger mechanical contract.
+The plan **semantic** hash uses domain `sembla.plan-core/v1` and covers exactly
+`{schema_version, identity_scheme, model, identity}`. It excludes `origin` and
+`linked_provenance`, and source maps and display names never enter this hash.
+The **envelope** hash uses domain `sembla.plan-envelope/v1` and covers the whole
+envelope. This separation lets equivalent linked and direct-stable cores share
+semantic identity while their complete provenance-bearing artifacts remain
+distinguishable.
+
+### J11. Hashes live outside the plan
+
+**Decision.** Plan files never embed their own hash records. Hashes are
+computed over exact canonical file bytes and recorded in run manifests and
+bundle manifests. Embedding a plan's own digest and the architecture document
+§5.3 self-reference rules are rejected because they make the hashed value
+self-referential. External recording keeps the canonical plan bytes and their
+integrity records unambiguous.
+
+### J12. Deferred constructs
+
+**Decision.** Synchronized transition families, `Share`/`Identify`, semantic
+invariants and constrained products, observational assertions, heterogeneous
+schedulers, explicit adapter/merge components, dynamic component topology,
+ACSet storage or any Julia dependency, non-Lean source producers, and any
+non-Lean linker are all out of scope for this release. They are deferred rather
+than admitted as partially implemented alternatives. Under DESIGN.md §5.5's
+no-inert-syntax rule, every one must be rejected with a deterministic error if
+it appears in an artifact. No deferred construct may be accepted and then
+silently ignored.
