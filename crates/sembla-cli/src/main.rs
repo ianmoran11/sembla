@@ -1802,6 +1802,10 @@ fn summaries_csv(summaries: &[SummaryValue]) -> String {
     csv
 }
 
+fn parent_occurrence_path(box_name: &str) -> &str {
+    box_name.rsplit_once('/').map_or("", |(parent, _)| parent)
+}
+
 fn initializers_from_population(
     model: &sembla_ir::ValidatedModel,
     population: &SyntheticPopulation,
@@ -1824,12 +1828,12 @@ fn initializers_from_population(
             }) && model_box.tables.iter().any(|table| table.name == "employer")
         })
         .collect::<Vec<_>>();
-    let [population_box] = population_boxes.as_slice() else {
-        return Err(format!(
-            "population file requires exactly one compatible person/employer schema, found {}",
-            population_boxes.len()
-        ));
-    };
+    if population_boxes.is_empty() {
+        return Err(
+            "population file requires exactly one compatible person/employer schema, found 0"
+                .to_owned(),
+        );
+    }
     let controller_boxes = model
         .model()
         .boxes
@@ -1843,28 +1847,86 @@ fn initializers_from_population(
             })
         })
         .collect::<Vec<_>>();
-    let controller_box = match controller_boxes.as_slice() {
-        [] => None,
-        [model_box] => Some(*model_box),
-        _ => {
+
+    let mut initial = Vec::new();
+    let mut initialized_population_boxes = Vec::new();
+    let mut initialized_controller_boxes = Vec::new();
+    if let [population_box] = population_boxes.as_slice() {
+        // Preserve the pre-PRD single-population behavior exactly.
+        let controller_box = match controller_boxes.as_slice() {
+            [] => None,
+            [model_box] => Some(*model_box),
+            _ => {
+                return Err(format!(
+                    "population file found {} compatible controller schemas",
+                    controller_boxes.len()
+                ));
+            }
+        };
+        initial.extend(match controller_box {
+            Some(controller) => population
+                .sir_policy_table_initializers_for_boxes(&population_box.name, &controller.name),
+            None => population.sir_table_initializers_for_box(&population_box.name),
+        });
+        initialized_population_boxes.push(population_box.name.as_str());
+        if let Some(controller) = controller_box {
+            initialized_controller_boxes.push(controller.name.as_str());
+        }
+    } else {
+        for (index, population_box) in population_boxes.iter().enumerate() {
+            let scope = parent_occurrence_path(&population_box.name);
+            if population_boxes[..index]
+                .iter()
+                .any(|other| parent_occurrence_path(&other.name) == scope)
+            {
+                return Err(format!(
+                    "population file found multiple compatible population schemas in occurrence scope '{scope}'"
+                ));
+            }
+            let matching_controllers = controller_boxes
+                .iter()
+                .filter(|controller| parent_occurrence_path(&controller.name) == scope)
+                .copied()
+                .collect::<Vec<_>>();
+            let controller = match matching_controllers.as_slice() {
+                [] if controller_boxes.is_empty() => None,
+                [controller] => Some(*controller),
+                _ => {
+                    return Err(format!(
+                        "population file found {} compatible controller schemas in occurrence scope '{scope}'",
+                        matching_controllers.len()
+                    ));
+                }
+            };
+            initial.extend(match controller {
+                Some(controller) => population.sir_policy_table_initializers_for_boxes(
+                    &population_box.name,
+                    &controller.name,
+                ),
+                None => population.sir_table_initializers_for_box(&population_box.name),
+            });
+            initialized_population_boxes.push(population_box.name.as_str());
+            if let Some(controller) = controller {
+                initialized_controller_boxes.push(controller.name.as_str());
+            }
+        }
+        if let Some(unmatched) = controller_boxes
+            .iter()
+            .find(|controller| !initialized_controller_boxes.contains(&controller.name.as_str()))
+        {
             return Err(format!(
-                "population file found {} compatible controller schemas",
-                controller_boxes.len()
+                "population file found unmatched compatible controller schema '{}'",
+                unmatched.name
             ));
         }
-    };
-    let mut initial = match controller_box {
-        Some(controller) => population
-            .sir_policy_table_initializers_for_boxes(&population_box.name, &controller.name),
-        None => population.sir_table_initializers_for_box(&population_box.name),
-    };
+    }
+
     for model_box in &model.model().boxes {
         for table in &model_box.tables {
-            if (model_box.name == population_box.name
+            if (initialized_population_boxes.contains(&model_box.name.as_str())
                 && (table.name == "person" || table.name == "employer"))
-                || controller_box.is_some_and(|controller| {
-                    model_box.name == controller.name && table.name == "controller"
-                })
+                || (initialized_controller_boxes.contains(&model_box.name.as_str())
+                    && table.name == "controller")
             {
                 continue;
             }

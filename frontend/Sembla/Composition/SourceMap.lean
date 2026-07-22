@@ -10,13 +10,25 @@ structure SourceMapLeafV1 where
   displayPath : String
 deriving Repr, BEq
 
-/-- Minimal source map emitted by the product linker.  Boundary and hidden
-    entries remain empty until PRD 0009 defines their payloads. -/
+/-- One root boundary alias resolved transitively to a primitive leaf. -/
+structure SourceMapBoundaryV1 where
+  outer : String
+  leaf : String
+  port : String
+  path : List String
+deriving Repr, BEq
+
+/-- One root-owned hidden direct-child boundary port. -/
+structure SourceMapHiddenV1 where
+  instance_ : String
+  port : String
+deriving Repr, BEq
+
 structure SourceMapV1 where
   schemaVersion : String
   leaves : List SourceMapLeafV1
-  boundary : List String
-  hidden : List String
+  boundary : List SourceMapBoundaryV1
+  hidden : List SourceMapHiddenV1
 deriving Repr, BEq
 
 end Sembla.Composition

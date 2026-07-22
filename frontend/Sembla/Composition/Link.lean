@@ -54,24 +54,12 @@ private def envelopeErrors (source : CompositionSourceV1) : List LinkErrorV1 :=
   versionErrors ++ featureErrors
 
 private def constructErrors (source : CompositionSourceV1) : List LinkErrorV1 :=
-  let laterConstructs := (source.definitions.map fun definition =>
-    match definition.body with
-    | .primitive _ => []
-    | .composite body =>
-        let exposureErrors := body.exposures.map fun exposure =>
-          mkError .unsupportedConstruct exposure.id
-            s!"exposure '{exposure.id.raw}' is unsupported by wire linking; PRD 0009 adds exposures"
-        let hiddenErrors := body.hiddenPorts.map fun hidden =>
-          mkError .unsupportedConstruct definition.id
-            s!"hidden port on '{definition.id.raw}' is unsupported by wire linking; PRD 0009 adds hiding"
-            [hidden.instance_, hidden.port]
-        exposureErrors ++ hiddenErrors).join
   let rootPrimitive := match definition? source.definitions source.rootDefinition with
     | some { body := .primitive _, .. } =>
         [mkError .unsupportedConstruct source.rootDefinition
           "primitive root definitions are unsupported in V1 because executable leaf paths must be nonempty"]
     | _ => []
-  laterConstructs ++ rootPrimitive
+  rootPrimitive
 
 private def duplicateDefinitionErrors (definitions : List ComponentDefinitionV1) : List LinkErrorV1 :=
   let rec loop (seen : List StableId) : List ComponentDefinitionV1 → List LinkErrorV1
@@ -308,6 +296,179 @@ private partial def expandDefinition
           (chain ++ [idSlug "inst:" item.id]) (instancePath ++ [item.id])
           (resolvedBindings bindings item target)).join
 
+private structure ResolvedBoundaryPort where
+  direction : PortDirection
+  schema : List IR.Attr
+  leafPath : List StableId
+  leafPort : StableId
+  exposurePath : List StableId
+deriving Repr, BEq
+
+private instance : Inhabited ResolvedBoundaryPort := ⟨{
+  direction := .input
+  schema := []
+  leafPath := []
+  leafPort := sid "port:invalid"
+  exposurePath := [] }⟩
+
+private instance : Inhabited LinkErrorV1 :=
+  ⟨mkError .missingPort (sid "port:invalid") "partial boundary resolution failed"⟩
+
+private partial def descendantHasPort
+    (definitions : List ComponentDefinitionV1) (definition : ComponentDefinitionV1)
+    (portId : StableId) : Bool :=
+  definition.ports.any (·.id == portId) || match definition.body with
+  | .primitive _ => false
+  | .composite body =>
+      body.exposures.any (·.outerPort == portId) || body.instances.any fun item =>
+        match definition? definitions item.definition with
+        | none => false
+        | some child => descendantHasPort definitions child portId
+
+mutual
+  private partial def resolveDefinitionBoundary
+      (definitions : List ComponentDefinitionV1) (primary : StableId) (context : String)
+      (definition : ComponentDefinitionV1) (portId : StableId) :
+      Except LinkErrorV1 ResolvedBoundaryPort := do
+    match definition.body with
+    | .primitive _ =>
+        let port ← match definition.ports.find? fun candidate => candidate.id == portId with
+          | some port => pure port
+          | none => throw (mkError .missingPort primary
+              s!"{context} references missing port '{portId.raw}' on primitive '{definition.id.raw}'"
+              [definition.id, portId])
+        pure {
+          direction := port.direction
+          schema := port.schema
+          leafPath := []
+          leafPort := port.id
+          exposurePath := [] }
+    | .composite body =>
+        let exposure ← match body.exposures.find? fun candidate => candidate.outerPort == portId with
+          | some exposure => pure exposure
+          | none =>
+              if descendantHasPort definitions definition portId then
+                throw (mkError .inaccessibleDescendantPort primary
+                  s!"{context} references descendant port '{portId.raw}', but composite '{definition.id.raw}' failed to expose it"
+                  [definition.id, portId])
+              else
+                throw (mkError .missingPort primary
+                  s!"{context} references missing boundary port '{portId.raw}' on composite '{definition.id.raw}'"
+                  [definition.id, portId])
+        let resolved ← resolveDirectChildBoundary definitions primary context body
+          exposure.innerInstance exposure.innerPort
+        pure { resolved with exposurePath := exposure.id :: resolved.exposurePath }
+
+  private partial def resolveDirectChildBoundary
+      (definitions : List ComponentDefinitionV1) (primary : StableId) (context : String)
+      (owner : CompositeBodyV1) (childId portId : StableId) :
+      Except LinkErrorV1 ResolvedBoundaryPort := do
+    let child ← match owner.instances.find? fun item => item.id == childId with
+      | some child => pure child
+      | none => throw (mkError .missingPort primary
+          s!"{context} references missing direct child '{childId.raw}'" [childId, portId])
+    let childDefinition ← match definition? definitions child.definition with
+      | some childDefinition => pure childDefinition
+      | none => throw (mkError .missingPort primary
+          s!"{context} cannot resolve child definition '{child.definition.raw}'"
+          [child.id, child.definition, portId])
+    let resolved ← resolveDefinitionBoundary definitions primary context childDefinition portId
+    pure { resolved with leafPath := child.id :: resolved.leafPath }
+end
+
+private def duplicateOuterPortErrors
+    (definition : ComponentDefinitionV1) (body : CompositeBodyV1) : List LinkErrorV1 :=
+  let rec loop (seen : List StableId) : List ExposureDeclV1 → List LinkErrorV1
+    | [] => []
+    | exposure :: rest =>
+        let errors := if seen.contains exposure.outerPort then
+          [mkError .duplicateStableId exposure.outerPort
+            s!"composite '{definition.id.raw}' exposes duplicate outer port '{exposure.outerPort.raw}'"
+            [definition.id, exposure.id]]
+        else []
+        errors ++ loop (exposure.outerPort :: seen) rest
+  loop [] body.exposures
+
+private def duplicateDeclaredPortErrors
+    (definition : ComponentDefinitionV1) : List LinkErrorV1 :=
+  let rec loop (seen : List StableId) : List PortDeclV1 → List LinkErrorV1
+    | [] => []
+    | port :: rest =>
+        let errors := if seen.contains port.id then
+          [mkError .duplicateStableId port.id
+            s!"composite '{definition.id.raw}' declares duplicate boundary port '{port.id.raw}'"
+            [definition.id, port.id]]
+        else []
+        errors ++ loop (port.id :: seen) rest
+  loop [] definition.ports
+
+private def exposureResolutionErrors
+    (definitions : List ComponentDefinitionV1) (definition : ComponentDefinitionV1)
+    (body : CompositeBodyV1) : List LinkErrorV1 :=
+  let exposureErrors := (body.exposures.map fun exposure =>
+    match resolveDirectChildBoundary definitions exposure.id
+        s!"exposure '{exposure.id.raw}'" body exposure.innerInstance exposure.innerPort with
+    | .error error => [error]
+    | .ok resolved =>
+        match definition.ports.find? fun port => port.id == exposure.outerPort with
+        | none => [mkError .missingPort exposure.id
+            s!"exposure '{exposure.id.raw}' has no declared outer boundary port '{exposure.outerPort.raw}' on composite '{definition.id.raw}'"
+            [definition.id, exposure.outerPort]]
+        | some declared =>
+            (if declared.direction == resolved.direction then [] else
+              [mkError .directionMismatch exposure.id
+                s!"declared outer port '{declared.id.raw}' direction does not match the boundary inherited by exposure '{exposure.id.raw}'"
+                [definition.id, declared.id, resolved.leafPort]]) ++
+            (if declared.schema == resolved.schema then [] else
+              [mkError .schemaMismatch exposure.id
+                s!"declared outer port '{declared.id.raw}' schema {reprStr declared.schema} does not match inherited schema {reprStr resolved.schema}"
+                [definition.id, declared.id, resolved.leafPort]])).join
+  let unexposedDeclarations := definition.ports.filterMap fun port =>
+    if body.exposures.any fun exposure => exposure.outerPort == port.id then none
+    else some (mkError .missingPort port.id
+      s!"declared composite boundary port '{port.id.raw}' on '{definition.id.raw}' has no exposure"
+      [definition.id, port.id])
+  exposureErrors ++ unexposedDeclarations
+
+private def hiddenResolutionErrors
+    (definitions : List ComponentDefinitionV1) (owner : ComponentDefinitionV1)
+    (body : CompositeBodyV1) : List LinkErrorV1 :=
+  body.hiddenPorts.filterMap fun hidden =>
+    match resolveDirectChildBoundary definitions owner.id
+        s!"hidden port on composite '{owner.id.raw}'" body hidden.instance_ hidden.port with
+    | .ok _ => none
+    | .error error =>
+        if error.code == .inaccessibleDescendantPort then
+          some (mkError .missingPort owner.id
+            s!"hidden port '{hidden.port.raw}' is not a boundary port of direct child '{hidden.instance_.raw}'"
+            [hidden.instance_, hidden.port])
+        else some error
+
+private def hiddenConflictErrors
+    (owner : ComponentDefinitionV1) (body : CompositeBodyV1) : List LinkErrorV1 :=
+  body.hiddenPorts.filterMap fun hidden =>
+    let wires := body.wires.filter fun wire =>
+      (wire.sourceInstance == hidden.instance_ && wire.sourcePort == hidden.port) ||
+      (wire.targetInstance == hidden.instance_ && wire.targetPort == hidden.port)
+    let exposures := body.exposures.filter fun exposure =>
+      exposure.innerInstance == hidden.instance_ && exposure.innerPort == hidden.port
+    let related := sortBy (wires.map (·.id) ++ exposures.map (·.id)) (·.raw)
+    if related.isEmpty then none
+    else some (mkError .hiddenPortConflict owner.id
+      s!"hidden direct-child boundary '{hidden.instance_.raw}.{hidden.port.raw}' cannot also be wired or exposed by composite '{owner.id.raw}'"
+      ([hidden.instance_, hidden.port] ++ related))
+
+private def boundaryValidationErrors
+    (definitions : List ComponentDefinitionV1) : List LinkErrorV1 :=
+  (definitions.map fun definition => match definition.body with
+    | .primitive _ => []
+    | .composite body =>
+        duplicateOuterPortErrors definition body ++
+        duplicateDeclaredPortErrors definition ++
+        exposureResolutionErrors definitions definition body ++
+        hiddenResolutionErrors definitions definition body ++
+        hiddenConflictErrors definition body).join
+
 private structure ResolvedWireEndpoint where
   instance_ : InstanceDeclV1
   definition : ComponentDefinitionV1
@@ -343,25 +504,20 @@ private def resolveWireEndpoint
     | none => throw (mkError .missingPort wire.id
         s!"wire '{wire.id.raw}' cannot resolve child definition '{child.definition.raw}'"
         [child.id, child.definition])
-  match childDefinition.body with
-  | .composite _ =>
-      throw (mkError .missingPort wire.id
-        s!"wire '{wire.id.raw}' references composite child '{child.id.raw}'; boundary wiring requires exposures (PRD 0009)"
-        [child.id, childDefinition.id, portId])
-  | .primitive _ =>
-      let port ← match childDefinition.ports.find? fun candidate => candidate.id == portId with
-        | some port => pure port
-        | none => throw (mkError .missingPort wire.id
-            s!"wire '{wire.id.raw}' references missing port '{portId.raw}' on '{child.id.raw}'"
-            [child.id, childDefinition.id, portId])
-      let chain := ownerChain ++ [idSlug "inst:" child.id]
-      let boxName := String.intercalate "/" chain
-      pure {
-        instance_ := child
-        definition := childDefinition
-        port
-        boxName
-        occurrence := "occ:" ++ boxName }
+  let resolved ← resolveDirectChildBoundary definitions wire.id s!"wire '{wire.id.raw}'"
+    owner childId portId
+  let chain := ownerChain ++ resolved.leafPath.map (idSlug "inst:")
+  let boxName := String.intercalate "/" chain
+  pure {
+    instance_ := child
+    definition := childDefinition
+    port := {
+      id := resolved.leafPort
+      displayName := ""
+      direction := resolved.direction
+      schema := resolved.schema }
+    boxName
+    occurrence := "occ:" ++ boxName }
 
 private def resolveWire
     (definitions : List ComponentDefinitionV1) (owner : CompositeBodyV1)
@@ -448,6 +604,28 @@ private def expandedMailbox (wire : ExpandedWire) : Plan.MailboxIdentityV1 := {
   sourcePort := wire.modelWire.source.port
   targetBox := wire.modelWire.target.box
   targetPort := wire.modelWire.target.port }
+
+private def rootBoundarySourceMap
+    (definitions : List ComponentDefinitionV1) (root : ComponentDefinitionV1) :
+    List SourceMapBoundaryV1 :=
+  match root.body with
+  | .primitive _ => []
+  | .composite body => sortBy (body.exposures.filterMap fun exposure =>
+      match resolveDefinitionBoundary definitions exposure.id
+          s!"root exposure '{exposure.id.raw}'" root exposure.outerPort with
+      | .error _ => none
+      | .ok resolved => some {
+          outer := exposure.outerPort.raw
+          leaf := "occ:" ++ String.intercalate "/" (resolved.leafPath.map (idSlug "inst:"))
+          port := idSlug "port:" resolved.leafPort
+          path := resolved.exposurePath.map (·.raw) }) (·.outer)
+
+private def rootHiddenSourceMap (root : ComponentDefinitionV1) : List SourceMapHiddenV1 :=
+  match root.body with
+  | .primitive _ => []
+  | .composite body => sortBy (body.hiddenPorts.map fun hidden => {
+      instance_ := hidden.instance_.raw
+      port := hidden.port.raw }) fun item => item.instance_ ++ "|" ++ item.port
 
 private def identityErrors
     (transitions : List Plan.TransitionIdentityV1) : List LinkErrorV1 :=
@@ -1157,7 +1335,14 @@ def planValidCheck (plan : Plan.ExecutablePlanV1) : Bool :=
       provenance.linker.canonicalEncoding == Plan.canonicalEncoding &&
       provenance.linker.sourceMapSchema == Plan.sourceMapSchema &&
       provenance.sourceMap.schemaVersion == Plan.sourceMapSchema &&
-      provenance.sourceMap.boundary.isEmpty && provenance.sourceMap.hidden.isEmpty &&
+      provenance.sourceMap.boundary == sortBy provenance.sourceMap.boundary (·.outer) &&
+      namesUnique (provenance.sourceMap.boundary.map (·.outer)) &&
+      provenance.sourceMap.boundary.all (fun boundary =>
+        expectedLeaves.any (·.occurrence == boundary.leaf) &&
+        PlanExport.isSlug boundary.port && !boundary.path.isEmpty) &&
+      provenance.sourceMap.hidden == sortBy provenance.sourceMap.hidden
+        (fun item => item.instance_ ++ "|" ++ item.port) &&
+      namesUnique (provenance.sourceMap.hidden.map fun item => item.instance_ ++ "|" ++ item.port) &&
       provenance.sourceMap.leaves == sortBy provenance.sourceMap.leaves (·.occurrence) &&
       provenance.sourceMap.leaves.map (·.occurrence) == expectedLeaves.map (·.occurrence)
 
@@ -1175,6 +1360,8 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
     | some root => pure root
     | none => fail [mkError .missingDefinition source.rootDefinition
         s!"root definition '{source.rootDefinition.raw}' does not exist"]
+  let nestingErrors := boundaryValidationErrors source.definitions
+  if !nestingErrors.isEmpty then fail nestingErrors
   let rootBindings := root.parameterRequirements.map fun requirement =>
     { requirement, parameter := requirement : ParameterBinding }
   let rootRequirementErrors := root.parameterRequirements.filterMap fun requirement =>
@@ -1230,8 +1417,8 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
       definition := leaf.definition.raw
       instancePath := leaf.instancePath.map (·.raw)
       displayPath := leaf.modelBox.name }) (·.occurrence)
-    boundary := []
-    hidden := [] }
+    boundary := rootBoundarySourceMap source.definitions root
+    hidden := rootHiddenSourceMap root }
   let plan : Plan.ExecutablePlanV1 := {
     schemaVersion := Plan.planSchema
     identityScheme := Plan.stableIdentityScheme

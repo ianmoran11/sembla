@@ -199,7 +199,7 @@ fn every_linked_plan_is_valid_canonical_and_pins_its_source_hash() {
         })
         .collect::<Vec<_>>();
     plans.sort();
-    assert_eq!(plans.len(), 5);
+    assert_eq!(plans.len(), 8);
 
     for path in plans {
         let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
@@ -248,14 +248,24 @@ fn every_linked_plan_is_valid_canonical_and_pins_its_source_hash() {
             provenance.source_map["schema_version"],
             "sembla.source-map/v1"
         );
-        assert!(provenance.source_map["boundary"]
-            .as_array()
-            .unwrap()
-            .is_empty());
-        assert!(provenance.source_map["hidden"]
-            .as_array()
-            .unwrap()
-            .is_empty());
+        let boundary = provenance.source_map["boundary"].as_array().unwrap();
+        let hidden = provenance.source_map["hidden"].as_array().unwrap();
+        if fixture == "regional_response" {
+            assert_eq!(boundary.len(), 1);
+            assert_eq!(boundary[0]["outer"], "port:regional_infection_count");
+            assert_eq!(boundary[0]["leaf"], "occ:epidemic/population");
+            assert_eq!(boundary[0]["port"], "infection_count");
+            assert_eq!(
+                boundary[0]["path"],
+                serde_json::json!(["expose:regional_infection_count", "expose:infection_count"])
+            );
+            assert_eq!(hidden.len(), 1);
+            assert_eq!(hidden[0]["instance"], "inst:epidemic");
+            assert_eq!(hidden[0]["port"], "port:restriction_modifier");
+        } else {
+            assert!(boundary.is_empty(), "{fixture}");
+            assert!(hidden.is_empty(), "{fixture}");
+        }
         let source_leaves = provenance.source_map["leaves"].as_array().unwrap();
         assert_eq!(source_leaves.len(), plan.identity.leaves.len());
         for leaf in source_leaves {

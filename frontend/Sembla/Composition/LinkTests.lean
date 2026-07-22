@@ -287,10 +287,10 @@ private def wireToCompositeChild : CompositionSourceV1 :=
           parameterBindings := [] }]
       «wires» := [{
         id := sid "wire:boundary"
-        sourceInstance := sid "inst:region"
-        sourcePort := sid "port:infection_count"
-        targetInstance := sid "inst:policy"
-        targetPort := sid "port:infection_count"
+        sourceInstance := sid "inst:policy"
+        sourcePort := sid "port:restriction_modifier"
+        targetInstance := sid "inst:region"
+        targetPort := sid "port:restriction_modifier"
         delayTicks := 1 }]
       exposures := []
       hiddenPorts := [] } }
@@ -306,34 +306,33 @@ private def wireToCompositeChild : CompositionSourceV1 :=
 #guard codes wireSchemaTypeMismatch == [.schemaMismatch]
 #guard codes multiplyDrivenInput == [.multipleDrivers]
 #guard codes reservedSynthesizedWireId == [.reservedRuntimeIdentity]
-#guard codes wireToCompositeChild == [.missingPort]
+#guard codes wireToCompositeChild == [.inaccessibleDescendantPort]
 
-private def compositeChildErrorNamesPrd0009 : Bool :=
+private def compositeChildErrorNamesBoundary : Bool :=
   match linkErrors wireToCompositeChild with
   | [error] => error.message ==
-      "wire 'wire:boundary' references composite child 'inst:region'; boundary wiring requires exposures (PRD 0009)"
+      "wire 'wire:boundary' references descendant port 'port:restriction_modifier', but composite 'def:epidemic_policy' failed to expose it"
   | _ => false
 
-#guard compositeChildErrorNamesPrd0009
+#guard compositeChildErrorNamesBoundary
 
 private def sourceWithExposure : CompositionSourceV1 :=
-  modifyRootComposite independentEpidemicPolicy fun body =>
+  let exposed := modifyRootComposite independentEpidemicPolicy fun body =>
     { body with exposures := [{
         id := sid "expose:test"
         innerInstance := sid "inst:population"
         innerPort := sid "port:infection_count"
         outerPort := sid "port:test" }] }
+  { exposed with definitions := exposed.definitions.map fun definition =>
+      if definition.id == exposed.rootDefinition then
+        { definition with ports := [{
+            id := sid "port:test"
+            displayName := "Test"
+            direction := .output
+            schema := [{ name := "infected", ty := .int }] }] }
+      else definition }
 
-#guard codes sourceWithExposure == [.unsupportedConstruct]
-
-private def exposureErrorNamesPrd0009 : Bool :=
-  match linkV1 sourceWithExposure (Json.render sourceWithExposure) with
-  | .ok _ => false
-  | .error [error] => error.message ==
-      "exposure 'expose:test' is unsupported by wire linking; PRD 0009 adds exposures"
-  | .error _ => false
-
-#guard exposureErrorNamesPrd0009
+#guard (linkedPlan? sourceWithExposure).isSome
 
 private def sourceWithHiddenPort : CompositionSourceV1 :=
   modifyRootComposite independentEpidemicPolicy fun body =>
@@ -341,8 +340,95 @@ private def sourceWithHiddenPort : CompositionSourceV1 :=
         instance_ := sid "inst:population"
         port := sid "port:infection_count" }] }
 
-#guard codes sourceWithHiddenPort == [.unsupportedConstruct]
-#guard codes twoRegions == [.unsupportedConstruct, .unsupportedConstruct]
+#guard (linkedPlan? sourceWithHiddenPort).isSome
+#guard (linkedPlan? twoRegions).isSome
+
+private def exposureOfMissingPort : CompositionSourceV1 :=
+  modifyRootComposite independentEpidemicPolicy fun body =>
+    { body with exposures := [{
+        id := sid "expose:missing"
+        innerInstance := sid "inst:population"
+        innerPort := sid "port:missing"
+        outerPort := sid "port:missing" }] }
+
+private def duplicateOuterPort : CompositionSourceV1 :=
+  let duplicated := modifyRootComposite independentEpidemicPolicy fun body =>
+    { body with exposures := [
+      { id := sid "expose:count"
+        innerInstance := sid "inst:population"
+        innerPort := sid "port:infection_count"
+        outerPort := sid "port:duplicate" },
+      { id := sid "expose:duplicate_count"
+        innerInstance := sid "inst:population"
+        innerPort := sid "port:infection_count"
+        outerPort := sid "port:duplicate" }] }
+  { duplicated with definitions := duplicated.definitions.map fun definition =>
+      if definition.id == duplicated.rootDefinition then
+        { definition with ports := [{
+            id := sid "port:duplicate"
+            displayName := "Duplicate"
+            direction := .output
+            schema := [{ name := "infected", ty := .int }] }] }
+      else definition }
+
+private def declaredBoundaryDirectionMismatch : CompositionSourceV1 :=
+  modifyDefinitionPort sourceWithExposure "def:independent_epidemic_policy" "port:test" fun port =>
+    { port with direction := .input }
+
+private def declaredBoundarySchemaMismatch : CompositionSourceV1 :=
+  modifyDefinitionPort sourceWithExposure "def:independent_epidemic_policy" "port:test" fun port =>
+    { port with schema := [{ name := "wrong", ty := .int }] }
+
+private def hiddenAndWired : CompositionSourceV1 :=
+  modifyRootComposite epidemicPolicy fun body =>
+    { body with hiddenPorts := [{
+        instance_ := sid "inst:population"
+        port := sid "port:infection_count" }] }
+
+private def hiddenAndExposed : CompositionSourceV1 :=
+  modifyRootComposite sourceWithExposure fun body =>
+    { body with hiddenPorts := [{
+        instance_ := sid "inst:population"
+        port := sid "port:infection_count" }] }
+
+private def wireToHiddenBoundary : CompositionSourceV1 :=
+  modifyRootComposite wrappedPingPong fun body =>
+    { body with hiddenPorts := [{
+        instance_ := sid "inst:wping"
+        port := sid "port:pulse" }] }
+
+private def exposedInputUsedAsSource : CompositionSourceV1 :=
+  modifyRootComposite wrappedPingPong fun body =>
+    { body with
+      instances := body.instances ++ [{
+        id := sid "inst:direct_pong"
+        displayName := "Direct pong"
+        definition := sid "def:pong"
+        parameterBindings := [] }]
+      «wires» := [{
+        id := sid "wire:input_as_source"
+        sourceInstance := sid "inst:wpong"
+        sourcePort := sid "port:pulse"
+        targetInstance := sid "inst:direct_pong"
+        targetPort := sid "port:pulse"
+        delayTicks := 1 }] }
+
+#guard codes exposureOfMissingPort == [.missingPort]
+#guard codes duplicateOuterPort == [.duplicateStableId]
+#guard codes declaredBoundaryDirectionMismatch == [.directionMismatch]
+#guard codes declaredBoundarySchemaMismatch == [.schemaMismatch]
+#guard codes hiddenAndWired == [.hiddenPortConflict]
+#guard codes hiddenAndExposed == [.hiddenPortConflict]
+#guard codes wireToHiddenBoundary == [.hiddenPortConflict]
+#guard codes exposedInputUsedAsSource == [.directionMismatch]
+
+private def hiddenConflictMessagePinned : Bool :=
+  match linkErrors wireToHiddenBoundary with
+  | [error] => error.message ==
+      "hidden direct-child boundary 'inst:wping.port:pulse' cannot also be wired or exposed by composite 'def:wrapped_ping_pong'"
+  | _ => false
+
+#guard hiddenConflictMessagePinned
 
 private def sortedIndependentErrors : CompositionSourceV1 :=
   { sourceWithWire with
@@ -598,6 +684,159 @@ private def repeatedWireOccurrencesDistinct : Bool :=
       "mbox:occ:south#wire:restriction_to_population|occ:south/policy.port:restriction_modifier|occ:south/population.port:restriction_modifier"]
 
 #guard repeatedWireOccurrencesDistinct
+
+private def nestedFixtureShapesPinned : Bool :=
+  match linkedPlan? twoRegions, linkedPlan? regionalResponse, linkedPlan? wrappedPingPong with
+  | some regions, some regional, some wrapped =>
+      regions.identity.leaves.map (·.occurrence) == [
+        "occ:north/policy", "occ:north/population",
+        "occ:south/policy", "occ:south/population"] &&
+      regions.identity.mailboxes.length == 4 &&
+      regions.model.summaries == [{
+        name := "peak_i", «box» := "north/population", «view» := "I", «reduce» := .max }] &&
+      regional.identity.mailboxes.length == 2 &&
+      wrapped.identity.mailboxes.length == 1 &&
+      wrapped.identity.mailboxes.map (·.identity) == [
+        "mbox:occ:#wire:pulse|occ:wping/ping.port:pulse|occ:wpong/pong.port:pulse"]
+  | _, _, _ => false
+
+#guard nestedFixtureShapesPinned
+
+private def regionalSourceMapPinned : Bool :=
+  match linkedPlan? regionalResponse with
+  | none => false
+  | some plan => match plan.linkedProvenance with
+    | none => false
+    | some provenance =>
+        provenance.sourceMap.boundary == [{
+          outer := "port:regional_infection_count"
+          leaf := "occ:epidemic/population"
+          port := "infection_count"
+          path := ["expose:regional_infection_count", "expose:infection_count"] }] &&
+        provenance.sourceMap.hidden == [{
+          instance_ := "inst:epidemic"
+          port := "port:restriction_modifier" }]
+
+#guard regionalSourceMapPinned
+
+private def twoRegionsOccurrencesAndWordsDistinct : Bool :=
+  match linkedPlan? twoRegions with
+  | none => false
+  | some plan =>
+      let occurrences := plan.identity.leaves.map (·.occurrence)
+      let identities := plan.identity.transitions.map (·.identity)
+      let words := plan.identity.transitions.map (·.ruleWord)
+      occurrences.length == 4 && occurrences.eraseDups.length == 4 &&
+      identities.length == 8 && identities.eraseDups.length == 8 &&
+      words.length == 8 && words.eraseDups.length == 8 &&
+      plan.identity.mailboxes.map (·.identity) == [
+        "mbox:occ:north#wire:count_to_policy|occ:north/population.port:infection_count|occ:north/policy.port:infection_count",
+        "mbox:occ:north#wire:restriction_to_population|occ:north/policy.port:restriction_modifier|occ:north/population.port:restriction_modifier",
+        "mbox:occ:south#wire:count_to_policy|occ:south/population.port:infection_count|occ:south/policy.port:infection_count",
+        "mbox:occ:south#wire:restriction_to_population|occ:south/policy.port:restriction_modifier|occ:south/population.port:restriction_modifier"]
+
+#guard twoRegionsOccurrencesAndWordsDistinct
+
+private def normalizeDisplayProvenance
+    (plan : Plan.ExecutablePlanV1) : Plan.ExecutablePlanV1 :=
+  { plan with linkedProvenance := plan.linkedProvenance.map fun provenance =>
+      { provenance with
+        sourceHash := { provenance.sourceHash with digest := "" }
+        sourceMap := { provenance.sourceMap with leaves := [], boundary := [], hidden := [] } } }
+
+private def normalizeSourceHash (plan : Plan.ExecutablePlanV1) : Plan.ExecutablePlanV1 :=
+  { plan with linkedProvenance := plan.linkedProvenance.map fun provenance =>
+      { provenance with sourceHash := { provenance.sourceHash with digest := "" } } }
+
+private def sourceHashMatches
+    (source : CompositionSourceV1) (plan : Plan.ExecutablePlanV1) : Bool :=
+  match plan.linkedProvenance with
+  | none => false
+  | some provenance =>
+      provenance.sourceHash.digest ==
+        (Hash.hashRecord Plan.sourceArtifactDomain (Json.render source).toUTF8).digest
+
+private def sourceDigest? (plan : Plan.ExecutablePlanV1) : Option String :=
+  plan.linkedProvenance.map (·.sourceHash.digest)
+
+/-- Exact source-byte provenance remains author-sensitive, so the display law
+    normalizes only nonsemantic provenance and compares the semantic input too. -/
+private def displayRenameByteLaw : Bool :=
+  let renamed := twoRegionsDisplayRenamed
+  match linkedPlan? twoRegions, linkedPlan? renamed with
+  | some original, some variant =>
+      Json.render renamed != Json.render twoRegions &&
+      sourceHashMatches twoRegions original && sourceHashMatches renamed variant &&
+      sourceDigest? original != sourceDigest? variant &&
+      PlanJson.renderPlan (normalizeDisplayProvenance original) ==
+        PlanJson.renderPlan (normalizeDisplayProvenance variant) &&
+      (PlanJson.semanticPayloadToCJson original).render ==
+        (PlanJson.semanticPayloadToCJson variant).render
+  | _, _ => false
+
+#guard displayRenameByteLaw
+
+private def permuteDefinitions (source : CompositionSourceV1) : CompositionSourceV1 :=
+  { source with definitions := source.definitions.reverse }
+
+private def permuteInstances (source : CompositionSourceV1) : CompositionSourceV1 :=
+  { source with definitions := source.definitions.map fun definition =>
+      match definition.body with
+      | .primitive _ => definition
+      | .composite body =>
+          { definition with body := .composite { body with instances := body.instances.reverse } } }
+
+private def permuteWires (source : CompositionSourceV1) : CompositionSourceV1 :=
+  { source with definitions := source.definitions.map fun definition =>
+      match definition.body with
+      | .primitive _ => definition
+      | .composite body =>
+          { definition with body := .composite { body with «wires» := body.wires.reverse } } }
+
+private def permuteExposures (source : CompositionSourceV1) : CompositionSourceV1 :=
+  { source with definitions := source.definitions.map fun definition =>
+      match definition.body with
+      | .primitive _ => definition
+      | .composite body =>
+          { definition with body := .composite { body with exposures := body.exposures.reverse } } }
+
+private def permutationVariantLaw
+    (originalSource variantSource : CompositionSourceV1) : Bool :=
+  match linkedPlan? originalSource, linkedPlan? variantSource with
+  | some original, some variant =>
+      Json.render originalSource != Json.render variantSource &&
+      sourceHashMatches originalSource original && sourceHashMatches variantSource variant &&
+      sourceDigest? original != sourceDigest? variant &&
+      PlanJson.renderPlan (normalizeSourceHash original) ==
+        PlanJson.renderPlan (normalizeSourceHash variant) &&
+      (PlanJson.semanticPayloadToCJson original).render ==
+        (PlanJson.semanticPayloadToCJson variant).render &&
+      original.linkedProvenance.map (·.sourceMap) == variant.linkedProvenance.map (·.sourceMap)
+  | _, _ => false
+
+private def permutationByteLaw : Bool :=
+  [permuteDefinitions twoRegions, permuteInstances twoRegions,
+    permuteWires twoRegions].all (permutationVariantLaw twoRegions) &&
+  permutationVariantLaw regionalResponse (permuteExposures regionalResponse)
+
+#guard permutationByteLaw
+
+private def renameNorthInstance : CompositionSourceV1 :=
+  let renamedRoot := modifyRootComposite twoRegions fun body =>
+    { body with instances := body.instances.map fun item =>
+        if item.id.raw == "inst:north" then { item with id := sid "inst:west" }
+        else item }
+  let renamedSummaries := renamedRoot.summaries.map fun sourceSummary =>
+    { sourceSummary with instancePath := sourceSummary.instancePath.map fun item =>
+        if item.raw == "inst:north" then sid "inst:west" else item }
+  { renamedRoot with «summaries» := renamedSummaries }
+
+private def instanceRenameChangesSemanticHash : Bool :=
+  match linkedPlan? twoRegions, linkedPlan? renameNorthInstance with
+  | some original, some renamed => semanticDigest original != semanticDigest renamed
+  | _, _ => false
+
+#guard instanceRenameChangesSemanticHash
 
 mutual
   private partial def expressionContainsParameter (expected : String) : IR.Expr → Bool

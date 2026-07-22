@@ -296,13 +296,12 @@ fn linked_product_preserves_population_views_firings_and_deferred_trace() {
     std::fs::remove_dir_all(temp).unwrap();
 }
 
-#[test]
-fn linked_ping_pong_delivers_the_pulse_exactly_one_tick_later() {
-    let temp = temp_dir("linked-ping-pong");
+fn assert_linked_ping_delay(plan: &str, label: &str) {
+    let temp = temp_dir(label);
     let output = temp.join("ping-pong.csv");
     let result = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("run")
-        .arg(repository_path("fixtures/plans/linked/ping_pong.plan.json"))
+        .arg(repository_path(plan))
         .args(["--population", "1", "--seed", "55", "--ticks", "4", "--out"])
         .arg(&output)
         .output()
@@ -323,6 +322,18 @@ fn linked_ping_pong_delivers_the_pulse_exactly_one_tick_later() {
         assert_eq!(row[seen], "1");
     }
     std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn exposure_aliases_add_no_ping_pong_delay() {
+    assert_linked_ping_delay(
+        "fixtures/plans/linked/ping_pong.plan.json",
+        "linked-ping-pong",
+    );
+    assert_linked_ping_delay(
+        "fixtures/plans/linked/wrapped_ping_pong.plan.json",
+        "linked-wrapped-ping-pong",
+    );
 }
 
 #[test]
@@ -448,6 +459,104 @@ fn linked_epidemic_policy_run_pins_both_wire_delays_and_golden() {
         projected(&solo_rows[2], &solo_column),
         "restriction must reach population on the second hop at tick 2"
     );
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn nested_plan_runs_match_checked_csv_and_hash_goldens() {
+    let temp = temp_dir("nested-goldens");
+    let population = temp.join("population.bin");
+    let synth = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("synth-pop")
+        .args([
+            "--persons",
+            "1000",
+            "--employers",
+            "50",
+            "--initial-infected",
+            "600",
+            "--seed",
+            "12",
+            "--out",
+        ])
+        .arg(&population)
+        .output()
+        .unwrap();
+    assert_success(&synth);
+
+    for fixture in ["two_regions", "regional_response"] {
+        let output = temp.join(format!("{fixture}.csv"));
+        let result = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("run")
+            .arg(repository_path(format!(
+                "fixtures/plans/linked/{fixture}.plan.json"
+            )))
+            .arg("--population")
+            .arg(&population)
+            .args(["--seed", "55", "--ticks", "8", "--out"])
+            .arg(&output)
+            .output()
+            .unwrap();
+        assert_success(&result);
+
+        let actual_csv = std::fs::read(&output).unwrap();
+        assert_eq!(
+            actual_csv,
+            std::fs::read(repository_path(format!(
+                "fixtures/plans/goldens/{fixture}.seed55.ticks8.csv"
+            )))
+            .unwrap(),
+            "{fixture} CSV changed"
+        );
+        let hashes: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(repository_path(format!(
+                "fixtures/plans/goldens/{fixture}.seed55.ticks8.hashes.json"
+            )))
+            .unwrap(),
+        )
+        .unwrap();
+        let expected_stdout = format!(
+            "results_sha256={} final_state_sha256={} observation_sha256={}\n",
+            hashes["results_sha256"].as_str().unwrap(),
+            hashes["final_state_sha256"].as_str().unwrap(),
+            hashes["observation_sha256"].as_str().unwrap(),
+        );
+        assert_eq!(result.stdout, expected_stdout.as_bytes(), "{fixture}");
+
+        if fixture == "two_regions" {
+            let (headers, rows) = csv_table(&actual_csv);
+            let infected_columns = headers
+                .iter()
+                .enumerate()
+                .filter_map(|(index, header)| (header == "I").then_some(index))
+                .collect::<Vec<_>>();
+            assert_eq!(infected_columns.len(), 2);
+            let north_trace = rows
+                .iter()
+                .map(|row| row[infected_columns[0]].as_str())
+                .collect::<Vec<_>>();
+            let south_trace = rows
+                .iter()
+                .map(|row| row[infected_columns[1]].as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                north_trace,
+                ["629", "651", "657", "659", "658", "656", "649", "643"]
+            );
+            assert_eq!(
+                south_trace,
+                ["634", "656", "654", "646", "652", "651", "645", "633"]
+            );
+            assert!(
+                north_trace
+                    .iter()
+                    .zip(&south_trace)
+                    .any(|(north, south)| north != south),
+                "the checked two_regions CLI golden must expose independent draws"
+            );
+        }
+    }
 
     std::fs::remove_dir_all(temp).unwrap();
 }

@@ -13,7 +13,7 @@ private def roundTrips (source : CompositionSourceV1) : Bool :=
 
 #guard Fixtures.corpus.map (·.1) == [
   "solo_population", "independent_epidemic_policy", "two_independent_regions",
-  "epidemic_policy", "ping_pong", "two_regions", "regional_response"]
+  "epidemic_policy", "ping_pong", "wrapped_ping_pong", "two_regions", "regional_response"]
 #guard Fixtures.corpus.all fun entry => roundTrips entry.2
 private def fixtureIsWellFormed (source : CompositionSourceV1) : Bool :=
   match wellFormed source with
@@ -21,6 +21,7 @@ private def fixtureIsWellFormed (source : CompositionSourceV1) : Bool :=
   | .error _ => false
 
 #guard Fixtures.corpus.all fun entry => fixtureIsWellFormed entry.2
+#guard fixtureIsWellFormed twoRegionsDisplayRenamed
 
 /-- Independently frozen non-canonical input.  Object keys are deliberately
     reversed at every level and whitespace is hand-authored in this literal;

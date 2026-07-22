@@ -7,7 +7,7 @@ namespace Sembla.Composition
 inductive LinkErrorCodeV1 where
   | unknownVersion | unsupportedFeature | unsupportedConstruct
   | duplicateStableId | missingDefinition | recursiveDefinition
-  | missingPort | inaccessibleDescendantPort
+  | missingPort | inaccessibleDescendantPort | hiddenPortConflict
   | directionMismatch | schemaMismatch
   | multipleDrivers | unboundParameter | ambiguousParameterBinding
   | identityCollision | reservedRuntimeIdentity
@@ -31,6 +31,7 @@ def LinkErrorCodeV1.toString : LinkErrorCodeV1 → String
   | .recursiveDefinition => "recursiveDefinition"
   | .missingPort => "missingPort"
   | .inaccessibleDescendantPort => "inaccessibleDescendantPort"
+  | .hiddenPortConflict => "hiddenPortConflict"
   | .directionMismatch => "directionMismatch"
   | .schemaMismatch => "schemaMismatch"
   | .multipleDrivers => "multipleDrivers"

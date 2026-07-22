@@ -286,6 +286,77 @@ private def pingPongDefinition : ComponentDefinitionV1 := {
     exposures := []
     hiddenPorts := [] } }
 
+private def wrappedPingDefinition : ComponentDefinitionV1 := {
+  id := sid "def:wrapped_ping"
+  displayName := "Wrapped ping"
+  parameterRequirements := []
+  ports := [{
+    id := sid "port:pulse"
+    displayName := "Pulse"
+    direction := .output
+    schema := pulseSchema }]
+  body := .composite {
+    instances := [{
+      id := sid "inst:ping"
+      displayName := "Ping"
+      definition := sid "def:ping"
+      parameterBindings := [] }]
+    «wires» := []
+    exposures := [{
+      id := sid "expose:pulse"
+      innerInstance := sid "inst:ping"
+      innerPort := sid "port:pulse"
+      outerPort := sid "port:pulse" }]
+    hiddenPorts := [] } }
+
+private def wrappedPongDefinition : ComponentDefinitionV1 := {
+  id := sid "def:wrapped_pong"
+  displayName := "Wrapped pong"
+  parameterRequirements := []
+  ports := [{
+    id := sid "port:pulse"
+    displayName := "Pulse"
+    direction := .input
+    schema := pulseSchema }]
+  body := .composite {
+    instances := [{
+      id := sid "inst:pong"
+      displayName := "Pong"
+      definition := sid "def:pong"
+      parameterBindings := [] }]
+    «wires» := []
+    exposures := [{
+      id := sid "expose:pulse"
+      innerInstance := sid "inst:pong"
+      innerPort := sid "port:pulse"
+      outerPort := sid "port:pulse" }]
+    hiddenPorts := [] } }
+
+private def wrappedPingPongDefinition : ComponentDefinitionV1 := {
+  id := sid "def:wrapped_ping_pong"
+  displayName := "Wrapped ping pong"
+  parameterRequirements := []
+  ports := []
+  body := .composite {
+    instances := [
+      { id := sid "inst:wping"
+        displayName := "Wrapped ping"
+        definition := sid "def:wrapped_ping"
+        parameterBindings := [] },
+      { id := sid "inst:wpong"
+        displayName := "Wrapped pong"
+        definition := sid "def:wrapped_pong"
+        parameterBindings := [] }]
+    «wires» := [{
+      id := sid "wire:pulse"
+      sourceInstance := sid "inst:wping"
+      sourcePort := sid "port:pulse"
+      targetInstance := sid "inst:wpong"
+      targetPort := sid "port:pulse"
+      delayTicks := 1 }]
+    exposures := []
+    hiddenPorts := [] } }
+
 private def epidemicPolicyExposed : ComponentDefinitionV1 := {
   id := sid "def:epidemic_policy"
   displayName := "Epidemic policy"
@@ -364,6 +435,12 @@ def pingPong : CompositionSourceV1 :=
     [pingDefinition, pongDefinition, pingPongDefinition]
     "def:ping_pong"
 
+def wrappedPingPong : CompositionSourceV1 :=
+  mkSource "wrapped_ping_pong" "Wrapped ping pong"
+    [pingDefinition, pongDefinition, wrappedPingDefinition, wrappedPongDefinition,
+      wrappedPingPongDefinition]
+    "def:wrapped_ping_pong"
+
 def twoRegions : CompositionSourceV1 :=
   let root : ComponentDefinitionV1 := {
     id := sid "def:two_regions"
@@ -380,6 +457,22 @@ def twoRegions : CompositionSourceV1 :=
       «reduce» := .max
       instancePath := [sid "inst:north", sid "inst:population"]
       «view» := "I" }]
+
+/-- Alpha-equivalent two-region source with every display name changed. -/
+def twoRegionsDisplayRenamed : CompositionSourceV1 :=
+  { twoRegions with
+    displayName := "Renamed model display"
+    definitions := twoRegions.definitions.map fun definition =>
+      let body := match definition.body with
+        | .primitive primitive => .primitive primitive
+        | .composite composite => .composite {
+            composite with instances := composite.instances.map fun item =>
+              { item with displayName := "Renamed instance " ++ item.id.raw } }
+      { definition with
+        displayName := "Renamed definition " ++ definition.id.raw
+        ports := definition.ports.map fun port =>
+          { port with displayName := "Renamed port " ++ port.id.raw }
+        body } }
 
 def regionalResponse : CompositionSourceV1 :=
   let root : ComponentDefinitionV1 := {
@@ -413,6 +506,7 @@ def corpus : List (String × CompositionSourceV1) := [
   ("two_independent_regions", twoIndependentRegions),
   ("epidemic_policy", epidemicPolicy),
   ("ping_pong", pingPong),
+  ("wrapped_ping_pong", wrappedPingPong),
   ("two_regions", twoRegions),
   ("regional_response", regionalResponse)]
 

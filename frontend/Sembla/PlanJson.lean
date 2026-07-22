@@ -268,11 +268,20 @@ private def sourceMapLeafJson (leaf : Composition.SourceMapLeafV1) : CJson := ob
   ("definition", .str leaf.definition),
   ("instance_path", arr (leaf.instancePath.map CJson.str)),
   ("display_path", .str leaf.displayPath)]
+private def sourceMapBoundaryJson (boundary : Composition.SourceMapBoundaryV1) : CJson := obj [
+  ("outer", .str boundary.outer),
+  ("leaf", .str boundary.leaf),
+  ("port", .str boundary.port),
+  ("path", arr (boundary.path.map CJson.str))]
+private def sourceMapHiddenJson (hidden : Composition.SourceMapHiddenV1) : CJson := obj [
+  ("instance", .str hidden.instance_),
+  ("port", .str hidden.port)]
 private def sourceMapJson (sourceMap : Composition.SourceMapV1) : CJson := obj [
   ("schema_version", .str sourceMap.schemaVersion),
   ("leaves", arr ((sortBy sourceMap.leaves (·.occurrence)).map sourceMapLeafJson)),
-  ("boundary", arr (sourceMap.boundary.map CJson.str)),
-  ("hidden", arr (sourceMap.hidden.map CJson.str))]
+  ("boundary", arr ((sortBy sourceMap.boundary (·.outer)).map sourceMapBoundaryJson)),
+  ("hidden", arr ((sortBy sourceMap.hidden fun item => item.instance_ ++ "|" ++ item.port).map
+    sourceMapHiddenJson))]
 private def provenanceJson (provenance : Plan.LinkedProvenanceV1) : CJson := obj [
   ("source_hash", hashRecordJson provenance.sourceHash),
   ("linker", linkerJson provenance.linker),

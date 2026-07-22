@@ -183,3 +183,16 @@ for fixture in "${linked_wire_fixtures[@]}"; do
   "$sembla" validate "$tmp/$fixture.linked.plan.json"
 done
 echo "Lean delayed-wire source and linked plans are byte-identical to canonical fixtures"
+
+# --- PRD 0009: canonical nesting source/plan parity (append-only) ---
+(cd "$frontend_root" && lake exe sembla-export --source wrapped_ping_pong "$tmp/wrapped_ping_pong.source.json")
+cmp "$repo_root/fixtures/composition-source/wrapped_ping_pong.source.json" "$tmp/wrapped_ping_pong.source.json"
+linked_nesting_fixtures=(two_regions regional_response wrapped_ping_pong)
+for fixture in "${linked_nesting_fixtures[@]}"; do
+  (cd "$frontend_root" && lake exe sembla-link \
+    "$repo_root/fixtures/composition-source/$fixture.source.json" \
+    --plan "$tmp/$fixture.linked.plan.json")
+  cmp "$repo_root/fixtures/plans/linked/$fixture.plan.json" "$tmp/$fixture.linked.plan.json"
+  "$sembla" validate "$tmp/$fixture.linked.plan.json"
+done
+echo "Lean nesting source and linked plans are byte-identical to canonical fixtures"
