@@ -31,7 +31,10 @@ cargo run -p sembla-cli -- run /tmp/epidemic_policy.plan.json --population 1000 
 ```
 
 See [`docs/composition.md`](docs/composition.md) for component syntax, bundles,
-identity and provenance rules, validation, and run verification.
+identity and provenance rules, validation, and run verification. The
+[`composition showcase`](docs/examples/composition-showcase.md) provides four
+runnable models covering counterfactuals, policy fan-out, surveillance, and
+deep regional nesting.
 
 ## IR JSON conventions
 

@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-21T14:02:04.121Z",
+  "runId": "2026-07-21T13-34-23-344Z",
+  "prdPath": "docs/prds-composition/0001-decision-record.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-composition/0001-decision-record.md",
+  "attempt": 1,
+  "text": "## Review\n\nNo blocking issues found.\n\n1. **PASS:** `DECISIONS.md:859` adds section J; J1–J12 appear at lines 861–1027 with the required subjects and 3–10 sentences each.\n2. **PASS:** Frozen identity, RNG, canonical JSON, and version strings match the README, including all required spot checks.\n3. **PASS:** Both design Status paragraphs reference `DECISIONS.md §J` and `docs/prds-composition/README.md`.\n4. **PASS:** The non-managed diff contains exactly the three permitted documentation files. Pre-existing `.piprd/` changes are managed-run metadata.\n5. **PASS:** `./scripts/check.sh`, standalone Lean build/parity checks, and final `git diff --check` passed.\n\n`DECISIONS.md` is append-only relative to HEAD, and the design-document changes are confined to their Status paragraphs.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD requirements and acceptance criteria pass: section J is complete and append-only, frozen strings and status references are correct, the implementation scope is exactly the three allowed documentation files excluding managed-run metadata, and all required checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD requirements and acceptance criteria pass: section J is complete and append-only, frozen strings and status references are correct, the implementation scope is exactly the three allowed documentation files excluding managed-run metadata, and all required checks pass.",
+    "raw": "## Review\n\nNo blocking issues found.\n\n1. **PASS:** `DECISIONS.md:859` adds section J; J1–J12 appear at lines 861–1027 with the required subjects and 3–10 sentences each.\n2. **PASS:** Frozen identity, RNG, canonical JSON, and version strings match the README, including all required spot checks.\n3. **PASS:** Both design Status paragraphs reference `DECISIONS.md §J` and `docs/prds-composition/README.md`.\n4. **PASS:** The non-managed diff contains exactly the three permitted documentation files. Pre-existing `.piprd/` changes are managed-run metadata.\n5. **PASS:** `./scripts/check.sh`, standalone Lean build/parity checks, and final `git diff --check` passed.\n\n`DECISIONS.md` is append-only relative to HEAD, and the design-document changes are confined to their Status paragraphs.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD requirements and acceptance criteria pass: section J is complete and append-only, frozen strings and status references are correct, the implementation scope is exactly the three allowed documentation files excluding managed-run metadata, and all required checks pass.\"}\n```",
+    "source": "json"
+  }
+}

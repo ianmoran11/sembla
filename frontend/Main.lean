@@ -34,8 +34,9 @@ private def lookupModel (name : String) : Option IR.Model :=
   | _ => none
 
 private def lookupSource (name : String) : Option Composition.CompositionSourceV1 :=
-  (Composition.SurfaceModels.lookup name).orElse fun _ =>
-    Composition.Fixtures.lookup name
+  (Demos.Composition.lookup name).orElse fun _ =>
+    (Composition.SurfaceModels.lookup name).orElse fun _ =>
+      Composition.Fixtures.lookup name
 
 def main (args : List String) : IO UInt32 := do
   match args with

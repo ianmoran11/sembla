@@ -10,6 +10,8 @@ Lean surface syntax → canonical composition source → Lean linker
 The normative rules are in [`DECISIONS.md` §J](../DECISIONS.md#j-composition-and-the-option-d-architecture-accepted-2026-07-21).
 The architecture and rollout boundaries are described in
 [`docs/design/option-d-architecture.md`](design/option-d-architecture.md).
+For four runnable worked models, see the
+[`composition showcase`](examples/composition-showcase.md).
 
 ## Author components and a root composition
 
@@ -23,14 +25,10 @@ exposes, or hides their ports:
 
 ```lean
 sembla_component EpidemicPolicy where
-  instance population : Population with [
+  instance population := Population (
     beta := beta,
-    gamma := gamma,
-    policy_strength := policy_strength
-  ]
-  instance policy : Policy with [
-    threshold := threshold
-  ]
+    gamma := gamma)
+  instance policy := Policy
   wire count_to_policy : population.infection_count -> policy.infection_count
   wire modifier_to_population : policy.restriction_modifier -> population.restriction_modifier
 ```
@@ -46,12 +44,10 @@ summaries:
 ```lean
 sembla_composition epidemicPolicyModel
     (name := "epidemic_policy") (dt := 0.25) where
-  param beta : Real := 0.3
-  param gamma : Real := 0.1
-  param policy_strength : Real := 0.6
-  param threshold : Real := 100.0
-  root epidemic : EpidemicPolicy
-  summary infected_peak := max epidemic.population.I
+  param beta : ℝ := 0.3
+  param gamma : ℝ := 0.1
+  root EpidemicPolicy
+  summary infected_peak := max population.I
 ```
 
 See

@@ -230,3 +230,23 @@ fi
 grep -F "refusing to overwrite non-empty bundle directory" "$tmp/bundle-overwrite.err"
 "$sembla" bundle-verify "$bundle_actual"
 echo "Lean artifact bundle is byte-identical to the canonical fixture and Rust-verified"
+
+# --- Composition showcase: authored source → linked bundle → Rust verification ---
+composition_demos=(
+  demo_counterfactual_outbreak
+  demo_coordinated_regions
+  demo_regional_surveillance
+  demo_national_network
+)
+for demo in "${composition_demos[@]}"; do
+  demo_source="$tmp/$demo.source.json"
+  demo_bundle="$tmp/$demo.bundle"
+  demo_fixture="$repo_root/fixtures/demos/composition/$demo"
+  (cd "$frontend_root" && lake exe sembla-export --source "$demo" "$demo_source")
+  (cd "$frontend_root" && lake exe sembla-link "$demo_source" --bundle "$demo_bundle")
+  for artifact in bundle-manifest.json composition-source.json executable-plan.json link-report.json; do
+    cmp "$demo_fixture/$artifact" "$demo_bundle/$artifact"
+  done
+  "$sembla" bundle-verify "$demo_bundle"
+done
+echo "Composition showcase sources, plans, reports, manifests, and bundle hashes are reproducible"

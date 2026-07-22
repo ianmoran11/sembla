@@ -1,6 +1,8 @@
 import Sembla.Demos.Modeling
 import Sembla.Demos.DeepIR
 import Sembla.Demos.CanonicalModels
+import Sembla.Demos.Composition
+import Sembla.Demos.CompositionTests
 import Sembla.Demos.Serialization
 import Sembla.Demos.Widgets
 import Sembla.Demos.Proofs
@@ -13,6 +15,8 @@ This root imports a curated, build-checked tutorial suite:
 * `Sembla.Demos.Modeling` — the complete public `sembla_model` command surface;
 * `Sembla.Demos.DeepIR` — lower-level IR data, expressions, priors, and contests;
 * `Sembla.Demos.CanonicalModels` — all eight shipped scientific models;
+* `Sembla.Demos.Composition` — four end-to-end component, wiring, nesting,
+  exposure, fan-out, identity, and bundle-ready demonstrations;
 * `Sembla.Demos.Serialization` — exact JSON and the Rust export boundary;
 * `Sembla.Demos.Widgets` — pure props, infoview HTML, and all themes; and
 * `Sembla.Demos.Proofs` — executable lumping fixtures and the proved rewrite.
