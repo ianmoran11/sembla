@@ -1047,3 +1047,60 @@ across the linkable fixture corpus. Full behavioral preservation is
 stated-deferred under the project proof policy. Per the architecture document
 §14.3, rollout remains gated on the executable preservation checks until that
 behavioral proof is completed.
+
+### J14. Composition integration (2026-07-22)
+
+1. **CUDA keying.** **Decision.** The CUDA backend follows the same split PRD
+   0004 of the composition track gave the CPU runtime: the content-addressed
+   `rule_word` is used wherever a rule identity enters a Philox counter or an
+   ordering/tie-break key; the dense `rule_id` ordinal remains for indexing,
+   buffer layout, codegen specialization, and diagnostics. **Alternatives.**
+   Dense positional words for RNG and content-addressed words for indexing are
+   rejected. **Reason.** Legacy models have `rule_word == rule_id`, so legacy
+   CUDA behavior is bit-identical — the existing differential goldens prove it.
+
+2. **GPU evidence discipline.** **Decision.** PRDs in this folder split
+   acceptance into **local criteria** (must pass in the managed run without a
+   GPU: compilation, corpus listing, graceful skips, legacy goldens unchanged)
+   and **hardware criteria** (recorded in the runbook/evidence conventions,
+   executed manually later). A PRD is approvable on local criteria alone;
+   hardware criteria must be *listed* in its implementation notes as pending.
+   **Alternatives.** Requiring unavailable GPU hardware for approval or
+   presenting the stub workflow as evidence is rejected. **Reason.** Hosted CI
+   has no GPU, so the local-versus-hardware acceptance split keeps approval
+   honest without hiding later hardware obligations.
+
+3. **Mixed identity schemes never compare.** **Decision.** `compare` rejects a
+   legacy model in one arm and a plan envelope in the other with a deterministic
+   error. **Alternatives.** Silently pairing or normalizing mixed arms is
+   rejected. **Reason.** CRN pairing across the legacy/stable identity boundary
+   is meaningless and must not be silently computed.
+
+4. **Plan sweeps carry the plan tuple, not `ir_hash`.** **Decision.** A sweep
+   over a plan envelope records the existing `PlanIdentityTuple` (and
+   `LinkedSourceTuple` when origin is `linked`) in its manifests via the
+   existing `plan_identity_tuples` helper; the legacy `ir_hash` field stays
+   absent. **Alternatives.** Reusing `ir_hash` or inventing a parallel plan-
+   identity field is rejected. **Reason.** The existing tuples are the canonical
+   plan identity contract, and legacy sweeps are byte-unchanged.
+
+5. **No `--dt` for plans anywhere.** **Decision.** `--dt` overrides never apply
+   to plans (already enforced for `run`; the same rejection extends to
+   `diff-backends`). **Alternatives.** Mutating a plan envelope at the CLI is
+   rejected. **Reason.** A plan is edited and re-linked/re-canonicalized, never
+   mutated at the CLI.
+
+6. **`--all-plan-fixtures` is a sibling flag.** **Decision.**
+   `diff-backends --all-examples` keeps its exact current behavior; a new
+   `--all-plan-fixtures` flag walks `fixtures/plans/*.plan.json` and
+   `fixtures/plans/linked/*.plan.json`. The corpus runbook runs both.
+   **Alternatives.** Giving `--all-examples` a new meaning is rejected.
+   **Reason.** A sibling flag preserves the legacy corpus contract while making
+   the plan corpus explicit.
+
+7. **Structure-widget-only scope.** **Decision.** The composition widget is a
+   structure widget in the DESIGN.md §3 taxonomy (zero runtime cost, rendered
+   from elaborated values). **Alternatives.** Behavior widgets, simulation
+   calls, and new frontend dependencies beyond the existing ProofWidgets stack
+   are rejected. **Reason.** Widgets render structure only; integration adds no
+   runtime semantics.

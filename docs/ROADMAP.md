@@ -3,7 +3,9 @@
 **Status:** Draft, 2026-07-15. Amended 2026-07-18: ADR 0001 closed (CUDA native
 `f64`); v0.4 calibration resolved to amortized NPE via an external workflow
 (DECISIONS.md §G5); synthetic population generation descoped from v0.5.
-Planning horizon v0.2 → v1.0.
+Amended 2026-07-22: composition implemented far beyond the v0.3 cut via the
+Option D track (`docs/prds-composition/`, DECISIONS.md §J); integration track
+started (`docs/prds-composition-integration/`). Planning horizon v0.2 → v1.0.
 **Authority:** [`DESIGN.md`](../DESIGN.md) is the design authority; this roadmap
 sequences its §9 "Out" backlog and resolves its §10 open questions into ordered
 milestones. Where this roadmap and DESIGN.md conflict, DESIGN.md wins — flag it.
@@ -44,6 +46,19 @@ H100 measured ~1,380 ticks/sec at 26M rows with zero reduction error**
 ([ADR 0001](decisions/0001-gpu-precision.md), three verified runs). The
 central technical risk is retired; v0.2 now builds the selected backend.
 
+### Composition (Option D) is complete
+
+The Option D track (`docs/prds-composition/`, DECISIONS.md §J) now provides
+serialized `CompositionSourceV1`, the canonical Lean linker (`sembla-link`),
+a versioned `ExecutablePlanV1` with content-addressed rule words,
+`sembla_component` / `sembla_composition` surface syntax, and bundles with
+`bundle-verify`. Its law tests establish byte equality for alpha-renaming and
+declaration permutation, while the modules under
+`frontend/Sembla/Composition/` state and executable-check static preservation.
+The integration gaps this folder closes are narrower: plans run CPU-only;
+`sweep`, `compare`, and `diff-backends` are legacy-only; no composition widget
+exists.
+
 ---
 
 ## Roadmap at a glance
@@ -51,7 +66,7 @@ central technical risk is retired; v0.2 now builds the selected backend.
 | Version | Theme | Retires / unlocks | Headline decision |
 |---|---|---|---|
 | **v0.2** | Real GPU backend | Throughput thesis confirmed on H100; the run contract recorded (manifest) | [CUDA native `f64` selected](decisions/0001-gpu-precision.md) |
-| **v0.3** | Expressiveness I: composition & observation | Views/summaries (starts now — NPE's `x`); flat n-box; the last hard-coded model leaves the CLI | Resolved 2026-07-18: flat n-box first; birth/death & ODE/Kurtz on demand |
+| **v0.3** | Expressiveness I: composition & observation | Option D composition complete; plan/CLI/widget integration in progress; views/summaries done | Superseded 2026-07-22: full Option D pipeline (DECISIONS.md §J); birth/death & ODE/Kurtz remain on demand |
 | **v0.4** | Inference & behavior widgets | Amortized-NPE calibration; interactive widgets (trained-flow and live paths) | Resolved 2026-07-18: amortized NPE via external `sbi` (DECISIONS.md §G5) |
 | **v0.5** | Policy-domain realism | Courts/queueing; the exact/tau-leap hybrid | Non-exponential durations: scheduled clocks vs. phase-type first |
 | **v1.0** | Consolidation & guarantees | Level B (if feasible); first landed proofs | Is portable-bitwise practical or aspirational |
@@ -142,7 +157,7 @@ more than two boxes when a model wants them — without breaking the order-free
 semantics.
 
 **Scope.**
-- **Declared views and summaries** (DESIGN.md §4.6; promoted, starts now) —
+- **Declared views and summaries** (DESIGN.md §4.6; promoted, now done) —
   retire the hard-coded SIR branch in the runner, and provide the `x` that
   v0.4's NPE pipeline conditions on. Acceptance is deletion:
   `optional_sir_box_name` and the "sweep requires a SIR box" refusal both go,
@@ -151,7 +166,8 @@ semantics.
 - **Flat n-box composition** — beyond the v0.1 two-box special case: any number
   of boxes wired in one flat port graph. The operad-nesting story ("a composed
   system is a box") remains the semantics; the nesting *surface* and UI wait
-  for demand.
+  for demand. **Superseded 2026-07-22:** the Option D track implemented product,
+  wires, nesting/exposure, and surface syntax (DECISIONS.md §J).
 
 **Deferred to demand** (specified, not scheduled):
 - **Birth/death** as deterministic stream compaction — entity IDs allocated as
@@ -175,6 +191,9 @@ semantics.
 Full operad nesting with a composition UI is a large frontend + runtime
 investment; the NPE-era examples don't need it. Nesting follows demand.
 
+**Superseded 2026-07-22:** DECISIONS.md §J records the implemented Option D
+pipeline, including full nesting/exposure; only its integration work remains.
+
 **Exit criteria.**
 1. No model name appears in `sembla-cli`. Every example reports through declared
    views/summaries, and a test asserts that adding, removing, or disabling an
@@ -197,6 +216,9 @@ was built to eventually support.
   coordinate so training pairs carry independent noise (CRN stays the default
   for policy contrasts), and a thin, versioned `(θ, x)` export beside the run
   manifest feeding an external Python reference pipeline (the `sbi` stack).
+  NPE sweeps must also accept plan envelopes so composed models can be
+  calibrated (this folder, PRD 0003); the `(θ, x)` export contract itself is
+  unchanged.
 - **Behavior widgets** — two latency paths: posterior-conditioned widgets query
   the trained NPE flow (milliseconds, no simulation), and live prior-predictive
   bands use the v0.2 GPU backend with scenario caching / surrogates as needed.
@@ -262,6 +284,13 @@ below); the milestone consumes populations, it does not manufacture them.
   hybrid the operad exists for gets exercised — a large court box run *exactly*
   (sequential DES) wired to a tau-leaped population box.
 
+The courts/queueing hybrid is gated on heterogeneous scheduler domains (Option
+D Phase 8, explicitly deferred by DECISIONS.md §J12), so opening v0.5 starts
+with a Phase-0-style decision PRD for the outer-boundary protocol, per-domain
+identity coordinates, and the co-simulation coupling-error caveat: a monolithic
+exact run validates a wired hybrid only up to coupling error, so that check is a
+convergence check, not a bitwise one.
+
 **⚠ Decision point — non-exponential durations: scheduled clocks vs. phase-type
 first** (DESIGN.md §4.3). Both are in the design. Scheduled clocks are "easier
 on the runtime (no staleness), weaker theory at the edges"; phase-type stays
@@ -323,8 +352,10 @@ cheapest-useful first:
    specification-level plans over the ℕ-counting fragment; 1b, binding the
    theorem to the deep-embedding evaluator, remains open.
 2. **Refactoring invariance** — re-drawing box boundaries preserves semantics
-   (consequence of uniform one-tick delay). Naturally paired with v0.3's general
-   composition work.
+   (consequence of uniform one-tick delay). Byte-level law tests now cover
+   alpha-renaming and declaration-permutation invariance, and executable
+   static-preservation checks now exist. The tractable next proof is the
+   universal `staticPreservationStatement`; lumping 1b above remains open.
 3. **Composition laws** — the operad-algebra axioms for box wiring.
 4. **Kurtz mean-field limit** for the compartmentalizable fragment — paired with
    v0.3's ODE/coarse-graining work.
@@ -406,10 +437,10 @@ discipline. Keep it.
 v0.1 (done) ──> v0.2 GPU backend ──┬──> v0.4 inference + behavior widgets
                 (CUDA f64 selected)│      (needs GPU latency + summaries)
                                    │
-                v0.3 expressiveness┴──> v0.5 policy domain ──> v1.0 consolidation
-                (views/summaries now,    (courts/queueing)     (Level B, proofs)
-                 flat n-box; birth/death
-                 & ODE/Kurtz on demand)
+                v0.3 composition ──┴──> v0.5 policy domain ──> v1.0 consolidation
+                (Option D done;          (courts/queueing)     (Level B, proofs)
+                 integration in progress;
+                 birth/death & ODE/Kurtz on demand)
 
 proof track ......................... parallel throughout .........................
 ```
