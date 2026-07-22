@@ -373,7 +373,7 @@ fn sir_plan_run_matches_the_checked_csv_golden_bitwise() {
 }
 
 #[test]
-fn run_accepts_plan_envelopes_on_cpu_and_rejects_cuda_and_dt_overrides() {
+fn run_accepts_plan_envelopes_on_cpu_and_reaches_cuda_backend_without_dt() {
     let plan = repository_path("fixtures/plans/two_box.plan.json");
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("run")
@@ -387,36 +387,36 @@ fn run_accepts_plan_envelopes_on_cpu_and_rejects_cuda_and_dt_overrides() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    for (flag, value, expected) in [
-        (
-            "--backend",
-            "cuda",
-            "plan envelopes run on the cpu backend only for now",
-        ),
-        (
-            "--dt",
-            "0.5",
-            "plan envelopes do not support --dt overrides",
-        ),
-    ] {
-        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
-            .arg("run")
-            .arg(&plan)
-            .args(["--seed", "1", "--ticks", "1", "--population", "1"])
-            .args([flag, value])
-            .output()
-            .unwrap();
-        assert_eq!(output.status.code(), Some(1));
-        assert!(
-            String::from_utf8_lossy(&output.stderr).contains(expected),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let cuda = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(&plan)
+        .args(["--seed", "1", "--ticks", "1", "--population", "1"])
+        .args(["--backend", "cuda"])
+        .output()
+        .unwrap();
+    assert_eq!(cuda.status.code(), Some(1));
+    let stderr = String::from_utf8(cuda.stderr).unwrap();
+    assert!(stderr.contains("cuda backend unavailable"), "{stderr}");
+    assert!(!stderr.contains("cpu backend only"), "{stderr}");
+
+    let dt = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(&plan)
+        .args(["--seed", "1", "--ticks", "1", "--population", "1"])
+        .args(["--dt", "0.5"])
+        .output()
+        .unwrap();
+    assert_eq!(dt.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&dt.stderr)
+            .contains("plan envelopes do not support --dt overrides"),
+        "{}",
+        String::from_utf8_lossy(&dt.stderr)
+    );
 }
 
 #[test]
-fn sweep_compare_and_differential_entrypoints_reject_plan_envelopes() {
+fn sweep_and_compare_entrypoints_still_reject_plan_envelopes() {
     let plan = repository_path("fixtures/plans/two_box.plan.json");
     let population = std::env::temp_dir().join(format!(
         "sembla-plan-rejection-population-{}.bin",
@@ -450,17 +450,6 @@ fn sweep_compare_and_differential_entrypoints_reject_plan_envelopes() {
         .arg(&output_path);
     commands.push(("compare", compare));
 
-    let mut differential = Command::new(env!("CARGO_BIN_EXE_sembla"));
-    differential.arg("diff-backends").arg(&plan).args([
-        "--population",
-        "1",
-        "--seed",
-        "1",
-        "--ticks",
-        "1",
-    ]);
-    commands.push(("diff-backends", differential));
-
     for (name, mut command) in commands {
         let output = command.output().unwrap();
         let stderr = String::from_utf8(output.stderr).unwrap();
@@ -472,4 +461,73 @@ fn sweep_compare_and_differential_entrypoints_reject_plan_envelopes() {
     }
 
     std::fs::remove_file(population).unwrap();
+}
+
+#[test]
+fn diff_backends_accepts_plans_rejects_plan_dt_and_checks_corpus_exclusivity() {
+    let plan = repository_path("fixtures/plans/two_box.plan.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .current_dir(repository_path("."))
+        .arg("diff-backends")
+        .arg(&plan)
+        .args(["--population", "1", "--seed", "1", "--ticks", "1"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("cuda backend unavailable"), "{stderr}");
+    assert!(!stderr.contains("not yet runnable"), "{stderr}");
+
+    let dt = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .current_dir(repository_path("."))
+        .arg("diff-backends")
+        .arg(&plan)
+        .args(["--population", "1", "--seed", "1", "--ticks", "1"])
+        .args(["--dt", "0.5"])
+        .output()
+        .unwrap();
+    assert_eq!(dt.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&dt.stderr)
+            .contains("plan envelopes do not support --dt overrides"),
+        "{}",
+        String::from_utf8_lossy(&dt.stderr)
+    );
+
+    let corpus = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .current_dir(repository_path("."))
+        .args([
+            "diff-backends",
+            "--all-plan-fixtures",
+            "--population",
+            "1",
+            "--seed",
+            "1",
+            "--ticks",
+            "1",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(corpus.status.code(), Some(1));
+    let stderr = String::from_utf8(corpus.stderr).unwrap();
+    assert!(stderr.contains("cuda backend unavailable"), "{stderr}");
+
+    for arguments in [
+        vec!["--all-plan-fixtures", "--all-examples"],
+        vec!["--all-plan-fixtures", "fixtures/plans/two_box.plan.json"],
+        vec!["fixtures/plans/two_box.plan.json", "--all-plan-fixtures"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .current_dir(repository_path("."))
+            .arg("diff-backends")
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("cannot be combined"),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }

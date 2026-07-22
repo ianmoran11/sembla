@@ -38,6 +38,12 @@ if [[ $status -eq 0 ]]; then
     2>&1 | tee "$out/corpus.log"
   status=${PIPESTATUS[0]}
 fi
+if [[ $status -eq 0 ]]; then
+  cargo run --locked --release -p sembla-cli --features cuda -- diff-backends \
+    --all-plan-fixtures --population 1000 --seed 7 --ticks 20 \
+    2>&1 | tee "$out/plan-corpus.log"
+  status=${PIPESTATUS[0]}
+fi
 set -e
 if [[ $status -eq 0 && "${SEMBLA_RUN_FULL_RATE:-0}" == "1" ]]; then
   population="$out/full-rate-26m-population.bin"
@@ -62,6 +68,7 @@ if [[ $status -eq 0 && "${SEMBLA_RUN_FULL_RATE:-0}" == "1" ]]; then
 fi
 evidence_files=(provenance.txt tests.log)
 [[ -f "$out/corpus.log" ]] && evidence_files+=(corpus.log)
+[[ -f "$out/plan-corpus.log" ]] && evidence_files+=(plan-corpus.log)
 [[ -f "$out/full-rate-population.log" ]] && evidence_files+=(full-rate-population.log)
 [[ -f "$out/full-rate-26m.log" ]] && evidence_files+=(full-rate-26m.log)
 if command -v sha256sum >/dev/null; then

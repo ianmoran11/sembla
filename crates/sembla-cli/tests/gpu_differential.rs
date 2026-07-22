@@ -51,6 +51,26 @@ fn differential_corpus_passes() {
 
 #[test]
 #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
+fn composition_plan_differential_corpus_passes() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .current_dir(repository_path("."))
+        .args([
+            "diff-backends",
+            "--all-plan-fixtures",
+            "--population",
+            "1000",
+            "--seed",
+            "7",
+            "--ticks",
+            "20",
+        ])
+        .output()
+        .unwrap();
+    assert_success(&output);
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
 fn cuda_manifest_verify_and_level_a_bytes_round_trip() {
     let temp = temp_dir("manifest");
     let model = repository_path("examples/two_state.json");

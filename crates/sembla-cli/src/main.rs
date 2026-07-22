@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -479,11 +479,6 @@ fn read_run_input(path: &str, options: &RunOptions) -> Result<RunInput, String> 
             if options.dt.is_some() {
                 return Err(format!(
                     "{path}: plan envelopes do not support --dt overrides; edit and re-canonicalize the plan instead"
-                ));
-            }
-            if options.backend == BackendSelection::Cuda {
-                return Err(format!(
-                    "{path}: plan envelopes run on the cpu backend only for now"
                 ));
             }
             Ok(RunInput {
@@ -2610,6 +2605,13 @@ fn compare_arm(
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DiffInputMode {
+    Single,
+    AllExamples,
+    AllPlanFixtures,
+}
+
 #[derive(Clone, Debug)]
 struct DiffOptions {
     models: Vec<String>,
@@ -2631,60 +2633,88 @@ fn diff_backends_command(arguments: &[String]) -> i32 {
 }
 
 fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
-    let all_examples = arguments
-        .first()
-        .is_some_and(|value| value == "--all-examples");
-    let (model, flags) = if all_examples {
-        (None, &arguments[1..])
-    } else {
-        let model = arguments
-            .first()
-            .ok_or_else(|| "diff-backends requires a model path or --all-examples".to_owned())?;
-        (Some(model.clone()), &arguments[1..])
+    let selector = arguments.first().ok_or_else(|| {
+        "diff-backends requires a model or plan path, --all-examples, or --all-plan-fixtures"
+            .to_owned()
+    })?;
+    let (mode, model) = match selector.as_str() {
+        "--all-examples" => (DiffInputMode::AllExamples, None),
+        "--all-plan-fixtures" => (DiffInputMode::AllPlanFixtures, None),
+        value if value.starts_with("--") => {
+            return Err(format!("unknown diff-backends input selector '{value}'"));
+        }
+        value => (DiffInputMode::Single, Some(value.to_owned())),
     };
-    if flags.len() % 2 != 0 {
-        return Err("diff-backends flags require values".to_owned());
-    }
+
     let mut population = None;
     let mut seed = None;
     let mut ticks = None;
     let mut dt = None;
     let mut params = None;
-    for pair in flags.chunks_exact(2) {
-        match pair[0].as_str() {
-            "--population" => set_once(&mut population, pair[1].clone(), "--population")?,
-            "--seed" => set_once(&mut seed, parse_number(&pair[1], "--seed")?, "--seed")?,
-            "--ticks" => set_once(&mut ticks, parse_number(&pair[1], "--ticks")?, "--ticks")?,
+    let mut index = 1;
+    while index < arguments.len() {
+        let flag = &arguments[index];
+        if matches!(flag.as_str(), "--all-examples" | "--all-plan-fixtures") {
+            return Err(format!(
+                "diff-backends input selector '{selector}' cannot be combined with '{flag}'"
+            ));
+        }
+        if !flag.starts_with("--") {
+            return Err(format!(
+                "diff-backends input selector '{selector}' cannot be combined with positional path '{flag}'"
+            ));
+        }
+        let value = arguments
+            .get(index + 1)
+            .ok_or_else(|| "diff-backends flags require values".to_owned())?;
+        match flag.as_str() {
+            "--population" => set_once(&mut population, value.clone(), "--population")?,
+            "--seed" => set_once(&mut seed, parse_number(value, "--seed")?, "--seed")?,
+            "--ticks" => set_once(&mut ticks, parse_number(value, "--ticks")?, "--ticks")?,
             "--dt" => {
-                let value: f64 = parse_number(&pair[1], "--dt")?;
+                let value: f64 = parse_number(value, "--dt")?;
                 if !value.is_finite() || value <= 0.0 {
                     return Err("'--dt' must be finite and greater than zero".to_owned());
                 }
                 set_once(&mut dt, value, "--dt")?;
             }
-            "--params" => set_once(&mut params, pair[1].clone(), "--params")?,
+            "--params" => set_once(&mut params, value.clone(), "--params")?,
             flag => return Err(format!("unknown diff-backends flag '{flag}'")),
         }
+        index += 2;
     }
-    if all_examples && params.is_some() {
-        return Err("'--params' is only valid for a single diff-backends model".to_owned());
+
+    if mode != DiffInputMode::Single && params.is_some() {
+        return Err("'--params' is only valid for a single diff-backends input".to_owned());
     }
-    let models = if let Some(model) = model {
-        vec![model]
-    } else {
-        let mut paths = std::fs::read_dir("examples")
-            .map_err(|error| format!("examples: {error}"))?
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("json"))
-            .map(|path| path.to_string_lossy().into_owned())
-            .collect::<Vec<_>>();
-        paths.sort();
-        paths
+    if mode == DiffInputMode::AllPlanFixtures && dt.is_some() {
+        return Err(
+            "plan envelopes do not support --dt overrides; edit and re-canonicalize the plan instead"
+                .to_owned(),
+        );
+    }
+
+    let models = match mode {
+        DiffInputMode::Single => vec![model.expect("single input has a model or plan path")],
+        DiffInputMode::AllExamples => collect_diff_corpus_paths("examples", ".json")?,
+        DiffInputMode::AllPlanFixtures => {
+            let mut paths = collect_diff_corpus_paths("fixtures/plans", ".plan.json")?;
+            paths.extend(collect_diff_corpus_paths(
+                "fixtures/plans/linked",
+                ".plan.json",
+            )?);
+            paths.sort();
+            paths
+        }
     };
     let population = population.unwrap_or_else(|| "100".to_owned());
-    if all_examples && population.parse::<usize>().is_err() {
-        return Err("'--all-examples' requires a numeric '--population'".to_owned());
+    if mode != DiffInputMode::Single && population.parse::<usize>().is_err() {
+        let selector = match mode {
+            DiffInputMode::AllExamples => "--all-examples",
+            DiffInputMode::AllPlanFixtures => "--all-plan-fixtures",
+            DiffInputMode::Single => unreachable!(),
+        };
+        return Err(format!("'{selector}' requires a numeric '--population'"));
     }
     Ok(DiffOptions {
         models,
@@ -2696,13 +2726,36 @@ fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
     })
 }
 
+fn collect_diff_corpus_paths(directory: &str, suffix: &str) -> Result<Vec<String>, String> {
+    let mut paths = std::fs::read_dir(directory)
+        .map_err(|error| format!("{directory}: {error}"))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .is_some_and(|name| name.ends_with(suffix))
+        })
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    paths.sort();
+    Ok(paths)
+}
+
 fn diff_backends(options: DiffOptions) -> Result<(), String> {
     for path in &options.models {
-        let mut raw_model = read_model(path)?;
-        if let Some(dt) = options.dt {
-            raw_model.dt = dt;
-        }
-        let model = sembla_ir::validate(raw_model).map_err(|error| format!("{path}: {error}"))?;
+        let run_options = RunOptions {
+            seed: options.seed,
+            ticks: options.ticks,
+            population: options.population.clone(),
+            out: None,
+            dt: options.dt,
+            params: options.params.clone(),
+            backend: BackendSelection::Cpu,
+        };
+        let model = read_run_input(path, &run_options)?.model;
         let params = resolve_params(&model, options.params.as_deref())?;
         let initial = match options.population.parse::<usize>() {
             Ok(population) => initialize_population(&model, population),
@@ -2870,8 +2923,9 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 #[cfg(test)]
 mod tests {
     use super::{
-        csv_field, initialize_population, parse_backend, parse_diff_options, run, run_file_result,
-        run_results_output, BackendSelection, RunOptions, VERSION,
+        collect_diff_corpus_paths, csv_field, initialize_population, parse_backend,
+        parse_diff_options, run, run_file_result, run_results_output, BackendSelection, RunOptions,
+        VERSION,
     };
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
@@ -2922,7 +2976,68 @@ mod tests {
             "params.json".to_owned(),
         ])
         .unwrap_err()
-        .contains("single diff-backends model"));
+        .contains("single diff-backends input"));
+        assert!(parse_diff_options(&[
+            "--all-plan-fixtures".to_owned(),
+            "--all-examples".to_owned(),
+        ])
+        .unwrap_err()
+        .contains("cannot be combined"));
+        assert!(
+            parse_diff_options(&["model.json".to_owned(), "--all-plan-fixtures".to_owned(),])
+                .unwrap_err()
+                .contains("cannot be combined")
+        );
+        assert!(
+            parse_diff_options(&["--all-plan-fixtures".to_owned(), "model.json".to_owned(),])
+                .unwrap_err()
+                .contains("positional path")
+        );
+        assert!(parse_diff_options(&[
+            "--all-plan-fixtures".to_owned(),
+            "--dt".to_owned(),
+            "0.5".to_owned(),
+        ])
+        .unwrap_err()
+        .contains("plan envelopes do not support --dt overrides"));
+    }
+
+    #[test]
+    fn plan_fixture_corpus_is_the_exact_sorted_top_level_and_linked_set() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let plans = root.join("fixtures/plans");
+        let linked = plans.join("linked");
+        let mut paths = collect_diff_corpus_paths(plans.to_str().unwrap(), ".plan.json").unwrap();
+        paths.extend(collect_diff_corpus_paths(linked.to_str().unwrap(), ".plan.json").unwrap());
+        paths.sort();
+        let relative = paths
+            .iter()
+            .map(|path| {
+                std::path::Path::new(path)
+                    .strip_prefix(&root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            relative,
+            [
+                "fixtures/plans/linked/epidemic_policy.plan.json",
+                "fixtures/plans/linked/independent_epidemic_policy.plan.json",
+                "fixtures/plans/linked/ping_pong.plan.json",
+                "fixtures/plans/linked/regional_response.plan.json",
+                "fixtures/plans/linked/solo_population.plan.json",
+                "fixtures/plans/linked/two_independent_regions.plan.json",
+                "fixtures/plans/linked/two_regions.plan.json",
+                "fixtures/plans/linked/wrapped_ping_pong.plan.json",
+                "fixtures/plans/observations.plan.json",
+                "fixtures/plans/sir.plan.json",
+                "fixtures/plans/sir_policy.plan.json",
+                "fixtures/plans/two_box.plan.json",
+                "fixtures/plans/two_box_plus_sibling.plan.json",
+            ]
+        );
     }
 
     #[test]

@@ -21,12 +21,35 @@ cargo run --release -p sembla-cli --features cuda -- diff-backends \
   --all-examples --population 100 --seed 7 --ticks 20
 ```
 
-For each model the command compares every committed state hash, the exact
-results CSV bytes, and the exact summaries CSV bytes. It exits at the first
-mismatch and reports the tick and CPU/CUDA hash pair. Successful lines include
-informational ticks/second for both backends. The CUDA rate times execution plus
-the per-tick downloads and read-only formatting required by this differential
-mode; it is not a `FinalOnly` production-throughput claim.
+Composition corpus mode discovers the top-level
+`fixtures/plans/*.plan.json` and `fixtures/plans/linked/*.plan.json` files and
+sorts their paths bytewise. It includes `two_box.plan.json` and the linked
+`epidemic_policy.plan.json`, `two_regions.plan.json`,
+`regional_response.plan.json`, and `wrapped_ping_pong.plan.json` fixtures, along
+with every other plan in those two directories. Invalid and golden subtrees are
+not traversed. Population initialization is unchanged from `run`: composed
+models honor each table's nonzero authored `size_hint`, while the supplied
+numeric population initializes tables without such a hint. Plans never accept
+a `--dt` override.
+
+```sh
+cargo run --release -p sembla-cli --features cuda -- diff-backends \
+  --all-plan-fixtures --population 1000 --seed 7 --ticks 20
+```
+
+For each model or plan the command compares every committed state hash, the
+exact results CSV bytes, and the exact summaries CSV bytes. It exits at the
+first mismatch and reports the tick and CPU/CUDA hash pair. Successful lines
+include informational ticks/second for both backends. The CUDA rate times
+execution plus the per-tick downloads and read-only formatting required by this
+differential mode; it is not a `FinalOnly` production-throughput claim.
+
+Per DECISIONS.md §J14, CUDA uses the content-addressed `rule_word` wherever a
+rule identity enters Philox or the deterministic ordering/tie-break key, while
+the dense `rule_id` ordinal remains the indexing, layout, specialization, and
+diagnostic coordinate. CUDA consumes the words already stamped on the
+validated plan model and never recomputes them. Existing legacy evidence
+remains valid unchanged because legacy models have `rule_word == rule_id`.
 
 CUDA owns scheduling, conflict resolution, effects, wires, and the evolving
 state. The CLI downloads the committed post-tick snapshot only for canonical

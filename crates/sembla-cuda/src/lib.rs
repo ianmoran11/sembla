@@ -21,17 +21,23 @@ pub use error::CudaError;
 pub struct PhiloxCoordinate {
     pub seed: u64,
     pub tick: u32,
-    pub rule_id: u32,
+    pub rule_word: u32,
     pub entity_id: u32,
     pub draw_index: u32,
 }
 
 impl PhiloxCoordinate {
-    pub const fn new(seed: u64, tick: u32, rule_id: u32, entity_id: u32, draw_index: u32) -> Self {
+    pub const fn new(
+        seed: u64,
+        tick: u32,
+        rule_word: u32,
+        entity_id: u32,
+        draw_index: u32,
+    ) -> Self {
         Self {
             seed,
             tick,
-            rule_id,
+            rule_word,
             entity_id,
             draw_index,
         }

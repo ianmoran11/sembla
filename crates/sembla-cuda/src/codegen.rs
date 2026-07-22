@@ -1305,7 +1305,7 @@ impl<'a> Generator<'a> {
             let hazard = self
                 .render(&transition.hazard, rows, Some(&Ty::Real), "state", "row")?
                 .0;
-            writeln!(out, "  int guard = {guard};\n  errors[candidate * 2ULL] = local_error;\n  local_error = 0;\n  double lambda = (double)({hazard});\n  errors[candidate * 2ULL + 1ULL] = local_error;\n  double time = sembla_exp(seed, tick, {}U, (unsigned int)row, 0U, lambda);\n  times[candidate] = time;\n  enabled[candidate] = (unsigned char)(errors[candidate * 2ULL] == 0U && errors[candidate * 2ULL + 1ULL] == 0U && guard && lambda > 0.0 && time < dt);\n}}", validated.rule_id).unwrap();
+            writeln!(out, "  int guard = {guard};\n  errors[candidate * 2ULL] = local_error;\n  local_error = 0;\n  double lambda = (double)({hazard});\n  errors[candidate * 2ULL + 1ULL] = local_error;\n  double time = sembla_exp(seed, tick, {}U, (unsigned int)row, 0U, lambda);\n  times[candidate] = time;\n  enabled[candidate] = (unsigned char)(errors[candidate * 2ULL] == 0U && errors[candidate * 2ULL + 1ULL] == 0U && guard && lambda > 0.0 && time < dt);\n}}", validated.rule_word).unwrap();
         }
         Ok(names)
     }
@@ -1450,8 +1450,8 @@ impl<'a> Generator<'a> {
                     .0;
                 writeln!(out, "    unsigned int resource_{claim_index} = {resource};").unwrap();
                 let (self_key, self_key_ty) =
-                    self.claim_key(claim, rows, validated.rule_id, "row", "self_candidate")?;
-                writeln!(out, "    {} best_key_{claim_index} = {self_key}; unsigned int best_rule_{claim_index} = {}U; unsigned int best_entity_{claim_index} = (unsigned int)row;", self_key_ty.cuda(), validated.rule_id).unwrap();
+                    self.claim_key(claim, rows, "row", "self_candidate")?;
+                writeln!(out, "    {} best_key_{claim_index} = {self_key}; unsigned int best_rule_{claim_index} = {}U; unsigned int best_entity_{claim_index} = (unsigned int)row;", self_key_ty.cuda(), validated.rule_word).unwrap();
                 for other in self.model.transitions() {
                     let other_transition = &self.model.model().boxes[other.box_index].transitions
                         [other.transition_index];
@@ -1487,21 +1487,20 @@ impl<'a> Generator<'a> {
                         let (other_key, _) = self.claim_key(
                             other_claim,
                             other_rows,
-                            other.rule_id,
                             "other_row",
                             "other_candidate",
                         )?;
                         let better = if self_key_ty == Ty::Real {
-                            format!("sembla_total_less({other_key}, best_key_{claim_index}) || (sembla_total_equal({other_key}, best_key_{claim_index}) && ({}U < best_rule_{claim_index} || ({}U == best_rule_{claim_index} && (unsigned int)other_row < best_entity_{claim_index})))", other.rule_id, other.rule_id)
+                            format!("sembla_total_less({other_key}, best_key_{claim_index}) || (sembla_total_equal({other_key}, best_key_{claim_index}) && ({}U < best_rule_{claim_index} || ({}U == best_rule_{claim_index} && (unsigned int)other_row < best_entity_{claim_index})))", other.rule_word, other.rule_word)
                         } else {
-                            format!("({other_key}) < best_key_{claim_index} || (({other_key}) == best_key_{claim_index} && ({}U < best_rule_{claim_index} || ({}U == best_rule_{claim_index} && (unsigned int)other_row < best_entity_{claim_index})))", other.rule_id, other.rule_id)
+                            format!("({other_key}) < best_key_{claim_index} || (({other_key}) == best_key_{claim_index} && ({}U < best_rule_{claim_index} || ({}U == best_rule_{claim_index} && (unsigned int)other_row < best_entity_{claim_index})))", other.rule_word, other.rule_word)
                         };
-                        writeln!(out, "      if ({better}) {{ best_key_{claim_index} = {other_key}; best_rule_{claim_index} = {}U; best_entity_{claim_index} = (unsigned int)other_row; }}\n    }}", other.rule_id).unwrap();
+                        writeln!(out, "      if ({better}) {{ best_key_{claim_index} = {other_key}; best_rule_{claim_index} = {}U; best_entity_{claim_index} = (unsigned int)other_row; }}\n    }}", other.rule_word).unwrap();
                     }
                 }
                 let target_table = self.table_index(validated.box_index, &target_name)?;
                 let target_global = self.global_table(validated.box_index, target_table);
-                writeln!(out, "    if (best_rule_{claim_index} != {}U || best_entity_{claim_index} != (unsigned int)row) {{ wins[self_candidate] = 0; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }}", validated.rule_id).unwrap();
+                writeln!(out, "    if (best_rule_{claim_index} != {}U || best_entity_{claim_index} != (unsigned int)row) {{ wins[self_candidate] = 0; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }}", validated.rule_word).unwrap();
             }
             out.push_str("  }\n");
         }
@@ -1513,7 +1512,6 @@ impl<'a> Generator<'a> {
         &self,
         claim: &sembla_ir::ResourceClaim,
         rows: Rows,
-        _rule: u32,
         row: &str,
         candidate: &str,
     ) -> Result<(String, Ty), CudaError> {
@@ -2125,6 +2123,63 @@ mod tests {
         sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
     }
 
+    fn stable_contested_model() -> sembla_ir::ValidatedModel {
+        use sembla_ir::{
+            occurrence_of_leaf, rule_word, transition_identity, ExecutablePlanV1, IdentityMapV1,
+            LeafIdentityV1, PlanOrigin, SchedulerDomainV1, TransitionIdentityV1,
+            EXECUTABLE_PLAN_SCHEMA, STABLE_IDENTITY_SCHEME,
+        };
+
+        let mut model = contested_model().into_model();
+        model.boxes[0]
+            .tables
+            .sort_by(|left, right| left.name.cmp(&right.name));
+        let mut second = model.boxes[0].transitions[0].clone();
+        second.name = String::from("finish_other");
+        model.boxes[0].transitions.push(second);
+
+        let occurrence = occurrence_of_leaf("world");
+        let mut transitions = model.boxes[0]
+            .transitions
+            .iter()
+            .map(|transition| {
+                let identity = transition_identity(&occurrence, &transition.name);
+                TransitionIdentityV1 {
+                    r#box: "world".to_owned(),
+                    name: transition.name.clone(),
+                    rule_word: rule_word(&identity),
+                    identity,
+                }
+            })
+            .collect::<Vec<_>>();
+        transitions.sort_by(|left, right| left.identity.cmp(&right.identity));
+        let plan = ExecutablePlanV1 {
+            schema_version: EXECUTABLE_PLAN_SCHEMA.to_owned(),
+            identity_scheme: STABLE_IDENTITY_SCHEME.to_owned(),
+            origin: PlanOrigin::DirectStable,
+            identity: IdentityMapV1 {
+                model_id: "model:claims".to_owned(),
+                enabled_features: Vec::new(),
+                scheduler_domains: vec![SchedulerDomainV1 {
+                    id: "domain:global".to_owned(),
+                    algorithm: "tau_leap".to_owned(),
+                    leaves: vec!["world".to_owned()],
+                }],
+                leaves: vec![LeafIdentityV1 {
+                    r#box: "world".to_owned(),
+                    occurrence,
+                }],
+                transitions,
+                mailboxes: Vec::new(),
+            },
+            model,
+            linked_provenance: None,
+        };
+        sembla_ir::validate_plan(&plan)
+            .unwrap()
+            .model_with_rule_words()
+    }
+
     fn incompatible_claim_model() -> sembla_ir::ValidatedModel {
         let source = r#"{"name":"incompatible_claims","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Worker","size_hint":1,"attrs":[]},{"name":"Applicant","size_hint":1,"attrs":[{"name":"worker","ty":{"kind":"ref","table":"Worker"}},{"name":"priority","ty":{"kind":"int"}}]}],"transitions":[{"name":"race","table":"Applicant","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"race_time"}}]},{"name":"priority","table":"Applicant","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"key","expr":{"kind":"self_attr","name":"priority"}}}]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
         sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
@@ -2211,6 +2266,35 @@ mod tests {
             .contains("self_candidate = candidate_begin + local_candidate"));
         assert!(generated.source.contains("sembla_prepare_effects"));
         assert!(generated.source.contains("owner_values[owner]"));
+    }
+
+    #[test]
+    fn stable_rule_words_key_philox_and_conflict_ordering_while_ordinals_index() {
+        let model = stable_contested_model();
+        assert!(model
+            .transitions()
+            .iter()
+            .all(|transition| transition.rule_word != transition.rule_id));
+        let generated = generate(&model).unwrap();
+
+        for transition in model.transitions() {
+            assert!(generated.source.contains(&format!(
+                "sembla_exp(seed, tick, {}U,",
+                transition.rule_word
+            )));
+            assert!(generated
+                .source
+                .contains(&format!("best_rule_0 = {}U", transition.rule_word)));
+            assert!(generated
+                .source
+                .contains(&format!("candidate_offsets[{}]", transition.rule_id)));
+            assert!(generated
+                .source
+                .contains(&format!("sembla_transition_{:08x}", transition.rule_id)));
+            assert!(!generated
+                .source
+                .contains(&format!("sembla_exp(seed, tick, {}U,", transition.rule_id)));
+        }
     }
 
     #[test]

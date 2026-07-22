@@ -457,7 +457,7 @@ impl CudaBackend {
             .collect::<Vec<_>>();
         let rules = coordinates
             .iter()
-            .map(|value| value.rule_id)
+            .map(|value| value.rule_word)
             .collect::<Vec<_>>();
         let entities = coordinates
             .iter()
