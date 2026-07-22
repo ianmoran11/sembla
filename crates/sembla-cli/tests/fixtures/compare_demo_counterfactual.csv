@@ -1,0 +1,16 @@
+# arm_a_model=demo_counterfactual_outbreak
+# arm_b_model=demo_counterfactual_outbreak
+# arm_a_params={"control_beta":0.45,"high_contact_beta":0.9,"recovery_rate":0.1}
+# arm_b_params={"control_beta":0.9,"high_contact_beta":0.9,"recovery_rate":0.1}
+# seed=55
+# dt_a=0.25
+# dt_b=0.25
+tick,S_a,I_a,R_a,S_b,I_b,R_b,dS,dI,dR,fired_infect_a,fired_recover_a,deferred_a,fired_infect_b,fired_recover_b,deferred_b
+0,378,593,29,359,612,29,-19,19,0,22,29,0,41,29,0
+1,356,599,45,316,639,45,-40,40,0,22,16,0,43,16,0
+2,346,594,60,298,641,61,-48,47,1,10,15,0,18,16,0
+3,331,592,77,270,652,78,-61,60,1,15,17,0,28,17,0
+4,299,615,86,225,686,89,-74,71,3,32,9,0,45,11,0
+5,276,618,106,198,691,111,-78,73,5,23,20,0,27,22,0
+6,262,621,117,171,704,125,-91,83,8,14,11,0,27,14,0
+7,240,631,129,143,719,138,-97,88,9,22,12,0,28,13,0

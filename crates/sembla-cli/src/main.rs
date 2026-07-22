@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -323,7 +323,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
         .unwrap_or(arguments.len());
     if !(1..=2).contains(&positional_count) {
         return Err(
-            "compare requires one model (parameter contrast) or two models (model contrast)"
+            "compare requires one model or plan (parameter contrast) or two models or plans (model contrast)"
                 .to_owned(),
         );
     }
@@ -2472,8 +2472,20 @@ struct CompareArmOutcome {
 fn compare_result(options: CompareOptions) -> Result<(), String> {
     let path_a = &options.models[0];
     let path_b = options.models.get(1).unwrap_or(path_a);
-    let model_a = read_validated(path_a)?;
-    let model_b = read_validated(path_b)?;
+    let input_a = read_executable_input(path_a, None)?;
+    let input_b = read_executable_input(path_b, None)?;
+    if input_a.plan.is_some() != input_b.plan.is_some() {
+        let (legacy_path, plan_path) = if input_a.plan.is_some() {
+            (path_b, path_a)
+        } else {
+            (path_a, path_b)
+        };
+        return Err(format!(
+            "compare requires both inputs to use the same identity scheme; got legacy model '{legacy_path}' and plan envelope '{plan_path}'"
+        ));
+    }
+    let model_a = input_a.model;
+    let model_b = input_b.model;
     let params_a = resolve_params(&model_a, options.params_a.as_deref())?;
     let params_b = resolve_params(&model_b, options.params_b.as_deref())?;
     let population =

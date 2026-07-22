@@ -416,39 +416,6 @@ fn run_accepts_plan_envelopes_on_cpu_and_reaches_cuda_backend_without_dt() {
 }
 
 #[test]
-fn compare_entrypoint_still_rejects_plan_envelopes() {
-    let plan = repository_path("fixtures/plans/two_box.plan.json");
-    let population = std::env::temp_dir().join(format!(
-        "sembla-plan-rejection-population-{}.bin",
-        std::process::id()
-    ));
-    std::fs::write(&population, []).unwrap();
-    let output_path = std::env::temp_dir().join(format!(
-        "sembla-plan-rejection-output-{}",
-        std::process::id()
-    ));
-
-    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
-        .arg("compare")
-        .arg(&plan)
-        .arg(repository_path("examples/two_box.json"))
-        .arg("--population")
-        .arg(&population)
-        .args(["--seed", "1", "--ticks", "1", "--out"])
-        .arg(&output_path)
-        .output()
-        .unwrap();
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert_eq!(output.status.code(), Some(1), "{stderr}");
-    assert!(
-        stderr.contains("plan envelopes are not yet runnable; see PRD 0004"),
-        "{stderr}"
-    );
-
-    std::fs::remove_file(population).unwrap();
-}
-
-#[test]
 fn diff_backends_accepts_plans_rejects_plan_dt_and_checks_corpus_exclusivity() {
     let plan = repository_path("fixtures/plans/two_box.plan.json");
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))

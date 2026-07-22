@@ -153,6 +153,60 @@ and canonical run manifest as a legacy sweep. The pairs CSV and adjacent
 manifest records the complete plan identity tuple and linked-source tuple,
 not a legacy `ir_hash`; direct-stable plans omit only `linked_source`.
 
+## Compare plans with common random numbers
+
+`compare` accepts either two plan envelopes or one plan with two parameter
+files. Both arms use the same seed. Content-addressed transition identities
+make that pairing principled: a shared component keeps the same `occ:…#…`
+identity, rule word, and Philox draws even when the surrounding composed model
+changes (DECISIONS.md §J4 and §J14).
+
+For example, the population leaf is shared by the standalone plan and the
+unwired population-plus-policy product. Every population view and firing
+trajectory in this contrast is therefore exactly equal, not merely
+statistically similar:
+
+```sh
+cargo run -p sembla-cli -- compare \
+  fixtures/plans/linked/solo_population.plan.json \
+  fixtures/plans/linked/independent_epidemic_policy.plan.json \
+  --population build/population.bin --seed 55 --ticks 8 \
+  --out build/population-noninterference.csv
+```
+
+The wired policy regression fixture exposes the otherwise literal restriction
+threshold as a test-only parameter. At this seed, thresholds 500 and 1000 have
+identical population columns at ticks 0 and 1; the first difference is pinned
+at tick 2, after the population-to-policy and policy-to-population one-tick
+wires have both carried the counterfactual:
+
+```sh
+printf '%s\n' '{"restriction_threshold":500}' > build/policy-a.json
+printf '%s\n' '{"restriction_threshold":1000}' > build/policy-b.json
+cargo run -p sembla-cli -- compare \
+  crates/sembla-cli/tests/fixtures/epidemic_policy_threshold.plan.json \
+  --population build/population.bin --seed 55 --ticks 8 \
+  --params-a build/policy-a.json --params-b build/policy-b.json \
+  --out build/policy-counterfactual.csv
+```
+
+The committed counterfactual demo is also directly runnable in parameter
+contrast form without changing any demo artifact:
+
+```sh
+printf '%s\n' '{"control_beta":0.45}' > build/control.json
+printf '%s\n' '{"control_beta":0.9}' > build/high-contact.json
+cargo run -p sembla-cli -- compare \
+  fixtures/demos/composition/demo_counterfactual_outbreak/executable-plan.json \
+  --population build/population.bin --seed 55 --ticks 8 \
+  --params-a build/control.json --params-b build/high-contact.json \
+  --out build/demo-counterfactual.csv
+```
+
+Legacy models may still compare with legacy models, but a legacy/plan pair is
+rejected before execution because positional and stable identities cannot
+form a meaningful CRN contrast.
+
 ## Identity and refactoring
 
 V1 stable identities use this grammar:
