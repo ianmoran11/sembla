@@ -16,10 +16,9 @@ recommended hybrid pipeline. It is constrained by [`DESIGN.md`](../../DESIGN.md)
 and [`DECISIONS.md`](../../DECISIONS.md). Once accepted, its normative choices
 should be recorded in `DECISIONS.md` and implemented through focused PRDs.
 
-**Implementation status:** The current Lean frontend elaborates directly to the
-flat `Sembla.IR.Model`, serializes it, and hands it to Rust for validation and
-execution. `CompositionSourceV1`, `ExecutablePlanV1`, and the linker described
-below do not yet exist.
+**Implementation status:** The first release (document Phases 0–4) is implemented
+through [`docs/prds-composition/`](../prds-composition/); remaining phases are
+unimplemented.
 
 The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** describe the proposed
 contract. They become normative only after the architecture is accepted.

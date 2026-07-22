@@ -11,6 +11,8 @@ Amended 2026-07-18: §10.4 resolved (amortized neural posterior estimation, run
 as an external workflow — see DECISIONS.md §G5), §10.5 descoped (population
 generation is an external pipeline's product), §10.6 gains the
 amortized-posterior path.
+Amended 2026-07-22: §4.4 points to the implemented composition guide and the
+normative composition decisions.
 **Scope:** Semantics, architecture, and v0.1 definition for a compositional simulation
 framework with a Lean 4 frontend and a Rust execution backend.
 
@@ -234,6 +236,9 @@ coarse-graining *theorem*, not an analogy.
 - **No global variables.** Global-looking *mutable* quantities are inputs
   wired in; per-run constants are parameters (§4.1) — read-only, hence not
   globals. The only sanctioned globals are the synchronous tick and θ.
+
+The implemented first-release composition workflow is documented in
+[`docs/composition.md`](docs/composition.md); [`DECISIONS.md` §J](DECISIONS.md#j-composition-and-the-option-d-architecture-accepted-2026-07-21) is normative.
 
 ### 4.5 Meaning: the Lean layer
 

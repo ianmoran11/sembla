@@ -416,7 +416,7 @@ fn run_accepts_plan_envelopes_on_cpu_and_rejects_cuda_and_dt_overrides() {
 }
 
 #[test]
-fn every_other_runtime_entrypoint_rejects_plan_envelopes() {
+fn sweep_compare_and_differential_entrypoints_reject_plan_envelopes() {
     let plan = repository_path("fixtures/plans/two_box.plan.json");
     let population = std::env::temp_dir().join(format!(
         "sembla-plan-rejection-population-{}.bin",
@@ -438,14 +438,6 @@ fn every_other_runtime_entrypoint_rejects_plan_envelopes() {
         .args(["--ticks", "1", "--out"])
         .arg(&output_path);
     commands.push(("sweep", sweep));
-
-    let mut verify = Command::new(env!("CARGO_BIN_EXE_sembla"));
-    verify
-        .arg("verify-run")
-        .arg("manifest-does-not-need-to-exist.json")
-        .arg(&plan)
-        .args(["--population", "1"]);
-    commands.push(("verify-run", verify));
 
     let mut compare = Command::new(env!("CARGO_BIN_EXE_sembla"));
     compare

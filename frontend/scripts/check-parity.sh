@@ -211,3 +211,22 @@ done
 cmp "$repo_root/fixtures/plans/linked/epidemic_policy.plan.json" \
   "$tmp/epidemic_policy.surface.plan.json"
 echo "Lean-authored composition surface twins are byte-identical to source and linked-plan fixtures"
+
+# --- PRD 0012: canonical artifact-bundle parity (append-only) ---
+bundle_fixture="$repo_root/fixtures/bundles/epidemic_policy"
+bundle_actual="$tmp/epidemic_policy.bundle"
+(cd "$frontend_root" && lake exe sembla-link \
+  "$repo_root/fixtures/composition-source/epidemic_policy.source.json" \
+  --bundle "$bundle_actual")
+for artifact in bundle-manifest.json composition-source.json executable-plan.json link-report.json; do
+  cmp "$bundle_fixture/$artifact" "$bundle_actual/$artifact"
+done
+if (cd "$frontend_root" && lake exe sembla-link \
+    "$repo_root/fixtures/composition-source/epidemic_policy.source.json" \
+    --bundle "$bundle_actual") 2>"$tmp/bundle-overwrite.err"; then
+  echo "sembla-link unexpectedly overwrote a non-empty bundle directory" >&2
+  exit 1
+fi
+grep -F "refusing to overwrite non-empty bundle directory" "$tmp/bundle-overwrite.err"
+"$sembla" bundle-verify "$bundle_actual"
+echo "Lean artifact bundle is byte-identical to the canonical fixture and Rust-verified"

@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -32,6 +32,7 @@ fn run(arguments: &[String]) -> i32 {
         }
         [command, path] if command == "validate" => validate_file(path),
         [command, path] if command == "plan-hash" => plan_hash_file(path),
+        [command, path] if command == "bundle-verify" => bundle_verify(path),
         [command, left, right] if command == "diff-ir" => diff_ir(left, right),
         [command, flags @ ..] if command == "synth-pop" => {
             let options = match parse_synth_options(flags) {
@@ -445,23 +446,6 @@ fn read_input(path: &str) -> Result<(String, sembla_ir::ParsedInput), String> {
     Ok((source, input))
 }
 
-fn reject_plan_envelope(path: &str) -> Result<(), String> {
-    let Ok(source) = std::fs::read_to_string(path) else {
-        return Ok(());
-    };
-    let Ok(value) = serde_json::from_str::<serde_json::Value>(&source) else {
-        return Ok(());
-    };
-    if value
-        .as_object()
-        .is_some_and(|object| object.contains_key("schema_version"))
-    {
-        Err(format!("{path}: {PLAN_NOT_RUNNABLE}"))
-    } else {
-        Ok(())
-    }
-}
-
 fn read_model(path: &str) -> Result<sembla_ir::Model, String> {
     match read_input(path)?.1 {
         sembla_ir::ParsedInput::LegacyModel(model) => Ok(model),
@@ -579,6 +563,169 @@ fn plan_hash_file(path: &str) -> i32 {
             1
         }
     }
+}
+
+fn bundle_verify(directory: &str) -> i32 {
+    match bundle_verify_result(Path::new(directory)) {
+        Ok(checks) => {
+            for check in checks {
+                println!("ok {check}");
+            }
+            0
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+fn require_bundle_hash(
+    record_name: &str,
+    recorded: &sembla_ir::HashRecordV1,
+    actual: &sembla_ir::HashRecordV1,
+) -> Result<(), String> {
+    if recorded == actual {
+        Ok(())
+    } else {
+        Err(format!(
+            "{record_name} mismatch: recorded={} actual={}",
+            recorded.digest, actual.digest
+        ))
+    }
+}
+
+fn bundle_verify_result(directory: &Path) -> Result<Vec<&'static str>, String> {
+    let (bundle, _) = manifest::read_bundle_manifest(directory)?;
+    let mut checks = vec!["bundle-manifest schema, encoding, domains, and canonicality"];
+
+    let source_path = directory.join(&bundle.source.path);
+    let source_bytes = std::fs::read(&source_path)
+        .map_err(|error| format!("{}: {error}", source_path.display()))?;
+    let plan_path = directory.join(&bundle.plan.path);
+    let plan_bytes =
+        std::fs::read(&plan_path).map_err(|error| format!("{}: {error}", plan_path.display()))?;
+    let report_path = directory.join(manifest::BUNDLE_REPORT_PATH);
+    let report_bytes = std::fs::read(&report_path)
+        .map_err(|error| format!("{}: {error}", report_path.display()))?;
+
+    let source_hash = manifest::source_artifact_hash(&source_bytes);
+    require_bundle_hash("source.hash", &bundle.source.hash, &source_hash)?;
+    checks.push("composition-source.json source.hash");
+
+    let envelope_hash = manifest::plan_envelope_artifact_hash(&plan_bytes);
+    require_bundle_hash(
+        "plan.envelope_hash",
+        &bundle.plan.envelope_hash,
+        &envelope_hash,
+    )?;
+    checks.push("executable-plan.json plan.envelope_hash");
+
+    let plan_source = std::str::from_utf8(&plan_bytes)
+        .map_err(|error| format!("{}: invalid UTF-8: {error}", plan_path.display()))?;
+    let parsed = sembla_ir::parse_input(plan_source)
+        .map_err(|error| format!("{}: {error}", plan_path.display()))?;
+    let sembla_ir::ParsedInput::Plan(plan) = parsed else {
+        return Err(format!(
+            "{}: expected an executable plan envelope",
+            plan_path.display()
+        ));
+    };
+    let semantic_hash = sembla_ir::plan_semantic_hash(&plan)
+        .map_err(|error| format!("plan.semantic_hash recomputation failed: {error}"))?;
+    require_bundle_hash(
+        "plan.semantic_hash",
+        &bundle.plan.semantic_hash,
+        &semantic_hash,
+    )?;
+    checks.push("executable-plan.json plan.semantic_hash");
+
+    let integrity = manifest::bundle_integrity_hash(
+        &bundle,
+        &[
+            (manifest::BUNDLE_SOURCE_PATH, source_bytes.as_slice()),
+            (manifest::BUNDLE_PLAN_PATH, plan_bytes.as_slice()),
+            (manifest::BUNDLE_REPORT_PATH, report_bytes.as_slice()),
+        ],
+    )?;
+    require_bundle_hash(
+        "bundle_integrity",
+        bundle
+            .bundle_integrity
+            .as_ref()
+            .expect("bundle-manifest validation requires bundle_integrity"),
+        &integrity,
+    )?;
+    checks.push(
+        "composition-source.json, executable-plan.json, and link-report.json bundle_integrity",
+    );
+
+    sembla_ir::validate_plan(&plan).map_err(|error| format!("{}: {error}", plan_path.display()))?;
+    require_canonical_plan(&plan_path.display().to_string(), plan_source)?;
+    checks.push("executable-plan.json validation and canonicality");
+
+    let provenance = plan.linked_provenance.as_ref().ok_or_else(|| {
+        "manifest/plan agreement: linked plan has no linked_provenance".to_owned()
+    })?;
+    let origin = match plan.origin {
+        sembla_ir::PlanOrigin::Linked => "linked",
+        sembla_ir::PlanOrigin::DirectStable => "direct_stable",
+    };
+    let agreement = [
+        ("plan.origin", bundle.plan.origin.as_str(), origin),
+        (
+            "plan.schema",
+            bundle.plan.schema.as_str(),
+            plan.schema_version.as_str(),
+        ),
+        (
+            "plan.identity_scheme",
+            bundle.plan.identity_scheme.as_str(),
+            plan.identity_scheme.as_str(),
+        ),
+        (
+            "source.schema",
+            bundle.source.schema.as_str(),
+            provenance.linker.source_schema.as_str(),
+        ),
+        (
+            "linker.semantics",
+            bundle.linker.semantics.as_str(),
+            provenance.linker.semantics.as_str(),
+        ),
+        (
+            "source_map_schema",
+            bundle.source_map_schema.as_str(),
+            provenance.linker.source_map_schema.as_str(),
+        ),
+        (
+            "canonical_encoding",
+            bundle.canonical_encoding.as_str(),
+            provenance.linker.canonical_encoding.as_str(),
+        ),
+    ];
+    for (field, manifest_value, plan_value) in agreement {
+        if manifest_value != plan_value {
+            return Err(format!(
+                "manifest/plan agreement failed for {field}: manifest='{manifest_value}' plan='{plan_value}'"
+            ));
+        }
+    }
+    if bundle.plan.enabled_features != plan.identity.enabled_features {
+        return Err(format!(
+            "manifest/plan agreement failed for plan.enabled_features: manifest={:?} plan={:?}",
+            bundle.plan.enabled_features, plan.identity.enabled_features
+        ));
+    }
+    if bundle.source.hash != provenance.source_hash {
+        return Err(format!(
+            "manifest/plan agreement failed for linked_provenance.source_hash: manifest={} plan={}",
+            bundle.source.hash.digest, provenance.source_hash.digest
+        ));
+    }
+    checks
+        .push("manifest/plan origin, schemas, identity, features, and source provenance agreement");
+    Ok(checks)
 }
 
 fn diff_ir(left: &str, right: &str) -> i32 {
@@ -1958,10 +2105,6 @@ fn initializers_from_population(
 }
 
 fn verify_run(manifest_path: &str, model_path: &str, options: VerifyOptions) -> i32 {
-    if let Err(error) = reject_plan_envelope(model_path) {
-        eprintln!("{error}");
-        return 1;
-    }
     match verify_run_result(manifest_path, model_path, options) {
         Ok(count) => {
             println!("verified {count} execution(s)");
@@ -1990,9 +2133,27 @@ fn verify_run_result(
     let dt = recorded
         .dt
         .ok_or_else(|| "manifest is missing required field 'dt'".to_owned())?;
-    let mut raw_model = read_model(model_path)?;
-    raw_model.dt = dt;
-    let model = sembla_ir::validate(raw_model).map_err(|error| format!("{model_path}: {error}"))?;
+    let (input_source, input) = read_input(model_path)?;
+    let (model, plan) = match input {
+        sembla_ir::ParsedInput::LegacyModel(mut raw_model) => {
+            raw_model.dt = dt;
+            let model =
+                sembla_ir::validate(raw_model).map_err(|error| format!("{model_path}: {error}"))?;
+            (model, None)
+        }
+        sembla_ir::ParsedInput::Plan(plan) => {
+            let validated = sembla_ir::validate_plan(&plan)
+                .map_err(|error| format!("{model_path}: {error}"))?;
+            require_canonical_plan(model_path, &input_source)?;
+            if plan.model.dt != dt {
+                return Err(format!(
+                    "verification mismatch:\n  dt: recorded={dt:?} plan={:?}",
+                    plan.model.dt
+                ));
+            }
+            (validated.model_with_rule_words(), Some(plan))
+        }
+    };
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
     let backend = match recorded
@@ -2062,6 +2223,20 @@ fn verify_run_result(
         "ir_hash",
         &recorded.ir_hash,
         &Some(manifest::canonical_ir_hash(&model)?),
+        &mut differences,
+    );
+    let (expected_plan, expected_linked_source) = match plan.as_ref() {
+        Some(plan) => {
+            let (identity, linked_source) = manifest::plan_identity_tuples(plan)?;
+            (Some(identity), linked_source)
+        }
+        None => (None, None),
+    };
+    compare_field("plan", &recorded.plan, &expected_plan, &mut differences);
+    compare_field(
+        "linked_source",
+        &recorded.linked_source,
+        &expected_linked_source,
         &mut differences,
     );
 

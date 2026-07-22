@@ -4,7 +4,7 @@
 
 CI builds, lints, and tests Rust and Lean, runs the reduced Python NPE smoke test on relevant changes, and byte-compares repeated CPU runs and sweeps for determinism.
 
-Sembla is a simulation framework with a Lean frontend and a deterministic Rust runtime. See [DESIGN.md](DESIGN.md) for the architecture and project scope.
+Sembla is a simulation framework with a Lean frontend and a deterministic Rust runtime. Its composition pipeline authors reusable components in Lean, links canonical sources into stable-identity executable plans, and verifies portable artifact bundles. See [DESIGN.md](DESIGN.md) for the architecture and project scope.
 
 ## Build and test
 
@@ -20,6 +20,18 @@ Print the CLI version or validate an IR document with:
 cargo run -p sembla-cli -- --version
 cargo run -p sembla-cli -- validate examples/two_state.json
 ```
+
+After authoring a `sembla_composition`, export its source, link it, and run the
+standalone plan with three commands:
+
+```sh
+(cd frontend && lake exe sembla-export --source surface_epidemic_policy /tmp/epidemic_policy.source.json)
+(cd frontend && lake exe sembla-link /tmp/epidemic_policy.source.json --plan /tmp/epidemic_policy.plan.json)
+cargo run -p sembla-cli -- run /tmp/epidemic_policy.plan.json --population 1000 --seed 55 --ticks 40
+```
+
+See [`docs/composition.md`](docs/composition.md) for component syntax, bundles,
+identity and provenance rules, validation, and run verification.
 
 ## IR JSON conventions
 

@@ -10,6 +10,60 @@ const MANIFEST_SCHEMA_VERSION: u32 = 1;
 const BACKEND_IDENTITY_SCHEMA_VERSION: u32 = 1;
 const PAIRS_SCHEMA_VERSION: u32 = 1;
 
+pub const BUNDLE_SCHEMA: &str = "sembla.bundle/v1";
+pub const CANONICAL_ENCODING: &str = "sembla.canonical-json/v1";
+pub const COMPOSITION_SOURCE_SCHEMA: &str = "sembla.composition-source/v1";
+pub const LINKER_SEMANTICS: &str = "sembla.linker/v1";
+pub const SOURCE_MAP_SCHEMA: &str = "sembla.source-map/v1";
+pub const SOURCE_ARTIFACT_DOMAIN: &str = "sembla.source-artifact/v1";
+pub const PLAN_CORE_DOMAIN: &str = "sembla.plan-core/v1";
+pub const PLAN_ENVELOPE_DOMAIN: &str = "sembla.plan-envelope/v1";
+pub const BUNDLE_ROOT_DOMAIN: &str = "sembla.bundle-root/v1";
+pub const BUNDLE_SOURCE_PATH: &str = "composition-source.json";
+pub const BUNDLE_PLAN_PATH: &str = "executable-plan.json";
+pub const BUNDLE_REPORT_PATH: &str = "link-report.json";
+pub const BUNDLE_MANIFEST_PATH: &str = "bundle-manifest.json";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BundleSourceRecord {
+    pub schema: String,
+    pub path: String,
+    pub hash: sembla_ir::HashRecordV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BundleLinkerRecord {
+    pub semantics: String,
+    pub implementation: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BundlePlanRecord {
+    pub schema: String,
+    pub identity_scheme: String,
+    pub origin: String,
+    pub enabled_features: Vec<String>,
+    pub path: String,
+    pub semantic_hash: sembla_ir::HashRecordV1,
+    pub envelope_hash: sembla_ir::HashRecordV1,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BundleManifestV1 {
+    pub bundle_schema: String,
+    pub canonical_encoding: String,
+    pub source: BundleSourceRecord,
+    pub linker: BundleLinkerRecord,
+    pub plan: BundlePlanRecord,
+    pub source_map_schema: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub bundle_integrity: Option<sembla_ir::HashRecordV1>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ManifestKind {
@@ -320,6 +374,138 @@ pub fn plan_identity_tuples(
         },
         linked_source,
     ))
+}
+
+fn domain_hash_record(domain: &str, payload: &[u8]) -> sembla_ir::HashRecordV1 {
+    let mut hasher = Sha256::new();
+    hasher.update(domain.as_bytes());
+    hasher.update([0]);
+    hasher.update(payload);
+    sembla_ir::HashRecordV1 {
+        algorithm: HASH_ALGORITHM.to_owned(),
+        domain: domain.to_owned(),
+        digest: hex(&hasher.finalize()),
+    }
+}
+
+pub fn source_artifact_hash(bytes: &[u8]) -> sembla_ir::HashRecordV1 {
+    domain_hash_record(SOURCE_ARTIFACT_DOMAIN, bytes)
+}
+
+pub fn plan_envelope_artifact_hash(bytes: &[u8]) -> sembla_ir::HashRecordV1 {
+    domain_hash_record(PLAN_ENVELOPE_DOMAIN, bytes)
+}
+
+pub fn bundle_integrity_hash(
+    manifest: &BundleManifestV1,
+    named_files: &[(&str, &[u8])],
+) -> Result<sembla_ir::HashRecordV1, String> {
+    let mut without_integrity = manifest.clone();
+    without_integrity.bundle_integrity = None;
+    let manifest_bytes = sembla_ir::to_canonical_string(&without_integrity)?;
+    let mut payload = manifest_bytes.into_bytes();
+    let mut files = named_files.to_vec();
+    files.sort_by(|left, right| left.0.as_bytes().cmp(right.0.as_bytes()));
+    for (path, bytes) in files {
+        payload.extend_from_slice(path.as_bytes());
+        payload.push(0);
+        payload.extend_from_slice(&Sha256::digest(bytes));
+    }
+    Ok(domain_hash_record(BUNDLE_ROOT_DOMAIN, &payload))
+}
+
+pub fn read_bundle_manifest(directory: &Path) -> Result<(BundleManifestV1, String), String> {
+    let path = directory.join(BUNDLE_MANIFEST_PATH);
+    let source =
+        std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let manifest: BundleManifestV1 =
+        serde_json::from_str(&source).map_err(|error| format!("{}: {error}", path.display()))?;
+    validate_bundle_manifest(&manifest)?;
+    let canonical = sembla_ir::to_canonical_string(&manifest)
+        .map_err(|error| format!("bundle-manifest canonical serialization failed: {error}"))?;
+    if source != canonical {
+        return Err("bundle-manifest.json is not canonical".to_owned());
+    }
+    Ok((manifest, source))
+}
+
+fn validate_bundle_manifest(manifest: &BundleManifestV1) -> Result<(), String> {
+    for (field, actual, expected) in [
+        (
+            "bundle_schema",
+            manifest.bundle_schema.as_str(),
+            BUNDLE_SCHEMA,
+        ),
+        (
+            "canonical_encoding",
+            manifest.canonical_encoding.as_str(),
+            CANONICAL_ENCODING,
+        ),
+        (
+            "source.schema",
+            manifest.source.schema.as_str(),
+            COMPOSITION_SOURCE_SCHEMA,
+        ),
+        (
+            "source.path",
+            manifest.source.path.as_str(),
+            BUNDLE_SOURCE_PATH,
+        ),
+        (
+            "linker.semantics",
+            manifest.linker.semantics.as_str(),
+            LINKER_SEMANTICS,
+        ),
+        (
+            "linker.implementation",
+            manifest.linker.implementation.as_str(),
+            "lean4",
+        ),
+        (
+            "plan.schema",
+            manifest.plan.schema.as_str(),
+            sembla_ir::EXECUTABLE_PLAN_SCHEMA,
+        ),
+        (
+            "plan.identity_scheme",
+            manifest.plan.identity_scheme.as_str(),
+            sembla_ir::STABLE_IDENTITY_SCHEME,
+        ),
+        ("plan.origin", manifest.plan.origin.as_str(), "linked"),
+        ("plan.path", manifest.plan.path.as_str(), BUNDLE_PLAN_PATH),
+        (
+            "source_map_schema",
+            manifest.source_map_schema.as_str(),
+            SOURCE_MAP_SCHEMA,
+        ),
+    ] {
+        if actual != expected {
+            return Err(format!(
+                "unsupported bundle-manifest {field} '{actual}' (supported: '{expected}')"
+            ));
+        }
+    }
+    if let Some(feature) = manifest.plan.enabled_features.first() {
+        return Err(format!(
+            "unsupported bundle-manifest plan.enabled_features entry '{feature}'; V1 requires an empty list"
+        ));
+    }
+    validate_hash_record("source.hash", &manifest.source.hash, SOURCE_ARTIFACT_DOMAIN)?;
+    validate_hash_record(
+        "plan.semantic_hash",
+        &manifest.plan.semantic_hash,
+        PLAN_CORE_DOMAIN,
+    )?;
+    validate_hash_record(
+        "plan.envelope_hash",
+        &manifest.plan.envelope_hash,
+        PLAN_ENVELOPE_DOMAIN,
+    )?;
+    let integrity = manifest
+        .bundle_integrity
+        .as_ref()
+        .ok_or_else(|| "bundle_integrity record is missing".to_owned())?;
+    validate_hash_record("bundle_integrity", integrity, BUNDLE_ROOT_DOMAIN)
 }
 
 pub fn resolved_theta(params: &sembla_runtime::eval::ParamEnv) -> BTreeMap<String, ResolvedValue> {

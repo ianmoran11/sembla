@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use sha2::{Digest, Sha256};
+
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -260,6 +262,112 @@ fn verify_run_round_trips_sir_generic_and_one_sweep_draw() {
         .output()
         .unwrap();
     assert_success(&sweep_verify);
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn linked_and_direct_plan_manifests_preserve_end_to_end_provenance() {
+    let temp = temp_dir("plan-provenance");
+    let population = temp.join("population.bin");
+    synth_population(&population);
+
+    let linked_plan = repository_path("fixtures/plans/linked/two_regions.plan.json");
+    let linked_output = temp.join("linked.csv");
+    let linked_run = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(&linked_plan)
+        .arg("--population")
+        .arg(&population)
+        .args(["--seed", "55", "--ticks", "2", "--out"])
+        .arg(&linked_output)
+        .output()
+        .unwrap();
+    assert_success(&linked_run);
+
+    let linked_manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(sidecar(&linked_output)).unwrap()).unwrap();
+    let plan_tuple = linked_manifest["plan"].as_object().unwrap();
+    assert_eq!(
+        plan_tuple.keys().map(String::as_str).collect::<Vec<_>>(),
+        [
+            "enabled_features",
+            "identity_scheme",
+            "origin",
+            "plan_schema",
+            "plan_semantic_hash",
+        ]
+    );
+    assert_eq!(plan_tuple["plan_schema"], "sembla.executable-plan/v1");
+    assert_eq!(plan_tuple["identity_scheme"], "sembla.identity/stable-v1");
+    assert_eq!(plan_tuple["origin"], "linked");
+    assert_eq!(plan_tuple["enabled_features"], serde_json::json!([]));
+    assert_eq!(
+        plan_tuple["plan_semantic_hash"]["domain"],
+        "sembla.plan-core/v1"
+    );
+
+    let linked_source = linked_manifest["linked_source"].as_object().unwrap();
+    assert_eq!(
+        linked_source.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["linker_semantics", "source_hash"]
+    );
+    assert_eq!(linked_source["linker_semantics"], "sembla.linker/v1");
+    let source_bytes = std::fs::read(repository_path(
+        "fixtures/composition-source/two_regions.source.json",
+    ))
+    .unwrap();
+    let mut source_hasher = Sha256::new();
+    source_hasher.update(b"sembla.source-artifact/v1\0");
+    source_hasher.update(source_bytes);
+    let expected_source_digest = format!("{:x}", source_hasher.finalize());
+    assert_eq!(
+        linked_source["source_hash"],
+        serde_json::json!({
+            "algorithm": "sha256",
+            "domain": "sembla.source-artifact/v1",
+            "digest": expected_source_digest,
+        })
+    );
+
+    let plan_source = std::fs::read_to_string(&linked_plan).unwrap();
+    let sembla_ir::ParsedInput::Plan(parsed_plan) = sembla_ir::parse_input(&plan_source).unwrap()
+    else {
+        panic!("linked fixture did not parse as a plan");
+    };
+    let expected_semantic = sembla_ir::plan_semantic_hash(&parsed_plan).unwrap();
+    assert_eq!(
+        plan_tuple["plan_semantic_hash"]["digest"],
+        expected_semantic.digest
+    );
+
+    let verify = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("verify-run")
+        .arg(sidecar(&linked_output))
+        .arg(&linked_plan)
+        .arg("--population")
+        .arg(&population)
+        .output()
+        .unwrap();
+    assert_success(&verify);
+    assert_eq!(verify.stdout, b"verified 1 execution(s)\n");
+
+    let direct_plan = repository_path("fixtures/plans/sir.plan.json");
+    let direct_output = temp.join("direct.csv");
+    let direct_run = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("run")
+        .arg(&direct_plan)
+        .arg("--population")
+        .arg(&population)
+        .args(["--seed", "55", "--ticks", "2", "--out"])
+        .arg(&direct_output)
+        .output()
+        .unwrap();
+    assert_success(&direct_run);
+    let direct_manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(sidecar(&direct_output)).unwrap()).unwrap();
+    assert_eq!(direct_manifest["plan"]["origin"], "direct_stable");
+    assert!(direct_manifest.get("linked_source").is_none());
 
     std::fs::remove_dir_all(temp).unwrap();
 }
