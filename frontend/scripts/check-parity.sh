@@ -196,3 +196,18 @@ for fixture in "${linked_nesting_fixtures[@]}"; do
   "$sembla" validate "$tmp/$fixture.linked.plan.json"
 done
 echo "Lean nesting source and linked plans are byte-identical to canonical fixtures"
+
+# --- PRD 0011: composition surface twin parity (append-only) ---
+surface_twins=(epidemic_policy independent_epidemic_policy two_regions)
+for fixture in "${surface_twins[@]}"; do
+  (cd "$frontend_root" && lake exe sembla-export --source \
+    "surface_$fixture" "$tmp/$fixture.surface.source.json")
+  cmp "$repo_root/fixtures/composition-source/$fixture.source.json" \
+    "$tmp/$fixture.surface.source.json"
+done
+(cd "$frontend_root" && lake exe sembla-link \
+  "$tmp/epidemic_policy.surface.source.json" \
+  --plan "$tmp/epidemic_policy.surface.plan.json")
+cmp "$repo_root/fixtures/plans/linked/epidemic_policy.plan.json" \
+  "$tmp/epidemic_policy.surface.plan.json"
+echo "Lean-authored composition surface twins are byte-identical to source and linked-plan fixtures"

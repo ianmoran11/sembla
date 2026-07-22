@@ -95,6 +95,17 @@ structure SurfaceBox where
   outputs : List SurfaceOutput
   views : List SurfaceView
 
+/-- One parsed port declaration in its original position among the other
+    input/output declarations of a command-layout box. -/
+inductive SurfacePortItem where
+  | input (declaration : SurfaceInput)
+  | output (declaration : SurfaceOutput)
+
+/-- The shared box result plus cross-direction port author order. -/
+structure CollectedSurfaceBox where
+  surfaceBox : SurfaceBox
+  ports : List SurfacePortItem
+
 structure SurfaceWire where
   fromBox : TSyntax `ident
   fromPort : TSyntax `ident
@@ -416,7 +427,10 @@ private def deriveRuntimeName (source : String) : Except String String := do
     throw s!"identifier '{source}' has an unsupported separator pattern"
   pure (String.mk (snakeCaseAscii none expanded))
 
-private def deriveRuntimeNameAt (token : TSyntax `ident) : TermElabM String := do
+/-- Derive the frozen runtime name at the original identifier token. Surface
+    frontends reuse this entry point so name rules and positioned diagnostics
+    remain identical. -/
+def deriveRuntimeNameAt (token : TSyntax `ident) : TermElabM String := do
   match deriveRuntimeName (identText token) with
   | .ok name => pure name
   | .error message => throwErrorAt token message
@@ -506,7 +520,8 @@ private def parseAttr (stx : TSyntax `semblaAttr) : TermElabM SurfaceAttr := do
         refTargetToken := some target.raw }
   | _ => throwUnsupportedSyntax
 
-private def parseParam (stx : TSyntax `semblaParam) : TermElabM SurfaceParam := do
+/-- Parse one parameter declaration through the shared surface kernel. -/
+def parseSurfaceParam (stx : TSyntax `semblaParam) : TermElabM SurfaceParam := do
   match stx with
   | `(semblaParam| param $name:ident : ℝ := $default:term ~ LogNormal
         $a:semblaRealTerm $b:semblaRealTerm) =>
@@ -897,7 +912,10 @@ private def parseCommandSummary (stx : TSyntax `semblaCommandSummary) :
       finish name endpoint "argmax_tick"
   | _ => throwUnsupportedSyntax
 
-private def parseCommandBox (stx : TSyntax `semblaCommandBox) : TermElabM SurfaceBox := do
+/-- Collect one command-layout box through the shared surface kernel while
+    retaining the original interleaving of input and output declarations. -/
+def parseCommandBoxWithPorts
+    (stx : TSyntax `semblaCommandBox) : TermElabM CollectedSurfaceBox := do
   match stx with
   | `(semblaCommandBox| box $name:ident where $items:semblaCommandBoxItem*) =>
       let mut systemDecls : List SurfaceSystem := []
@@ -905,25 +923,38 @@ private def parseCommandBox (stx : TSyntax `semblaCommandBox) : TermElabM Surfac
       let mut transitionDecls : List SurfaceTransition := []
       let mut outputDecls : List SurfaceOutput := []
       let mut viewDecls : List SurfaceView := []
+      let mut portDecls : List SurfacePortItem := []
       for item in items do
         match item with
         | `(semblaCommandBoxItem| $decl:semblaCommandSystem) =>
             systemDecls := systemDecls ++ [← parseCommandSystem decl]
         | `(semblaCommandBoxItem| $decl:semblaCommandInput) =>
-            inputDecls := inputDecls ++ [← parseCommandInput decl]
+            let parsed ← parseCommandInput decl
+            inputDecls := inputDecls ++ [parsed]
+            portDecls := portDecls ++ [.input parsed]
         | `(semblaCommandBoxItem| $decl:semblaCommandGeneralTransition) =>
             transitionDecls := transitionDecls ++ [← parseCommandGeneralTransition decl]
         | `(semblaCommandBoxItem| $decl:semblaTransition) =>
             transitionDecls := transitionDecls ++ [← parseTransition decl]
         | `(semblaCommandBoxItem| $decl:semblaCommandOutput) =>
-            outputDecls := outputDecls ++ [← parseCommandOutput decl]
+            let parsed ← parseCommandOutput decl
+            outputDecls := outputDecls ++ [parsed]
+            portDecls := portDecls ++ [.output parsed]
         | `(semblaCommandBoxItem| $decl:semblaCommandView) =>
             viewDecls := viewDecls ++ [← parseCommandView decl]
         | `(semblaCommandBoxItem| contest $unsupported:ident) =>
             throwErrorAt unsupported "unsupported Sembla box declaration '{identText unsupported}'"
         | _ => throwUnsupportedSyntax
-      pure ⟨identText name, name.raw, systemDecls, inputDecls, transitionDecls, outputDecls, viewDecls⟩
+      let surfaceBox : SurfaceBox :=
+        ⟨identText name, name.raw, systemDecls, inputDecls, transitionDecls,
+          outputDecls, viewDecls⟩
+      pure ⟨surfaceBox, portDecls⟩
   | _ => throwUnsupportedSyntax
+
+/-- Existing command-box API; model elaboration intentionally ignores the
+    additional port-order metadata. -/
+def parseCommandBox (stx : TSyntax `semblaCommandBox) : TermElabM SurfaceBox := do
+  pure (← parseCommandBoxWithPorts stx).surfaceBox
 
 private def collectCommandSurfaceModel (declaration : TSyntax `ident)
     (runtimeOverride : Option (TSyntax `str)) (stepWidth : TSyntax `term)
@@ -935,7 +966,7 @@ private def collectCommandSurfaceModel (declaration : TSyntax `ident)
   for item in items do
     match item with
     | `(semblaCommandModelItem| $decl:semblaParam) =>
-        paramDecls := paramDecls ++ [← parseParam decl]
+        paramDecls := paramDecls ++ [← parseSurfaceParam decl]
     | `(semblaCommandModelItem| $decl:semblaCommandBox) =>
         boxDecls := boxDecls ++ [← parseCommandBox decl]
     | `(semblaCommandModelItem| $decl:semblaWire) =>
@@ -959,7 +990,7 @@ private def collectLegacySurfaceModel (name : TSyntax `str) (stepWidth : TSyntax
     | some declarations => parseSummaryBlock declarations
     | none => pure []
   pure ⟨name.getString, name.raw, none, stepWidth,
-    ← paramDecls.mapM parseParam,
+    ← paramDecls.mapM parseSurfaceParam,
     ← boxDecls.mapM parseBox,
     ← wireDecls.mapM parseWire,
     summaryCtx⟩
@@ -1557,11 +1588,9 @@ private def modelTerm (name : String) (stepWidth : TSyntax `term)
     (params boxes wires summaryTerms : Array (TSyntax `term)) : TermElabM (TSyntax `term) :=
   `(Model.mk $(Lean.quote name) $stepWidth [$params,*] [$boxes,*] [$wires,*] [$summaryTerms,*])
 
-/-- Internal shared path for validation, IR emission, one-time evaluation, and
-    widget attachment.  Surface frontends should only collect `SurfaceModel`
-    and invoke this function; the individual IR-building helpers stay private.
-    The elaboration callback preserves Lean's active term-elaborator scope. -/
-def elaborateSurfaceModel (surface : SurfaceModel)
+/-- Single shared path for validation, IR emission, and one-time evaluation.
+    Widget attachment is a caller policy; all IR-building helpers stay private. -/
+private def elaborateSurfaceModelCore (attachWidgets : Bool) (surface : SurfaceModel)
     (elaborateTerm : TSyntax `term → TermElabM Lean.Expr) : TermElabM Lean.Expr := do
   let modelName := match surface.runtimeName with
     | some runtime => runtime.1
@@ -1670,20 +1699,31 @@ def elaborateSurfaceModel (surface : SurfaceModel)
   synthesizeSyntheticMVarsNoPostponing
   let modelValue ← evalModel elaborated
 
-  -- Attach thin ProofWidgets panels to the original declaration-name ranges.
-  -- The displayed JSON props come only from the pure IR builders.
-  for boxCtx in boxCtxs do
-    for selected in boxCtx.systems do
-      if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
-        saveStateDiagram props selected.token
-    for transitionDecl in boxCtx.transitions do
-      let selected ← selectedSystemForTransition boxCtx transitionDecl
-      if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
-        saveStateDiagram props transitionDecl.token
-      if let some props := hazardPanelProps? modelValue boxCtx.name transitionDecl.name then
-        saveHazardPanel props transitionDecl.token
+  if attachWidgets then
+    -- Attach thin ProofWidgets panels to the original declaration-name ranges.
+    -- The displayed JSON props come only from the pure IR builders.
+    for boxCtx in boxCtxs do
+      for selected in boxCtx.systems do
+        if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
+          saveStateDiagram props selected.token
+      for transitionDecl in boxCtx.transitions do
+        let selected ← selectedSystemForTransition boxCtx transitionDecl
+        if let some props := stateDiagramProps? modelValue boxCtx.name selected.irName then
+          saveStateDiagram props transitionDecl.token
+        if let some props := hazardPanelProps? modelValue boxCtx.name transitionDecl.name then
+          saveHazardPanel props transitionDecl.token
 
   pure elaborated
+
+/-- Shared surface kernel with the existing model-widget behavior. -/
+def elaborateSurfaceModel (surface : SurfaceModel)
+    (elaborateTerm : TSyntax `term → TermElabM Lean.Expr) : TermElabM Lean.Expr :=
+  elaborateSurfaceModelCore true surface elaborateTerm
+
+/-- Shared surface kernel without widget anchors, for composition authoring. -/
+def elaborateSurfaceModelNoWidgets (surface : SurfaceModel)
+    (elaborateTerm : TSyntax `term → TermElabM Lean.Expr) : TermElabM Lean.Expr :=
+  elaborateSurfaceModelCore false surface elaborateTerm
 
 elab "model%" name:str "step" "(" stepWidth:term ")" "where"
     "params" "[" paramDecls:semblaParam,* "]"

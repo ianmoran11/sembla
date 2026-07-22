@@ -341,6 +341,48 @@ check_failure_exact Negative/CommandUnknownWireBox.lean \
 check_failure_exact Negative/CommandUnsupportedModelDeclaration.lean \
   "Negative/CommandUnsupportedModelDeclaration.lean:4:10: error: unsupported Sembla model declaration 'race'"
 
+check_failure_exact Negative/ComponentDuplicateInstance.lean \
+  "Negative/ComponentDuplicateInstance.lean:6:11: error: duplicate instance 'population'"
+
+check_failure_exact Negative/ComponentUnknownConstant.lean \
+  "Negative/ComponentUnknownConstant.lean:5:20: error: unknown identifier 'MissingComponent'"
+
+check_failure_exact Negative/ComponentUnknownWirePort.lean \
+  "Negative/ComponentUnknownWirePort.lean:7:24: error: unknown port 'population.missing'"
+
+check_failure_exact Negative/ComponentUnknownExposePort.lean \
+  "Negative/ComponentUnknownExposePort.lean:6:26: error: unknown port 'population.missing'"
+
+check_failure_exact Negative/ComponentUnknownHidePort.lean \
+  "Negative/ComponentUnknownHidePort.lean:6:18: error: unknown port 'population.missing'"
+
+check_failure_exact Negative/ComponentUnlabeledWire.lean \
+  "Negative/ComponentUnlabeledWire.lean:7:2: error: wire declarations require an explicit label before ':'"
+
+check_failure_exact Negative/ComponentUnsupportedInstanceName.lean \
+  "Negative/ComponentUnsupportedInstanceName.lean:5:11: error: identifier 'North'' contains unsupported character '''"
+
+check_failure_exact Negative/ComponentRequiresComposite.lean \
+  "Negative/ComponentRequiresComposite.lean:5:2: error: requires declarations are not allowed on composite components"
+
+check_failure_exact Negative/ComponentDt.lean \
+  "Negative/ComponentDt.lean:4:30: error: dt is not allowed on a component"
+
+check_failure_exact Negative/CompositionMissingRoot.lean \
+  "Negative/CompositionMissingRoot.lean:4:19: error: sembla_composition requires exactly one root"
+
+check_failure_exact Negative/CompositionMissingName.lean \
+  "Negative/CompositionMissingName.lean:4:19: error: sembla_composition requires '(name := <exact slug>)'"
+
+check_failure_exact Negative/ComponentDuplicateWireLabel.lean \
+  "Negative/ComponentDuplicateWireLabel.lean:8:7: error: duplicate wire label 'duplicate'"
+
+check_failure_exact Negative/ComponentUnknownRequirement.lean \
+  "Negative/ComponentUnknownRequirement.lean:5:37: error: component 'def:population' has no requirement 'missing'"
+
+check_failure_exact Negative/CompositionInvalidSummaryPath.lean \
+  "Negative/CompositionInvalidSummaryPath.lean:7:21: error: summary source must contain only identifier path segments"
+
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
 lake env lean Positive/ObservationOrder.lean

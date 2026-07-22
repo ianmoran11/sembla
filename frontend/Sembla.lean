@@ -16,6 +16,9 @@ import Sembla.Composition.SpecObservation
 import Sembla.Composition.SpecStatic
 import Sembla.Composition.SpecStatements
 import Sembla.Composition.SpecTests
+import Sembla.Composition.Surface
+import Sembla.Composition.SurfaceModels
+import Sembla.Composition.SurfaceTests
 import Sembla.DSL
 import Sembla.Models
 import Sembla.PlanTests

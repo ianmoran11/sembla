@@ -33,10 +33,14 @@ private def lookupModel (name : String) : Option IR.Model :=
   | "Sembla/Models/noisyVoter" | "Sembla/Models/noisy_voter" => some Models.noisyVoter
   | _ => none
 
+private def lookupSource (name : String) : Option Composition.CompositionSourceV1 :=
+  (Composition.SurfaceModels.lookup name).orElse fun _ =>
+    Composition.Fixtures.lookup name
+
 def main (args : List String) : IO UInt32 := do
   match args with
   | ["--source", name, outputPath] =>
-      match Composition.Fixtures.lookup name with
+      match lookupSource name with
       | none =>
           IO.eprintln s!"unknown composition source fixture '{name}'\n{usage}"
           pure 2
