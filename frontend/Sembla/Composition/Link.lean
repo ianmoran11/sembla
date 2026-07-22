@@ -1346,8 +1346,9 @@ def planValidCheck (plan : Plan.ExecutablePlanV1) : Bool :=
       provenance.sourceMap.leaves == sortBy provenance.sourceMap.leaves (·.occurrence) &&
       provenance.sourceMap.leaves.map (·.occurrence) == expectedLeaves.map (·.occurrence)
 
-/-- Canonical product linker for composition source V1. -/
-def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
+/-- Build the candidate linked plan and report before the final validity gate. -/
+private def buildLinkResultV1
+    (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
     Except (List LinkErrorV1) LinkResultV1 := do
   let firstErrors := envelopeErrors source ++ constructErrors source
   if !firstErrors.isEmpty then fail firstErrors
@@ -1447,22 +1448,59 @@ def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
         canonicalEncoding := Plan.canonicalEncoding
         sourceMapSchema := Plan.sourceMapSchema }
       sourceMap } }
-  if planValidCheck plan then
-    pure {
-      plan
-      report := {
-        warnings := if source.definitions.any fun definition =>
-          match definition.body with
-          | .primitive _ => false
-          | .composite _ => !definition.parameterRequirements.isEmpty
-        then ["composite parameter requirements are forwarded through the shared model-level V1 namespace"]
-        else []
-        statistics := {
-          leaves := identityLeaves.length
-          transitions := transitions.length
-          mailboxes := mailboxes.length } } }
-  else
-    fail [mkError .unsupportedConstruct source.modelId
-      "linked model failed the executable-plan V1 validity check"]
+  pure {
+    plan
+    report := {
+      warnings := if source.definitions.any fun definition =>
+        match definition.body with
+        | .primitive _ => false
+        | .composite _ => !definition.parameterRequirements.isEmpty
+      then ["composite parameter requirements are forwarded through the shared model-level V1 namespace"]
+      else []
+      statistics := {
+        leaves := identityLeaves.length
+        transitions := transitions.length
+        mailboxes := mailboxes.length } } }
+
+/-- The final linker gate, kept separate so validity-by-construction has a
+    local proof while preserving the public `linkV1` result type. -/
+private def finalizeLinkV1
+    (sourceId : StableId) (candidate : LinkResultV1) :
+    Except (List LinkErrorV1) LinkResultV1 :=
+  if planValidCheck candidate.plan then .ok candidate
+  else .error [mkError .unsupportedConstruct sourceId
+    "linked model failed the executable-plan V1 validity check"]
+
+/-- Canonical product linker for composition source V1. -/
+def linkV1 (source : CompositionSourceV1) (sourceCanonicalBytes : String) :
+    Except (List LinkErrorV1) LinkResultV1 := do
+  let candidate ← buildLinkResultV1 source sourceCanonicalBytes
+  finalizeLinkV1 source.modelId candidate
+
+private theorem finalizeLinkV1_produces_valid_plan
+    (sourceId : StableId) (candidate result : LinkResultV1)
+    (h : finalizeLinkV1 sourceId candidate = .ok result) :
+    planValidCheck result.plan = true := by
+  unfold finalizeLinkV1 at h
+  split at h
+  next valid =>
+    simp only [Except.ok.injEq] at h
+    subst result
+    exact valid
+  next _ =>
+    contradiction
+
+/-- Internal proof boundary used by the public specification theorem. -/
+theorem linkV1ProducesValidPlan
+    (source : CompositionSourceV1) (sourceCanonicalBytes : String) (result : LinkResultV1)
+    (h : linkV1 source sourceCanonicalBytes = .ok result) :
+    planValidCheck result.plan = true := by
+  unfold linkV1 at h
+  cases candidateResult : buildLinkResultV1 source sourceCanonicalBytes with
+  | error errors =>
+      simp_all [Bind.bind, Except.bind]
+  | ok candidate =>
+      exact finalizeLinkV1_produces_valid_plan source.modelId candidate result (by
+        simpa [candidateResult] using h)
 
 end Sembla.Composition

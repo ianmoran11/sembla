@@ -12,6 +12,10 @@ import Sembla.Composition.SourceTests
 import Sembla.Composition.Errors
 import Sembla.Composition.Link
 import Sembla.Composition.LinkTests
+import Sembla.Composition.SpecObservation
+import Sembla.Composition.SpecStatic
+import Sembla.Composition.SpecStatements
+import Sembla.Composition.SpecTests
 import Sembla.DSL
 import Sembla.Models
 import Sembla.PlanTests

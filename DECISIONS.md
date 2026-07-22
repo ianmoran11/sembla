@@ -1035,3 +1035,15 @@ than admitted as partially implemented alternatives. Under DESIGN.md §5.5's
 no-inert-syntax rule, every one must be rejected with a deterministic error if
 it appears in an artifact. No deferred construct may be accepted and then
 silently ignored.
+
+### J13. Observation quotient and proof obligations (2026-07)
+
+**Decision.** Composition V1 observational equivalence includes every field of
+the observation contract: leaf and mailbox state, external outputs, firing
+order, Philox draw coordinates, and named scalar observations. Hashes remain
+consequences of canonical artifacts rather than observations, consistent with
+§J10. The independent static source and plan denotations are executable-checked
+across the linkable fixture corpus. Full behavioral preservation is
+stated-deferred under the project proof policy. Per the architecture document
+§14.3, rollout remains gated on the executable preservation checks until that
+behavioral proof is completed.
