@@ -1,0 +1,7 @@
+# params={"beta":1.3002036366837335,"gamma":0.1101353619809845}
+# dt=0.25
+tick,I,R,S,I,R,S,fired_reopen,fired_restrict,fired_infect,fired_recover,fired_reopen,fired_restrict,fired_infect,fired_recover,deferred_total
+0,639,17,344,657,15,328,0,0,56,17,0,0,72,15,0
+1,695,31,274,708,36,256,0,1,70,14,0,1,72,21,0
+2,698,47,255,706,62,232,0,0,19,16,0,0,24,26,0
+3,700,65,235,718,76,206,0,0,20,18,0,0,26,14,0

@@ -115,6 +115,47 @@ fn custom_sweep(
     process.output().unwrap()
 }
 
+struct ModelSweepOptions<'a> {
+    seed: u64,
+    draws: Option<u32>,
+    ticks: u32,
+    noise: &'a str,
+    theta_file: Option<&'a Path>,
+    export_pairs: Option<&'a Path>,
+}
+
+fn model_sweep(
+    model: &Path,
+    population: &Path,
+    out: &Path,
+    options: ModelSweepOptions<'_>,
+) -> Output {
+    let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    process
+        .arg("sweep")
+        .arg(model)
+        .arg("--population")
+        .arg(population)
+        .arg("--seed")
+        .arg(options.seed.to_string())
+        .arg("--ticks")
+        .arg(options.ticks.to_string())
+        .arg("--noise")
+        .arg(options.noise)
+        .arg("--out")
+        .arg(out);
+    if let Some(draws) = options.draws {
+        process.arg("--draws").arg(draws.to_string());
+    }
+    if let Some(theta_file) = options.theta_file {
+        process.arg("--theta-file").arg(theta_file);
+    }
+    if let Some(export_pairs) = options.export_pairs {
+        process.arg("--export-pairs").arg(export_pairs);
+    }
+    process.output().unwrap()
+}
+
 struct PairsSweepOptions<'a> {
     seed: u64,
     draws: Option<u32>,
@@ -212,6 +253,26 @@ fn file(path: &Path, name: &str) -> Vec<u8> {
 
 fn run_manifest(path: &Path) -> serde_json::Value {
     serde_json::from_slice(&file(path, "run-manifest.json")).unwrap()
+}
+
+fn output_files(path: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    std::fs::read_dir(path)
+        .unwrap()
+        .map(|entry| {
+            let entry = entry.unwrap();
+            (
+                entry.file_name().to_string_lossy().into_owned(),
+                std::fs::read(entry.path()).unwrap(),
+            )
+        })
+        .collect()
+}
+
+fn source_artifact_digest(path: &Path) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sembla.source-artifact/v1\0");
+    hasher.update(std::fs::read(path).unwrap());
+    format!("{:x}", hasher.finalize())
 }
 
 #[test]
@@ -736,4 +797,442 @@ fn sweep_rejects_zero_draws() {
     ]);
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("must be greater than zero"));
+}
+
+#[test]
+fn linked_plan_sweep_is_bitwise_deterministic() {
+    let temp = temp_dir("plan-determinism");
+    let population = temp.join("population.bin");
+    synth(&population, 1_000, 50, 600);
+    let model = repository_path("fixtures/plans/linked/two_regions.plan.json");
+    let first = temp.join("first");
+    let repeat = temp.join("repeat");
+
+    for out in [&first, &repeat] {
+        let result = model_sweep(
+            &model,
+            &population,
+            out,
+            ModelSweepOptions {
+                seed: 31,
+                draws: Some(3),
+                ticks: 4,
+                noise: "crn",
+                theta_file: None,
+                export_pairs: None,
+            },
+        );
+        assert_success(&result);
+    }
+    assert_eq!(output_files(&first), output_files(&repeat));
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn linked_plan_sweep_matches_checked_goldens() {
+    let temp = temp_dir("plan-golden");
+    let population = temp.join("population.bin");
+    synth(&population, 1_000, 50, 600);
+    let out = temp.join("sweep");
+    let result = model_sweep(
+        &repository_path("fixtures/plans/linked/two_regions.plan.json"),
+        &population,
+        &out,
+        ModelSweepOptions {
+            seed: 31,
+            draws: Some(2),
+            ticks: 4,
+            noise: "independent",
+            theta_file: None,
+            export_pairs: None,
+        },
+    );
+    assert_success(&result);
+
+    for (actual, golden) in [
+        ("draw_0.csv", "plan_sweep_two_regions_draw_0.csv"),
+        ("draw_1.csv", "plan_sweep_two_regions_draw_1.csv"),
+        ("manifest.csv", "plan_sweep_two_regions_manifest.csv"),
+        ("summary.csv", "plan_sweep_two_regions_summary.csv"),
+        (
+            "run-manifest.json",
+            "plan_sweep_two_regions_run_manifest.json",
+        ),
+    ] {
+        assert_eq!(
+            file(&out, actual),
+            std::fs::read(repository_path(format!(
+                "crates/sembla-cli/tests/fixtures/{golden}"
+            )))
+            .unwrap(),
+            "{actual} changed"
+        );
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn plan_sweep_theta_file_accepts_known_parameters_and_rejects_unknown_names() {
+    let temp = temp_dir("plan-theta-file");
+    let population = temp.join("population.bin");
+    synth(&population, 1_000, 50, 600);
+    let model = repository_path("fixtures/plans/linked/two_regions.plan.json");
+    let theta = temp.join("theta.json");
+    std::fs::write(
+        &theta,
+        b"[{\"beta\":0.7,\"gamma\":0.12},{\"beta\":0.8,\"gamma\":0.1}]\n",
+    )
+    .unwrap();
+    let out = temp.join("accepted");
+    let accepted = model_sweep(
+        &model,
+        &population,
+        &out,
+        ModelSweepOptions {
+            seed: 44,
+            draws: None,
+            ticks: 3,
+            noise: "crn",
+            theta_file: Some(&theta),
+            export_pairs: None,
+        },
+    );
+    assert_success(&accepted);
+    let manifest = run_manifest(&out);
+    assert_eq!(manifest["theta_source"]["kind"], "file");
+    assert!(manifest.get("ir_hash").is_none());
+    assert_eq!(manifest["plan"]["origin"], "linked");
+
+    let unknown = temp.join("unknown.json");
+    std::fs::write(
+        &unknown,
+        b"[{\"beta\":0.7,\"gamma\":0.12,\"mystery\":1.0}]\n",
+    )
+    .unwrap();
+    let rejected = model_sweep(
+        &model,
+        &population,
+        &temp.join("rejected"),
+        ModelSweepOptions {
+            seed: 44,
+            draws: None,
+            ticks: 3,
+            noise: "crn",
+            theta_file: Some(&unknown),
+            export_pairs: None,
+        },
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(rejected.stderr).unwrap().trim_end(),
+        format!(
+            "{}: theta assignment 0 has unknown parameter 'mystery'",
+            unknown.display()
+        )
+    );
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn plan_sweep_noise_modes_preserve_theta_and_split_simulation_shocks() {
+    let temp = temp_dir("plan-noise-modes");
+    let population = temp.join("population.bin");
+    synth(&population, 1_000, 50, 600);
+    let model = repository_path("fixtures/plans/linked/two_regions.plan.json");
+    let theta = temp.join("theta.json");
+    std::fs::write(
+        &theta,
+        b"[{\"beta\":0.7,\"gamma\":0.12},{\"beta\":0.7,\"gamma\":0.12}]\n",
+    )
+    .unwrap();
+    let crn = temp.join("crn");
+    let independent = temp.join("independent");
+    for (out, noise) in [(&crn, "crn"), (&independent, "independent")] {
+        let result = model_sweep(
+            &model,
+            &population,
+            out,
+            ModelSweepOptions {
+                seed: 81,
+                draws: None,
+                ticks: 8,
+                noise,
+                theta_file: Some(&theta),
+                export_pairs: None,
+            },
+        );
+        assert_success(&result);
+    }
+
+    assert_eq!(file(&crn, "draw_0.csv"), file(&crn, "draw_1.csv"));
+    assert_ne!(
+        file(&independent, "draw_0.csv"),
+        file(&independent, "draw_1.csv")
+    );
+    assert_eq!(
+        file(&crn, "manifest.csv"),
+        file(&independent, "manifest.csv")
+    );
+    for draw in 0..2 {
+        assert_eq!(
+            run_manifest(&crn)["executions"][draw]["resolved_theta"],
+            run_manifest(&independent)["executions"][draw]["resolved_theta"]
+        );
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn plan_sweep_manifests_carry_complete_origin_specific_tuples() {
+    let temp = temp_dir("plan-manifest-tuples");
+    let population = temp.join("population.bin");
+    synth(&population, 1_000, 50, 600);
+    let linked_plan = repository_path("fixtures/plans/linked/two_regions.plan.json");
+    let linked_out = temp.join("linked");
+    assert_success(&model_sweep(
+        &linked_plan,
+        &population,
+        &linked_out,
+        ModelSweepOptions {
+            seed: 55,
+            draws: Some(2),
+            ticks: 2,
+            noise: "independent",
+            theta_file: None,
+            export_pairs: None,
+        },
+    ));
+    let linked = run_manifest(&linked_out);
+    assert!(linked.get("ir_hash").is_none());
+    assert_eq!(linked["model"], "two_regions");
+    assert_eq!(linked["dt"], 0.25);
+    assert_eq!(linked["plan"]["origin"], "linked");
+    assert_eq!(
+        linked["plan"].as_object().unwrap().keys().count(),
+        5,
+        "plan tuple shape changed"
+    );
+    let expected_source_digest = source_artifact_digest(&repository_path(
+        "fixtures/composition-source/two_regions.source.json",
+    ));
+    assert_eq!(
+        linked["linked_source"]["source_hash"]["digest"],
+        expected_source_digest
+    );
+    let source = std::fs::read_to_string(&linked_plan).unwrap();
+    let sembla_ir::ParsedInput::Plan(parsed_plan) = sembla_ir::parse_input(&source).unwrap() else {
+        panic!("linked fixture did not parse as a plan");
+    };
+    assert_eq!(
+        linked["plan"]["plan_semantic_hash"]["digest"],
+        sembla_ir::plan_semantic_hash(&parsed_plan).unwrap().digest
+    );
+
+    let linked_manifest = linked_out.join("run-manifest.json");
+    let verified = command(&[
+        "verify-run",
+        linked_manifest.to_str().unwrap(),
+        linked_plan.to_str().unwrap(),
+        "--population",
+        population.to_str().unwrap(),
+    ]);
+    assert_success(&verified);
+    assert_eq!(verified.stdout, b"verified 2 execution(s)\n");
+    let verified_draw = command(&[
+        "verify-run",
+        linked_manifest.to_str().unwrap(),
+        linked_plan.to_str().unwrap(),
+        "--population",
+        population.to_str().unwrap(),
+        "--draw",
+        "1",
+    ]);
+    assert_success(&verified_draw);
+    assert_eq!(verified_draw.stdout, b"verified 1 execution(s)\n");
+
+    let direct_plan = repository_path("fixtures/plans/two_box.plan.json");
+    let direct_out = temp.join("direct");
+    assert_success(&model_sweep(
+        &direct_plan,
+        Path::new("10"),
+        &direct_out,
+        ModelSweepOptions {
+            seed: 55,
+            draws: Some(1),
+            ticks: 2,
+            noise: "crn",
+            theta_file: None,
+            export_pairs: None,
+        },
+    ));
+    let direct = run_manifest(&direct_out);
+    assert_eq!(direct["plan"]["origin"], "direct_stable");
+    assert!(direct.get("linked_source").is_none());
+    assert!(direct.get("ir_hash").is_none());
+    let direct_manifest = direct_out.join("run-manifest.json");
+    let verified_direct = command(&[
+        "verify-run",
+        direct_manifest.to_str().unwrap(),
+        direct_plan.to_str().unwrap(),
+        "--population",
+        "10",
+    ]);
+    assert_success(&verified_direct);
+    assert_eq!(verified_direct.stdout, b"verified 1 execution(s)\n");
+
+    let mut partial = linked;
+    partial["plan"]
+        .as_object_mut()
+        .unwrap()
+        .remove("enabled_features");
+    let partial_path = temp.join("partial-sweep-manifest.json");
+    std::fs::write(&partial_path, serde_json::to_vec(&partial).unwrap()).unwrap();
+    let rejected = command(&[
+        "verify-run",
+        partial_path.to_str().unwrap(),
+        linked_plan.to_str().unwrap(),
+        "--population",
+        population.to_str().unwrap(),
+    ]);
+    assert_eq!(rejected.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&rejected.stderr);
+    assert!(stderr.contains("plan tuple"), "{stderr}");
+    assert!(stderr.contains("enabled_features"), "{stderr}");
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn legacy_sweep_outputs_and_manifest_match_pre_prd3_goldens() {
+    let temp = temp_dir("legacy-freeze");
+    let population = temp.join("pop.bin");
+    synth(&population, 80, 8, 4);
+    let out = temp.join("sweep");
+    sweep(&population, &out, 9, 2, 3, None);
+
+    for (actual, golden) in [
+        ("draw_0.csv", "sweep_draw_0_legacy.csv"),
+        ("draw_1.csv", "sweep_draw_1_legacy.csv"),
+        ("manifest.csv", "sweep_manifest_legacy.csv"),
+        ("summary.csv", "sweep_summary_legacy.csv"),
+        (
+            "run-manifest.json",
+            "sweep_run_manifest_legacy_pre_prd3.json",
+        ),
+    ] {
+        assert_eq!(
+            file(&out, actual),
+            std::fs::read(repository_path(format!(
+                "crates/sembla-cli/tests/fixtures/{golden}"
+            )))
+            .unwrap(),
+            "legacy {actual} changed"
+        );
+    }
+    let manifest = run_manifest(&out);
+    assert!(manifest.get("plan").is_none());
+    assert!(manifest.get("linked_source").is_none());
+    assert!(manifest.get("ir_hash").is_some());
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn linked_plan_pairs_export_matches_golden_warns_and_rejects_summary_free_plan() {
+    let temp = temp_dir("plan-pairs");
+    let population = temp.join("population.bin");
+    synth(&population, 1_000, 50, 600);
+    let model = repository_path("fixtures/plans/linked/two_regions.plan.json");
+    let out = temp.join("sweep");
+    let pairs = temp.join("pairs.csv");
+    let result = model_sweep(
+        &model,
+        &population,
+        &out,
+        ModelSweepOptions {
+            seed: 91,
+            draws: Some(3),
+            ticks: 8,
+            noise: "independent",
+            theta_file: None,
+            export_pairs: Some(&pairs),
+        },
+    );
+    assert_success(&result);
+    assert!(result.stderr.is_empty());
+    let pairs_bytes = std::fs::read(&pairs).unwrap();
+    assert_eq!(
+        pairs_bytes,
+        std::fs::read(repository_path(
+            "crates/sembla-cli/tests/fixtures/plan_sweep_two_regions_pairs.csv"
+        ))
+        .unwrap()
+    );
+    let metadata_bytes = std::fs::read(pairs_meta_path(&pairs)).unwrap();
+    let metadata: serde_json::Value = serde_json::from_slice(&metadata_bytes).unwrap();
+    assert_eq!(metadata["schema_versions"], serde_json::json!({"pairs": 1}));
+    assert_eq!(metadata["model"], "two_regions");
+    assert_eq!(
+        metadata["parameter_columns"],
+        serde_json::json!(["beta", "gamma"])
+    );
+    assert_eq!(metadata["summary_columns"], serde_json::json!(["peak_i"]));
+    assert_eq!(metadata["noise_mode"], "independent");
+    assert_eq!(
+        metadata["pairs_sha256"],
+        format!("{:x}", Sha256::digest(&pairs_bytes))
+    );
+    assert_eq!(metadata_bytes.last(), Some(&b'\n'));
+    assert_eq!(
+        metadata_bytes,
+        (serde_json::to_string(&metadata).unwrap() + "\n").as_bytes()
+    );
+
+    let warning_pairs = temp.join("warning.csv");
+    let warned = model_sweep(
+        &model,
+        &population,
+        &temp.join("warning-sweep"),
+        ModelSweepOptions {
+            seed: 91,
+            draws: Some(1),
+            ticks: 2,
+            noise: "crn",
+            theta_file: None,
+            export_pairs: Some(&warning_pairs),
+        },
+    );
+    assert_success(&warned);
+    assert_eq!(
+        String::from_utf8(warned.stderr).unwrap().trim_end(),
+        "warning: --export-pairs with --noise crn is unsuitable for NPE training (DECISIONS.md §G5); use --noise independent"
+    );
+
+    let rejected_pairs = temp.join("rejected.csv");
+    let rejected = model_sweep(
+        &repository_path("fixtures/plans/linked/epidemic_policy.plan.json"),
+        &population,
+        &temp.join("rejected-sweep"),
+        ModelSweepOptions {
+            seed: 1,
+            draws: Some(1),
+            ticks: 2,
+            noise: "independent",
+            theta_file: None,
+            export_pairs: Some(&rejected_pairs),
+        },
+    );
+    assert_eq!(rejected.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(rejected.stderr).unwrap().trim_end(),
+        "model 'epidemic_policy' declares no summaries; --export-pairs requires declared summaries (DESIGN.md §4.6)"
+    );
+    assert!(!rejected_pairs.exists());
+    assert!(!pairs_meta_path(&rejected_pairs).exists());
+
+    std::fs::remove_dir_all(temp).unwrap();
 }

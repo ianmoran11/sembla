@@ -416,7 +416,7 @@ fn run_accepts_plan_envelopes_on_cpu_and_reaches_cuda_backend_without_dt() {
 }
 
 #[test]
-fn sweep_and_compare_entrypoints_still_reject_plan_envelopes() {
+fn compare_entrypoint_still_rejects_plan_envelopes() {
     let plan = repository_path("fixtures/plans/two_box.plan.json");
     let population = std::env::temp_dir().join(format!(
         "sembla-plan-rejection-population-{}.bin",
@@ -428,37 +428,22 @@ fn sweep_and_compare_entrypoints_still_reject_plan_envelopes() {
         std::process::id()
     ));
 
-    let mut commands = Vec::new();
-
-    let mut sweep = Command::new(env!("CARGO_BIN_EXE_sembla"));
-    sweep
-        .arg("sweep")
-        .arg(&plan)
-        .args(["--population", "1", "--seed", "1", "--draws", "1"])
-        .args(["--ticks", "1", "--out"])
-        .arg(&output_path);
-    commands.push(("sweep", sweep));
-
-    let mut compare = Command::new(env!("CARGO_BIN_EXE_sembla"));
-    compare
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("compare")
         .arg(&plan)
         .arg(repository_path("examples/two_box.json"))
         .arg("--population")
         .arg(&population)
         .args(["--seed", "1", "--ticks", "1", "--out"])
-        .arg(&output_path);
-    commands.push(("compare", compare));
-
-    for (name, mut command) in commands {
-        let output = command.output().unwrap();
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        assert_eq!(output.status.code(), Some(1), "{name}: {stderr}");
-        assert!(
-            stderr.contains("plan envelopes are not yet runnable; see PRD 0004"),
-            "{name}: {stderr}"
-        );
-    }
+        .arg(&output_path)
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert_eq!(output.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("plan envelopes are not yet runnable; see PRD 0004"),
+        "{stderr}"
+    );
 
     std::fs::remove_file(population).unwrap();
 }

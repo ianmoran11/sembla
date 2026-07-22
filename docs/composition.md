@@ -125,9 +125,33 @@ cargo run -p sembla-cli -- verify-run build/results.csv.manifest.json \
   build/epidemic_policy.plan.json --population 1000
 ```
 
-Plan envelopes currently run on the deterministic CPU backend. Composition
-does not add a second runtime semantics: the linker emits the same flat model
-shape consumed by existing validation and execution.
+Plan envelopes run on the deterministic CPU oracle and may select CUDA with
+`--backend cuda` when a qualified device is available. Composition does not
+add a second runtime semantics: the linker emits the same flat model shape
+consumed by existing validation and execution.
+
+## Sweep a plan for calibration
+
+A linked plan uses the existing sweep, prior, noise, and summary machinery.
+For example, generate a hermetic population and export independent-noise
+`(θ, x)` pairs from the `two_regions` plan's `beta`/`gamma` priors and
+`peak_i` summary:
+
+```sh
+cargo run -p sembla-cli -- synth-pop \
+  --persons 1000 --employers 50 --initial-infected 600 --seed 123 \
+  --out build/population.bin
+cargo run -p sembla-cli -- sweep fixtures/plans/linked/two_regions.plan.json \
+  --population build/population.bin --seed 91 --draws 100 --ticks 40 \
+  --noise independent --out build/two-regions-sweep \
+  --export-pairs build/two-regions-pairs.csv
+```
+
+The sweep directory has the same draw CSVs, aggregate summary, θ manifest,
+and canonical run manifest as a legacy sweep. The pairs CSV and adjacent
+`.meta.json` sidecar retain the calibration export format. A plan sweep's run
+manifest records the complete plan identity tuple and linked-source tuple,
+not a legacy `ir_hash`; direct-stable plans omit only `linked_source`.
 
 ## Identity and refactoring
 

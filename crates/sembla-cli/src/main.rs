@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <modelA.json> <modelB.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -463,10 +463,14 @@ struct RunInput {
 }
 
 fn read_run_input(path: &str, options: &RunOptions) -> Result<RunInput, String> {
+    read_executable_input(path, options.dt)
+}
+
+fn read_executable_input(path: &str, dt: Option<f64>) -> Result<RunInput, String> {
     let (source, input) = read_input(path)?;
     match input {
         sembla_ir::ParsedInput::LegacyModel(mut model) => {
-            if let Some(dt) = options.dt {
+            if let Some(dt) = dt {
                 model.dt = dt;
             }
             let model = sembla_ir::validate(model).map_err(|error| format!("{path}: {error}"))?;
@@ -476,7 +480,7 @@ fn read_run_input(path: &str, options: &RunOptions) -> Result<RunInput, String> 
             let validated =
                 sembla_ir::validate_plan(&plan).map_err(|error| format!("{path}: {error}"))?;
             require_canonical_plan(path, &source)?;
-            if options.dt.is_some() {
+            if dt.is_some() {
                 return Err(format!(
                     "{path}: plan envelopes do not support --dt overrides; edit and re-canonicalize the plan instead"
                 ));
@@ -982,7 +986,7 @@ fn params_from_theta_assignment(
 }
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
-    let model = read_validated(path)?;
+    let RunInput { model, plan } = read_executable_input(path, None)?;
     if options.export_pairs.is_some() && model.model().summaries.is_empty() {
         return Err(format!(
             "model '{}' declares no summaries; --export-pairs requires declared summaries (DESIGN.md §4.6)",
@@ -994,7 +998,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             "warning: --export-pairs with --noise crn is unsuitable for NPE training (DECISIONS.md §G5); use --noise independent"
         );
     }
-    let ir_hash = manifest::canonical_ir_hash(&model)?;
+    let effective_ir_hash = manifest::canonical_ir_hash(&model)?;
     let theta_file = options
         .theta_file
         .as_deref()
@@ -1018,7 +1022,13 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     );
     run_manifest.model = Some(model.model().name.clone());
     run_manifest.dt = Some(model.model().dt);
-    run_manifest.ir_hash = Some(ir_hash.clone());
+    if let Some(plan) = &plan {
+        let (plan_identity, linked_source) = manifest::plan_identity_tuples(plan)?;
+        run_manifest.plan = Some(plan_identity);
+        run_manifest.linked_source = linked_source;
+    } else {
+        run_manifest.ir_hash = Some(effective_ir_hash.clone());
+    }
     run_manifest.noise_mode = Some(options.noise_mode);
     run_manifest.theta_source = Some(match &theta_file {
         Some(theta) => manifest::ThetaSource {
@@ -1029,8 +1039,9 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         None => manifest::ThetaSource {
             kind: manifest::ThetaSourceKind::Prior,
             // Prior-mode theta comes from declarations in the effective,
-            // canonical IR, whose digest is already the run's IR identity.
-            sha256: ir_hash,
+            // canonical IR. Plan manifests use their plan tuple as run
+            // identity, while this digest continues to identify the priors.
+            sha256: effective_ir_hash.clone(),
             algorithm: manifest::HASH_ALGORITHM.to_owned(),
         },
     });
@@ -1222,6 +1233,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         let pairs_sha256 = hex(&Sha256::digest(pairs_csv.as_bytes()));
         let metadata = manifest::PairsMetadata::for_sweep(
             &run_manifest,
+            effective_ir_hash,
             draw_count,
             parameter_columns,
             summary_columns,
@@ -2214,10 +2226,16 @@ fn verify_run_result(
         &Some(model.model().name.clone()),
         &mut differences,
     );
+    let expected_ir_hash =
+        if plan.is_some() && recorded.manifest_kind == manifest::ManifestKind::Sweep {
+            None
+        } else {
+            Some(manifest::canonical_ir_hash(&model)?)
+        };
     compare_field(
         "ir_hash",
         &recorded.ir_hash,
-        &Some(manifest::canonical_ir_hash(&model)?),
+        &expected_ir_hash,
         &mut differences,
     );
     let (expected_plan, expected_linked_source) = match plan.as_ref() {

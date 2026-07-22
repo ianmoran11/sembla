@@ -116,6 +116,7 @@ pub struct PairsMetadata {
 impl PairsMetadata {
     pub fn for_sweep(
         run_manifest: &RunManifest,
+        effective_ir_hash: String,
         draws: u32,
         parameter_columns: Vec<String>,
         summary_columns: Vec<String>,
@@ -131,10 +132,7 @@ impl PairsMetadata {
             dt: run_manifest
                 .dt
                 .ok_or_else(|| "sweep run manifest has no dt".to_owned())?,
-            ir_hash: run_manifest
-                .ir_hash
-                .clone()
-                .ok_or_else(|| "sweep run manifest has no IR hash".to_owned())?,
+            ir_hash: effective_ir_hash,
             ir_hash_algorithm: run_manifest.ir_hash_algorithm.clone(),
             model: run_manifest
                 .model
@@ -886,8 +884,11 @@ fn validate_plan_identity_values(manifest: &RunManifest) -> Result<(), String> {
         }
         return Ok(());
     };
-    if manifest.manifest_kind != ManifestKind::Run {
-        return Err("plan identity tuple is supported only for run manifests".to_owned());
+    if !matches!(
+        manifest.manifest_kind,
+        ManifestKind::Run | ManifestKind::Sweep
+    ) {
+        return Err("plan identity tuple is supported only for run and sweep manifests".to_owned());
     }
     if plan.plan_schema != sembla_ir::EXECUTABLE_PLAN_SCHEMA {
         return Err(format!(
