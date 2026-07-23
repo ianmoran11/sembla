@@ -5,6 +5,9 @@
 /.lake/
 /frontend/.lake/
 
+# Generated agent runtime artifacts
+/.pi-subagents/
+
 # Editors and operating systems
 .DS_Store
 .idea/
