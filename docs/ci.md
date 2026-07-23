@@ -3,11 +3,13 @@
 GitHub Actions runs `.github/workflows/ci.yml` on every push and pull request.
 It contains these checks:
 
-- **Rust:** installs the root `rust-toolchain.toml` pin, restores the Cargo
-  cache, parses the workflow YAML, runs `scripts/check-rust.sh` for formatting,
-  Clippy, workspace tests, dependency/RNG policy, and lock verification, then
-  runs the dependency-free Lean proof-hygiene guard. It does not repeat an
-  equivalent Cargo build or test afterward.
+- **Rust and documentation hygiene:** installs the root `rust-toolchain.toml`
+  pin, restores the Cargo cache, parses the workflow YAML, runs the standard-
+  library Markdown-link tests and tracked-document scan, then runs
+  `scripts/check-rust.sh` for formatting, Clippy, workspace tests,
+  dependency/RNG policy, and lock verification. It finishes with the
+  dependency-free Lean proof-hygiene guard and does not repeat an equivalent
+  Cargo build or test afterward.
 - **Determinism:** runs `scripts/check-determinism.sh`, which executes the SIR
   model twice and compares the result CSV, summary CSV, and manifest bytes. It
   also executes the same sweep twice and compares every output and the sweep
@@ -54,7 +56,8 @@ committed lock and fail rather than regenerating it.
 | Contract | Command | Environment and claim |
 | --- | --- | --- |
 | Fast Rust | `./scripts/check-rust.sh` | Requires the pinned Rust toolchain and Git, but not Lean. Runs formatting, Clippy, workspace tests, runtime dependency/RNG policy, and verifies `Cargo.lock` is unchanged. |
-| Complete local | `./scripts/check.sh` | Requires Cargo, Git, and Lake from the pinned Rust/Lean toolchains. Runs the Rust contract, Lean proof hygiene, and full frontend parity; a missing tool is an error, never a skip. |
+| Documentation links | `python3 scripts/check-markdown-links.py` | Uses only the Python standard library. Checks tracked Markdown relative targets, ignores `.piprd` managed records, remote/mailto links, images, fenced examples, and pure anchors, and does not claim anchor-fragment validation. |
+| Complete local | `./scripts/check.sh` | Requires Cargo, Git, Python 3, and Lake from the pinned Rust/Lean toolchains. Runs the Markdown check and its temporary-fixture tests, Rust contract, Lean proof hygiene, and full frontend parity; a missing tool is an error, never a skip. |
 | Determinism | `./scripts/check-determinism.sh` | Requires the pinned Rust toolchain. Repeats CPU run and sweep workflows and compares their outputs byte-for-byte. |
 | NPE smoke | `PYTHON=calibration/npe/.venv/bin/python ./scripts/check-npe-smoke.sh` | Requires the pinned Python 3.12 environment described in `calibration/npe/README.md`. This is reduced contract/training evidence, not SBC. |
 | NPE lock | `./scripts/check-npe-lock.sh` | Requires Docker. In the immutable Linux/amd64 CPython 3.12.8 image, regenerates and compares the hashed lock, performs a fresh install without isolated build resolution, and runs the full reduced NPE smoke check. |

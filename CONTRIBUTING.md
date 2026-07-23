@@ -33,15 +33,21 @@ contract before submitting a repository-wide change:
 
 ```sh
 ./scripts/check-rust.sh       # formatting, Clippy, Rust tests, dependency policy
-./scripts/check.sh            # strict Rust + Lean proof hygiene + frontend parity
+./scripts/check.sh            # documentation + strict Rust + Lean + parity
+python3 scripts/check-markdown-links.py
 ./scripts/check-determinism.sh
 bash frontend/scripts/check-parity.sh
 ```
 
+The directly runnable Markdown checker uses only the Python standard library.
+It checks relative targets in tracked Markdown, excludes managed `.piprd`
+records, and does not test remote URLs or anchor fragments. The complete check
+runs both its temporary-fixture unit tests and the repository scan.
+
 `./scripts/check.sh` fails when a required pinned tool is unavailable; it does
-not silently skip Lean. The determinism command byte-compares repeated CPU run
-and sweep outputs. The direct parity command byte-compares Lean exports and
-canonical fixtures and verifies their Rust-side contracts.
+not silently skip Python or Lean. The determinism command byte-compares repeated
+CPU run and sweep outputs. The direct parity command byte-compares Lean exports
+and canonical fixtures and verifies their Rust-side contracts.
 
 For NPE dependency or calibration-path changes, also run the immutable
 Linux/amd64 lock validation and reduced smoke test described in the NPE README:
