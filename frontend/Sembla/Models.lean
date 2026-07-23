@@ -1,5 +1,6 @@
 import Sembla.Json
 import Sembla.DSL
+import Sembla.Models.DemographicSlots
 
 namespace Sembla.Models
 open Sembla.IR Sembla.DSL

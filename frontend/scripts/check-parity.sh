@@ -272,3 +272,15 @@ LEAN
 cmp "$repo_root/fixtures/plans/grouped_observation.plan.json" "$tmp/grouped_observation.plan.json"
 "$sembla" validate "$tmp/grouped_observation.plan.json"
 echo "Lean grouped-observation plan is byte-identical to the Rust-validated fixture"
+
+# PRD 0007: the dedicated aggregate demographic model and its direct-stable
+# feature-bearing plan remain Lean-authored and byte-reproducible.
+(
+  cd "$frontend_root"
+  lake exe sembla-export demographic_slots "$tmp/demographic_slots.json"
+  lake exe sembla-export --plan demographic_slots "$tmp/demographic_slots.plan.json"
+)
+cmp "$repo_root/fixtures/demographic/demographic_slots.json" "$tmp/demographic_slots.json"
+cmp "$repo_root/fixtures/demographic/demographic_slots.plan.json" "$tmp/demographic_slots.plan.json"
+"$sembla" validate "$tmp/demographic_slots.plan.json"
+echo "Lean demographic model and direct-stable plan are byte-identical to canonical fixtures"

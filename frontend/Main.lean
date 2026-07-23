@@ -31,6 +31,10 @@ private def lookupModel (name : String) : Option IR.Model :=
   | "noisyVoter" | "noisy_voter"
   | "Sembla.Models.noisyVoter" | "Sembla.Models.noisy_voter"
   | "Sembla/Models/noisyVoter" | "Sembla/Models/noisy_voter" => some Models.noisyVoter
+  | "demographicSlots" | "demographic_slots"
+  | "Sembla.Models.demographicSlots" | "Sembla.Models.demographic_slots"
+  | "Sembla/Models/demographicSlots" | "Sembla/Models/demographic_slots" =>
+      some Models.demographicSlots
   | _ => none
 
 private def lookupSource (name : String) : Option Composition.CompositionSourceV1 :=
