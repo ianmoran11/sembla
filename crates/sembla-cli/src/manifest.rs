@@ -251,6 +251,13 @@ pub struct LinkedSourceTuple {
     pub linker_semantics: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateArtifactTuple {
+    pub format: String,
+    pub hash: sembla_ir::HashRecordV1,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunManifest {
     pub backend_identity: Option<BackendIdentity>,
@@ -262,6 +269,10 @@ pub struct RunManifest {
     pub final_state_hash_algorithm: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub final_state_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub exported_state: Option<StateArtifactTuple>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub initial_state: Option<StateArtifactTuple>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ir_hash: Option<String>,
     pub ir_hash_algorithm: String,
@@ -317,6 +328,8 @@ impl RunManifest {
             executions: Vec::new(),
             final_state_hash_algorithm: HASH_ALGORITHM.to_owned(),
             final_state_sha256: None,
+            exported_state: None,
+            initial_state: None,
             ir_hash: None,
             ir_hash_algorithm: HASH_ALGORITHM.to_owned(),
             linked_source: None,
@@ -574,8 +587,10 @@ pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
     let value = serde_json::to_value(manifest).map_err(|error| error.to_string())?;
     validate_backend_identity_tuple(&value)?;
     validate_plan_identity_tuple_shape(&value)?;
+    validate_state_artifact_tuple_shape(&value)?;
     validate_observation_tuple(manifest)?;
     validate_plan_identity_values(manifest)?;
+    validate_state_artifact_tuple_values(manifest)?;
     validate_algorithms(manifest)?;
     let bytes = to_canonical_json(manifest)?;
     std::fs::write(path, bytes.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))
@@ -590,6 +605,7 @@ pub fn read(path: &Path) -> Result<RunManifest, String> {
     validate_backend_identity_tuple(&value)?;
     validate_theta_source_tuple(&value)?;
     validate_plan_identity_tuple_shape(&value)?;
+    validate_state_artifact_tuple_shape(&value)?;
     // Deserialize from the original bytes rather than through `Value`: the
     // latter can round an already-parsed f64 during `from_value`, which would
     // break exact replay of sampled sweep parameters.
@@ -597,6 +613,7 @@ pub fn read(path: &Path) -> Result<RunManifest, String> {
         serde_json::from_str(&source).map_err(|error| format!("{}: {error}", path.display()))?;
     validate_observation_tuple(&manifest)?;
     validate_plan_identity_values(&manifest)?;
+    validate_state_artifact_tuple_values(&manifest)?;
     validate_algorithms(&manifest)?;
     Ok(manifest)
 }
@@ -809,6 +826,15 @@ fn validate_hash_record_shape(
     Ok(())
 }
 
+fn validate_state_artifact_tuple_shape(value: &serde_json::Value) -> Result<(), String> {
+    for name in ["initial_state", "exported_state"] {
+        if let Some(tuple) = tuple_object(value, name, &["format", "hash"])? {
+            validate_hash_record_shape(tuple, name, "hash")?;
+        }
+    }
+    Ok(())
+}
+
 fn validate_plan_identity_tuple_shape(value: &serde_json::Value) -> Result<(), String> {
     let plan = tuple_object(
         value,
@@ -940,6 +966,30 @@ fn validate_plan_identity_values(manifest: &RunManifest) -> Result<(), String> {
             "unsupported plan.origin '{origin}' (supported: 'linked', 'direct_stable')"
         )),
     }
+}
+
+fn validate_state_artifact_tuple_values(manifest: &RunManifest) -> Result<(), String> {
+    for (name, tuple) in [
+        ("initial_state", manifest.initial_state.as_ref()),
+        ("exported_state", manifest.exported_state.as_ref()),
+    ] {
+        let Some(tuple) = tuple else {
+            continue;
+        };
+        if tuple.format != sembla_runtime::state_artifact::STATE_ARTIFACT_SCHEMA {
+            return Err(format!(
+                "unsupported {name}.format '{}' (supported: '{}')",
+                tuple.format,
+                sembla_runtime::state_artifact::STATE_ARTIFACT_SCHEMA
+            ));
+        }
+        validate_hash_record(
+            &format!("{name}.hash"),
+            &tuple.hash,
+            sembla_runtime::state_artifact::STATE_ARTIFACT_HASH_DOMAIN,
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_observation_tuple(manifest: &RunManifest) -> Result<(), String> {
@@ -1241,6 +1291,84 @@ mod tests {
         let error = read(&path).unwrap_err();
         assert!(error.contains("theta_source tuple"), "{error}");
         assert!(error.contains("algorithm"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_rejects_invalid_state_artifact_tuple_values() {
+        let path = temp_file("invalid-state-artifact-values");
+        let mut manifest = RunManifest::new(
+            ManifestKind::Run,
+            1,
+            2,
+            PopulationSource::Numeric(10),
+            "abc".to_owned(),
+        );
+        manifest.observation_sha256 = Some("observation".to_owned());
+        manifest.initial_state = Some(super::StateArtifactTuple {
+            format: "sembla.state/v2".to_owned(),
+            hash: sembla_ir::HashRecordV1 {
+                algorithm: "sha256".to_owned(),
+                domain: "sembla.state-artifact/v1".to_owned(),
+                digest: "0".repeat(64),
+            },
+        });
+        std::fs::write(&path, to_canonical_json(&manifest).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("initial_state.format"), "{error}");
+
+        "sembla.state/v1".clone_into(&mut manifest.initial_state.as_mut().unwrap().format);
+        "wrong-domain".clone_into(&mut manifest.initial_state.as_mut().unwrap().hash.domain);
+        std::fs::write(&path, to_canonical_json(&manifest).unwrap()).unwrap();
+        let error = read(&path).unwrap_err();
+        assert!(error.contains("initial_state.hash.domain"), "{error}");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_rejects_partial_state_artifact_tuples() {
+        let path = temp_file("partial-state-artifact");
+        for tuple_name in ["initial_state", "exported_state"] {
+            for missing in ["format", "hash"] {
+                let mut tuple = serde_json::json!({
+                    "format": "sembla.state/v1",
+                    "hash": {
+                        "algorithm": "sha256",
+                        "domain": "sembla.state-artifact/v1",
+                        "digest": "0".repeat(64)
+                    }
+                });
+                tuple.as_object_mut().unwrap().remove(missing);
+                let mut value = serde_json::json!({
+                    "backend_identity": null,
+                    "schema_versions": {"backend_identity": 1, "manifest": 1}
+                });
+                value[tuple_name] = tuple;
+                std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+                let error = read(&path).unwrap_err();
+                assert!(error.contains(&format!("{tuple_name} tuple")), "{error}");
+                assert!(error.contains(missing), "{error}");
+            }
+
+            let mut value = serde_json::json!({
+                "backend_identity": null,
+                "schema_versions": {"backend_identity": 1, "manifest": 1}
+            });
+            value[tuple_name] = serde_json::json!({
+                "format": "sembla.state/v1",
+                "hash": {
+                    "algorithm": "sha256",
+                    "domain": "sembla.state-artifact/v1"
+                }
+            });
+            std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+            let error = read(&path).unwrap_err();
+            assert!(
+                error.contains(&format!("{tuple_name}.hash tuple")),
+                "{error}"
+            );
+            assert!(error.contains("digest"), "{error}");
+        }
         let _ = std::fs::remove_file(path);
     }
 

@@ -4,8 +4,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
 use sembla_runtime::state_artifact::{
-    read, sniff_magic, state_artifact_hash, to_table_inits, write, StateArtifactError, StateKind,
-    STATE_ARTIFACT_HASH_DOMAIN, STATE_MAGIC,
+    read, sniff_magic, state_artifact_hash, to_table_inits, write, write_new, StateArtifactError,
+    StateKind, STATE_ARTIFACT_HASH_DOMAIN, STATE_MAGIC,
 };
 
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
@@ -345,6 +345,21 @@ fn round_trip_and_repeated_writes_are_byte_identical() {
         std::fs::read(&first).unwrap(),
         std::fs::read(&third).unwrap()
     );
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn create_new_writer_refuses_to_replace_a_chain_link() {
+    let model = refs_model();
+    let temp = temp_dir("create-new");
+    let path = temp.join("link.state");
+    write_new(&path, &model, &refs_tables()).unwrap();
+    let original = std::fs::read(&path).unwrap();
+    assert_eq!(
+        write_new(&path, &model, &refs_tables()).unwrap_err(),
+        StateArtifactError::RefuseOverwrite { path: path.clone() }
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), original);
     std::fs::remove_dir_all(temp).unwrap();
 }
 

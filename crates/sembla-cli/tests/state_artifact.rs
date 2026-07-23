@@ -166,6 +166,14 @@ fn state_artifacts_dispatch_through_sweep_and_verify_run() {
         .output()
         .unwrap();
     assert_success(&sweep);
+    let sweep_manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(sweep_dir.join("run-manifest.json")).unwrap())
+            .unwrap();
+    assert_eq!(sweep_manifest["initial_state"]["format"], "sembla.state/v1");
+    assert_eq!(
+        sweep_manifest["initial_state"]["hash"]["digest"],
+        "bdf363c0b12a157f9adffcca3591b33026e4907d99ec9a871623857935140cdc"
+    );
 
     let run_csv = temp.join("run.csv");
     let run = Command::new(env!("CARGO_BIN_EXE_sembla"))
@@ -209,6 +217,14 @@ fn state_artifacts_dispatch_through_compare() {
         .unwrap();
     assert_success(&output);
     assert!(out.is_file());
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(format!("{}.manifest.json", out.display())).unwrap())
+            .unwrap();
+    assert_eq!(manifest["initial_state"]["format"], "sembla.state/v1");
+    assert_eq!(
+        manifest["initial_state"]["hash"]["domain"],
+        "sembla.state-artifact/v1"
+    );
     std::fs::remove_dir_all(temp).unwrap();
 }
 

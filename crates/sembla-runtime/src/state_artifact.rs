@@ -4,11 +4,12 @@ use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use sembla_ir::{domain_digest, to_canonical_string, AttrType, HashRecordV1, ValidatedModel};
 
-use crate::state::{ColumnData, ColumnInit, TableInit};
+use crate::state::{ColumnData, ColumnInit, StateError, StateStore, TableInit};
 
 pub const STATE_ARTIFACT_SCHEMA: &str = "sembla.state/v1";
 pub const STATE_ARTIFACT_HASH_DOMAIN: &str = "sembla.state-artifact/v1";
@@ -167,6 +168,9 @@ pub enum StateArtifactError {
     HeaderTooLarge {
         length: usize,
     },
+    RefuseOverwrite {
+        path: PathBuf,
+    },
 }
 
 impl fmt::Display for StateArtifactError {
@@ -203,6 +207,7 @@ impl fmt::Display for StateArtifactError {
             RefTargetMismatch { box_name, table, column, expected, actual } => write!(f, "state ref_target mismatch for column '{box_name}.{table}.{column}': expected '{expected}', found '{actual}'"),
             RefValueOutOfRange { box_name, table, column, row, value, target, target_rows } => write!(f, "state ref value out of range for column '{box_name}.{table}.{column}' at row {row}: {value} >= '{target}' row_count {target_rows}"),
             HeaderTooLarge { length } => write!(f, "state artifact canonical header is too large for u32 length: {length} bytes"),
+            RefuseOverwrite { path } => write!(f, "refusing to overwrite existing state artifact '{}'", path.display()),
         }
     }
 }
@@ -277,6 +282,94 @@ pub fn write(
     model: &ValidatedModel,
     tables: &[TableInit],
 ) -> Result<(), StateArtifactError> {
+    let bytes = artifact_bytes(model, tables)?;
+    fs::write(path.as_ref(), bytes).map_err(|error| io_error(path.as_ref(), error))
+}
+
+/// Writes a canonical artifact while atomically refusing to replace an existing path.
+pub fn write_new(
+    path: impl AsRef<Path>,
+    model: &ValidatedModel,
+    tables: &[TableInit],
+) -> Result<(), StateArtifactError> {
+    let path = path.as_ref();
+    let bytes = artifact_bytes(model, tables)?;
+    let mut file = match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            return Err(StateArtifactError::RefuseOverwrite {
+                path: path.to_owned(),
+            });
+        }
+        Err(error) => return Err(io_error(path, error)),
+    };
+    if let Err(error) = file.write_all(&bytes) {
+        drop(file);
+        let _ = fs::remove_file(path);
+        return Err(io_error(path, error));
+    }
+    Ok(())
+}
+
+/// Copies every committed model table from a state store into writer-ready inits.
+pub fn committed_table_inits(
+    model: &ValidatedModel,
+    state: &StateStore,
+) -> Result<Vec<TableInit>, StateError> {
+    let snapshot = state.snapshot();
+    let mut tables = Vec::new();
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let row_count = snapshot.row_count(&model_box.name, &table.name)?;
+            let mut columns = Vec::with_capacity(table.attrs.len());
+            for attr in &table.attrs {
+                let data = match &attr.ty {
+                    AttrType::Real => ColumnData::Real(
+                        (0..row_count)
+                            .map(|row| snapshot.real(&model_box.name, &table.name, &attr.name, row))
+                            .collect::<Result<Vec<_>, _>>()?,
+                    ),
+                    AttrType::Int => ColumnData::Int(
+                        (0..row_count)
+                            .map(|row| snapshot.int(&model_box.name, &table.name, &attr.name, row))
+                            .collect::<Result<Vec<_>, _>>()?,
+                    ),
+                    AttrType::Enum { .. } => ColumnData::Enum(
+                        (0..row_count)
+                            .map(|row| {
+                                snapshot.enum_index(&model_box.name, &table.name, &attr.name, row)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
+                    ),
+                    AttrType::Ref { .. } => ColumnData::Ref(
+                        (0..row_count)
+                            .map(|row| {
+                                snapshot.reference(&model_box.name, &table.name, &attr.name, row)
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
+                    ),
+                };
+                columns.push(ColumnInit::new(&attr.name, data));
+            }
+            tables.push(TableInit::new(
+                &model_box.name,
+                &table.name,
+                row_count,
+                columns,
+            ));
+        }
+    }
+    Ok(tables)
+}
+
+fn artifact_bytes(
+    model: &ValidatedModel,
+    tables: &[TableInit],
+) -> Result<Vec<u8>, StateArtifactError> {
     let normalized = normalize_writer_inputs(model, tables)?;
     let header = header_for_model(model)?;
     let header_json = canonical_header(&header)?;
@@ -321,7 +414,7 @@ pub fn write(
             append_column_bytes(&mut bytes, &column.data);
         }
     }
-    fs::write(path.as_ref(), bytes).map_err(|error| io_error(path.as_ref(), error))
+    Ok(bytes)
 }
 
 /// Reads and structurally validates a canonical state artifact.

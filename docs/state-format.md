@@ -57,8 +57,11 @@ sembla state-hash initial.state
 state sha256 sembla.state-artifact/v1 <64-lowercase-hex-digest>
 ```
 
-Manifest state tuples and state export are separate chained-run features; the
-artifact itself remains execution-metadata-free.
+The artifact itself remains execution-metadata-free. Run manifests record state
+links separately with optional `initial_state` and `exported_state` tuples. Each
+tuple contains `format: "sembla.state/v1"` and the complete
+`sembla.state-artifact/v1` hash record; each tuple is either wholly present or
+absent.
 
 ## Loading
 
@@ -75,6 +78,38 @@ produced a `ValidatedModel`. Consequently the same loader applies to legacy
 model JSON and plan envelopes without depending on their identity scheme.
 See [Composition](composition.md) for plan-envelope execution and model
 composition.
+
+## Chained runs
+
+`sembla run --export-state final.state` writes every table from the final
+committed state, after the final tick barrier. Export uses the same bytes and
+validation rules described above. An existing export path is rejected rather
+than overwritten: state artifacts are chain links, so silently replacing one
+would invalidate the recorded chain. Exporting does not change `results.csv`,
+the final-state hash, or the observation/output hashes.
+
+A later run loads that artifact through `--population`. With output manifests,
+the first run's `exported_state.hash` and the second run's
+`initial_state.hash` are identical, while each manifest records its own seed,
+tick count, and resolved parameters. For example:
+
+```sh
+sembla run model.json --population initial.state --seed 101 --ticks 12 \
+  --params year-1.json --out year-1.csv --export-state year-1.state
+sembla run model.json --population year-1.state --seed 202 --ticks 12 \
+  --params year-2.json --out year-2.csv --export-state year-2.state
+```
+
+`year-1.csv.manifest.json` records `exported_state` for `year-1.state`.
+`year-2.csv.manifest.json` records the same hash under `initial_state`, its own
+resolved θ from `year-2.json`, and a new `exported_state` for `year-2.state`.
+Numeric and legacy `SEMBLA_POP` inputs do not produce `initial_state` tuples.
+
+This is chaining, not checkpoint/restart. A pair of 12-tick runs is **not**
+bitwise-equivalent to one continuous 24-tick run, even when both windows use
+the same seed and θ. Tick coordinates restart at zero in the second run, so
+its counter-based random draws intentionally differ. Manifests describe the
+two honest run identities rather than claiming calendar or RNG continuity.
 
 ## Fixture regeneration
 

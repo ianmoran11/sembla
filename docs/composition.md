@@ -145,7 +145,10 @@ cargo run -p sembla-cli -- verify-run build/results.csv.manifest.json \
 Plan envelopes run on the deterministic CPU oracle and may select CUDA with
 `--backend cuda` when a qualified device is available. Composition does not
 add a second runtime semantics: the linker emits the same flat model shape
-consumed by existing validation and execution.
+consumed by existing validation and execution. `run --export-state final.state`
+can export the final committed tables from either model input form for a later
+`--population final.state` window; see [Sembla state artifacts](state-format.md#chained-runs)
+for manifest links and the deliberate non-equivalence to one continuous run.
 
 ## Sweep a plan for calibration
 

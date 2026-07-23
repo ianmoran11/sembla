@@ -9,14 +9,15 @@ use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::rng::derive_sweep_replica_seed;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sembla_runtime::state_artifact::{
-    read as read_state_artifact, sniff_magic, state_artifact_hash, to_table_inits, StateKind,
+    committed_table_inits, read as read_state_artifact, sniff_magic, state_artifact_hash,
+    to_table_inits, write_new as write_new_state_artifact, StateKind, STATE_ARTIFACT_SCHEMA,
 };
 use sha2::{Digest, Sha256};
 
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -110,6 +111,7 @@ struct RunOptions {
     ticks: u32,
     population: String,
     out: Option<String>,
+    export_state: Option<String>,
     dt: Option<f64>,
     params: Option<String>,
     backend: BackendSelection,
@@ -120,6 +122,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
     let mut ticks = None;
     let mut population = None;
     let mut out = None;
+    let mut export_state = None;
     let mut dt = None;
     let mut params = None;
     let mut backend = None;
@@ -141,6 +144,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
                 set_once(&mut population, value.clone(), flag)?;
             }
             "--out" => set_once(&mut out, value.clone(), flag)?,
+            "--export-state" => set_once(&mut export_state, value.clone(), flag)?,
             "--dt" => {
                 let value: f64 = parse_number(value, flag)?;
                 if !value.is_finite() || value <= 0.0 {
@@ -159,6 +163,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
         ticks: ticks.ok_or_else(|| "missing required flag '--ticks'".to_owned())?,
         population: population.ok_or_else(|| "missing required flag '--population'".to_owned())?,
         out,
+        export_state,
         dt,
         params,
         backend: backend.unwrap_or_default(),
@@ -804,12 +809,48 @@ fn run_file(path: &str, options: RunOptions) -> i32 {
 }
 
 fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
+    if let (Some(export_path), Some(out)) =
+        (options.export_state.as_deref(), options.out.as_deref())
+    {
+        let export_path = Path::new(export_path);
+        for output_path in [
+            PathBuf::from(out),
+            summaries_path(out),
+            manifest::sidecar_path(out),
+        ] {
+            if paths_resolve_to_same_file(export_path, &output_path) {
+                return Err(format!(
+                    "--export-state path '{}' conflicts with run output path '{}'",
+                    export_path.display(),
+                    output_path.display()
+                ));
+            }
+        }
+    }
+    if let Some(export_path) = options.export_state.as_deref() {
+        let export_path = Path::new(export_path);
+        if export_path
+            .try_exists()
+            .map_err(|error| format!("{}: {error}", export_path.display()))?
+        {
+            return Err(format!(
+                "refusing to overwrite existing state artifact '{}'",
+                export_path.display()
+            ));
+        }
+    }
+
     let RunInput { model, plan } = read_run_input(path, &options)?;
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
-    let initial = initialized_tables(&model, &options.population)?;
+    let initialized = initialized_tables(&model, &options.population)?;
+    let initial_state = initialized.state_hash.map(state_artifact_tuple);
+    let initial = initialized.tables;
     let params = resolve_params(&model, options.params.as_deref())?;
-    if options.out.is_none() && options.backend == BackendSelection::Cpu {
+    if options.out.is_none()
+        && options.export_state.is_none()
+        && options.backend == BackendSelection::Cpu
+    {
         let mut state =
             StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
         let report = executor::run(&model, &mut state, &params, options.seed, options.ticks)
@@ -834,6 +875,18 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         options.ticks,
         options.backend,
     )?;
+    let exported_state = options
+        .export_state
+        .as_deref()
+        .map(|export_path| {
+            let tables = committed_table_inits(&model, &execution.state)
+                .map_err(|error| format!("{export_path}: {error}"))?;
+            write_new_state_artifact(export_path, &model, &tables)
+                .map_err(|error| error.to_string())?;
+            let hash = state_artifact_hash(export_path).map_err(|error| error.to_string())?;
+            Ok::<_, String>(state_artifact_tuple(hash))
+        })
+        .transpose()?;
 
     if let Some(out) = options.out.as_deref() {
         std::fs::write(out, execution.output.csv.as_bytes())
@@ -861,6 +914,8 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         run_manifest.results_sha256 = Some(hashes.results_sha256);
         run_manifest.final_state_sha256 = Some(hashes.final_state_sha256);
         run_manifest.observation_sha256 = Some(hashes.observation_sha256);
+        run_manifest.initial_state = initial_state;
+        run_manifest.exported_state = exported_state;
         if let Some(plan) = &plan {
             let (plan_identity, linked_source) = manifest::plan_identity_tuples(plan)?;
             run_manifest.plan = Some(plan_identity);
@@ -1060,7 +1115,9 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         Some(params_path) => read_param_overrides(&model, params_path)?,
         None => Vec::new(),
     };
-    let initial_tables = initialized_tables(&model, &options.population)?;
+    let initialized = initialized_tables(&model, &options.population)?;
+    run_manifest.initial_state = initialized.state_hash.map(state_artifact_tuple);
+    let initial_tables = initialized.tables;
     let out = Path::new(&options.out);
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
     remove_previous_sweep_outputs(out)?;
@@ -1506,6 +1563,24 @@ struct RunOutput {
 
 fn summaries_path(output: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(format!("{output}.summaries.csv"))
+}
+
+fn paths_resolve_to_same_file(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+    let resolve = |path: &Path| {
+        let file_name = path.file_name()?;
+        let parent = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        parent
+            .canonicalize()
+            .ok()
+            .map(|parent| parent.join(file_name))
+    };
+    matches!((resolve(left), resolve(right)), (Some(left), Some(right)) if left == right)
 }
 
 struct BackendRunOutput {
@@ -2269,7 +2344,7 @@ fn verify_run_result(
             let params = params_from_manifest(&model, &recorded.resolved_theta)?;
             let execution = execute_backend_output(
                 &model,
-                initialized_tables(&model, &options.population)?,
+                initialized_tables(&model, &options.population)?.tables,
                 &params,
                 recorded.seed,
                 recorded.ticks,
@@ -2347,7 +2422,7 @@ fn verify_run_result(
                 let params = params_from_manifest(&model, &execution.resolved_theta)?;
                 let replay = execute_backend_output(
                     &model,
-                    initialized_tables(&model, &options.population)?,
+                    initialized_tables(&model, &options.population)?.tables,
                     &params,
                     execution.seed.unwrap_or(recorded.seed),
                     recorded.ticks,
@@ -2387,21 +2462,45 @@ fn verify_run_result(
     }
 }
 
+struct InitializedTables {
+    tables: Vec<TableInit>,
+    state_hash: Option<sembla_ir::HashRecordV1>,
+}
+
+fn state_artifact_tuple(hash: sembla_ir::HashRecordV1) -> manifest::StateArtifactTuple {
+    manifest::StateArtifactTuple {
+        format: STATE_ARTIFACT_SCHEMA.to_owned(),
+        hash,
+    }
+}
+
 fn initialized_tables(
     model: &sembla_ir::ValidatedModel,
     population_spec: &str,
-) -> Result<Vec<TableInit>, String> {
+) -> Result<InitializedTables, String> {
     if let Ok(population) = population_spec.parse::<usize>() {
-        return Ok(initialize_population(model, population));
+        return Ok(InitializedTables {
+            tables: initialize_population(model, population),
+            state_hash: None,
+        });
     }
     match sniff_magic(population_spec).map_err(|error| error.to_string())? {
-        StateKind::SemblaPop => initializers_from_population(
-            model,
-            &SyntheticPopulation::read(population_spec).map_err(|error| error.to_string())?,
-        ),
+        StateKind::SemblaPop => Ok(InitializedTables {
+            tables: initializers_from_population(
+                model,
+                &SyntheticPopulation::read(population_spec).map_err(|error| error.to_string())?,
+            )?,
+            state_hash: None,
+        }),
         StateKind::SemblaState => {
             let artifact = read_state_artifact(population_spec).map_err(|error| error.to_string())?;
-            to_table_inits(&artifact, model).map_err(|error| error.to_string())
+            let tables = to_table_inits(&artifact, model).map_err(|error| error.to_string())?;
+            let state_hash =
+                state_artifact_hash(population_spec).map_err(|error| error.to_string())?;
+            Ok(InitializedTables {
+                tables,
+                state_hash: Some(state_hash),
+            })
         }
         StateKind::Unknown => Err(format!(
             "unrecognized population artifact magic in '{population_spec}'; supported formats: SEMBLA_POP, SEMBLA_STATE"
@@ -2498,8 +2597,14 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     let model_b = input_b.model;
     let params_a = resolve_params(&model_a, options.params_a.as_deref())?;
     let params_b = resolve_params(&model_b, options.params_b.as_deref())?;
-    let initial_a = initialized_tables(&model_a, &options.population)?;
-    let initial_b = initialized_tables(&model_b, &options.population)?;
+    let initialized_a = initialized_tables(&model_a, &options.population)?;
+    let initialized_b = initialized_tables(&model_b, &options.population)?;
+    if initialized_a.state_hash != initialized_b.state_hash {
+        return Err("compare arms resolved different initial state artifact hashes".to_owned());
+    }
+    let initial_state_hash = initialized_a.state_hash;
+    let initial_a = initialized_a.tables;
+    let initial_b = initialized_b.tables;
     let arm_a = compare_arm(
         &model_a,
         &params_a,
@@ -2568,6 +2673,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
         population_sha256,
     );
     run_manifest.backend_identity = Some(arm_a.identity.clone());
+    run_manifest.initial_state = initial_state_hash.map(state_artifact_tuple);
     if arm_a.identity != arm_b.identity {
         return Err("backend device identity changed between compare arms".to_owned());
     }
@@ -2790,13 +2896,14 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
             ticks: options.ticks,
             population: options.population.clone(),
             out: None,
+            export_state: None,
             dt: options.dt,
             params: options.params.clone(),
             backend: BackendSelection::Cpu,
         };
         let model = read_run_input(path, &run_options)?.model;
         let params = resolve_params(&model, options.params.as_deref())?;
-        let initial = initialized_tables(&model, &options.population)?;
+        let initial = initialized_tables(&model, &options.population)?.tables;
         let cpu = execute_backend_output(
             &model,
             initial.clone(),
@@ -3126,6 +3233,7 @@ mod tests {
                     ticks: 40,
                     population: "16".to_owned(),
                     out: Some(output.to_str().unwrap().to_owned()),
+                    export_state: None,
                     dt: None,
                     params: None,
                     backend: BackendSelection::Cpu,
