@@ -383,6 +383,23 @@ check_failure_exact Negative/ComponentUnknownRequirement.lean \
 check_failure_exact Negative/CompositionInvalidSummaryPath.lean \
   "Negative/CompositionInvalidSummaryPath.lean:7:21: error: summary source must contain only identifier path segments"
 
+check_failure_exact Negative/CommandEffectIntTypeMismatch.lean \
+  "Negative/CommandEffectIntTypeMismatch.lean:12:24: error: effect value has incompatible type"
+check_failure_exact Negative/CommandEnumEffectExpression.lean \
+  "Negative/CommandEnumEffectExpression.lean:12:18: error: enum effect values must be variant literals"
+check_failure_exact Negative/CommandUnknownEffectIdentifier.lean \
+  "Negative/CommandUnknownEffectIdentifier.lean:12:21: error: unknown state or attribute 'missing'"
+check_failure_exact Negative/CommandAmbiguousEffectIdentifier.lean \
+  "Negative/CommandAmbiguousEffectIdentifier.lean:14:20: error: ambiguous identifier 'counter': both an attribute and parameter are in scope"
+check_failure_exact Negative/CommandAggregateEffect.lean \
+  "Negative/CommandAggregateEffect.lean:14:21: error: aggregates are not supported in effect expressions"
+check_failure_exact Negative/CommandIntParamPrior.lean \
+  "Negative/CommandIntParamPrior.lean:6:8: error: priors are not supported on Int parameters"
+check_failure_exact Negative/CommandIntParamRealLiteral.lean \
+  "Negative/CommandIntParamRealLiteral.lean:6:19: error: Int parameter defaults require an integer literal"
+check_failure_exact Negative/CommandIntParamCollision.lean \
+  "Negative/CommandIntParamCollision.lean:7:8: error: duplicate parameter 'n'"
+
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
 lake env lean Positive/ObservationOrder.lean

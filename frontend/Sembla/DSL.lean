@@ -23,6 +23,7 @@ structure SurfaceParam where
   sourceName : String
   name : String
   token : Syntax
+  ty : SurfaceTy := .real
   default : TSyntax `term
   prior : Option (TSyntax `term × TSyntax `term)
 
@@ -149,6 +150,8 @@ syntax "param" ident ":" "ℝ" ":=" term "~" "LogNormal" semblaRealTerm semblaRe
 syntax "param" ident ":" "ℝ" ":=" term : semblaParam
 syntax "param" ident ":" "Real" ":=" term "prior" "LogNormal" "(" term "," term ")" : semblaParam
 syntax "param" ident ":" "Real" ":=" term : semblaParam
+syntax "param" ident ":" "Int" ":=" term "~" "LogNormal" semblaRealTerm semblaRealTerm : semblaParam
+syntax "param" ident ":" "Int" ":=" term : semblaParam
 
 declare_syntax_cat semblaExpr
 syntax:max ident : semblaExpr
@@ -179,9 +182,7 @@ syntax:40 semblaExpr:41 " && " semblaExpr:40 : semblaExpr
 syntax:40 semblaExpr:41 " ∧ " semblaExpr:40 : semblaExpr
 
 declare_syntax_cat semblaSet
-syntax ident ":=" ident : semblaSet
-syntax ident ":=" num : semblaSet
-syntax ident ":=" scientific : semblaSet
+syntax ident ":=" semblaExpr : semblaSet
 
 declare_syntax_cat semblaSystem
 syntax "system" ident "(" "rows" ":=" term ")" "where" "[" semblaAttr,* "]" : semblaSystem
@@ -485,6 +486,16 @@ private def validateRealTerm (stx : TSyntax `term) : TermElabM Unit := do
   | `(term| -$value:scientific) => validateScientific value false
   | _ => throwErrorAt stx "real declarations require a decimal or scientific literal"
 
+private def validateIntTerm (stx : TSyntax `term) : TermElabM Unit := do
+  match stx with
+  | `(term| $value:num) =>
+      if value.raw.isNatLit?.getD 0 > 9223372036854775807 then
+        throwErrorAt stx "integer literal is outside the supported i64 range"
+  | `(term| -$value:num) =>
+      if value.raw.isNatLit?.getD 0 > 9223372036854775808 then
+        throwErrorAt stx "integer literal is outside the supported i64 range"
+  | _ => throwErrorAt stx "Int parameter defaults require an integer literal"
+
 private def validateStep (stx : TSyntax `term) : TermElabM Unit := do
   match stx with
   | `(term| $value:scientific) => validateScientific value true
@@ -525,14 +536,19 @@ def parseSurfaceParam (stx : TSyntax `semblaParam) : TermElabM SurfaceParam := d
   match stx with
   | `(semblaParam| param $name:ident : ℝ := $default:term ~ LogNormal
         $a:semblaRealTerm $b:semblaRealTerm) =>
-      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, default,
+      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, .real, default,
         some (← realSurfaceTerm a, ← realSurfaceTerm b)⟩
   | `(semblaParam| param $name:ident : ℝ := $default:term) =>
-      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, default, none⟩
+      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, .real, default, none⟩
   | `(semblaParam| param $name:ident : Real := $default:term prior LogNormal($a:term, $b:term)) =>
-      pure ⟨identText name, identText name, name.raw, default, some (a, b)⟩
+      pure ⟨identText name, identText name, name.raw, .real, default, some (a, b)⟩
   | `(semblaParam| param $name:ident : Real := $default:term) =>
-      pure ⟨identText name, identText name, name.raw, default, none⟩
+      pure ⟨identText name, identText name, name.raw, .real, default, none⟩
+  | `(semblaParam| param $name:ident : Int := $_default:term ~ LogNormal
+        $_a:semblaRealTerm $_b:semblaRealTerm) =>
+      throwErrorAt name "priors are not supported on Int parameters"
+  | `(semblaParam| param $name:ident : Int := $default:term) =>
+      pure ⟨identText name, ← deriveRuntimeNameAt name, name.raw, .int, default, none⟩
   | _ => throwUnsupportedSyntax
 
 private def parseSystem (stx : TSyntax `semblaSystem) : TermElabM SurfaceSystem := do
@@ -1134,14 +1150,14 @@ private partial def elaborateExpr (tableCtx : SurfaceSystem) (attrs : List Surfa
                 "unknown model parameter '{value}' in frequency predicate; {frequencyRowLocalMessage}"
             else
               throwErrorAt name "undeclared parameter '{value}'"
-      pure (← `(Expr.param $(Lean.quote paramDecl.name)), .real)
+      pure (← `(Expr.param $(Lean.quote paramDecl.name)), paramDecl.ty)
   | `(semblaExpr| $name:ident) =>
       let value := identText name
       match attrs.find? (·.name == value), paramCtx.find? (·.sourceName == value) with
       | some _, some _ => throwErrorAt name
           "ambiguous identifier '{value}': both an attribute and parameter are in scope"
       | some column, none => pure (← `(Expr.selfAttr $(Lean.quote column.name)), column.ty)
-      | none, some paramDecl => pure (← `(Expr.param $(Lean.quote paramDecl.name)), .real)
+      | none, some paramDecl => pure (← `(Expr.param $(Lean.quote paramDecl.name)), paramDecl.ty)
       | none, none =>
           if frequencyPredicate then
             throwErrorAt name
@@ -1410,6 +1426,45 @@ private def identifierEffectTerm (paramCtx : List SurfaceParam) (boxCtx : Surfac
         pure term
   `(Effect.setAttr $(Lean.quote destination.name) $valueTerm)
 
+/-- Effect values share the scalar expression elaborator used by guards and
+    hazards. Aggregates remain a deliberate surface rejection until a runtime
+    effect regression pins their snapshot and cache behavior. -/
+private partial def rejectEffectAggregates (stx : Syntax) : TermElabM Unit := do
+  match stx with
+  | `(semblaExpr| inputSum $_port:ident field $_field:ident)
+  | `(semblaExpr| countBy $_countKey:ident ($_filter:semblaExpr))
+  | `(semblaExpr| sizeBy $_sizeKey:ident)
+  | `(semblaExpr| freq ($_predicate:semblaExpr) over $_freqKey:ident) =>
+      throwErrorAt stx "aggregates are not supported in effect expressions"
+  | _ =>
+      for child in stx.getArgs do
+        rejectEffectAggregates child
+
+private def effectTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
+    (selected : SurfaceSystem) (attrName : TSyntax `ident) (value : TSyntax `semblaExpr) :
+    TermElabM (TSyntax `term) := do
+  let destination ← lookupAttr selected.attrs attrName
+  match destination.ty with
+  | .ref _ => throwErrorAt attrName
+      "writes to Ref attributes require resource claims, which are not supported by this DSL"
+  | .enum variants =>
+      match value with
+      | `(semblaExpr| $variant:ident) =>
+          let variantName := identText variant
+          unless variants.contains variantName do
+            throwErrorAt variant
+              "unknown variant '{variantName}' for attribute '{destination.name}'"
+          `(Effect.setAttr $(Lean.quote destination.name) (Expr.enum $(Lean.quote variantName)))
+      | _ => throwErrorAt value "enum effect values must be variant literals"
+  | .real | .int =>
+      rejectEffectAggregates value
+      let (valueTerm, actualTy) ←
+        elaborateExpr selected selected.attrs paramCtx boxCtx.inputs value
+      unless sameType destination.ty actualTy do
+        throwErrorAt value "effect value has incompatible type"
+      `(Effect.setAttr $(Lean.quote destination.name) $valueTerm)
+  | .bool => throwErrorAt value "effect value has incompatible type"
+
 private def resolveTransitionBody (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
     (transitionDecl : SurfaceTransition) : TermElabM ResolvedTransitionBody := do
   match transitionDecl.body with
@@ -1430,30 +1485,8 @@ private def resolveTransitionBody (paramCtx : List SurfaceParam) (boxCtx : Surfa
       let mut effects : Array (TSyntax `term) := #[]
       for assignment in assignments do
         match assignment with
-        | `(semblaSet| $attrName:ident := $value:ident) =>
-            effects := effects.push
-              (← identifierEffectTerm paramCtx boxCtx selected attrName value)
-        | `(semblaSet| $attrName:ident := $value:num) =>
-            let destination ← lookupAttr selected.attrs attrName
-            match destination.ty with
-            | .ref _ => throwErrorAt attrName
-                "writes to Ref attributes require resource claims, which are not supported by this DSL"
-            | _ => pure ()
-            unless sameType destination.ty .int do
-              throwErrorAt value "effect value has incompatible type"
-            effects := effects.push
-              (← `(Effect.setAttr $(Lean.quote destination.name) (Expr.int $value)))
-        | `(semblaSet| $attrName:ident := $value:scientific) =>
-            validateScientific value false
-            let destination ← lookupAttr selected.attrs attrName
-            match destination.ty with
-            | .ref _ => throwErrorAt attrName
-                "writes to Ref attributes require resource claims, which are not supported by this DSL"
-            | _ => pure ()
-            unless sameType destination.ty .real do
-              throwErrorAt value "effect value has incompatible type"
-            effects := effects.push
-              (← `(Effect.setAttr $(Lean.quote destination.name) (Expr.real $value)))
+        | `(semblaSet| $attrName:ident := $value:semblaExpr) =>
+            effects := effects.push (← effectTerm paramCtx boxCtx selected attrName value)
         | _ => throwUnsupportedSyntax
       pure ⟨selected, guardTerm, hazardExpr, effects⟩
 
@@ -1606,7 +1639,10 @@ private def elaborateSurfaceModelCore (attachWidgets : Bool) (surface : SurfaceM
   ensureUnique "parameter" (paramCtx.map fun p => (p.sourceName, p.token))
   ensureUniqueRuntimeNames "parameter" (paramCtx.map fun p => (p.name, p.sourceName, p.token))
   for paramDecl in paramCtx do
-    validateRealTerm paramDecl.default
+    match paramDecl.ty with
+    | .real => validateRealTerm paramDecl.default
+    | .int => validateIntTerm paramDecl.default
+    | _ => throwErrorAt paramDecl.token "unsupported parameter type"
     match paramDecl.prior with
     | some (first, second) =>
         validateRealTerm first
@@ -1635,12 +1671,17 @@ private def elaborateSurfaceModelCore (attachWidgets : Bool) (surface : SurfaceM
   -- Pass two: resolve from the declarations above and emit one pure deep-IR term.
   let mut paramTerms : Array (TSyntax `term) := #[]
   for paramDecl in paramCtx do
-    let term ← match paramDecl.prior with
-      | some (a, b) => `(ParamDecl.mk $(Lean.quote paramDecl.name) ParamType.real
+    let term ← match paramDecl.ty, paramDecl.prior with
+      | .real, some (a, b) => `(ParamDecl.mk $(Lean.quote paramDecl.name) ParamType.real
           (ParamValue.real $(paramDecl.default))
           (some (Prior.mk PriorFamily.logNormal [$a, $b])))
-      | none => `(ParamDecl.mk $(Lean.quote paramDecl.name) ParamType.real
+      | .real, none => `(ParamDecl.mk $(Lean.quote paramDecl.name) ParamType.real
           (ParamValue.real $(paramDecl.default)) none)
+      | .int, none => `(ParamDecl.mk $(Lean.quote paramDecl.name) ParamType.int
+          (ParamValue.int $(paramDecl.default)) none)
+      | .int, some _ => throwErrorAt paramDecl.token
+          "priors are not supported on Int parameters"
+      | _, _ => throwErrorAt paramDecl.token "unsupported parameter type"
     paramTerms := paramTerms.push term
 
   let mut boxTerms : Array (TSyntax `term) := #[]

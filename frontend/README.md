@@ -122,9 +122,21 @@ param β : ℝ := 0.8 ~ LogNormal (-0.2231435513142097) 0.25
 param γ : ℝ := 0.1
 ```
 
-Defaults and optional `LogNormal` priors remain first-class IR metadata. The
-surface accepts `ℝ`, mathematical multiplication `·`, conjunction `∧`,
-inequality `≠`, and less-than-or-equal `≤`. Its ASCII operators are `*`, `/`,
+The demographic-slot surface additions also accept integer parameters with
+integer-literal defaults, including negative literals:
+
+```lean
+param retirement_months : Int := 780
+param offset : Int := -3
+```
+
+`Int` parameters lower to the existing integer IR parameter type and can be
+used anywhere the scalar expression typechecker accepts `Int`, including guards
+and integer `set` effects. Priors remain real-valued: attaching any prior to an
+`Int` parameter is rejected. Defaults and optional `LogNormal` priors on real
+parameters remain first-class IR metadata. The surface accepts `ℝ`, mathematical
+multiplication `·`, conjunction `∧`, inequality `≠`, and less-than-or-equal `≤`.
+Its ASCII operators are `*`, `/`,
 `+`, `-`, `=`, `<`, `>`, and `&&`; there are deliberately no ASCII `!=` or
 `<=` forms. Expressions also support numeric arithmetic, enum comparisons, `inputSum`, and the
 restricted aggregate forms described below. Real values are stored as exact
@@ -177,8 +189,13 @@ transition restrict on Controller where
 ```
 
 A general transition requires exactly one `guard`, exactly one `hazard`, and at
-least one ordered `set`. Ref writes still require unsupported resource claims
-and are therefore rejected.
+least one ordered `set`. As a demographic-slot surface addition, numeric effects
+accept the existing row-local scalar expression fragment, so old-snapshot
+updates such as `set age_months := age_months + 1` are valid. The expression
+must have exactly the destination attribute's type; there is no additional
+coercion. Enum effects remain variant literals, Ref writes still require
+unsupported resource claims, and aggregate forms such as `countBy`, `freq`, and
+`inputSum` are rejected in effect expressions.
 
 ### Keyed frequency
 

@@ -34,6 +34,7 @@ import Sembla.SurfaceKernelTests
 import Sembla.ReactionArrowTests
 import Sembla.FrequencyTests
 import Sembla.CommandFrontendTests
+import Sembla.ArithmeticIntTests
 import Sembla.Lumping
 import Sembla.LumpingProof
 import Sembla.LumpingTests
