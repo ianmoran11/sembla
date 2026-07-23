@@ -62,6 +62,34 @@ staged and unstaged diff. Additional workflow and manual GPU checks, including
 their environment requirements, are documented in the
 [check matrix](docs/ci.md#local-check-contract).
 
+## Local cache cleanup
+
+Preview the repository's closed allowlist of rebuildable local caches before
+removing anything:
+
+```sh
+bash scripts/clean-local.sh
+```
+
+The default dry run reports whether each allowed path exists and its approximate
+size. Review that output first; deletion requires a separate explicit command:
+
+```sh
+bash scripts/clean-local.sh --apply
+```
+
+Cleanup is intentionally limited to the root Rust `target/`, Lean
+`frontend/.lake/`, root `.pytest_cache/`, the NPE `.venv/`, and Python
+`__pycache__` directories below `calibration/npe/`. It refuses symlinked or
+out-of-root candidates, protected paths, and any candidate containing tracked
+files; it never delegates to `git clean`.
+
+Applying cleanup trades disk space for rebuild time. Rust and Lean outputs must
+be rebuilt, and removing `calibration/npe/.venv/` requires reinstalling the
+pinned Python dependencies before running NPE checks. Managed `.piprd` state,
+agent transcripts, fixtures, examples, scientific artifacts and evidence, and
+Terraform material are outside the allowlist and are never cleanup targets.
+
 ## Package publishing
 
 Publishing is intentionally disabled for every workspace crate. Do not relax
