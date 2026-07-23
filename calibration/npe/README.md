@@ -7,18 +7,70 @@ the Cargo workspace, CPU-only, and is not a dependency of production code.
 
 ## Pinned CPU environment
 
-The reference is tested with Python 3.12. Create an isolated environment from
-the repository root:
+`requirements.txt` remains the concise, human-maintained input. It pins `sbi`,
+the platform's CPU build of `torch`, `numpy`, `pandas`, `scipy`, and `pytest`
+exactly. PyPI is the only package index; the torch-only page under
+`https://download.pytorch.org/whl/cpu/torch/` is a `--find-links` source rather
+than a competing package index. No CUDA package is used.
+
+The reviewed CI environment is `requirements-ci.lock`. It contains the complete
+Linux/amd64 CPython 3.12.8 graph with exact versions and SHA-256 hashes. CI and
+Linux validation install it through the repository script so the sdist-only
+`nflows==0.14` cannot create an unconstrained PEP 517 build environment:
+
+```sh
+python3.12 -m venv calibration/npe/.venv
+PYTHON=calibration/npe/.venv/bin/python \
+  calibration/npe/install-requirements-ci.sh
+```
+
+The installer first installs the lock's hashed `setuptools==75.8.0` and
+`wheel==0.45.1` entries without dependencies. It then installs the same lock
+with both `--require-hashes` and `--no-build-isolation`. It never resolves
+`requirements.txt`. The direct input may still be used for a local Darwin setup,
+which is intentionally outside the Linux CI lock contract:
 
 ```sh
 python3.12 -m venv calibration/npe/.venv
 . calibration/npe/.venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -r calibration/npe/requirements.txt
 ```
 
-`requirements.txt` pins `sbi`, the platform's CPU build of `torch`, `numpy`,
-`pandas`, `scipy`, and `pytest` exactly. No CUDA package is used.
+### Lock regeneration and authoritative validation
+
+Run this exact command from the repository root:
+
+```sh
+./scripts/check-npe-lock.sh
+```
+
+It runs Docker with `--platform linux/amd64` and the immutable platform image:
+
+```text
+python:3.12.8-slim-bookworm@sha256:8859bd6ca943079262c27e38b7119cdacede77c463139a15651dd340087a6cc9
+```
+
+The repository is mounted read-only. Inside that image the command installs only
+the pinned `uv==0.5.18` manylinux wheel with SHA-256
+`04e6c62d8947f62f1ec3255b5743cc775950b6203b06bf9c4d50682dcd68f340`
+into a temporary generator environment. It resolves for CPython 3.12 and
+`x86_64-manylinux_2_17`, uses a fixed `2026-07-23T00:00:00Z` release cutoff,
+and writes through a temporary file. The direct input SHA-256 and the generator,
+container, target, source, and cutoff contracts are recorded in the lock header.
+
+`uv` 0.5.18 does not emit a hash for a package selected from a flat
+`--find-links` page. The generator therefore requires exactly one
+`torch==2.5.1+cpu` result and attaches the independently verified Linux CPython
+3.12 wheel hash
+`4856f9d6925121d13c2df07aa7580b767f449dfe71ae5acde9c27535d5da4840`.
+The subsequent pip installation verifies that hash against the downloaded
+PyTorch wheel.
+
+Validation regenerates to a temporary path, byte-compares the checked lock,
+creates a fresh virtual environment, installs with `--require-hashes`, rejects
+any isolated build-dependency resolution, and runs
+`./scripts/check-npe-smoke.sh` in the same pinned container. A missing or failed
+Docker run is a failed validation, not a deferred CI claim.
 
 If those exact dependencies cannot be installed, the reference tests write
 `calibration/npe/artifacts/run/diagnostics.json` with `status: "unanswered"`,

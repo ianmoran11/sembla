@@ -16,12 +16,14 @@ It contains these checks:
   `frontend/lean-toolchain` pin, restores the Cargo and Lake caches, and runs the
   build, elaboration, export, runtime parity, and Cargo-lock checks.
 - **NPE smoke:** runs when `calibration/**`, `docs/prds-npe-path/**`, its
-  `scripts/check-npe-smoke.sh` harness, or `.github/workflows/ci.yml` changes.
-  The direct `calibration/npe/requirements.txt` input and the
+  `scripts/check-npe-smoke.sh` or `scripts/check-npe-lock.sh` harness, or
+  `.github/workflows/ci.yml` changes. The direct
+  `calibration/npe/requirements.txt` input and the
   `calibration/npe/requirements-ci.lock` path are also named explicitly so the
-  filter remains self-testing as the CI lock is introduced. The job installs
-  the pinned direct Python 3.12 requirements, runs the contract/refusal tests,
-  and performs a reduced one-epoch training call. It deliberately does not run
+  filter remains self-testing. The job uses CPython 3.12.8 and installs the
+  complete Linux/amd64 lock with `--require-hashes`; normal CI never bootstraps
+  the lock generator or resolves the direct input. It runs the contract/refusal
+  tests and a reduced one-epoch training call, but deliberately does not run
   SBC. The full PRD-0007 statistical acceptance configuration remains
   local/manual.
 
@@ -55,6 +57,7 @@ committed lock and fail rather than regenerating it.
 | Complete local | `./scripts/check.sh` | Requires Cargo, Git, and Lake from the pinned Rust/Lean toolchains. Runs the Rust contract, Lean proof hygiene, and full frontend parity; a missing tool is an error, never a skip. |
 | Determinism | `./scripts/check-determinism.sh` | Requires the pinned Rust toolchain. Repeats CPU run and sweep workflows and compares their outputs byte-for-byte. |
 | NPE smoke | `PYTHON=calibration/npe/.venv/bin/python ./scripts/check-npe-smoke.sh` | Requires the pinned Python 3.12 environment described in `calibration/npe/README.md`. This is reduced contract/training evidence, not SBC. |
+| NPE lock | `./scripts/check-npe-lock.sh` | Requires Docker. In the immutable Linux/amd64 CPython 3.12.8 image, regenerates and compares the hashed lock, performs a fresh install without isolated build resolution, and runs the full reduced NPE smoke check. |
 | GPU manual evidence | `bash crates/sembla-cuda/scripts/run-differential-corpus.sh` | Requires a clean committed worktree and remote NVIDIA CUDA/NVRTC environment. The dispatch-only hosted workflow is a stub and is not GPU evidence. |
 
 The Lean parity component can also be run directly when Git and both pinned
