@@ -295,12 +295,24 @@ bash frontend/scripts/check-parity.sh
 It also runs checked and exported models with fixed seeds, comparing CSV bytes,
 summaries, final-state hashes, and output hashes while asserting nontrivial
 dynamics and conserved state counts. No fixture regeneration is part of the
-workflow. The complete repository check is:
+workflow. The parity command requires Git plus both pinned Rust and Lean
+toolchains. For Rust-only validation without Lake, run:
+
+```sh
+./scripts/check-rust.sh
+```
+
+The strict complete repository check requires Cargo, Git, and Lake and never
+silently skips frontend validation:
 
 ```sh
 ./scripts/check.sh
 git diff --check
 ```
+
+The canonical [local check contract](../docs/ci.md#local-check-contract) also
+lists determinism, the reduced NPE smoke test, and manual GPU evidence with the
+required environments.
 
 The canonical-model catalog, formulas, run commands, and current limits are in
 [`docs/examples/canonical-models.md`](../docs/examples/canonical-models.md).
@@ -313,7 +325,8 @@ transports that equality through any per-row function of the count. This is
 theorem target 1a at the specification level, not a theorem about the
 deep-embedding evaluator; target 1b remains open.
 
-Run:
+Run the proof-hygiene guard directly, or use the complete repository check
+(which includes it):
 
 ```sh
 bash frontend/scripts/check-proofs.sh

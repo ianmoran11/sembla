@@ -1,53 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
 
+require_tool() {
+    local tool="$1" guidance="$2"
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "error: complete repository check requires '$tool'; $guidance" >&2
+        exit 1
+    fi
+}
+
+require_tool cargo "install the Rust toolchain pinned by rust-toolchain.toml"
+require_tool git "install git so Cargo.lock can be verified"
+require_tool lake "install elan so frontend/lean-toolchain provides Lake; for Rust-only validation run ./scripts/check-rust.sh"
+
+./scripts/check-rust.sh
 bash frontend/scripts/check-proofs.sh
-bash scripts/check-lean.sh
+bash frontend/scripts/check-parity.sh
 
-if ! grep -Eq '^libm[[:space:]]*=[[:space:]]*"=[0-9]+\.[0-9]+\.[0-9]+"[[:space:]]*$' \
-    crates/sembla-runtime/Cargo.toml; then
-    echo 'sembla-runtime must pin libm with an exact =x.y.z requirement' >&2
+if ! git diff --exit-code HEAD -- Cargo.lock; then
+    echo "error: complete repository validation changed Cargo.lock; restore it and update dependencies explicitly" >&2
     exit 1
 fi
 
-# Philox remains local: Cargo-resolved dependency identities prevent aliases,
-# target tables, optional features, or workspace inheritance from bypassing
-# the approved direct-dependency policy.
-unexpected_runtime_dependencies="$(
-    cargo tree \
-        --package sembla-runtime \
-        --all-features \
-        --target all \
-        --edges normal,build,dev \
-        --depth 1 \
-        --prefix none \
-        --format '{p}' | \
-        tail -n +2 | \
-        awk '$1 != "sembla-ir" && $1 != "sha2" && $1 != "libm"'
-)"
-if [[ -n "$unexpected_runtime_dependencies" ]]; then
-    echo "unapproved dependencies are forbidden in sembla-runtime; found:" >&2
-    printf '%s\n' "$unexpected_runtime_dependencies" >&2
-    exit 1
-fi
-
-rng_dependencies="$(
-    cargo tree \
-        --package sembla-runtime \
-        --all-features \
-        --target all \
-        --edges normal,build,dev \
-        --prefix none \
-        --format '{p}' | \
-        awk '{ print $1 }' | \
-        grep -E '^(rand|rand_[[:alnum:]_-]*|getrandom|fastrand|oorandom|random123)$' || true
-)"
-if [[ -n "$rng_dependencies" ]]; then
-    echo "external RNG dependencies are forbidden in sembla-runtime; found:" >&2
-    printf '%s\n' "$rng_dependencies" >&2
-    exit 1
-fi
+echo "complete Rust, Lean proof-hygiene, parity, and lock checks passed"

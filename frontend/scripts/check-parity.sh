@@ -68,7 +68,11 @@ for specification in "${canonical_aliases[@]}"; do
 done
 
 cd "$repo_root"
-cargo build --quiet -p sembla-cli
+cargo build --quiet --locked -p sembla-cli
+if ! git diff --exit-code HEAD -- Cargo.lock; then
+  echo "error: frontend parity validation changed Cargo.lock; restore it and update dependencies explicitly" >&2
+  exit 1
+fi
 sembla="$repo_root/target/debug/sembla"
 for file in sir.json sir_policy.json observations.json; do
   "$sembla" validate "examples/$file"

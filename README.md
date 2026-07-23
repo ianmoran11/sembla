@@ -8,11 +8,24 @@ Sembla is a simulation framework with a Lean frontend and a deterministic Rust r
 
 ## Build and test
 
+Run the fast Rust-only contract without requiring Lean:
+
 ```sh
-cargo build --workspace
-cargo test --workspace
+./scripts/check-rust.sh
+```
+
+Run the strict complete repository contract when both pinned toolchains are
+available:
+
+```sh
 ./scripts/check.sh
 ```
+
+The complete command requires Cargo, Git, and Lake; it runs Rust validation,
+Lean proof hygiene, and frontend parity without silently skipping a missing
+tool. The canonical [check matrix](docs/ci.md#local-check-contract) also lists
+the determinism check, reduced NPE smoke test, and manual GPU evidence command
+with their environment requirements.
 
 Print the CLI version or validate an IR document with:
 
