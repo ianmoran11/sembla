@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use sembla_cuda::{CudaBackend, HashMode};
-use sembla_ir::{AttrType, ParamType, ParamValue};
+use sembla_ir::{AttrType, FeatureSet, ParamType, ParamValue, GROUPED_OBSERVATIONS_FEATURE};
 use sembla_runtime::eval::{ParamEnv, ParamOverride};
 use sembla_runtime::executor::{self, ObservationValue, SummaryValue};
 use sembla_runtime::population::SyntheticPopulation;
@@ -17,8 +17,10 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
+const GROUPED_SCOPE_FOLLOW_UP: &str =
+    "--enable grouped-observations is not yet supported for compare or diff-backends; see the grouped-observations backend follow-up PRD";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -115,6 +117,16 @@ struct RunOptions {
     dt: Option<f64>,
     params: Option<String>,
     backend: BackendSelection,
+    enabled_features: FeatureSet,
+}
+
+fn parse_feature(value: &str) -> Result<String, String> {
+    match value {
+        GROUPED_OBSERVATIONS_FEATURE => Ok(value.to_owned()),
+        _ => Err(format!(
+            "unknown feature '{value}' (known features: {GROUPED_OBSERVATIONS_FEATURE})"
+        )),
+    }
 }
 
 fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
@@ -126,6 +138,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
     let mut dt = None;
     let mut params = None;
     let mut backend = None;
+    let mut enabled_features = FeatureSet::new();
     let mut index = 0;
     while index < flags.len() {
         let flag = flags[index].as_str();
@@ -154,6 +167,9 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
             }
             "--params" => set_once(&mut params, value.clone(), flag)?,
             "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
+            "--enable" => {
+                enabled_features.insert(parse_feature(value)?);
+            }
             _ => return Err(format!("unknown run flag '{flag}'")),
         }
         index += 2;
@@ -167,6 +183,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
         dt,
         params,
         backend: backend.unwrap_or_default(),
+        enabled_features,
     })
 }
 
@@ -182,6 +199,7 @@ struct SweepOptions {
     params: Option<String>,
     export_pairs: Option<String>,
     backend: BackendSelection,
+    enabled_features: FeatureSet,
 }
 
 fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
@@ -195,6 +213,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
     let mut noise_mode = None;
     let mut export_pairs = None;
     let mut backend = None;
+    let mut enabled_features = FeatureSet::new();
     let mut index = 0;
     while index < flags.len() {
         let flag = flags[index].as_str();
@@ -230,6 +249,9 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
             "--params" => set_once(&mut params, value.clone(), flag)?,
             "--export-pairs" => set_once(&mut export_pairs, value.clone(), flag)?,
             "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
+            "--enable" => {
+                enabled_features.insert(parse_feature(value)?);
+            }
             _ => return Err(format!("unknown sweep flag '{flag}'")),
         }
         index += 2;
@@ -254,6 +276,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         params,
         export_pairs,
         backend: backend.unwrap_or_default(),
+        enabled_features,
     })
 }
 
@@ -367,6 +390,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
             "--params-a" => set_once(&mut params_a, value, flag)?,
             "--params-b" => set_once(&mut params_b, value, flag)?,
             "--backend" => set_once(&mut backend, parse_backend(&value)?, flag)?,
+            "--enable" => return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned()),
             _ => return Err(format!("unknown compare flag '{flag}'")),
         }
     }
@@ -455,6 +479,17 @@ fn read_input(path: &str) -> Result<(String, sembla_ir::ParsedInput), String> {
     Ok((source, input))
 }
 
+fn input_uses_grouped_views(path: &str) -> Result<bool, String> {
+    let model = match read_input(path)?.1 {
+        sembla_ir::ParsedInput::LegacyModel(model) => model,
+        sembla_ir::ParsedInput::Plan(plan) => plan.model,
+    };
+    Ok(model
+        .boxes
+        .iter()
+        .any(|model_box| !model_box.grouped_views.is_empty()))
+}
+
 fn read_model(path: &str) -> Result<sembla_ir::Model, String> {
     match read_input(path)?.1 {
         sembla_ir::ParsedInput::LegacyModel(model) => Ok(model),
@@ -472,22 +507,31 @@ struct RunInput {
 }
 
 fn read_run_input(path: &str, options: &RunOptions) -> Result<RunInput, String> {
-    read_executable_input(path, options.dt)
+    read_executable_input(path, options.dt, &options.enabled_features)
 }
 
-fn read_executable_input(path: &str, dt: Option<f64>) -> Result<RunInput, String> {
+fn read_executable_input(
+    path: &str,
+    dt: Option<f64>,
+    enabled_features: &FeatureSet,
+) -> Result<RunInput, String> {
     let (source, input) = read_input(path)?;
     match input {
         sembla_ir::ParsedInput::LegacyModel(mut model) => {
             if let Some(dt) = dt {
                 model.dt = dt;
             }
-            let model = sembla_ir::validate(model).map_err(|error| format!("{path}: {error}"))?;
+            let model = sembla_ir::validate_with_features(model, enabled_features)
+                .map_err(|error| format!("{path}: {error}"))?;
             Ok(RunInput { model, plan: None })
         }
         sembla_ir::ParsedInput::Plan(plan) => {
             let validated =
                 sembla_ir::validate_plan(&plan).map_err(|error| format!("{path}: {error}"))?;
+            // Plan validation accepts an artifact that accurately describes its
+            // features. Executing it separately requires the runtime flag.
+            sembla_ir::validate_with_features(plan.model.clone(), enabled_features)
+                .map_err(|error| format!("{path}: {error}"))?;
             require_canonical_plan(path, &source)?;
             if dt.is_some() {
                 return Err(format!(
@@ -853,8 +897,15 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     {
         let mut state =
             StateStore::new(&model, initial).map_err(|error| format!("{path}: {error}"))?;
-        let report = executor::run(&model, &mut state, &params, options.seed, options.ticks)
-            .map_err(|error| format!("{path}: {error}"))?;
+        let report = executor::run_with_features(
+            &model,
+            &mut state,
+            &params,
+            options.seed,
+            options.ticks,
+            &options.enabled_features,
+        )
+        .map_err(|error| format!("{path}: {error}"))?;
         for tick in report.ticks {
             for (box_name, rules) in tick.fired_per_box {
                 for (rule_id, fired) in rules {
@@ -867,13 +918,14 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         }
         return Ok(());
     }
-    let execution = execute_backend_output(
+    let execution = execute_backend_output_with_features(
         &model,
         initial,
         &params,
         options.seed,
         options.ticks,
         options.backend,
+        &options.enabled_features,
     )?;
     let exported_state = options
         .export_state
@@ -894,6 +946,11 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         let summaries = summaries_path(out);
         std::fs::write(&summaries, execution.output.summaries_csv.as_bytes())
             .map_err(|error| format!("{}: {error}", summaries.display()))?;
+        for grouped in &execution.output.grouped {
+            let path = grouped_output_path(Path::new(out), &grouped.view);
+            std::fs::write(&path, grouped.csv.as_bytes())
+                .map_err(|error| format!("{}: {error}", path.display()))?;
+        }
         let hashes = execution_hashes(&execution.output, &execution.state);
         println!(
             "results_sha256={} final_state_sha256={} observation_sha256={}",
@@ -908,6 +965,8 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         );
         run_manifest.model = Some(model.model().name.clone());
         run_manifest.dt = Some(model.model().dt);
+        run_manifest.enabled_features = options.enabled_features.iter().cloned().collect();
+        run_manifest.grouped_outputs = grouped_output_records(&execution.output.grouped);
         run_manifest.ir_hash = Some(manifest::canonical_ir_hash(&model)?);
         run_manifest.backend_identity = Some(execution.identity);
         run_manifest.resolved_theta = manifest::resolved_theta(&params);
@@ -1052,7 +1111,7 @@ fn params_from_theta_assignment(
 }
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
-    let RunInput { model, plan } = read_executable_input(path, None)?;
+    let RunInput { model, plan } = read_executable_input(path, None, &options.enabled_features)?;
     if options.export_pairs.is_some() && model.model().summaries.is_empty() {
         return Err(format!(
             "model '{}' declares no summaries; --export-pairs requires declared summaries (DESIGN.md §4.6)",
@@ -1088,6 +1147,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     );
     run_manifest.model = Some(model.model().name.clone());
     run_manifest.dt = Some(model.model().dt);
+    run_manifest.enabled_features = options.enabled_features.iter().cloned().collect();
     if let Some(plan) = &plan {
         let (plan_identity, linked_source) = manifest::plan_identity_tuples(plan)?;
         run_manifest.plan = Some(plan_identity);
@@ -1215,13 +1275,14 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             manifest::NoiseMode::Crn => options.seed,
             manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
         };
-        let execution = execute_backend_output(
+        let execution = execute_backend_output_with_features(
             &model,
             initial,
             &params,
             execution_seed,
             options.ticks,
             options.backend,
+            &options.enabled_features,
         )?;
         if draw == 0 {
             run_manifest.backend_identity = Some(execution.identity.clone());
@@ -1249,6 +1310,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             )?;
         }
         let hashes = execution_hashes(&output, &execution.state);
+        let grouped_outputs = grouped_output_records(&output.grouped);
         run_manifest.executions.push(manifest::ManifestExecution {
             k: draw,
             seed: Some(execution_seed),
@@ -1260,10 +1322,16 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             results_sha256: hashes.results_sha256,
             final_state_sha256: hashes.final_state_sha256,
             observation_sha256: Some(hashes.observation_sha256),
+            grouped_outputs,
         });
         let draw_path = out.join(format!("draw_{draw}.csv"));
         std::fs::write(&draw_path, output.csv.as_bytes())
             .map_err(|error| format!("{}: {error}", draw_path.display()))?;
+        for grouped in &output.grouped {
+            let path = grouped_output_path(&draw_path, &grouped.view);
+            std::fs::write(&path, grouped.csv.as_bytes())
+                .map_err(|error| format!("{}: {error}", path.display()))?;
+        }
         if options.export_pairs.is_some() {
             let draw_summaries = PathBuf::from(format!("{}.summaries.csv", draw_path.display()));
             std::fs::write(&draw_summaries, output.summaries_csv.as_bytes())
@@ -1553,8 +1621,15 @@ struct ReportedSeries {
 }
 
 #[derive(Clone, Debug)]
+struct GroupedCsvOutput {
+    view: String,
+    csv: String,
+}
+
+#[derive(Clone, Debug)]
 struct RunOutput {
     csv: String,
+    grouped: Vec<GroupedCsvOutput>,
     series: ReportedSeries,
     summaries: Vec<SummaryValue>,
     summaries_csv: String,
@@ -1563,6 +1638,26 @@ struct RunOutput {
 
 fn summaries_path(output: &str) -> std::path::PathBuf {
     std::path::PathBuf::from(format!("{output}.summaries.csv"))
+}
+
+fn grouped_output_path(output: &Path, view: &str) -> PathBuf {
+    let stem = output
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("results");
+    let name = format!("{stem}.grouped.{view}.csv");
+    output.parent().unwrap_or_else(|| Path::new("")).join(name)
+}
+
+fn grouped_output_records(outputs: &[GroupedCsvOutput]) -> Vec<manifest::GroupedOutputRecord> {
+    outputs
+        .iter()
+        .map(|output| manifest::GroupedOutputRecord {
+            view: output.view.clone(),
+            algorithm: manifest::HASH_ALGORITHM.to_owned(),
+            sha256: hex(&Sha256::digest(output.csv.as_bytes())),
+        })
+        .collect()
 }
 
 fn paths_resolve_to_same_file(left: &Path, right: &Path) -> bool {
@@ -1599,11 +1694,47 @@ fn execute_backend_output(
     ticks: u32,
     backend: BackendSelection,
 ) -> Result<BackendRunOutput, String> {
+    execute_backend_output_with_features(
+        model,
+        initial,
+        params,
+        seed,
+        ticks,
+        backend,
+        &FeatureSet::new(),
+    )
+}
+
+fn execute_backend_output_with_features(
+    model: &sembla_ir::ValidatedModel,
+    initial: Vec<TableInit>,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+    backend: BackendSelection,
+    enabled_features: &FeatureSet,
+) -> Result<BackendRunOutput, String> {
+    if backend == BackendSelection::Cuda
+        && model
+            .model()
+            .boxes
+            .iter()
+            .any(|model_box| !model_box.grouped_views.is_empty())
+    {
+        return Err("grouped observations run on the cpu backend only for now".to_owned());
+    }
     match backend {
         BackendSelection::Cpu => {
             let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
             let started = std::time::Instant::now();
-            let output = run_results_output(model, &mut state, params, seed, ticks)?;
+            let output = run_results_output_with_features(
+                model,
+                &mut state,
+                params,
+                seed,
+                ticks,
+                enabled_features,
+            )?;
             let elapsed = started.elapsed();
             let per_tick_hashes = output.per_tick_hashes.clone();
             Ok(BackendRunOutput {
@@ -1671,6 +1802,73 @@ fn generic_enum_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<EnumCountD
     descriptors
 }
 
+fn grouped_csv_outputs(
+    model: &sembla_ir::ValidatedModel,
+    ticks: &[executor::TickReport],
+) -> Result<Vec<GroupedCsvOutput>, String> {
+    let mut outputs = Vec::new();
+    for model_box in &model.model().boxes {
+        for view in &model_box.grouped_views {
+            let table = model_box
+                .tables
+                .iter()
+                .find(|table| table.name == view.table)
+                .expect("validated grouped table disappeared");
+            let mut csv = String::from("tick");
+            for key in &view.keys {
+                csv.push(',');
+                csv.push_str(&csv_field(&key.attr));
+            }
+            csv.push_str(",count\n");
+            for tick in ticks {
+                let mut rows = tick
+                    .grouped_views
+                    .iter()
+                    .filter(|row| row.box_name == model_box.name && row.name == view.name)
+                    .collect::<Vec<_>>();
+                rows.sort_by(|left, right| left.keys.cmp(&right.keys));
+                for row in rows {
+                    csv.push_str(&tick.tick.to_string());
+                    for (key, value) in view.keys.iter().zip(&row.keys) {
+                        let attr = table
+                            .attrs
+                            .iter()
+                            .find(|attr| attr.name == key.attr)
+                            .expect("validated grouped key disappeared");
+                        let rendered = match (&attr.ty, key.band_width) {
+                            (AttrType::Enum { variants }, None) => {
+                                let index = usize::try_from(*value).map_err(|_| {
+                                    format!("grouped enum key '{}' is negative", key.attr)
+                                })?;
+                                variants.get(index).cloned().ok_or_else(|| {
+                                    format!(
+                                        "grouped enum key '{}' has invalid variant index {index}",
+                                        key.attr
+                                    )
+                                })?
+                            }
+                            (AttrType::Ref { .. }, None) | (AttrType::Int, Some(_)) => {
+                                value.to_string()
+                            }
+                            _ => unreachable!("validated grouped key type disappeared"),
+                        };
+                        csv.push(',');
+                        csv.push_str(&csv_field(&rendered));
+                    }
+                    csv.push(',');
+                    csv.push_str(&row.count.to_string());
+                    csv.push('\n');
+                }
+            }
+            outputs.push(GroupedCsvOutput {
+                view: view.name.clone(),
+                csv,
+            });
+        }
+    }
+    Ok(outputs)
+}
+
 fn generic_firing_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<FiringDescriptor> {
     model
         .transitions()
@@ -1687,12 +1885,24 @@ fn generic_firing_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<FiringDe
         .collect()
 }
 
+#[cfg(test)]
 fn run_results_output(
     model: &sembla_ir::ValidatedModel,
     state: &mut StateStore,
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
+) -> Result<RunOutput, String> {
+    run_results_output_with_features(model, state, params, seed, ticks, &FeatureSet::new())
+}
+
+fn run_results_output_with_features(
+    model: &sembla_ir::ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+    enabled_features: &FeatureSet,
 ) -> Result<RunOutput, String> {
     let has_views = model
         .model()
@@ -1750,8 +1960,9 @@ fn run_results_output(
     csv.push('\n');
 
     for tick in 0..ticks {
-        let report = executor::run_tick(model, state, params, seed, tick)
-            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let report =
+            executor::run_tick_with_features(model, state, params, seed, tick, enabled_features)
+                .map_err(|error| format!("tick {tick}: {error}"))?;
         let mut row = Vec::with_capacity(headers.len() - 1);
         if has_views {
             row.extend(
@@ -1821,10 +2032,12 @@ fn run_results_output(
         tick_reports.push(report);
         per_tick_hashes.push(state.state_hash());
     }
+    let grouped = grouped_csv_outputs(model, &tick_reports)?;
     let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
     let summaries_csv = summaries_csv(&summaries);
     Ok(RunOutput {
         csv,
+        grouped,
         series: ReportedSeries {
             columns: headers.into_iter().skip(1).collect(),
             rows,
@@ -1928,6 +2141,7 @@ fn run_results_output_cuda(
         let report = executor::TickReport {
             tick,
             views,
+            grouped_views: Vec::new(),
             fired,
             fired_per_box: observation.fired_per_box,
             deferred_per_resource_table: observation.deferred_per_resource_table,
@@ -2007,6 +2221,7 @@ fn run_results_output_cuda(
     Ok(BackendRunOutput {
         output: RunOutput {
             csv,
+            grouped: Vec::new(),
             series: ReportedSeries {
                 columns: headers.into_iter().skip(1).collect(),
                 rows,
@@ -2207,6 +2422,14 @@ fn verify_run_result(
     options: VerifyOptions,
 ) -> Result<usize, String> {
     let recorded = manifest::read(Path::new(manifest_path))?;
+    // Replay derives runtime feature enablement from the recorded run contract.
+    // Plan identity features describe the artifact and must not implicitly enable
+    // execution; verify-run has no user override for this manifest-owned value.
+    let enabled_features = recorded
+        .enabled_features
+        .iter()
+        .cloned()
+        .collect::<FeatureSet>();
     if recorded.manifest_kind == manifest::ManifestKind::Compare {
         return Err(
             "verify-run does not accept compare manifests because both original model inputs are required"
@@ -2221,12 +2444,14 @@ fn verify_run_result(
     let (model, plan) = match input {
         sembla_ir::ParsedInput::LegacyModel(mut raw_model) => {
             raw_model.dt = dt;
-            let model =
-                sembla_ir::validate(raw_model).map_err(|error| format!("{model_path}: {error}"))?;
+            let model = sembla_ir::validate_with_features(raw_model, &enabled_features)
+                .map_err(|error| format!("{model_path}: {error}"))?;
             (model, None)
         }
         sembla_ir::ParsedInput::Plan(plan) => {
             let validated = sembla_ir::validate_plan(&plan)
+                .map_err(|error| format!("{model_path}: {error}"))?;
+            sembla_ir::validate_with_features(plan.model.clone(), &enabled_features)
                 .map_err(|error| format!("{model_path}: {error}"))?;
             require_canonical_plan(model_path, &input_source)?;
             if plan.model.dt != dt {
@@ -2342,13 +2567,14 @@ fn verify_run_result(
                 );
             }
             let params = params_from_manifest(&model, &recorded.resolved_theta)?;
-            let execution = execute_backend_output(
+            let execution = execute_backend_output_with_features(
                 &model,
                 initialized_tables(&model, &options.population)?.tables,
                 &params,
                 recorded.seed,
                 recorded.ticks,
                 backend,
+                &enabled_features,
             )?;
             compare_field(
                 "backend_identity",
@@ -2377,6 +2603,12 @@ fn verify_run_result(
                     &mut differences,
                 );
             }
+            compare_field(
+                "grouped_outputs",
+                &recorded.grouped_outputs,
+                &grouped_output_records(&execution.output.grouped),
+                &mut differences,
+            );
             finish_verification(differences, 1)
         }
         manifest::ManifestKind::Sweep => {
@@ -2420,13 +2652,14 @@ fn verify_run_result(
                     );
                 }
                 let params = params_from_manifest(&model, &execution.resolved_theta)?;
-                let replay = execute_backend_output(
+                let replay = execute_backend_output_with_features(
                     &model,
                     initialized_tables(&model, &options.population)?.tables,
                     &params,
                     execution.seed.unwrap_or(recorded.seed),
                     recorded.ticks,
                     backend,
+                    &enabled_features,
                 )?;
                 compare_field(
                     "backend_identity",
@@ -2455,6 +2688,12 @@ fn verify_run_result(
                         &mut differences,
                     );
                 }
+                compare_field(
+                    &format!("executions[{}].grouped_outputs", execution.k),
+                    &execution.grouped_outputs,
+                    &grouped_output_records(&replay.output.grouped),
+                    &mut differences,
+                );
             }
             finish_verification(differences, executions.len())
         }
@@ -2581,8 +2820,11 @@ struct CompareArmOutcome {
 fn compare_result(options: CompareOptions) -> Result<(), String> {
     let path_a = &options.models[0];
     let path_b = options.models.get(1).unwrap_or(path_a);
-    let input_a = read_executable_input(path_a, None)?;
-    let input_b = read_executable_input(path_b, None)?;
+    if input_uses_grouped_views(path_a)? || input_uses_grouped_views(path_b)? {
+        return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned());
+    }
+    let input_a = read_executable_input(path_a, None, &FeatureSet::new())?;
+    let input_b = read_executable_input(path_b, None, &FeatureSet::new())?;
     if input_a.plan.is_some() != input_b.plan.is_some() {
         let (legacy_path, plan_path) = if input_a.plan.is_some() {
             (path_b, path_a)
@@ -2693,6 +2935,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
             results_sha256: arm.hashes.results_sha256.clone(),
             final_state_sha256: arm.hashes.final_state_sha256.clone(),
             observation_sha256: Some(arm.hashes.observation_sha256.clone()),
+            grouped_outputs: Vec::new(),
         });
     }
     manifest::write(&manifest::sidecar_path(&options.out), &run_manifest)?;
@@ -2824,6 +3067,7 @@ fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
                 set_once(&mut dt, value, "--dt")?;
             }
             "--params" => set_once(&mut params, value.clone(), "--params")?,
+            "--enable" => return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned()),
             flag => return Err(format!("unknown diff-backends flag '{flag}'")),
         }
         index += 2;
@@ -2891,6 +3135,9 @@ fn collect_diff_corpus_paths(directory: &str, suffix: &str) -> Result<Vec<String
 
 fn diff_backends(options: DiffOptions) -> Result<(), String> {
     for path in &options.models {
+        if input_uses_grouped_views(path)? {
+            return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned());
+        }
         let run_options = RunOptions {
             seed: options.seed,
             ticks: options.ticks,
@@ -2900,6 +3147,7 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
             dt: options.dt,
             params: options.params.clone(),
             backend: BackendSelection::Cpu,
+            enabled_features: FeatureSet::new(),
         };
         let model = read_run_input(path, &run_options)?.model;
         let params = resolve_params(&model, options.params.as_deref())?;
@@ -3162,6 +3410,8 @@ mod tests {
         assert_eq!(
             relative,
             [
+                // DECISIONS §K6 sanctions this first feature-bearing plan fixture.
+                "fixtures/plans/grouped_observation.plan.json",
                 "fixtures/plans/linked/epidemic_policy.plan.json",
                 "fixtures/plans/linked/independent_epidemic_policy.plan.json",
                 "fixtures/plans/linked/ping_pong.plan.json",
@@ -3237,6 +3487,7 @@ mod tests {
                     dt: None,
                     params: None,
                     backend: BackendSelection::Cpu,
+                    enabled_features: sembla_ir::FeatureSet::new(),
                 },
             )
             .unwrap();

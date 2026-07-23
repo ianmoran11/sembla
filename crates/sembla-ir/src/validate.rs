@@ -1,6 +1,10 @@
 use crate::model::*;
 use crate::ValidationError;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
+
+pub const GROUPED_OBSERVATIONS_FEATURE: &str = "grouped-observations";
+pub const KNOWN_FEATURES: [&str; 1] = [GROUPED_OBSERVATIONS_FEATURE];
+pub type FeatureSet = BTreeSet<String>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ValueType {
@@ -102,9 +106,19 @@ impl ValidatedModel {
     }
 }
 
-/// Validates all references and expression types, then assigns rule IDs.
+/// Validates all references and expression types with no provisional runtime features.
 pub fn validate(model: Model) -> Result<ValidatedModel, ValidationError> {
-    validate_model(&model)?;
+    validate_with_features(model, &FeatureSet::new())
+}
+
+/// Validates a model under an explicit, per-execution feature set.
+///
+/// The set is data threaded by callers, never process-global state or a Cargo feature.
+pub fn validate_with_features(
+    model: Model,
+    enabled_features: &FeatureSet,
+) -> Result<ValidatedModel, ValidationError> {
+    validate_model(&model, enabled_features)?;
 
     let mut transitions = Vec::new();
     for (box_index, model_box) in model.boxes.iter().enumerate() {
@@ -134,7 +148,7 @@ pub fn validate(model: Model) -> Result<ValidatedModel, ValidationError> {
     Ok(ValidatedModel { model, transitions })
 }
 
-fn validate_model(model: &Model) -> Result<(), ValidationError> {
+fn validate_model(model: &Model, enabled_features: &FeatureSet) -> Result<(), ValidationError> {
     if !model.dt.is_finite() || model.dt <= 0.0 {
         return Err(error(
             "$.dt",
@@ -162,7 +176,7 @@ fn validate_model(model: &Model) -> Result<(), ValidationError> {
         validate_param(param, index)?;
     }
     for (index, model_box) in model.boxes.iter().enumerate() {
-        validate_box(model, model_box, index)?;
+        validate_box(model, model_box, index, enabled_features)?;
     }
     for (index, summary) in model.summaries.iter().enumerate() {
         validate_summary(model, summary, index)?;
@@ -242,7 +256,12 @@ fn validate_param(param: &ParamDecl, index: usize) -> Result<(), ValidationError
     Ok(())
 }
 
-fn validate_box(model: &Model, model_box: &Box, box_index: usize) -> Result<(), ValidationError> {
+fn validate_box(
+    model: &Model,
+    model_box: &Box,
+    box_index: usize,
+    enabled_features: &FeatureSet,
+) -> Result<(), ValidationError> {
     let base = format!("$.boxes[{box_index}]");
     unique_names(
         model_box.tables.iter().map(|table| table.name.as_str()),
@@ -272,6 +291,28 @@ fn validate_box(model: &Model, model_box: &Box, box_index: usize) -> Result<(), 
         &format!("{base}.views"),
         "view",
     )?;
+    let mut view_names = model_box
+        .views
+        .iter()
+        .map(|view| view.name.as_str())
+        .collect::<HashSet<_>>();
+    for (index, view) in model_box.grouped_views.iter().enumerate() {
+        if !view_names.insert(view.name.as_str()) {
+            return Err(error(
+                format!("{base}.grouped_views[{index}].name"),
+                format!("duplicate view name '{}'", view.name),
+            ));
+        }
+        if !enabled_features.contains(GROUPED_OBSERVATIONS_FEATURE) {
+            return Err(error(
+                format!("{base}.grouped_views[{index}]"),
+                format!(
+                    "grouped view '{}' requires --enable {GROUPED_OBSERVATIONS_FEATURE}",
+                    view.name
+                ),
+            ));
+        }
+    }
 
     for (table_index, table) in model_box.tables.iter().enumerate() {
         validate_schema(
@@ -308,8 +349,134 @@ fn validate_box(model: &Model, model_box: &Box, box_index: usize) -> Result<(), 
             &format!("{base}.views[{view_index}]"),
         )?;
     }
+    for (view_index, view) in model_box.grouped_views.iter().enumerate() {
+        validate_grouped_view(
+            model,
+            model_box,
+            view,
+            &format!("{base}.grouped_views[{view_index}]"),
+        )?;
+    }
 
     Ok(())
+}
+
+fn validate_grouped_view(
+    model: &Model,
+    model_box: &Box,
+    view: &GroupedViewDecl,
+    path: &str,
+) -> Result<(), ValidationError> {
+    let table = find_table(model_box, &view.table).ok_or_else(|| {
+        error(
+            format!("{path}.table"),
+            format!(
+                "grouped view '{}' refers to unknown table '{}'",
+                view.name, view.table
+            ),
+        )
+    })?;
+    if !(1..=4).contains(&view.keys.len()) {
+        return Err(error(
+            format!("{path}.keys"),
+            format!(
+                "grouped view '{}' requires between 1 and 4 keys, found {}",
+                view.name,
+                view.keys.len()
+            ),
+        ));
+    }
+    for (index, key) in view.keys.iter().enumerate() {
+        let key_path = format!("{path}.keys[{index}]");
+        let attr = find_attr(&table.attrs, &key.attr).ok_or_else(|| {
+            error(
+                format!("{key_path}.attr"),
+                format!(
+                    "grouped view key refers to unknown attribute '{}'",
+                    key.attr
+                ),
+            )
+        })?;
+        match (&attr.ty, key.band_width) {
+            (AttrType::Int, Some(width)) if width >= 1 => {}
+            (AttrType::Int, Some(_)) => {
+                return Err(error(
+                    format!("{key_path}.band_width"),
+                    "grouped Int key band_width must be at least 1",
+                ));
+            }
+            (AttrType::Int, None) => {
+                return Err(error(
+                    format!("{key_path}.band_width"),
+                    format!("grouped Int key '{}' requires band_width", key.attr),
+                ));
+            }
+            (AttrType::Enum { .. } | AttrType::Ref { .. }, None) => {}
+            (AttrType::Enum { .. } | AttrType::Ref { .. }, Some(_)) => {
+                return Err(error(
+                    format!("{key_path}.band_width"),
+                    format!(
+                        "grouped non-Int key '{}' must not declare band_width",
+                        key.attr
+                    ),
+                ));
+            }
+            (AttrType::Real, _) => {
+                return Err(error(
+                    format!("{key_path}.attr"),
+                    format!(
+                        "grouped key '{}' must have type Enum, Ref, or Int",
+                        key.attr
+                    ),
+                ));
+            }
+        }
+    }
+    if let Some(filter) = &view.filter {
+        validate_grouped_filter_expr(filter, &format!("{path}.filter"))?;
+        let filter_type = infer_expr(
+            filter,
+            model,
+            model_box,
+            &table.attrs,
+            &format!("{path}.filter"),
+            Some(&ValueType::Bool),
+        )?;
+        require_type(&filter_type, &ValueType::Bool, &format!("{path}.filter"))?;
+    }
+    Ok(())
+}
+
+fn validate_grouped_filter_expr(expr: &Expr, path: &str) -> Result<(), ValidationError> {
+    match expr {
+        Expr::Input { .. } | Expr::Agg { .. } => Err(error(
+            path,
+            "aggregates are not supported in grouped view filters",
+        )),
+        Expr::Add { lhs, rhs }
+        | Expr::Sub { lhs, rhs }
+        | Expr::Mul { lhs, rhs }
+        | Expr::Div { lhs, rhs }
+        | Expr::Eq { lhs, rhs }
+        | Expr::Ne { lhs, rhs }
+        | Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs }
+        | Expr::And { lhs, rhs }
+        | Expr::Or { lhs, rhs } => {
+            validate_grouped_filter_expr(lhs, &format!("{path}.lhs"))?;
+            validate_grouped_filter_expr(rhs, &format!("{path}.rhs"))
+        }
+        Expr::Not { expr } => validate_grouped_filter_expr(expr, &format!("{path}.expr")),
+        Expr::Real { .. }
+        | Expr::Int { .. }
+        | Expr::Bool { .. }
+        | Expr::Enum { .. }
+        | Expr::Param { .. }
+        | Expr::SelfAttr { .. }
+        | Expr::EnumIs { .. } => Ok(()),
+    }
 }
 
 fn validate_view(

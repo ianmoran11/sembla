@@ -215,6 +215,13 @@ impl BackendIdentity {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GroupedOutputRecord {
+    pub view: String,
+    pub algorithm: String,
+    pub sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ManifestExecution {
     pub k: u32,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -232,6 +239,8 @@ pub struct ManifestExecution {
     pub final_state_sha256: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub observation_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub grouped_outputs: Vec<GroupedOutputRecord>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -265,6 +274,8 @@ pub struct RunManifest {
     pub determinism_level: String,
     pub enabled_flags: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub enabled_features: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub executions: Vec<ManifestExecution>,
     pub final_state_hash_algorithm: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -273,6 +284,8 @@ pub struct RunManifest {
     pub exported_state: Option<StateArtifactTuple>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub initial_state: Option<StateArtifactTuple>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub grouped_outputs: Vec<GroupedOutputRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ir_hash: Option<String>,
     pub ir_hash_algorithm: String,
@@ -325,11 +338,13 @@ impl RunManifest {
             component_versions: component_versions(),
             determinism_level: DETERMINISM_LEVEL.to_owned(),
             enabled_flags: Vec::new(),
+            enabled_features: Vec::new(),
             executions: Vec::new(),
             final_state_hash_algorithm: HASH_ALGORITHM.to_owned(),
             final_state_sha256: None,
             exported_state: None,
             initial_state: None,
+            grouped_outputs: Vec::new(),
             ir_hash: None,
             ir_hash_algorithm: HASH_ALGORITHM.to_owned(),
             linked_source: None,
@@ -496,11 +511,10 @@ fn validate_bundle_manifest(manifest: &BundleManifestV1) -> Result<(), String> {
             ));
         }
     }
-    if let Some(feature) = manifest.plan.enabled_features.first() {
-        return Err(format!(
-            "unsupported bundle-manifest plan.enabled_features entry '{feature}'; V1 requires an empty list"
-        ));
-    }
+    validate_feature_values(
+        "bundle-manifest plan.enabled_features",
+        &manifest.plan.enabled_features,
+    )?;
     validate_hash_record("source.hash", &manifest.source.hash, SOURCE_ARTIFACT_DOMAIN)?;
     validate_hash_record(
         "plan.semantic_hash",
@@ -612,6 +626,8 @@ pub fn read(path: &Path) -> Result<RunManifest, String> {
     let manifest: RunManifest =
         serde_json::from_str(&source).map_err(|error| format!("{}: {error}", path.display()))?;
     validate_observation_tuple(&manifest)?;
+    validate_feature_values("enabled_features", &manifest.enabled_features)?;
+    validate_grouped_output_values(&manifest)?;
     validate_plan_identity_values(&manifest)?;
     validate_state_artifact_tuple_values(&manifest)?;
     validate_algorithms(&manifest)?;
@@ -622,6 +638,8 @@ pub fn to_canonical_json(manifest: &RunManifest) -> Result<String, String> {
     let mut normalized = manifest.clone();
     normalized.enabled_flags.sort();
     normalized.enabled_flags.dedup();
+    normalized.enabled_features.sort();
+    normalized.enabled_features.dedup();
     serialize_canonical(&normalized)
 }
 
@@ -903,6 +921,54 @@ fn validate_hash_record(
     Ok(())
 }
 
+fn validate_feature_values(field: &str, features: &[String]) -> Result<(), String> {
+    let mut previous: Option<&str> = None;
+    for feature in features {
+        if feature != sembla_ir::GROUPED_OBSERVATIONS_FEATURE {
+            return Err(format!(
+                "unsupported {field} entry '{feature}' (known features: {})",
+                sembla_ir::GROUPED_OBSERVATIONS_FEATURE
+            ));
+        }
+        if previous.is_some_and(|previous| previous >= feature.as_str()) {
+            return Err(format!("{field} must be sorted and deduplicated"));
+        }
+        previous = Some(feature.as_str());
+    }
+    Ok(())
+}
+
+fn validate_grouped_output_values(manifest: &RunManifest) -> Result<(), String> {
+    for (index, output) in manifest.grouped_outputs.iter().enumerate() {
+        if output.algorithm != HASH_ALGORITHM {
+            return Err(format!(
+                "unsupported grouped_outputs[{index}].algorithm '{}' (supported: '{HASH_ALGORITHM}')",
+                output.algorithm
+            ));
+        }
+        if output.sha256.len() != 64
+            || !output
+                .sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(format!(
+                "grouped_outputs[{index}].sha256 must be exactly 64 lowercase hexadecimal characters"
+            ));
+        }
+    }
+    for (execution_index, execution) in manifest.executions.iter().enumerate() {
+        for (index, output) in execution.grouped_outputs.iter().enumerate() {
+            if output.algorithm != HASH_ALGORITHM || output.sha256.len() != 64 {
+                return Err(format!(
+                    "executions[{execution_index}].grouped_outputs[{index}] has an invalid sha256 record"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_plan_identity_values(manifest: &RunManifest) -> Result<(), String> {
     let Some(plan) = &manifest.plan else {
         if manifest.linked_source.is_some() {
@@ -930,11 +996,7 @@ fn validate_plan_identity_values(manifest: &RunManifest) -> Result<(), String> {
             sembla_ir::STABLE_IDENTITY_SCHEME
         ));
     }
-    if let Some(feature) = plan.enabled_features.first() {
-        return Err(format!(
-            "unsupported plan.enabled_features entry '{feature}'; V1 requires an empty list"
-        ));
-    }
+    validate_feature_values("plan.enabled_features", &plan.enabled_features)?;
     validate_hash_record(
         "plan.plan_semantic_hash",
         &plan.plan_semantic_hash,

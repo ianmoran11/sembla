@@ -75,6 +75,7 @@ fn validated_model(person_rows: u64, employer_rows: u64) -> sembla_ir::Validated
             }],
             outputs: vec![],
             views: vec![],
+            grouped_views: vec![],
         }],
         wires: vec![],
         summaries: vec![],

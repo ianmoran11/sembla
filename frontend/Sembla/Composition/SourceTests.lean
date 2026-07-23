@@ -706,6 +706,23 @@ private def addFirstDefinitionUnknown : PlanJson.CJson → PlanJson.CJson
 #guard parseErrorEq (addFirstDefinitionUnknown (Json.encode epidemicPolicy)).render
   "unknown field 'foo' at definitions[0]"
 
+/- DECISIONS §K6 keeps grouped primitive bodies out of composition sources. -/
+private def addFirstDefinitionGroupedViews : PlanJson.CJson → PlanJson.CJson
+  | .obj entries => .obj (entries.map fun entry =>
+      if entry.1 == "definitions" then
+        match entry.2 with
+        | .arr items =>
+            match items.toList with
+            | [] => entry
+            | first :: rest =>
+                (entry.1, .arr ((addObjectField "grouped_views" (.arr #[]) first :: rest).toArray))
+        | _ => entry
+      else entry)
+  | value => value
+
+#guard parseErrorEq (addFirstDefinitionGroupedViews (Json.encode epidemicPolicy)).render
+  "definitions[0].grouped_views: grouped views are not yet supported in composition sources (DECISIONS §K6)"
+
 private def unknownSchemaSource : CompositionSourceV1 :=
   { epidemicPolicy with schemaVersion := "sembla.composition-source/v2" }
 

@@ -46,7 +46,8 @@ private def canonicalBox (modelBox : IR.Box) : IR.Box :=
     transitions := sortBy modelBox.transitions (·.name)
     inputs := sortBy modelBox.inputs (·.name)
     outputs := sortBy modelBox.outputs (·.name)
-    views := sortBy modelBox.views (·.name) }
+    views := sortBy modelBox.views (·.name)
+    groupedViews := sortBy modelBox.groupedViews (·.name) }
 
 private def canonicalModel (model : IR.Model) : IR.Model :=
   { model with
@@ -98,6 +99,12 @@ def directStablePlanWithRuleWord
       targetBox := wire.target.box
       targetPort := wire.target.port : Plan.MailboxIdentityV1 }) (·.identity)
   let schedulerLeaves := leaves.map (·.box)
+  /- DECISIONS §K6: direct-stable artifacts describe grouped observation use
+     explicitly; runtime execution still requires its separately threaded flag. -/
+  let enabledFeatures :=
+    if model.boxes.any fun modelBox => !modelBox.groupedViews.isEmpty then
+      ["grouped-observations"]
+    else []
   pure {
     schemaVersion := Plan.planSchema
     identityScheme := Plan.stableIdentityScheme
@@ -105,7 +112,7 @@ def directStablePlanWithRuleWord
     model
     identity := {
       modelId := "model:" ++ model.name
-      enabledFeatures := []
+      enabledFeatures
       schedulerDomains := [{
         id := Plan.globalSchedulerDomain
         algorithm := Plan.tauLeapAlgorithm

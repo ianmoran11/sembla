@@ -132,6 +132,16 @@ structure ViewDecl where
   value : Option Expr
   reduce : ViewReduce
 deriving Repr, BEq
+structure GroupKey where
+  attr : String
+  bandWidth : Option Nat
+  deriving Repr, BEq
+structure GroupedViewDecl where
+  name : String
+  table : String
+  filter : Option Expr
+  keys : List GroupKey
+  deriving Repr, BEq
 structure Box where
   name : String
   tables : List Table
@@ -139,6 +149,7 @@ structure Box where
   inputs : List PortDecl
   outputs : List OutputDecl
   views : List ViewDecl
+  groupedViews : List GroupedViewDecl := []
 deriving Repr, BEq
 structure WireEndpoint where
   box : String

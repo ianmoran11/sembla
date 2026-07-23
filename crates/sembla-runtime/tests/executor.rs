@@ -59,6 +59,7 @@ fn model(tables: Vec<Table>, transitions: Vec<Transition>, dt: f64) -> sembla_ir
             inputs: Vec::new(),
             outputs: Vec::new(),
             views: Vec::new(),
+            grouped_views: Vec::new(),
         }],
         wires: Vec::new(),
         summaries: Vec::new(),

@@ -69,6 +69,28 @@ pub struct Box {
     pub outputs: Vec<OutputDecl>,
     #[serde(default)]
     pub views: Vec<ViewDecl>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub grouped_views: Vec<GroupedViewDecl>,
+}
+
+/// A grouped count projection evaluated from committed state after each tick.
+///
+/// Like scalar views, grouped observations are sinks and cannot feed execution.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroupedViewDecl {
+    pub name: String,
+    pub table: String,
+    pub filter: Option<std::boxed::Box<Expr>>,
+    pub keys: Vec<GroupKey>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroupKey {
+    pub attr: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub band_width: Option<u64>,
 }
 
 /// A named scalar projection of one table evaluated after each committed tick.

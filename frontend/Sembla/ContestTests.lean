@@ -55,7 +55,7 @@ private def expectedContestTwin : Model :=
         [.setAttr "occupancy" (.enum "vacant")]
         [ ResourceClaim.mk (.selfAttr "slot_resource") .raceTime
         , ResourceClaim.mk (.selfAttr "backup_resource") .raceTime ]]
-      [] [] []]
+      [] [] [] []]
     [] []
 
 #guard contestTwin == expectedContestTwin

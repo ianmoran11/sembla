@@ -221,6 +221,29 @@ validator retains the deeper claim/write coverage checks, while the runtime owns
 argmin conflict resolution, deferred-loser reporting, and the double-write
 defense.
 
+### Grouped observations
+
+Grouped count views are authored in a box with one to four Enum, Ref, or banded
+Int keys:
+
+```lean
+grouped view population_cells :=
+  count PersonSlot by sex, area, band age_months 60 where occupancy = present
+```
+
+The surface always elaborates the complete `GroupedViewDecl`; authoring has no
+runtime feature context. Execution is default-off and requires repeatable
+`--enable grouped-observations` on `sembla run` or `sembla sweep`, as frozen by
+`DECISIONS.md` §K6. Int keys require a positive literal band width; Enum and Ref
+keys must not use `band`. Filters are row-local count predicates.
+
+V1 executes grouped observations on CPU only. Each declaration writes
+`<out-stem>.grouped.<view>.csv` with header
+`tick,<key1>,…,<keyN>,count`, non-empty groups only, and numeric key-tuple
+ordering before Enum names are rendered. Grouped observation is a sink: it is
+evaluated after commit and cannot consume draws, stage writes, affect conflicts,
+or feed scheduling.
+
 ### Keyed frequency
 
 `freq (predicate) over key` is the supported frequency-shaped aggregate. It

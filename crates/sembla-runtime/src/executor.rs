@@ -1,12 +1,13 @@
 //! Deterministic, snapshot-isolated synchronous box composition.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
 use sembla_ir::{
-    AggOp, AttrType, ClaimOrdering, Effect, Expr, OutputBuilder, SummaryReduce, ValidatedModel,
-    ViewReduce,
+    AggOp, AttrType, ClaimOrdering, Effect, Expr, FeatureSet, OutputBuilder, SummaryReduce,
+    ValidatedModel, ViewReduce, GROUPED_OBSERVATIONS_FEATURE,
 };
 
 use crate::eval::{
@@ -43,6 +44,16 @@ pub struct ViewValue {
     pub value: ObservationValue,
 }
 
+/// One non-empty grouped bucket from committed post-tick state.
+/// Keys retain underlying numeric values so callers sort before rendering.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GroupedViewValue {
+    pub box_name: String,
+    pub name: String,
+    pub keys: Vec<i128>,
+    pub count: usize,
+}
+
 /// One model-declaration-ordered summary value folded across a run.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SummaryValue {
@@ -56,6 +67,8 @@ pub struct TickReport {
     pub tick: u32,
     /// View values in box order and then view declaration order.
     pub views: Vec<ViewValue>,
+    /// Non-empty grouped buckets, sorted by view declaration then numeric key tuple.
+    pub grouped_views: Vec<GroupedViewValue>,
     /// Model-global rule counts, retained for single-box API compatibility.
     pub fired: Vec<(u32, usize)>,
     /// Counts grouped in box declaration order for composed-model reporting.
@@ -249,6 +262,18 @@ pub fn run_tick(
     seed: u64,
     tick: u32,
 ) -> Result<TickReport, TickError> {
+    run_tick_with_features(model, state, params, seed, tick, &FeatureSet::new())
+}
+
+pub fn run_tick_with_features(
+    model: &ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    tick: u32,
+    enabled_features: &FeatureSet,
+) -> Result<TickReport, TickError> {
+    require_grouped_observations_feature(model, enabled_features)?;
     Ok(execute_tick(model, state, params, seed, tick)?.report)
 }
 
@@ -260,6 +285,18 @@ pub fn run(
     seed: u64,
     n_ticks: u32,
 ) -> Result<RunReport, TickError> {
+    run_with_features(model, state, params, seed, n_ticks, &FeatureSet::new())
+}
+
+pub fn run_with_features(
+    model: &ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    n_ticks: u32,
+    enabled_features: &FeatureSet,
+) -> Result<RunReport, TickError> {
+    require_grouped_observations_feature(model, enabled_features)?;
     let mut ticks = Vec::with_capacity(n_ticks as usize);
     let mut warnings = Vec::new();
     for tick in 0..n_ticks {
@@ -292,6 +329,24 @@ pub fn run(
         summaries,
         warnings,
     })
+}
+
+fn require_grouped_observations_feature(
+    model: &ValidatedModel,
+    enabled_features: &FeatureSet,
+) -> Result<(), TickError> {
+    if model
+        .model()
+        .boxes
+        .iter()
+        .any(|model_box| !model_box.grouped_views.is_empty())
+        && !enabled_features.contains(GROUPED_OBSERVATIONS_FEATURE)
+    {
+        return Err(TickError::Evaluation(format!(
+            "grouped_views require enabled feature '{GROUPED_OBSERVATIONS_FEATURE}'"
+        )));
+    }
+    Ok(())
 }
 
 fn exceeds_saturation_threshold(deferred: usize, fired: usize) -> bool {
@@ -366,6 +421,7 @@ fn execute_tick(
     // immutable store. It cannot consume RNG coordinates, stage writes, or
     // influence conflict resolution or scheduling.
     let views = observe_views(model, state, params)?;
+    let grouped_views = observe_grouped_views(model, state, params)?;
 
     let mut fired = model
         .transitions()
@@ -397,6 +453,7 @@ fn execute_tick(
         report: TickReport {
             tick,
             views,
+            grouped_views,
             fired,
             fired_per_box,
             deferred_per_resource_table,
@@ -455,6 +512,80 @@ pub fn observe_views(
                 name: view.name.clone(),
                 value,
             });
+        }
+    }
+    Ok(observations)
+}
+
+/// Evaluates grouped count views from committed state without execution feedback.
+pub fn observe_grouped_views(
+    model: &ValidatedModel,
+    state: &StateStore,
+    params: &ParamEnv,
+) -> Result<Vec<GroupedViewValue>, TickError> {
+    let snapshot = state.snapshot();
+    let mut cache = AggCache::new(model, &snapshot, params);
+    let mut observations = Vec::new();
+    for model_box in &model.model().boxes {
+        for view in &model_box.grouped_views {
+            let table_decl = model_box
+                .tables
+                .iter()
+                .find(|table| table.name == view.table)
+                .expect("validated grouped view table disappeared");
+            let table = EvalTable::new(model, &model_box.name, &view.table)?;
+            let row_count = snapshot.row_count(&model_box.name, &view.table)?;
+            let selected = match &view.filter {
+                Some(filter) => match eval_column(filter, table, &snapshot, params, &mut cache)? {
+                    ValueColumn::Bool(values) => values,
+                    other => return Err(runtime_type("grouped view filter", &other)),
+                },
+                None => vec![true; row_count],
+            };
+            let mut buckets: BTreeMap<Vec<i128>, usize> = BTreeMap::new();
+            for (row, selected) in selected.into_iter().enumerate() {
+                if !selected {
+                    continue;
+                }
+                let mut tuple = Vec::with_capacity(view.keys.len());
+                for key in &view.keys {
+                    let attr = table_decl
+                        .attrs
+                        .iter()
+                        .find(|attr| attr.name == key.attr)
+                        .expect("validated grouped key disappeared");
+                    let value = match (&attr.ty, key.band_width) {
+                        (AttrType::Enum { .. }, None) => i128::from(snapshot.enum_index(
+                            &model_box.name,
+                            &view.table,
+                            &key.attr,
+                            row,
+                        )?),
+                        (AttrType::Ref { .. }, None) => i128::from(snapshot.reference(
+                            &model_box.name,
+                            &view.table,
+                            &key.attr,
+                            row,
+                        )?),
+                        (AttrType::Int, Some(width)) => i128::from(snapshot.int(
+                            &model_box.name,
+                            &view.table,
+                            &key.attr,
+                            row,
+                        )?)
+                        .div_euclid(i128::from(width)),
+                        _ => unreachable!("validated grouped key type disappeared"),
+                    };
+                    tuple.push(value);
+                }
+                *buckets.entry(tuple).or_default() += 1;
+            }
+            observations.extend(buckets.into_iter().map(|(keys, count)| GroupedViewValue {
+                box_name: model_box.name.clone(),
+                name: view.name.clone(),
+                keys,
+                count,
+            }));
         }
     }
     Ok(observations)

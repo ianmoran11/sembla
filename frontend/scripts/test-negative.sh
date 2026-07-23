@@ -413,6 +413,23 @@ check_failure_exact Negative/CommandDuplicateContest.lean \
 check_failure_exact Negative/CommandReactionContest.lean \
   "Negative/CommandReactionContest.lean:9:54: error: reaction arrows cannot declare contests; use the general transition form"
 
+check_failure_exact Negative/CommandGroupedUnknownAttribute.lean \
+  "Negative/CommandGroupedUnknownAttribute.lean:8:42: error: unknown state or attribute 'missing'"
+check_failure_exact Negative/CommandGroupedRealKey.lean \
+  "Negative/CommandGroupedRealKey.lean:8:42: error: grouped key 'rate' has type Real; expected Enum, Ref, or banded Int"
+check_failure_exact Negative/CommandGroupedBandEnum.lean \
+  "Negative/CommandGroupedBandEnum.lean:8:47: error: band is supported only for Int grouped keys; 'sex' has type Enum"
+check_failure_exact Negative/CommandGroupedMissingBand.lean \
+  "Negative/CommandGroupedMissingBand.lean:8:42: error: Int grouped key 'age' requires 'band age <positive-width>'"
+check_failure_exact Negative/CommandGroupedZeroBand.lean \
+  "Negative/CommandGroupedZeroBand.lean:8:51: error: grouped band width must be greater than zero"
+check_failure_exact Negative/CommandGroupedTooManyKeys.lean \
+  "Negative/CommandGroupedTooManyKeys.lean:8:62: error: grouped view 'cells' supports at most 4 keys"
+check_failure_exact Negative/CommandGroupedDuplicateView.lean \
+  "Negative/CommandGroupedDuplicateView.lean:9:17: error: duplicate view 'cells'"
+check_failure_exact Negative/CommandGroupedAggregateFilter.lean \
+  "Negative/CommandGroupedAggregateFilter.lean:10:52: error: aggregates are not supported in grouped view filters"
+
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
 lake env lean Positive/ObservationOrder.lean

@@ -36,6 +36,7 @@ import Sembla.FrequencyTests
 import Sembla.CommandFrontendTests
 import Sembla.ArithmeticIntTests
 import Sembla.ContestTests
+import Sembla.GroupedObservationTests
 import Sembla.Lumping
 import Sembla.LumpingProof
 import Sembla.LumpingTests

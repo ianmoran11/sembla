@@ -462,7 +462,12 @@ fn diff_backends_accepts_plans_rejects_plan_dt_and_checks_corpus_exclusivity() {
         .unwrap();
     assert_eq!(corpus.status.code(), Some(1));
     let stderr = String::from_utf8(corpus.stderr).unwrap();
-    assert!(stderr.contains("cuda backend unavailable"), "{stderr}");
+    // DECISIONS §K6 adds one CPU-only feature-bearing fixture; corpus-mode
+    // diff-backends must reject it rather than silently skipping or falling back.
+    assert!(
+        stderr.contains("grouped-observations backend follow-up PRD"),
+        "{stderr}"
+    );
 
     for arguments in [
         vec!["--all-plan-fixtures", "--all-examples"],

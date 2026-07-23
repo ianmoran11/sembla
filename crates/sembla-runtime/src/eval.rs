@@ -1799,6 +1799,7 @@ mod tests {
                 inputs: Vec::new(),
                 outputs: Vec::new(),
                 views: Vec::new(),
+                grouped_views: Vec::new(),
             }],
             wires: Vec::new(),
             summaries: Vec::new(),

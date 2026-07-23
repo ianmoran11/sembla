@@ -28,6 +28,7 @@ fn simple_box(name: &str, transitions: Vec<Transition>) -> ModelBox {
         inputs: vec![],
         outputs: vec![],
         views: vec![],
+        grouped_views: vec![],
     }
 }
 
@@ -63,6 +64,7 @@ fn observation_model(views: Vec<ViewDecl>, summaries: Vec<SummaryDecl>) -> Model
             inputs: vec![],
             outputs: vec![],
             views,
+            grouped_views: vec![],
         }],
         wires: vec![],
         summaries,
@@ -122,6 +124,7 @@ fn ref_write_model(value: Expr, contests: Vec<ResourceClaim>) -> Model {
             inputs: vec![],
             outputs: vec![],
             views: vec![],
+            grouped_views: vec![],
         }],
         wires: vec![],
         summaries: vec![],
@@ -209,6 +212,7 @@ fn aggregate_supports_the_infect_group_by_pattern() {
             inputs: vec![],
             outputs: vec![],
             views: vec![],
+            grouped_views: vec![],
         }],
         wires: vec![],
         summaries: vec![],
@@ -278,6 +282,7 @@ fn duplicate_wire_destinations_are_rejected_at_the_second_wire() {
             },
         }],
         views: vec![],
+        grouped_views: vec![],
     };
     let destination = ModelBox {
         name: "destination".into(),
@@ -293,6 +298,7 @@ fn duplicate_wire_destinations_are_rejected_at_the_second_wire() {
         }],
         outputs: vec![],
         views: vec![],
+        grouped_views: vec![],
     };
     let endpoint = WireEndpoint {
         r#box: "destination".into(),
@@ -434,6 +440,7 @@ fn duplicate_resource_claim_is_rejected_with_its_path() {
             inputs: vec![],
             outputs: vec![],
             views: vec![],
+            grouped_views: vec![],
         }],
         wires: vec![],
         summaries: vec![],

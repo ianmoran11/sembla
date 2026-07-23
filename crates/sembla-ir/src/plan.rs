@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
 
@@ -6,7 +6,10 @@ use crate::identity::{
     is_reserved_rule_word, is_slug, mailbox_identity, occurrence_of_leaf, rule_word,
     transition_identity,
 };
-use crate::{validate, Model, ValidatedModel, ValidationError, Wire};
+use crate::{
+    validate_with_features, FeatureSet, Model, ValidatedModel, ValidationError, Wire,
+    GROUPED_OBSERVATIONS_FEATURE, KNOWN_FEATURES,
+};
 
 pub const EXECUTABLE_PLAN_SCHEMA: &str = "sembla.executable-plan/v1";
 pub const STABLE_IDENTITY_SCHEME: &str = "sembla.identity/stable-v1";
@@ -175,17 +178,13 @@ pub fn validate_plan(plan: &ExecutablePlanV1) -> Result<ValidatedPlan, Validatio
         ));
     }
 
-    if let Some(feature) = plan.identity.enabled_features.first() {
-        return Err(plan_error(
-            "$.identity.enabled_features[0]",
-            format!("unsupported enabled feature '{feature}'; V1 requires an empty list"),
-        ));
-    }
+    let enabled_features = validate_enabled_features(plan)?;
 
-    let validated_model = validate(plan.model.clone()).map_err(|error| {
-        let suffix = error.path.strip_prefix('$').unwrap_or(&error.path);
-        plan_error(format!("$.model{suffix}"), error.message)
-    })?;
+    let validated_model =
+        validate_with_features(plan.model.clone(), &enabled_features).map_err(|error| {
+            let suffix = error.path.strip_prefix('$').unwrap_or(&error.path);
+            plan_error(format!("$.model{suffix}"), error.message)
+        })?;
 
     let expected_model_id = format!("model:{}", plan.model.name);
     if plan.identity.model_id != expected_model_id {
@@ -229,6 +228,52 @@ pub fn validate_plan(plan: &ExecutablePlanV1) -> Result<ValidatedPlan, Validatio
         identity: plan.identity.clone(),
         words_by_dense_rule_id,
     })
+}
+
+fn validate_enabled_features(plan: &ExecutablePlanV1) -> Result<FeatureSet, ValidationError> {
+    let mut enabled = BTreeSet::new();
+    let mut previous: Option<&str> = None;
+    for (index, feature) in plan.identity.enabled_features.iter().enumerate() {
+        if !KNOWN_FEATURES.contains(&feature.as_str()) {
+            return Err(plan_error(
+                format!("$.identity.enabled_features[{index}]"),
+                format!(
+                    "unsupported enabled feature '{feature}'; known features: {GROUPED_OBSERVATIONS_FEATURE}"
+                ),
+            ));
+        }
+        if previous.is_some_and(|previous| previous >= feature.as_str()) {
+            return Err(plan_error(
+                format!("$.identity.enabled_features[{index}]"),
+                "enabled_features must be sorted and deduplicated",
+            ));
+        }
+        previous = Some(feature.as_str());
+        enabled.insert(feature.clone());
+    }
+    let has_grouped_views = plan
+        .model
+        .boxes
+        .iter()
+        .any(|model_box| !model_box.grouped_views.is_empty());
+    let grouped_enabled = enabled.contains(GROUPED_OBSERVATIONS_FEATURE);
+    if has_grouped_views && !grouped_enabled {
+        return Err(plan_error(
+            "$.identity.enabled_features",
+            format!(
+                "model grouped_views require enabled feature '{GROUPED_OBSERVATIONS_FEATURE}' (DECISIONS §K6)"
+            ),
+        ));
+    }
+    if grouped_enabled && !has_grouped_views {
+        return Err(plan_error(
+            "$.identity.enabled_features[0]",
+            format!(
+                "enabled feature '{GROUPED_OBSERVATIONS_FEATURE}' is inert because the model has no grouped_views (DECISIONS §K6)"
+            ),
+        ));
+    }
+    Ok(enabled)
 }
 
 fn validate_leaves(plan: &ExecutablePlanV1) -> Result<(), ValidationError> {

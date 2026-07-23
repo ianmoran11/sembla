@@ -612,7 +612,9 @@ private def decodeDefinition
   | "primitive" =>
       checkFields path fields [
         "id", "display_name", "parameter_requirements", "ports", "kind",
-        "tables", "transitions", "inputs", "outputs", "views"]
+        "tables", "transitions", "inputs", "outputs", "views", "grouped_views"]
+      if (fields.find compare "grouped_views").isSome then
+        throw s!"{childPath path "grouped_views"}: grouped views are not yet supported in composition sources (DECISIONS §K6)"
       pure {
         id, displayName, parameterRequirements := requirements, ports
         body := .primitive {

@@ -18,7 +18,10 @@ pub use identity::{
 };
 pub use model::*;
 pub use plan::*;
-pub use validate::{validate, ValidatedModel, ValidatedTransition};
+pub use validate::{
+    validate, validate_with_features, FeatureSet, ValidatedModel, ValidatedTransition,
+    GROUPED_OBSERVATIONS_FEATURE, KNOWN_FEATURES,
+};
 
 /// The version of the Sembla IR crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

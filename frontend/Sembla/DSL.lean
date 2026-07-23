@@ -84,6 +84,17 @@ structure SurfaceView where
   value : Option (TSyntax `semblaExpr)
   reduce : String
 
+structure SurfaceGroupKey where
+  attr : TSyntax `ident
+  bandWidth : Option (Nat × Syntax)
+
+structure SurfaceGroupedView where
+  name : String
+  token : Syntax
+  system : TSyntax `ident
+  filter : Option (TSyntax `semblaExpr)
+  keys : List SurfaceGroupKey
+
 structure SurfaceSummary where
   name : String
   token : Syntax
@@ -99,6 +110,7 @@ structure SurfaceBox where
   transitions : List SurfaceTransition
   outputs : List SurfaceOutput
   views : List SurfaceView
+  groupedViews : List SurfaceGroupedView
 
 /-- One parsed port declaration in its original position among the other
     input/output declarations of a command-layout box. -/
@@ -243,6 +255,19 @@ syntax "view" ident "from" ident "using" semblaExpr "reduce" semblaViewReduce : 
 syntax "view" ident "from" ident "where" semblaExpr "using" semblaExpr
   "reduce" semblaViewReduce : semblaView
 
+declare_syntax_cat semblaGroupedKey
+syntax ident : semblaGroupedKey
+syntax "band" ident num : semblaGroupedKey
+
+declare_syntax_cat semblaGroupedView
+syntax "grouped" "view" ident ":=" "count" ident "by" semblaGroupedKey,* : semblaGroupedView
+syntax "grouped" "view" ident ":=" "count" ident "by" semblaGroupedKey,*
+  "where" semblaExpr : semblaGroupedView
+
+declare_syntax_cat semblaBoxView
+syntax semblaView : semblaBoxView
+syntax semblaGroupedView : semblaBoxView
+
 declare_syntax_cat semblaSummaryReduce
 syntax "sum" : semblaSummaryReduce
 syntax "min" : semblaSummaryReduce
@@ -267,7 +292,7 @@ syntax "box" ident "where"
   "inputs" "[" semblaInput,* "]"
   "transitions" "[" semblaTransition,* "]"
   "outputs" "[" semblaOutput,* "]"
-  "views" "[" semblaView,* "]" : semblaBox
+  "views" "[" semblaBoxView,* "]" : semblaBox
 
 declare_syntax_cat semblaWire
 syntax "wire" ident ident "->" ident ident : semblaWire
@@ -342,6 +367,7 @@ syntax semblaCommandGeneralTransition : semblaCommandBoxItem
 syntax semblaTransition : semblaCommandBoxItem
 syntax semblaCommandOutput : semblaCommandBoxItem
 syntax semblaCommandView : semblaCommandBoxItem
+syntax semblaGroupedView : semblaCommandBoxItem
 syntax "contest" ident : semblaCommandBoxItem
 
 declare_syntax_cat semblaCommandBox
@@ -689,6 +715,28 @@ private def parseView (stx : TSyntax `semblaView) : TermElabM SurfaceView := do
       pure ⟨identText name, name.raw, source, some filter, some value, ← parseViewReduce reducer⟩
   | _ => throwUnsupportedSyntax
 
+private def parseGroupedKey (stx : TSyntax `semblaGroupedKey) : TermElabM SurfaceGroupKey := do
+  match stx with
+  | `(semblaGroupedKey| $attrName:ident) => pure ⟨attrName, none⟩
+  | `(semblaGroupedKey| band $attrName:ident $width:num) =>
+      let some value := width.raw.isNatLit?
+        | throwErrorAt width "grouped band width must be a positive integer literal"
+      pure ⟨attrName, some (value, width.raw)⟩
+  | _ => throwUnsupportedSyntax
+
+private def parseGroupedView (stx : TSyntax `semblaGroupedView) :
+    TermElabM SurfaceGroupedView := do
+  match stx with
+  | `(semblaGroupedView| grouped view $name:ident := count $source:ident by
+        $keys:semblaGroupedKey,*) =>
+      pure ⟨identText name, name.raw, source, none,
+        ← keys.getElems.toList.mapM parseGroupedKey⟩
+  | `(semblaGroupedView| grouped view $name:ident := count $source:ident by
+        $keys:semblaGroupedKey,* where $filter:semblaExpr) =>
+      pure ⟨identText name, name.raw, source, some filter,
+        ← keys.getElems.toList.mapM parseGroupedKey⟩
+  | _ => throwUnsupportedSyntax
+
 private def parseSummaryReduce (stx : TSyntax `semblaSummaryReduce) : TermElabM String := do
   match stx with
   | `(semblaSummaryReduce| sum) => pure "sum"
@@ -723,19 +771,28 @@ private def parseBox (stx : TSyntax `semblaBox) : TermElabM SurfaceBox := do
         ← systemDecls.getElems.toList.mapM parseSystem,
         ← inputDecls.getElems.toList.mapM parseInput,
         ← transitionDecls.getElems.toList.mapM parseTransition,
-        ← outputDecls.getElems.toList.mapM parseOutput, []⟩
+        ← outputDecls.getElems.toList.mapM parseOutput, [], []⟩
   | `(semblaBox| box $name:ident where
         systems [$systemDecls:semblaSystem,*]
         inputs [$inputDecls:semblaInput,*]
         transitions [$transitionDecls:semblaTransition,*]
         outputs [$outputDecls:semblaOutput,*]
-        views [$viewDecls:semblaView,*]) =>
+        views [$viewDecls:semblaBoxView,*]) =>
+      let mut scalarViews : List SurfaceView := []
+      let mut groupedViews : List SurfaceGroupedView := []
+      for declaration in viewDecls.getElems do
+        match declaration with
+        | `(semblaBoxView| $scalarDecl:semblaView) =>
+            scalarViews := scalarViews ++ [← parseView scalarDecl]
+        | `(semblaBoxView| $groupedDecl:semblaGroupedView) =>
+            groupedViews := groupedViews ++ [← parseGroupedView groupedDecl]
+        | _ => throwUnsupportedSyntax
       pure ⟨identText name, name.raw,
         ← systemDecls.getElems.toList.mapM parseSystem,
         ← inputDecls.getElems.toList.mapM parseInput,
         ← transitionDecls.getElems.toList.mapM parseTransition,
         ← outputDecls.getElems.toList.mapM parseOutput,
-        ← viewDecls.getElems.toList.mapM parseView⟩
+        scalarViews, groupedViews⟩
   | _ => throwUnsupportedSyntax
 
 private def parseWire (stx : TSyntax `semblaWire) : TermElabM SurfaceWire := do
@@ -980,6 +1037,7 @@ def parseCommandBoxWithPorts
       let mut transitionDecls : List SurfaceTransition := []
       let mut outputDecls : List SurfaceOutput := []
       let mut viewDecls : List SurfaceView := []
+      let mut groupedViewDecls : List SurfaceGroupedView := []
       let mut portDecls : List SurfacePortItem := []
       for item in items do
         match item with
@@ -999,12 +1057,14 @@ def parseCommandBoxWithPorts
             portDecls := portDecls ++ [.output parsed]
         | `(semblaCommandBoxItem| $decl:semblaCommandView) =>
             viewDecls := viewDecls ++ [← parseCommandView decl]
+        | `(semblaCommandBoxItem| $decl:semblaGroupedView) =>
+            groupedViewDecls := groupedViewDecls ++ [← parseGroupedView decl]
         | `(semblaCommandBoxItem| contest $unsupported:ident) =>
             throwErrorAt unsupported "contest is declared inside a transition body"
         | _ => throwUnsupportedSyntax
       let surfaceBox : SurfaceBox :=
         ⟨identText name, name.raw, systemDecls, inputDecls, transitionDecls,
-          outputDecls, viewDecls⟩
+          outputDecls, viewDecls, groupedViewDecls⟩
       pure ⟨surfaceBox, portDecls⟩
   | _ => throwUnsupportedSyntax
 
@@ -1636,6 +1696,61 @@ private def viewTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
   `(ViewDecl.mk $(Lean.quote viewDecl.name) $(Lean.quote selected.irName)
       $filterTerm $valueTerm $reduceTerm)
 
+private partial def rejectGroupedFilterAggregates (stx : Syntax) : TermElabM Unit := do
+  match stx with
+  | `(semblaExpr| inputSum $_port:ident field $_field:ident)
+  | `(semblaExpr| countBy $_countKey:ident ($_filter:semblaExpr))
+  | `(semblaExpr| sizeBy $_sizeKey:ident)
+  | `(semblaExpr| freq ($_predicate:semblaExpr) over $_freqKey:ident) =>
+      throwErrorAt stx "aggregates are not supported in grouped view filters"
+  | _ =>
+      for child in stx.getArgs do
+        rejectGroupedFilterAggregates child
+
+/- Grouped views always elaborate completely: Lean authoring has no runtime flag
+   context. Rust validation and execution enforce `grouped-observations` (K6). -/
+private def groupedViewTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
+    (viewDecl : SurfaceGroupedView) : TermElabM (TSyntax `term) := do
+  let systemName := identText viewDecl.system
+  let selected ← match boxCtx.systems.find? (·.logicalName == systemName) with
+    | some found => pure found
+    | none => throwErrorAt viewDecl.system
+        "grouped view '{viewDecl.name}' refers to unknown table '{systemName}'"
+  if viewDecl.keys.isEmpty then
+    throwErrorAt viewDecl.token "grouped view '{viewDecl.name}' requires at least one key"
+  if viewDecl.keys.length > 4 then
+    let some fifth := viewDecl.keys.get? 4
+      | throwErrorAt viewDecl.token "internal grouped key count mismatch"
+    throwErrorAt fifth.attr
+      "grouped view '{viewDecl.name}' supports at most 4 keys"
+  let mut keyTerms : Array (TSyntax `term) := #[]
+  for key in viewDecl.keys do
+    let column ← lookupAttr selected.attrs key.attr
+    let widthTerm ← match column.ty, key.bandWidth with
+      | .int, some (0, token) =>
+          throwErrorAt token "grouped band width must be greater than zero"
+      | .int, some (width, _) => `(some $(Lean.quote width))
+      | .int, none => throwErrorAt key.attr
+          "Int grouped key '{column.name}' requires 'band {column.name} <positive-width>'"
+      | .enum _, none | .ref _, none => `(none)
+      | .enum _, some _ | .ref _, some _ => throwErrorAt key.attr
+          "band is supported only for Int grouped keys; '{column.name}' has type {typeName column.ty}"
+      | .real, _ => throwErrorAt key.attr
+          "grouped key '{column.name}' has type Real; expected Enum, Ref, or banded Int"
+      | .bool, _ => throwErrorAt key.attr "Bool grouped keys are not supported"
+    keyTerms := keyTerms.push (← `(GroupKey.mk $(Lean.quote column.name) $widthTerm))
+  let filterTerm ← match viewDecl.filter with
+    | none => `(none)
+    | some filterExpr =>
+        rejectGroupedFilterAggregates filterExpr
+        let (term, ty) ← elaborateExpr selected selected.attrs paramCtx boxCtx.inputs
+          filterExpr (some s!"grouped view '{viewDecl.name}'")
+        if ty != .bool then throwErrorAt filterExpr
+          "grouped view '{viewDecl.name}' filter has type {typeName ty}; expected Bool"
+        `(some $term)
+  `(GroupedViewDecl.mk $(Lean.quote viewDecl.name) $(Lean.quote selected.irName)
+      $filterTerm [$keyTerms,*])
+
 private def summaryTerm (boxCtxs : List SurfaceBox) (summaryDecl : SurfaceSummary) :
     TermElabM (TSyntax `term) := do
   let boxName := identText summaryDecl.box
@@ -1713,8 +1828,9 @@ private def elaborateSurfaceModelCore (attachWidgets : Bool) (surface : SurfaceM
     ensureUnique "input port" (boxCtx.inputs.map fun p => (p.name, p.token))
     ensureUnique "transition" (boxCtx.transitions.map fun t => (t.name, t.token))
     ensureUnique "output port" (boxCtx.outputs.map fun p => (p.name, p.token))
-    ensureUnique "view" (boxCtx.views.map fun declaration =>
-      (declaration.name, declaration.token))
+    ensureUnique "view" (
+      boxCtx.views.map (fun declaration => (declaration.name, declaration.token)) ++
+      boxCtx.groupedViews.map (fun declaration => (declaration.name, declaration.token)))
     for selected in boxCtx.systems do
       validateAttrs "attribute" selected.attrs
     for inputDecl in boxCtx.inputs do
@@ -1755,8 +1871,10 @@ private def elaborateSurfaceModelCore (attachWidgets : Bool) (surface : SurfaceM
       inputTerms := inputTerms.push (← `(PortDecl.mk $(Lean.quote inputDecl.name) [$schemaTerms,*]))
     let outputTerms ← boxCtx.outputs.toArray.mapM (outputTerm paramCtx boxCtx)
     let viewTerms ← boxCtx.views.toArray.mapM (viewTerm paramCtx boxCtx)
+    let groupedViewTerms ← boxCtx.groupedViews.toArray.mapM (groupedViewTerm paramCtx boxCtx)
     boxTerms := boxTerms.push (← `(Box.mk $(Lean.quote boxCtx.name) [$tableTerms,*]
-      [$transitionTerms,*] [$inputTerms,*] [$outputTerms,*] [$viewTerms,*]))
+      [$transitionTerms,*] [$inputTerms,*] [$outputTerms,*] [$viewTerms,*]
+      [$groupedViewTerms,*]))
 
   let mut wireTerms : Array (TSyntax `term) := #[]
   let mut deliveredInputs : List String := []

@@ -254,3 +254,21 @@ for demo in "${composition_demos[@]}"; do
   "$sembla" bundle-verify "$demo_bundle"
 done
 echo "Composition showcase sources, plans, reports, manifests, and bundle hashes are reproducible"
+
+# DECISIONS §K6: the first feature-bearing direct-stable plan is Lean-authored,
+# Rust-canonical, and accepted as an artifact without a runtime execution flag.
+cat >"$tmp/ExportGroupedObservation.lean" <<'LEAN'
+import Sembla.GroupedObservationTests
+open Sembla.GroupedObservationTests
+unsafe def main (args : List String) : IO UInt32 := do
+  match args with
+  | [path] => IO.FS.writeFile path groupedObservationPlanJson; pure 0
+  | _ => pure 2
+LEAN
+(
+  cd "$frontend_root"
+  lake env lean --run "$tmp/ExportGroupedObservation.lean" "$tmp/grouped_observation.plan.json"
+)
+cmp "$repo_root/fixtures/plans/grouped_observation.plan.json" "$tmp/grouped_observation.plan.json"
+"$sembla" validate "$tmp/grouped_observation.plan.json"
+echo "Lean grouped-observation plan is byte-identical to the Rust-validated fixture"

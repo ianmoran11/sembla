@@ -140,11 +140,19 @@ private def viewJson (view : ViewDecl) : String := object [
   ("name", quote view.name), ("table", quote view.table),
   ("filter", opt exprJson view.filter), ("value", opt exprJson view.value),
   ("reduce", viewReduceJson view.reduce)]
-private def boxJson (box : Box) : String := object [
-  ("name", quote box.name), ("tables", array (box.tables.map tableJson)),
-  ("transitions", array (box.transitions.map transitionJson)),
-  ("inputs", array (box.inputs.map portJson)), ("outputs", array (box.outputs.map outputJson)),
-  ("views", array (box.views.map viewJson))]
+private def groupKeyJson (key : GroupKey) : String := object (
+  [("attr", quote key.attr)] ++ key.bandWidth.toList.map fun width =>
+    ("band_width", toString width))
+private def groupedViewJson (view : GroupedViewDecl) : String := object [
+  ("name", quote view.name), ("table", quote view.table),
+  ("filter", opt exprJson view.filter), ("keys", array (view.keys.map groupKeyJson))]
+private def boxJson (box : Box) : String := object (
+  [("name", quote box.name), ("tables", array (box.tables.map tableJson)),
+   ("transitions", array (box.transitions.map transitionJson)),
+   ("inputs", array (box.inputs.map portJson)), ("outputs", array (box.outputs.map outputJson)),
+   ("views", array (box.views.map viewJson))] ++
+  (if box.groupedViews.isEmpty then [] else
+    [("grouped_views", array (box.groupedViews.map groupedViewJson))]))
 private def endpointJson (endpoint : WireEndpoint) : String := object [
   ("box", quote endpoint.box), ("port", quote endpoint.port)]
 private def wireJson (wire : Wire) : String := object [

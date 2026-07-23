@@ -2086,6 +2086,7 @@ mod tests {
                         },
                     }],
                     views: Vec::new(),
+                    grouped_views: Vec::new(),
                 },
                 ModelBox {
                     name: "sink".to_owned(),
@@ -2097,6 +2098,7 @@ mod tests {
                     }],
                     outputs: Vec::new(),
                     views: Vec::new(),
+                    grouped_views: Vec::new(),
                 },
             ],
             wires: if wired {

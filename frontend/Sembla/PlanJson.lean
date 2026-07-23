@@ -214,13 +214,22 @@ private def viewJson (view : IR.ViewDecl) : CJson := obj [
   ("name", .str view.name), ("table", .str view.table),
   ("filter", opt exprJson view.filter), ("value", opt exprJson view.value),
   ("reduce", viewReduceJson view.reduce)]
-private def boxJson (modelBox : IR.Box) : CJson := obj [
-  ("name", .str modelBox.name),
-  ("tables", arr ((sortBy modelBox.tables (·.name)).map tableJson)),
-  ("transitions", arr ((sortBy modelBox.transitions (·.name)).map transitionJson)),
-  ("inputs", arr ((sortBy modelBox.inputs (·.name)).map portJson)),
-  ("outputs", arr ((sortBy modelBox.outputs (·.name)).map outputJson)),
-  ("views", arr ((sortBy modelBox.views (·.name)).map viewJson))]
+private def groupKeyJson (key : IR.GroupKey) : CJson := obj (
+  [("attr", .str key.attr)] ++ key.bandWidth.toList.map fun width =>
+    ("band_width", .int (Int.ofNat width)))
+private def groupedViewJson (view : IR.GroupedViewDecl) : CJson := obj [
+  ("name", .str view.name), ("table", .str view.table),
+  ("filter", opt exprJson view.filter),
+  ("keys", arr (view.keys.map groupKeyJson))]
+private def boxJson (modelBox : IR.Box) : CJson := obj (
+  [("name", .str modelBox.name),
+   ("tables", arr ((sortBy modelBox.tables (·.name)).map tableJson)),
+   ("transitions", arr ((sortBy modelBox.transitions (·.name)).map transitionJson)),
+   ("inputs", arr ((sortBy modelBox.inputs (·.name)).map portJson)),
+   ("outputs", arr ((sortBy modelBox.outputs (·.name)).map outputJson)),
+   ("views", arr ((sortBy modelBox.views (·.name)).map viewJson))] ++
+  (if modelBox.groupedViews.isEmpty then [] else
+    [("grouped_views", arr ((sortBy modelBox.groupedViews (·.name)).map groupedViewJson))]))
 private def endpointJson (endpoint : IR.WireEndpoint) : CJson := obj [
   ("box", .str endpoint.box), ("port", .str endpoint.port)]
 private def wireJson (wire : IR.Wire) : CJson := obj [

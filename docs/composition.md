@@ -150,6 +150,25 @@ can export the final committed tables from either model input form for a later
 `--population final.state` window; see [Sembla state artifacts](state-format.md#chained-runs)
 for manifest links and the deliberate non-equivalence to one continuous run.
 
+## Grouped observation artifacts
+
+A direct-stable model may declare grouped count views such as
+`count PersonSlot by sex, area, band age_months 60`. The plan identity records
+`grouped-observations`; executing the plan still requires
+`--enable grouped-observations`. `sembla validate` accepts the accurately
+feature-described plan without an execution flag. Composition-source primitive
+bodies reject grouped views in this track because linker support is deferred by
+DECISIONS §K6.
+
+Grouped execution is CPU-only in V1. Each view produces sparse long-format
+`<out-stem>.grouped.<view>.csv` bytes with
+`tick,<key1>,…,<keyN>,count`; groups are ordered by underlying Enum indices, Ref
+indices, and floor-divided Int band indices before rendering. The run manifest
+records the sorted enabled-feature set and a SHA-256 record for each grouped
+artifact. Observations run only after state commit and are sinks: adding a
+grouped view cannot change state hashes, ordinary `results.csv`, fired traces,
+draw coordinates, conflicts, or scheduling.
+
 ## Sweep a plan for calibration
 
 A linked plan uses the existing sweep, prior, noise, and summary machinery.
