@@ -8,6 +8,20 @@ Generated text-to-speech audio (18/07/2026, 1:32:41 pm):
 
 # Sembla — Assessment
 
+> [!IMPORTANT]
+> **Historical snapshot — 18 July 2026.** This assessment records the repository
+> as it existed on that date. It is preserved as historical analysis, not as a
+> description of current project status; counts, completed work, and operational
+> claims below may be superseded.
+>
+> **Current-status errata (23 July 2026):** Sembla now has both Apache-2.0 and
+> MIT licenses, CI and dispatch-only GPU workflows, and a runtime dependency
+> policy that permits `sha2` plus exact-pinned `libm` (in addition to the
+> workspace IR crate). The historical “no LICENSE”, “no CI”, and “exactly one
+> external dependency” statements below are therefore no longer current. See
+> the [project README](../README.md), [roadmap](ROADMAP.md), and
+> [CI/check contract](ci.md) for maintained status and commands.
+
 **What it is:** a compositional simulation framework with a Lean 4 frontend (DSL, IR exporter, ProofWidgets) and a deterministic Rust runtime, joined by a versioned JSON IR. The thesis: *seed + IR + θ + determinism level ⇒ reproducible results*. Current state: ~7k lines of Rust, ~5k lines of Lean, 74 tests passing, v0.1 success criteria (`DESIGN.md:583`) appear substantially met, with a GPU precision spike just concluded.
 
 ## Merits

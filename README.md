@@ -75,6 +75,12 @@ state-count/firing CSV output. See
 the formulas, commands, output schema, initialization semantics, and honest
 expressiveness limits.
 
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for pinned toolchains, canonical checks,
+frozen-artifact rules, and managed PRD workflow expectations. Report suspected
+vulnerabilities through the private process in [SECURITY.md](SECURITY.md).
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
@@ -82,7 +88,13 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 
 ## Workspace layout
 
-- `crates/sembla-ir`: shared simulation IR types.
-- `crates/sembla-runtime`: deterministic CPU interpreter.
-- `crates/sembla-cli`: `sembla` command-line binary, including normalized `diff-ir`.
-- [`frontend/`](frontend/README.md): minimal-dependency Lean DSL, IR exporter, and ProofWidgets structure panels (no mathlib).
+- `crates/sembla-cli`: `sembla` command-line validation, execution, sweep,
+  comparison, verification, and backend-differential workflows.
+- `crates/sembla-cuda`: CUDA kernel generation and an optional NVRTC execution
+  backend for native-`f64` CPU/GPU differential testing.
+- `crates/sembla-ir`: versioned simulation and plan types, stable identities,
+  canonical serialization, and semantic validation.
+- `crates/sembla-runtime`: deterministic CPU simulation, synthetic population,
+  prior-sampling, and local Philox RNG implementation.
+- [`frontend/`](frontend/README.md): minimal-dependency Lean DSL, IR exporter,
+  linker, and ProofWidgets structure panels (no mathlib).
