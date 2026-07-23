@@ -8,12 +8,15 @@ use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::rng::derive_sweep_replica_seed;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
+use sembla_runtime::state_artifact::{
+    read as read_state_artifact, sniff_magic, state_artifact_hash, to_table_inits, StateKind,
+};
 use sha2::{Digest, Sha256};
 
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--dt D] [--params file.json] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 
 fn main() {
@@ -32,6 +35,7 @@ fn run(arguments: &[String]) -> i32 {
         }
         [command, path] if command == "validate" => validate_file(path),
         [command, path] if command == "plan-hash" => plan_hash_file(path),
+        [command, path] if command == "state-hash" => state_hash_file(path),
         [command, path] if command == "bundle-verify" => bundle_verify(path),
         [command, left, right] if command == "diff-ir" => diff_ir(left, right),
         [command, flags @ ..] if command == "synth-pop" => {
@@ -564,6 +568,19 @@ fn plan_hash_file(path: &str) -> i32 {
     }
 }
 
+fn state_hash_file(path: &str) -> i32 {
+    match state_artifact_hash(path) {
+        Ok(hash) => {
+            println!("state {} {} {}", hash.algorithm, hash.domain, hash.digest);
+            0
+        }
+        Err(error) => {
+            eprintln!("{path}: {error}");
+            1
+        }
+    }
+}
+
 fn bundle_verify(directory: &str) -> i32 {
     match bundle_verify_result(Path::new(directory)) {
         Ok(checks) => {
@@ -790,13 +807,7 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     let RunInput { model, plan } = read_run_input(path, &options)?;
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
-    let initial = match options.population.parse::<usize>() {
-        Ok(population) => initialize_population(&model, population),
-        Err(_) => initializers_from_population(
-            &model,
-            &SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?,
-        )?,
-    };
+    let initial = initialized_tables(&model, &options.population)?;
     let params = resolve_params(&model, options.params.as_deref())?;
     if options.out.is_none() && options.backend == BackendSelection::Cpu {
         let mut state =
@@ -1049,12 +1060,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         Some(params_path) => read_param_overrides(&model, params_path)?,
         None => Vec::new(),
     };
-    let population = options.population.parse::<usize>().ok();
-    let population_file = if population.is_none() {
-        Some(SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?)
-    } else {
-        None
-    };
+    let initial_tables = initialized_tables(&model, &options.population)?;
     let out = Path::new(&options.out);
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
     remove_previous_sweep_outputs(out)?;
@@ -1147,11 +1153,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         }
         csv_manifest.push('\n');
 
-        let initial = match (&population, &population_file) {
-            (Some(row_count), None) => initialize_population(&model, *row_count),
-            (None, Some(population)) => initializers_from_population(&model, population)?,
-            _ => return Err("invalid sweep population source".to_owned()),
-        };
+        let initial = initial_tables.clone();
         let execution_seed = match options.noise_mode {
             manifest::NoiseMode::Crn => options.seed,
             manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
@@ -2389,14 +2391,22 @@ fn initialized_tables(
     model: &sembla_ir::ValidatedModel,
     population_spec: &str,
 ) -> Result<Vec<TableInit>, String> {
-    let initial = match population_spec.parse::<usize>() {
-        Ok(population) => initialize_population(model, population),
-        Err(_) => initializers_from_population(
+    if let Ok(population) = population_spec.parse::<usize>() {
+        return Ok(initialize_population(model, population));
+    }
+    match sniff_magic(population_spec).map_err(|error| error.to_string())? {
+        StateKind::SemblaPop => initializers_from_population(
             model,
             &SyntheticPopulation::read(population_spec).map_err(|error| error.to_string())?,
-        )?,
-    };
-    Ok(initial)
+        ),
+        StateKind::SemblaState => {
+            let artifact = read_state_artifact(population_spec).map_err(|error| error.to_string())?;
+            to_table_inits(&artifact, model).map_err(|error| error.to_string())
+        }
+        StateKind::Unknown => Err(format!(
+            "unrecognized population artifact magic in '{population_spec}'; supported formats: SEMBLA_POP, SEMBLA_STATE"
+        )),
+    }
 }
 
 fn params_from_manifest(
@@ -2488,12 +2498,12 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     let model_b = input_b.model;
     let params_a = resolve_params(&model_a, options.params_a.as_deref())?;
     let params_b = resolve_params(&model_b, options.params_b.as_deref())?;
-    let population =
-        SyntheticPopulation::read(&options.population).map_err(|error| error.to_string())?;
+    let initial_a = initialized_tables(&model_a, &options.population)?;
+    let initial_b = initialized_tables(&model_b, &options.population)?;
     let arm_a = compare_arm(
         &model_a,
         &params_a,
-        &population,
+        initial_a,
         options.seed,
         options.ticks,
         options.backend,
@@ -2501,7 +2511,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     let arm_b = compare_arm(
         &model_b,
         &params_b,
-        &population,
+        initial_b,
         options.seed,
         options.ticks,
         options.backend,
@@ -2587,12 +2597,11 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
 fn compare_arm(
     model: &sembla_ir::ValidatedModel,
     params: &ParamEnv,
-    population: &SyntheticPopulation,
+    initial: Vec<TableInit>,
     seed: u64,
     ticks: u32,
     backend: BackendSelection,
 ) -> Result<CompareArmOutcome, String> {
-    let initial = initializers_from_population(model, population)?;
     let execution = execute_backend_output(model, initial, params, seed, ticks, backend)?;
     let output = execution.output;
     let column = |name: &str| {
@@ -2787,14 +2796,7 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
         };
         let model = read_run_input(path, &run_options)?.model;
         let params = resolve_params(&model, options.params.as_deref())?;
-        let initial = match options.population.parse::<usize>() {
-            Ok(population) => initialize_population(&model, population),
-            Err(_) => initializers_from_population(
-                &model,
-                &SyntheticPopulation::read(&options.population)
-                    .map_err(|error| error.to_string())?,
-            )?,
-        };
+        let initial = initialized_tables(&model, &options.population)?;
         let cpu = execute_backend_output(
             &model,
             initial.clone(),

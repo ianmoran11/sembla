@@ -6,6 +6,7 @@ pub mod population;
 pub mod prior;
 pub mod rng;
 pub mod state;
+pub mod state_artifact;
 
 /// The version of the Sembla runtime crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
