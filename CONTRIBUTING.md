@@ -35,6 +35,7 @@ contract before submitting a repository-wide change:
 ./scripts/check-rust.sh       # formatting, Clippy, Rust tests, dependency policy
 ./scripts/check.sh            # documentation + strict Rust + Lean + parity
 python3 scripts/check-markdown-links.py
+python3 scripts/check-cargo-metadata.py
 ./scripts/check-determinism.sh
 bash frontend/scripts/check-parity.sh
 ```
@@ -60,6 +61,14 @@ Before handing off a change, run `git diff --check` and inspect the complete
 staged and unstaged diff. Additional workflow and manual GPU checks, including
 their environment requirements, are documented in the
 [check matrix](docs/ci.md#local-check-contract).
+
+## Package publishing
+
+Publishing is intentionally disabled for every workspace crate. Do not relax
+that manifest policy or add release automation as part of an unrelated change.
+A separate release PRD must cover package ownership, crate READMEs, API
+stability, versioning, and release provenance before any `cargo publish`
+attempt or registry upload is authorized.
 
 ## Frozen artifacts and regeneration
 

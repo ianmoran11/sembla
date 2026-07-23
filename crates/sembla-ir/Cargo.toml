@@ -1,8 +1,12 @@
 [package]
 name = "sembla-ir"
+description = "Validated intermediate representation and plan schema for Sembla simulations."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [lib]
 path = "src/lib.rs"

@@ -11,6 +11,9 @@ resolver = "2"
 version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/ianmoran11/sembla"
+rust-version = "1.79.0"
+publish = false
 
 # PRD 0013 exercises 100 million row-ticks in an integration test. Keep the
 # test oracle single-threaded, but compile it sufficiently to finish in CI.

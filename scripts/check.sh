@@ -19,6 +19,7 @@ require_tool lake "install elan so frontend/lean-toolchain provides Lake; for Ru
 
 python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 -B scripts/check-markdown-links.py
+python3 -B scripts/check-cargo-metadata.py
 ./scripts/check-rust.sh
 bash frontend/scripts/check-proofs.sh
 bash frontend/scripts/check-parity.sh

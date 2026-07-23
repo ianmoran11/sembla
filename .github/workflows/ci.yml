@@ -49,10 +49,11 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
       - name: Parse workflow YAML
         run: ruby scripts/check-workflow-yaml.rb
-      - name: Check local Markdown links
+      - name: Check package metadata and local Markdown links
         run: |
           python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
           python3 -B scripts/check-markdown-links.py
+          python3 -B scripts/check-cargo-metadata.py
       - name: Rust formatting, lint, tests, and dependency policy
         run: ./scripts/check-rust.sh
       - name: Lean proof hygiene
