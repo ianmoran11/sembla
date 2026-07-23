@@ -1104,3 +1104,167 @@ behavioral proof is completed.
    calls, and new frontend dependencies beyond the existing ProofWidgets stack
    are rejected. **Reason.** Widgets render structure only; integration adds no
    runtime semantics.
+
+## K. Demographic slot modeling (accepted 2026-07-23)
+
+### K1. Fixed-pool slot architecture
+
+**Decision.** Demographic turnover (births, deaths, and migration) is modeled
+inside a fixed table of reusable person slots. A row is vacant or present;
+entries activate vacant rows and exits vacate them. Person identity is
+`(slot ordinal, generation)`: the row ordinal is the permanent slot ID and
+Philox entity coordinate, never a person ID, and `generation` increments on
+each activation. Capacity exhaustion is an explicit observed failure reported
+through saturation diagnostics, never a silent condition.
+
+**Alternatives.** Dynamic row allocation is rejected. The roadmap's
+stream-compaction birth/death design is not selected and remains deferred under
+its original demand trigger.
+
+**Reason.** Reusing a bounded slot pool preserves stable Philox coordinates and
+makes turnover and exhaustion explicit without introducing dynamic-allocation
+or compaction semantics.
+
+### K2. Age representation
+
+**Decision.** Age is represented as `age_months : Int` and advanced by a
+deterministic monthly transition. Mutable age and an authoritative birth date
+are never stored together without a checked consistency contract.
+
+**Alternatives.** Derived age through `Expr::Tick` plus `birth_month_index` is
+deferred. PRD 0009's benchmark must first show that ageing-write cost is
+material before `Expr::Tick` is designed as a flagged semantic construct across
+validation, CPU, CUDA, and reproducibility.
+
+**Reason.** The mutable representation has defined semantics using existing
+constructs, while the cross-cutting cost and contract of a tick expression are
+not justified without measurement.
+
+### K3. State artifact format
+
+**Decision.** State artifacts use `sembla.state/v1`: the 12-byte ASCII
+`SEMBLA_STATE` magic, a canonical-JSON header, and raw little-endian column
+blobs matching runtime `ColumnData`. The hash domain is
+`sembla.state-artifact/v1` over exact file bytes. The artifact contains no
+execution metadata. For artifact-loaded runs, every declared `rows :=` count is
+enforced exactly rather than treated as a size hint.
+
+**Alternatives.** Self-describing execution metadata, non-canonical headers,
+converted column encodings, trailing data, and best-effort row-count repair are
+rejected.
+
+**Reason.** A byte-frozen state format can be validated and hashed
+unambiguously while manifests remain the sole owners of execution provenance.
+
+### K4. Chained annual runs, not checkpoints
+
+**Decision.** Standing-no #6 remains: there is no run-management or replay
+subsystem. Annual calibration windows are separate runs chained by hashed state
+artifacts and recorded with `initial_state` and `exported_state` manifest
+tuples. A chained 12+12 run pair is explicitly not bitwise-equal to a continuous
+24-tick run because tick coordinates restart; this distinction is documented
+and test-asserted.
+
+**Alternatives.** Checkpoint/restart semantics and claims that chained and
+continuous runs are interchangeable are rejected.
+
+**Reason.** Artifact chaining supplies the required annual boundary and
+provenance without adding hidden continuation state or contradicting the
+coordinate-based execution contract.
+
+### K5. Rate heterogeneity via loaded columns and per-run θ
+
+**Decision.** Per-slot age, sex, and area rate multipliers are `Real` attribute
+columns supplied in the initial state and referenced by hazards. Annual rate
+variation is represented by per-run θ across chained runs.
+
+**Alternatives.** A time-indexed rate-table construct is rejected for now; no
+customer under the selected monthly/annual design requires it.
+
+**Reason.** Loaded columns and existing parameters express the required
+heterogeneity and annual updates without adding a new time-indexed lookup
+semantics.
+
+### K6. `grouped-observations` is the first §5.5 feature flag
+
+**Decision.** `grouped-observations` is a runtime option threaded through
+validation and execution and recorded in sorted order in manifests. Models that
+use grouped views without the flag are rejected with a diagnostic naming it.
+The plan validator's known-feature set grows from empty to
+`{"grouped-observations"}`; this is the one sanctioned revision to §J's
+"exactly `[]`" rule, and unknown features still reject. Composition sources may
+not carry grouped views in this track. Grouped observation is a sink, extending
+the §4.6 invariant mechanically. V1 is CPU-only and rejects grouped views
+deterministically on CUDA.
+
+**Alternatives.** A Cargo feature, inert syntax, unrecorded enablement,
+composition-source support, and implicit CUDA fallback are rejected.
+
+**Reason.** The first provisional-meaning construct exercises §5.5's complete
+flag contract while preserving observation non-feedback and explicit backend
+limits.
+
+### K7. Contest surface syntax, `race_time` only
+
+**Decision.** `contest <ref-attr> by race_time` in a transition body lowers to
+the existing `ResourceClaim` and `ClaimOrdering::RaceTime` IR. This resolves
+DESIGN.md open question §10.1 for the race-time case.
+
+**Alternatives.** Keyed orderings and queue disciplines remain in v0.5 scope
+and are not exposed by this track.
+
+**Reason.** Race-time contests already have complete IR and runtime meaning, so
+the surface can expose them without prematurely choosing the keyed-ordering
+language.
+
+### K8. Surface gaps closed without flags
+
+**Decision.** Arithmetic `set` effects and `Int` parameter declarations expose
+IR/runtime capability present since v0.1: `Effect::SetAttr` accepts a full
+`Expr`, and `ParamType.int` exists. They require no feature flag.
+
+**Alternatives.** Treating these surface omissions as provisional semantics or
+placing them behind default-off flags is rejected.
+
+**Reason.** Under §5.5's rationale, flags govern constructs whose meaning is not
+yet settled, not syntax for semantics the system already defines.
+
+### K9. Deferred constructs and their triggers
+
+**Decision.** The folder's deferred list and triggers remain verbatim:
+
+> `Expr::Tick`/derived age (trigger: PRD 0009 measures ageing-write cost as
+> material); categorical draws, cross-row writes, mother-linked births,
+> vacant-slot claiming, non-exclusive `Ref` reassignment, household refs
+> (trigger: aggregate model shows identity linkage is scientifically required
+> → design-options note first); paired migration events/quotas (trigger:
+> reported balance residual unacceptable → Option D Phase 6); keyed contest
+> orderings (v0.5); event-stream sinks; sub-annual rate tables; CUDA support for
+> grouped observations (follow-up folder).
+
+The household-identity trigger produces a design-options note, not PRDs, as its
+first artifact. Option D Phase 6 is the synchronized-family path for paired
+migration.
+
+**Alternatives.** Half-building any deferred construct, admitting inert syntax,
+or advancing one without its named trigger is rejected.
+
+**Reason.** Named evidence and design triggers keep aggregate-model scope from
+silently acquiring individual-linkage, synchronization, event-stream,
+time-table, or backend semantics.
+
+### K10. Aggregate-model interpretation caveats
+
+**Decision.** The birth-activation hazard is a rate per eligible vacant slot,
+not a fertility hazard, and must not be interpreted as one without an explicit
+scaling derivation. The one-tick event-marker lockout—new entrants are
+ineligible for events while their marker persists—is a documented and measured
+model trade-off counted by PRD 0007, not a framework bug. National internal-
+migration balance holds only in expectation; the residual is always reported
+and never silently reconciled.
+
+**Alternatives.** Fertility interpretation without scaling, hiding the lockout,
+and silently forcing exact national migration balance are rejected.
+
+**Reason.** These caveats distinguish aggregate approximation choices from
+framework semantics and keep their measurable consequences visible.

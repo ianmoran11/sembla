@@ -194,6 +194,13 @@ investment; the NPE-era examples don't need it. Nesting follows demand.
 **Superseded 2026-07-22:** DECISIONS.md §J records the implemented Option D
 pipeline, including full nesting/exposure; only its integration work remains.
 
+**Amended 2026-07-23 — demographic slot demand:** Demand arrived through the
+demographic slot track, which selected the fixed-slot architecture in
+DECISIONS.md §K1 instead of triggering the flagged stream-compaction
+birth/death design. Stream compaction therefore remains deferred under its
+unchanged demand trigger. The flag-policy expectation is updated: the first
+§5.5 flag to land is `grouped-observations` (§K6), not birth/death.
+
 **Exit criteria.**
 1. No model name appears in `sembla-cli`. Every example reports through declared
    views/summaries, and a test asserts that adding, removing, or disabling an
@@ -372,6 +379,9 @@ cheapest-useful first:
 - **Cross-boundary tick-delay ergonomics** (DESIGN.md §10.7) — the uniform
   one-tick message delay is honest but must be *taught*; a docs/tooling
   responsibility that grows with v0.3's composition work.
+- **✓ Decision complete — conflict-scope declaration syntax, race-time case**
+  (2026-07-23; DESIGN.md §10.1) — DECISIONS.md §K7 resolves
+  `contest <ref-attr> by race_time`; keyed orderings remain owned by v0.5.
 - **Toolchain risk** (DESIGN.md §3) — Lean widget API churn and VS Code coupling
   are accepted risks; the frontend-agnostic IR is the standing hedge. Revisit if
   widget breakage starts costing milestones.
