@@ -1,11 +1,12 @@
 import ProofWidgets.Component.HtmlDisplay
 import Sembla.Widgets
+import Sembla.Composition.Widget
 
 /-! Thin ProofWidgets display/registration layer for the pure props in
 `Sembla.Widgets`.  No model execution or simulation is reachable here. -/
 namespace Sembla.WidgetDisplay
 
-open Lean Lean.Server ProofWidgets Sembla.Widgets
+open Lean Lean.Server ProofWidgets Sembla.Widgets Sembla.Composition.Widget
 
 /-- Visual presets for structure widgets. All presets still inherit the active VS Code theme. -/
 inductive WidgetTheme where
@@ -632,6 +633,173 @@ def stateDiagramHtmlWithTheme (theme : WidgetTheme) (props : StateDiagramProps) 
 def stateDiagramHtml (props : StateDiagramProps) : Html :=
   stateDiagramHtmlWithTheme .academic props
 
+private def compositionPortHtml (port : String × String) : Html :=
+  styledElementWithAttrs "div" [("data-sembla-port-direction", port.2)] [
+    ("display", "flex"),
+    ("alignItems", "center"),
+    ("justifyContent", "space-between"),
+    ("gap", "5px"),
+    ("padding", "2px 0"),
+    ("minWidth", "0")
+  ] #[
+    styledTextElement "span" port.1 [
+      ("minWidth", "0"),
+      ("fontFamily", "var(--sembla-code-font)"),
+      ("fontSize", "10px"),
+      ("overflowWrap", "anywhere")
+    ],
+    mutedPill port.2
+  ]
+
+private def compositionNodeHtml (node : CompositionNodeProps) : Html :=
+  let borderStyle := if node.kind == "composite" then "dashed" else "solid"
+  let ports := if node.ports.isEmpty then
+    #[styledTextElement "div" "No boundary ports" [
+      ("color", "var(--sembla-muted)"),
+      ("fontSize", "9px"),
+      ("fontStyle", "italic")]]
+  else node.ports.map compositionPortHtml
+  styledElementWithAttrs "article" [("data-sembla-node-kind", node.kind)] [
+    ("flex", "1 1 145px"),
+    ("minWidth", "130px"),
+    ("padding", "8px"),
+    ("borderWidth", "2px"),
+    ("borderColor", "var(--sembla-state-1)"),
+    ("borderStyle", borderStyle),
+    ("borderRadius", "var(--sembla-card-radius)"),
+    ("backgroundColor", "var(--sembla-surface)")
+  ] (#[] ++ #[
+    styledElement "div" [
+      ("display", "flex"),
+      ("alignItems", "flex-start"),
+      ("justifyContent", "space-between"),
+      ("gap", "6px"),
+      ("marginBottom", "6px")
+    ] #[
+      styledElement "div" [("minWidth", "0")] #[
+        styledTextElement "div" node.instanceName [
+          ("fontFamily", "var(--sembla-heading-font)"),
+          ("fontSize", "12px"),
+          ("fontWeight", "700"),
+          ("overflowWrap", "anywhere")
+        ],
+        styledTextElement "div" node.definitionName [
+          ("color", "var(--sembla-muted)"),
+          ("fontSize", "9px"),
+          ("overflowWrap", "anywhere")
+        ]
+      ],
+      mutedPill node.kind
+    ]
+  ] ++ ports)
+
+private def compositionWireHtml (wire : CompositionWireProps) : Html :=
+  styledElementWithAttrs "div" [("data-sembla-edge-kind", "wire")] [
+    ("display", "flex"),
+    ("alignItems", "center"),
+    ("justifyContent", "space-between"),
+    ("flexWrap", "wrap"),
+    ("gap", "5px 8px"),
+    ("padding", "6px 8px"),
+    ("borderLeft", "3px solid var(--sembla-state-1)"),
+    ("borderRadius", "var(--sembla-card-radius)"),
+    ("backgroundColor", "var(--sembla-code-bg)")
+  ] #[
+    styledTextElement "code" s!"{wire.source} → {wire.target}" [
+      ("minWidth", "0"),
+      ("fontFamily", "var(--sembla-code-font)"),
+      ("fontSize", "10px"),
+      ("overflowWrap", "anywhere")
+    ],
+    mutedPill s!"{wire.delayTicks}-tick delay"
+  ]
+
+private def compositionExposureHtml (exposure : CompositionExposureProps) : Html :=
+  styledElementWithAttrs "div" [("data-sembla-edge-kind", "exposure")] [
+    ("display", "flex"),
+    ("alignItems", "center"),
+    ("justifyContent", "space-between"),
+    ("flexWrap", "wrap"),
+    ("gap", "5px 8px"),
+    ("padding", "6px 8px"),
+    ("borderLeft", "3px dashed var(--sembla-state-3)"),
+    ("borderRadius", "var(--sembla-card-radius)"),
+    ("backgroundColor", "var(--sembla-surface)")
+  ] #[
+    styledTextElement "code" s!"{exposure.inner} ⇢ {exposure.outer}" [
+      ("minWidth", "0"),
+      ("fontFamily", "var(--sembla-code-font)"),
+      ("fontSize", "10px"),
+      ("overflowWrap", "anywhere")
+    ],
+    mutedPill "zero-delay alias"
+  ]
+
+private def compositionHiddenHtml (hidden : String) : Html :=
+  styledElementWithAttrs "div" [("data-sembla-port-visibility", "hidden")] [
+    ("padding", "5px 8px"),
+    ("border", "1px dashed var(--sembla-border)"),
+    ("borderRadius", "var(--sembla-card-radius)"),
+    ("color", "var(--sembla-muted)"),
+    ("fontFamily", "var(--sembla-code-font)"),
+    ("fontSize", "10px"),
+    ("textDecoration", "line-through"),
+    ("overflowWrap", "anywhere")
+  ] #[.text hidden]
+
+/-- Render a one-level composition structure diagram with an explicit visual preset. -/
+def compositionDiagramHtmlWithTheme
+    (theme : WidgetTheme) (props : CompositionDiagramProps) : Html :=
+  let nodes := if props.nodes.isEmpty then #[
+    styledTextElement "div" "No component instances" [
+      ("padding", "8px"),
+      ("border", "1px dashed var(--sembla-border)"),
+      ("borderRadius", "var(--sembla-card-radius)"),
+      ("color", "var(--sembla-muted)"),
+      ("fontSize", "10px"),
+      ("fontStyle", "italic"),
+      ("textAlign", "center")]]
+    else props.nodes.map compositionNodeHtml
+  let wires := props.wires.map compositionWireHtml
+  let exposures := props.exposures.map compositionExposureHtml
+  let hidden := props.hidden.map compositionHiddenHtml
+  let connectionCount := props.wires.size + props.exposures.size
+  widgetShell theme (#[] ++ #[
+    widgetHeader "Composition" props.title
+      s!"{countLabel props.nodes.size "node" "nodes"} · {countLabel connectionCount "connection" "connections"}",
+    styledElement "div" [
+      ("display", "flex"),
+      ("flexWrap", "wrap"),
+      ("alignItems", "stretch"),
+      ("gap", "8px")
+    ] nodes
+  ] ++ (if wires.isEmpty then #[] else #[] ++ #[
+    sectionHeading "Wires" (countLabel props.wires.size "delayed edge" "delayed edges"),
+    styledElement "div" [
+      ("display", "grid"),
+      ("gridTemplateColumns", "minmax(0, 1fr)"),
+      ("gap", "5px")
+    ] wires
+  ]) ++ (if exposures.isEmpty then #[] else #[] ++ #[
+    sectionHeading "Exposures" (countLabel props.exposures.size "alias" "aliases"),
+    styledElement "div" [
+      ("display", "grid"),
+      ("gridTemplateColumns", "minmax(0, 1fr)"),
+      ("gap", "5px")
+    ] exposures
+  ]) ++ (if hidden.isEmpty then #[] else #[] ++ #[
+    sectionHeading "Hidden" (countLabel props.hidden.size "port" "ports"),
+    styledElement "div" [
+      ("display", "grid"),
+      ("gridTemplateColumns", "minmax(0, 1fr)"),
+      ("gap", "5px")
+    ] hidden
+  ]))
+
+/-- Render using the default academic/professional preset. -/
+def compositionDiagramHtml (props : CompositionDiagramProps) : Html :=
+  compositionDiagramHtmlWithTheme .academic props
+
 private def paramHtml (param : ParamSummary) : Html :=
   let density := match param.density with
     | none => #[
@@ -787,5 +955,10 @@ def saveStateDiagram (props : StateDiagramProps) (stx : Syntax) : CoreM Unit := 
 /-- Attach the hazard panel to the source range of a transition. -/
 def saveHazardPanel (props : HazardPanelProps) (stx : Syntax) : CoreM Unit := do
   saveHtmlPanel (hazardPanelHtmlWithTheme (← selectedTheme) props) stx
+
+/-- Attach the composition structure panel to a component or composition declaration. -/
+def saveCompositionDiagram
+    (props : CompositionDiagramProps) (stx : Syntax) : CoreM Unit := do
+  saveHtmlPanel (compositionDiagramHtmlWithTheme (← selectedTheme) props) stx
 
 end Sembla.WidgetDisplay

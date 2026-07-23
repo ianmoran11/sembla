@@ -54,6 +54,23 @@ See
 [`frontend/Sembla/Composition/SurfaceModels.lean`](../frontend/Sembla/Composition/SurfaceModels.lean)
 for complete primitive, composite, nested, and root examples.
 
+## Inspecting compositions
+
+Place the cursor on a `sembla_component` or `sembla_composition` declaration
+name to open its composition structure panel in the Lean infoview. The panel
+shows the authored level only: instance boxes identify primitive versus
+composite definitions and list their boundary input/output ports. Nested
+children remain collapsed; move to the child component declaration to inspect
+that level. Primitive components show their interface summary without running
+a simulation.
+
+Connections deliberately teach the delay discipline. A solid wire row is a
+mailbox connection and carries an explicit `1-tick delay` marker. A dashed
+exposure row is a `zero-delay alias`: it renames a child boundary at the parent
+boundary without adding a mailbox tick. Hidden child ports appear struck
+through in a separate row. The panel is built only from already-elaborated
+composition values, so inspection adds no runtime behavior or execution cost.
+
 ## Export the canonical source
 
 Build the authored module, then export its registered source constant:

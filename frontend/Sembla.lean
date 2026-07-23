@@ -17,6 +17,7 @@ import Sembla.Composition.SpecObservation
 import Sembla.Composition.SpecStatic
 import Sembla.Composition.SpecStatements
 import Sembla.Composition.SpecTests
+import Sembla.Composition.Widget
 import Sembla.Composition.Surface
 import Sembla.Composition.SurfaceModels
 import Sembla.Composition.SurfaceTests
@@ -27,6 +28,7 @@ import Sembla.CanonicalModelsTests
 import Sembla.Widgets
 import Sembla.WidgetDisplay
 import Sembla.WidgetTests
+import Sembla.Composition.WidgetTests
 import Sembla.ScientificTests
 import Sembla.SurfaceKernelTests
 import Sembla.ReactionArrowTests

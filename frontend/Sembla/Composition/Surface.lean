@@ -1,6 +1,8 @@
 import Lean.Elab.Command
 import Sembla.DSL
 import Sembla.Composition.Source
+import Sembla.Composition.Widget
+import Sembla.WidgetDisplay
 
 namespace Sembla.Composition.Surface
 
@@ -11,7 +13,7 @@ open Sembla Sembla.IR Sembla.DSL
 # Composition command surface
 
 Primitive component bodies are collected with
-`Sembla.DSL.parseCommandBoxWithPorts` and elaborated only by
+`Sembla.DSL.parseCommandBoxWithPorts` and elaborated by
 `Sembla.DSL.elaborateSurfaceModelNoWidgets`. This module adds
 composition structure around that shared kernel; it intentionally contains no
 second expression checker or primitive IR builder. Each authored component also
@@ -248,6 +250,13 @@ private unsafe def evalComponentUnsafe (expr : Lean.Expr) : TermElabM ComponentD
 @[implemented_by evalComponentUnsafe]
 private opaque evalComponent (expr : Lean.Expr) : TermElabM ComponentDefinitionV1
 
+private unsafe def evalCompositionSourceUnsafe
+    (expr : Lean.Expr) : TermElabM CompositionSourceV1 :=
+  Meta.evalExpr CompositionSourceV1 (mkConst ``CompositionSourceV1) expr
+
+@[implemented_by evalCompositionSourceUnsafe]
+private opaque evalCompositionSource (expr : Lean.Expr) : TermElabM CompositionSourceV1
+
 private structure ComponentReference where
   token : TSyntax `ident
   expr : Lean.Expr
@@ -448,7 +457,7 @@ private def defineComponent (declaration : TSyntax `ident)
     if !hasPrimitive && !hasComposite then
       throwErrorAt declaration "sembla_component requires a primitive body or an instance"
 
-    let (value, dependencyTerms) ← if hasPrimitive then do
+    let (value, dependencyTerms, widgetDefinitions) ← if hasPrimitive then do
       let mut requirements : List (String × String × Syntax) := []
       let mut boxItems : Array (TSyntax `semblaCommandBoxItem) := #[]
       for item in items do
@@ -499,6 +508,8 @@ private def defineComponent (declaration : TSyntax `ident)
         «boxes» := [parsedBox]
         «wires» := []
         «summaries» := [] }
+      -- The synthetic model carries dummy dt/defaults, so behavior panels would
+      -- be misleading; the declaration-level interface panel is attached below.
       let modelExpression ← elaborateSurfaceModelNoWidgets surface fun result =>
         elabTerm result (some (mkConst ``Model))
       let requirementsExpression := Lean.toExpr (requirements.map (·.2.1))
@@ -508,7 +519,7 @@ private def defineComponent (declaration : TSyntax `ident)
       let application ← Meta.mkAppM ``primitiveComponentFromModel #[
         Lean.toExpr runtimeName, Lean.toExpr displayName, requirementsExpression,
         inputsExpression, outputsExpression, portOrderExpression, modelExpression]
-      pure (application, #[])
+      pure (application, #[], [])
     else do
       let mut dependencyTerms : Array (TSyntax `term) := #[]
       for item in items do
@@ -640,9 +651,11 @@ private def defineComponent (declaration : TSyntax `ident)
       let compositeValue ← Meta.mkAppM ``compositeComponent #[
         Lean.toExpr runtimeName, Lean.toExpr displayName, instanceList, wireList,
         exposureList, hiddenList]
-      pure (compositeValue, dependencyTerms)
+      pure (compositeValue, dependencyTerms,
+        resolvedInstances.map (·.reference.value))
 
     let value ← instantiateMVars value
+    let componentValue ← evalComponent value
     let componentDeclaration : Declaration := .defnDecl {
       name := declarationName
       levelParams := []
@@ -653,6 +666,10 @@ private def defineComponent (declaration : TSyntax `ident)
     Term.ensureNoUnassignedMVars componentDeclaration
     addAndCompile componentDeclaration
     Term.addTermInfo' declaration (mkConst declarationName) (isBinder := true)
+    Sembla.WidgetDisplay.saveCompositionDiagram
+      (Sembla.Composition.Widget.diagramPropsOfDefinitionWithDefinitions
+        (componentValue :: widgetDefinitions) componentValue)
+      declaration.raw
 
     let dependencyGroups ← `(term| [$dependencyTerms,*])
     let componentIdentifier : TSyntax `term := ⟨mkIdent declarationName⟩
@@ -775,6 +792,7 @@ private def defineComposition (declaration : TSyntax `ident) (modelName : TSynta
       Lean.toExpr modelName.getString, Lean.toExpr declarationRuntimeName,
       modelExpression, definitionsExpression, rootRef.expr, summariesExpression]
     let value ← instantiateMVars value
+    let sourceValue ← evalCompositionSource value
     let sourceDeclaration : Declaration := .defnDecl {
       name := declarationName
       levelParams := []
@@ -785,6 +803,8 @@ private def defineComposition (declaration : TSyntax `ident) (modelName : TSynta
     Term.ensureNoUnassignedMVars sourceDeclaration
     addAndCompile sourceDeclaration
     Term.addTermInfo' declaration (mkConst declarationName) (isBinder := true)
+    Sembla.WidgetDisplay.saveCompositionDiagram
+      (Sembla.Composition.Widget.diagramPropsOfSource sourceValue) declaration.raw
 
 @[command_elab semblaCompositionCommand] private def elabSemblaComposition : CommandElab := fun stx => do
   match stx with
