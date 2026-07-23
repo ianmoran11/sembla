@@ -40,11 +40,15 @@ structure SurfaceSystem where
   size : TSyntax `term
   attrs : List SurfaceAttr
 
+structure SurfaceContest where
+  resource : TSyntax `ident
+
 inductive SurfaceTransitionBody where
   | general
       (system : TSyntax `ident)
       (guard : TSyntax `semblaExpr)
       (hazard : TSyntax `semblaExpr)
+      (contests : List SurfaceContest)
       (sets : List (TSyntax `semblaSet))
   | reaction
       (system : Option (TSyntax `ident))
@@ -193,13 +197,20 @@ syntax "system" ident "as" str "rows" "(" term ")" "where" "[" semblaAttr,* "]" 
 declare_syntax_cat semblaInput
 syntax "input" ident "{" semblaAttr,* "}" : semblaInput
 
+declare_syntax_cat semblaContest
+syntax "contest" ident "by" ident : semblaContest
+-- Recovery-only form for the mandatory-ordering teaching diagnostic.
+syntax "contest" ident : semblaContest
+
 declare_syntax_cat semblaArrowTail
 syntax "guard" semblaExpr : semblaArrowTail
 syntax "set" "[" semblaSet,* "]" : semblaArrowTail
+syntax "contest" ident "by" ident : semblaArrowTail
+syntax "contest" ident : semblaArrowTail
 
 declare_syntax_cat semblaTransition
 syntax "transition" ident "on" ident "where" "guard" semblaExpr "hazard" semblaExpr
-  "set" "[" semblaSet,* "]" : semblaTransition
+  semblaContest* "set" "[" semblaSet,* "]" : semblaTransition
 syntax ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
 syntax ident "on" ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
 syntax ident ":" ident ":" ident "→" "[" semblaExpr "]" ident : semblaTransition
@@ -288,6 +299,8 @@ declare_syntax_cat semblaCommandTransitionItem
 syntax "guard" semblaExpr : semblaCommandTransitionItem
 syntax "hazard" semblaExpr : semblaCommandTransitionItem
 syntax "set" semblaSet : semblaCommandTransitionItem
+syntax "contest" ident "by" ident : semblaCommandTransitionItem
+syntax "contest" ident : semblaCommandTransitionItem
 
 declare_syntax_cat semblaCommandGeneralTransition
 syntax "transition" ident "on" ident "where"
@@ -573,12 +586,39 @@ private def parseInput (stx : TSyntax `semblaInput) : TermElabM SurfaceInput := 
       pure ⟨identText name, name.raw, ← attrs.getElems.toList.mapM parseAttr⟩
   | _ => throwUnsupportedSyntax
 
+private def finishContest (resourceName : TSyntax `ident)
+    (ordering : Option (TSyntax `ident)) : TermElabM SurfaceContest := do
+  let some ordering := ordering
+    | throwErrorAt resourceName "contest declaration requires 'by race_time'"
+  unless identText ordering == "race_time" do
+    throwErrorAt ordering
+      "keyed contest orderings are not yet supported (DECISIONS §K7); expected 'race_time'"
+  pure ⟨resourceName⟩
+
+private def parseContest (stx : TSyntax `semblaContest) : TermElabM SurfaceContest := do
+  match stx with
+  | `(semblaContest| contest $resourceName:ident by $ordering:ident) =>
+      finishContest resourceName (some ordering)
+  | `(semblaContest| contest $resourceName:ident) => finishContest resourceName none
+  | _ => throwUnsupportedSyntax
+
+private def rejectReactionContest (tail : TSyntax `semblaArrowTail) :
+    TermElabM SurfaceTransition := do
+  match tail with
+  | `(semblaArrowTail| contest $_resourceName:ident by $_ordering:ident)
+  | `(semblaArrowTail| contest $_resourceName:ident) =>
+      throwErrorAt tail "reaction arrows cannot declare contests; use the general transition form"
+  | _ => throwErrorAt tail
+      "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+
 private def parseTransition (stx : TSyntax `semblaTransition) : TermElabM SurfaceTransition := do
   match stx with
   | `(semblaTransition| transition $name:ident on $onSystem:ident where
-        guard $guardExpr:semblaExpr hazard $hazardExpr:semblaExpr set [$assignments:semblaSet,*]) =>
+        guard $guardExpr:semblaExpr hazard $hazardExpr:semblaExpr
+        $contests:semblaContest* set [$assignments:semblaSet,*]) =>
       pure ⟨identText name, name.raw,
-        .general onSystem guardExpr hazardExpr assignments.getElems.toList⟩
+        .general onSystem guardExpr hazardExpr
+          (← contests.toList.mapM parseContest) assignments.getElems.toList⟩
   | `(semblaTransition| $name:ident : $source:ident → [$hazardExpr:semblaExpr]
         $destination:ident) =>
       pure ⟨identText name, name.raw,
@@ -597,21 +637,17 @@ private def parseTransition (stx : TSyntax `semblaTransition) : TermElabM Surfac
         .reaction (some onSystem) (some stateAttr) source hazardExpr destination⟩
   | `(semblaTransition| $_name:ident : $_source:ident → [$_hazardExpr:semblaExpr]
         $_destination:ident $tail:semblaArrowTail) =>
-      throwErrorAt tail
-        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+      rejectReactionContest tail
   | `(semblaTransition| $_name:ident on $_onSystem:ident : $_source:ident →
         [$_hazardExpr:semblaExpr] $_destination:ident $tail:semblaArrowTail) =>
-      throwErrorAt tail
-        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+      rejectReactionContest tail
   | `(semblaTransition| $_name:ident : $_stateAttr:ident : $_source:ident →
         [$_hazardExpr:semblaExpr] $_destination:ident $tail:semblaArrowTail) =>
-      throwErrorAt tail
-        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+      rejectReactionContest tail
   | `(semblaTransition| $_name:ident on $_onSystem:ident : $_stateAttr:ident :
         $_source:ident → [$_hazardExpr:semblaExpr] $_destination:ident
         $tail:semblaArrowTail) =>
-      throwErrorAt tail
-        "reaction arrows cannot declare additional guards or effects; use 'transition ... where'"
+      rejectReactionContest tail
   | _ => throwUnsupportedSyntax
 
 private def parseOutputField (stx : TSyntax `semblaOutputField) : TermElabM SurfaceOutputField := do
@@ -782,6 +818,7 @@ private def parseCommandGeneralTransition
         $items:semblaCommandTransitionItem*) =>
       let mut guardExpr : Option (TSyntax `semblaExpr) := none
       let mut hazardExpr : Option (TSyntax `semblaExpr) := none
+      let mut contests : List SurfaceContest := []
       let mut assignments : List (TSyntax `semblaSet) := []
       for item in items do
         match item with
@@ -795,6 +832,10 @@ private def parseCommandGeneralTransition
             hazardExpr := some expression
         | `(semblaCommandTransitionItem| set $assignment:semblaSet) =>
             assignments := assignments ++ [assignment]
+        | `(semblaCommandTransitionItem| contest $resourceName:ident by $ordering:ident) =>
+            contests := contests ++ [← finishContest resourceName (some ordering)]
+        | `(semblaCommandTransitionItem| contest $resourceName:ident) =>
+            contests := contests ++ [← finishContest resourceName none]
         | _ => throwUnsupportedSyntax
       let resolvedGuard ← guardExpr.getDM
         (throwErrorAt name "general transition '{identText name}' requires exactly one guard")
@@ -803,7 +844,7 @@ private def parseCommandGeneralTransition
       if assignments.isEmpty then
         throwErrorAt name "general transition '{identText name}' requires at least one set effect"
       pure ⟨identText name, name.raw,
-        .general selectedToken resolvedGuard resolvedHazard assignments⟩
+        .general selectedToken resolvedGuard resolvedHazard contests assignments⟩
   | _ => throwUnsupportedSyntax
 
 private def parseCommandOutputField (stx : TSyntax `semblaCommandOutputField) :
@@ -959,7 +1000,7 @@ def parseCommandBoxWithPorts
         | `(semblaCommandBoxItem| $decl:semblaCommandView) =>
             viewDecls := viewDecls ++ [← parseCommandView decl]
         | `(semblaCommandBoxItem| contest $unsupported:ident) =>
-            throwErrorAt unsupported "unsupported Sembla box declaration '{identText unsupported}'"
+            throwErrorAt unsupported "contest is declared inside a transition body"
         | _ => throwUnsupportedSyntax
       let surfaceBox : SurfaceBox :=
         ⟨identText name, name.raw, systemDecls, inputDecls, transitionDecls,
@@ -990,7 +1031,7 @@ private def collectCommandSurfaceModel (declaration : TSyntax `ident)
     | `(semblaCommandModelItem| $decl:semblaCommandSummary) =>
         summaryDecls := summaryDecls ++ [← parseCommandSummary decl]
     | `(semblaCommandModelItem| contest $unsupported:ident) =>
-        throwErrorAt unsupported "unsupported Sembla model declaration '{identText unsupported}'"
+        throwErrorAt unsupported "contest is declared inside a transition body"
     | _ => throwUnsupportedSyntax
   let runtimeName ← match runtimeOverride with
     | some value => pure (value.getString, value.raw)
@@ -1390,7 +1431,7 @@ private def resolveReaction (boxCtx : SurfaceBox) (transitionName : String)
 private def selectedSystemForTransition (boxCtx : SurfaceBox)
     (transitionDecl : SurfaceTransition) : TermElabM SurfaceSystem := do
   match transitionDecl.body with
-  | .general onSystem _ _ _ => lookupSystem boxCtx onSystem
+  | .general onSystem _ _ _ _ => lookupSystem boxCtx onSystem
   | .reaction onSystem stateAttr source _ destination =>
       return (← resolveReaction boxCtx transitionDecl.name transitionDecl.token
         onSystem stateAttr source destination).selected
@@ -1400,6 +1441,7 @@ structure ResolvedTransitionBody where
   guardTerm : TSyntax `term
   hazardSyntax : TSyntax `semblaExpr
   effectTerms : Array (TSyntax `term)
+  contestTerms : Array (TSyntax `term)
 
 /-- Shared identifier-assignment validation for expanded transitions and
     reaction arrows.  Reactions retain their original destination token while
@@ -1475,20 +1517,33 @@ private def resolveTransitionBody (paramCtx : List SurfaceParam) (boxCtx : Surfa
         $(Lean.quote resolved.source))
       let attrName := stateAttr.getD ⟨resolved.stateAttr.nameToken⟩
       let effectTerm ← identifierEffectTerm paramCtx boxCtx resolved.selected attrName destination
-      pure ⟨resolved.selected, guardTerm, hazardExpr, #[effectTerm]⟩
-  | .general onSystem guardExpr hazardExpr assignments =>
+      pure ⟨resolved.selected, guardTerm, hazardExpr, #[effectTerm], #[]⟩
+  | .general onSystem guardExpr hazardExpr contests assignments =>
       let selected ← lookupSystem boxCtx onSystem
       let (guardTerm, guardTy) ←
         elaborateExpr selected selected.attrs paramCtx boxCtx.inputs guardExpr
       if guardTy != .bool then
         throwErrorAt guardExpr "guard has type {typeName guardTy}; expected Bool"
+      let mut contestTerms : Array (TSyntax `term) := #[]
+      let mut contestedAttrs : List String := []
+      for claimDecl in contests do
+        let resource ← lookupAttr selected.attrs claimDecl.resource
+        match resource.ty with
+        | .ref _ => pure ()
+        | _ => throwErrorAt claimDecl.resource
+            "contest attribute '{resource.name}' must have type Ref"
+        if contestedAttrs.contains resource.name then
+          throwErrorAt claimDecl.resource "duplicate contest for attribute '{resource.name}'"
+        contestedAttrs := contestedAttrs ++ [resource.name]
+        contestTerms := contestTerms.push
+          (← `(ResourceClaim.mk (Expr.selfAttr $(Lean.quote resource.name)) ClaimOrdering.raceTime))
       let mut effects : Array (TSyntax `term) := #[]
       for assignment in assignments do
         match assignment with
         | `(semblaSet| $attrName:ident := $value:semblaExpr) =>
             effects := effects.push (← effectTerm paramCtx boxCtx selected attrName value)
         | _ => throwUnsupportedSyntax
-      pure ⟨selected, guardTerm, hazardExpr, effects⟩
+      pure ⟨selected, guardTerm, hazardExpr, effects, contestTerms⟩
 
 private def transitionTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
     (transitionDecl : SurfaceTransition) : TermElabM (TSyntax `term) := do
@@ -1499,8 +1554,9 @@ private def transitionTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
     throwErrorAt resolved.hazardSyntax "hazard has type {typeName hazardTy}; expected Real"
   let guardTerm := resolved.guardTerm
   let effects := resolved.effectTerms
+  let contests := resolved.contestTerms
   `(Transition.mk $(Lean.quote transitionDecl.name) $(Lean.quote resolved.selected.irName)
-      $guardTerm $hazardTerm [$effects,*] [])
+      $guardTerm $hazardTerm [$effects,*] [$contests,*])
 
 private def outputTerm (paramCtx : List SurfaceParam) (boxCtx : SurfaceBox)
     (outputDecl : SurfaceOutput) : TermElabM (TSyntax `term) := do

@@ -282,7 +282,7 @@ check_failure_exact Negative/CommandUnknownWireEndpoint.lean \
   "Negative/CommandUnknownWireEndpoint.lean:10:9: error: unknown output port 'a.missing'"
 
 check_failure_exact Negative/CommandUnsupportedDeclaration.lean \
-  "Negative/CommandUnsupportedDeclaration.lean:5:12: error: unsupported Sembla box declaration 'race'"
+  "Negative/CommandUnsupportedDeclaration.lean:5:12: error: contest is declared inside a transition body"
 
 check_failure_exact Negative/CommandWireSchemaMismatch.lean \
   "Negative/CommandWireSchemaMismatch.lean:13:16: error: wire schema mismatch for 'a.p' -> 'b.p'"
@@ -339,7 +339,7 @@ check_failure_exact Negative/CommandUnknownWireBox.lean \
   "Negative/CommandUnknownWireBox.lean:8:7: error: unknown wire source box 'missing'"
 
 check_failure_exact Negative/CommandUnsupportedModelDeclaration.lean \
-  "Negative/CommandUnsupportedModelDeclaration.lean:4:10: error: unsupported Sembla model declaration 'race'"
+  "Negative/CommandUnsupportedModelDeclaration.lean:4:10: error: contest is declared inside a transition body"
 
 check_failure_exact Negative/ComponentDuplicateInstance.lean \
   "Negative/ComponentDuplicateInstance.lean:6:11: error: duplicate instance 'population'"
@@ -399,6 +399,19 @@ check_failure_exact Negative/CommandIntParamRealLiteral.lean \
   "Negative/CommandIntParamRealLiteral.lean:6:19: error: Int parameter defaults require an integer literal"
 check_failure_exact Negative/CommandIntParamCollision.lean \
   "Negative/CommandIntParamCollision.lean:7:8: error: duplicate parameter 'n'"
+
+check_failure_exact Negative/CommandUnknownContestAttribute.lean \
+  "Negative/CommandUnknownContestAttribute.lean:12:14: error: unknown state or attribute 'missing'"
+check_failure_exact Negative/CommandNonRefContestAttribute.lean \
+  "Negative/CommandNonRefContestAttribute.lean:11:14: error: contest attribute 'age_months' must have type Ref"
+check_failure_exact Negative/CommandMissingContestOrdering.lean \
+  "Negative/CommandMissingContestOrdering.lean:12:14: error: contest declaration requires 'by race_time'"
+check_failure_exact Negative/CommandUnknownContestOrdering.lean \
+  "Negative/CommandUnknownContestOrdering.lean:12:31: error: keyed contest orderings are not yet supported (DECISIONS §K7); expected 'race_time'"
+check_failure_exact Negative/CommandDuplicateContest.lean \
+  "Negative/CommandDuplicateContest.lean:13:14: error: duplicate contest for attribute 'slot_resource'"
+check_failure_exact Negative/CommandReactionContest.lean \
+  "Negative/CommandReactionContest.lean:9:54: error: reaction arrows cannot declare contests; use the general transition form"
 
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean

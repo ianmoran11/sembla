@@ -193,9 +193,33 @@ least one ordered `set`. As a demographic-slot surface addition, numeric effects
 accept the existing row-local scalar expression fragment, so old-snapshot
 updates such as `set age_months := age_months + 1` are valid. The expression
 must have exactly the destination attribute's type; there is no additional
-coercion. Enum effects remain variant literals, Ref writes still require
-unsupported resource claims, and aggregate forms such as `countBy`, `freq`, and
-`inputSum` are rejected in effect expressions.
+coercion. Enum effects remain variant literals, Ref writes remain rejected, and
+aggregate forms such as `countBy`, `freq`, and `inputSum` are rejected in effect
+expressions.
+
+### Race-time contests
+
+A general transition may claim one or more Ref-valued row resources in declaration
+order:
+
+```lean
+transition depart on Slot where
+  guard occupancy = present
+  hazard departure_hazard
+  contest slot_resource by race_time
+  set occupancy := vacant
+  set cause := departure
+```
+
+`race_time` is the only exposed ordering. Keyed orderings and queue disciplines
+remain deferred to v0.5 by `DECISIONS.md` §K7. Duplicate claims are rejected, and
+reaction-arrow sugar cannot carry contests; use the general transition form.
+This addition does not permit Ref writes.
+
+The surface validates resource names, Ref types, and duplicates. The Rust
+validator retains the deeper claim/write coverage checks, while the runtime owns
+argmin conflict resolution, deferred-loser reporting, and the double-write
+defense.
 
 ### Keyed frequency
 
