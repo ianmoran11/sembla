@@ -1,7 +1,12 @@
 name,value
-final_population,4105
+final_population,3751
 maximum_invalid_age_count,0
-births_total,548
-deaths_total,443
-final_max_generation,2
-locked_out_total,548
+births_total,448
+deaths_total,435
+overseas_arrivals_total,90
+overseas_departures_total,191
+internal_arrivals_total,57
+internal_departures_total,218
+minimum_vacant_birth_slots,583
+final_max_generation,3
+locked_out_total,595

@@ -1,0 +1,7 @@
+k,birth_rate,emigration_rate,internal_arrival_rate,internal_departure_rate,mortality_adult,mortality_old,mortality_young,overseas_arrival_rate,births_total,deaths_total,final_max_generation,final_population,internal_arrivals_total,internal_departures_total,locked_out_total,maximum_invalid_age_count,minimum_vacant_birth_slots,overseas_arrivals_total,overseas_departures_total
+0,0.02,0.0015,0.018,0.0025,0.0025,0.012,0.001,0.02,199,229,2,3869,35,110,277,0,587,43,69
+1,0.025,0.002,0.018,0.0025,0.0025,0.012,0.001,0.02,185,229,2,3855,25,104,267,0,581,57,79
+2,0.03,0.0025,0.018,0.0025,0.003,0.012,0.001,0.02,239,260,2,3856,30,103,342,0,578,73,123
+3,0.02,0.002,0.018,0.0025,0.003,0.012,0.001,0.02,162,228,2,3829,31,106,248,0,590,55,85
+4,0.025,0.0025,0.018,0.0025,0.0035,0.012,0.001,0.02,203,225,2,3821,25,121,290,0,580,62,123
+5,0.03,0.0015,0.018,0.0025,0.0035,0.012,0.001,0.02,229,240,2,3862,26,119,295,0,583,40,74

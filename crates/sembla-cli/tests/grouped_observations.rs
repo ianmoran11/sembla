@@ -376,44 +376,93 @@ fn flags_plan_artifacts_cuda_and_sweep_are_gated() {
         .join("draw_0.grouped.population_cells.csv")
         .is_file());
 
-    for (command, args) in [
-        (
-            "compare",
-            vec![
-                fixture_model_path().to_string_lossy().into_owned(),
-                fixture_model_path().to_string_lossy().into_owned(),
-                "--population".to_owned(),
-                state.to_string_lossy().into_owned(),
-                "--seed".to_owned(),
-                "1".to_owned(),
-                "--ticks".to_owned(),
-                "1".to_owned(),
-                "--out".to_owned(),
-                temp.join("compare.csv").to_string_lossy().into_owned(),
-                "--enable".to_owned(),
-                GROUPED_OBSERVATIONS_FEATURE.to_owned(),
-            ],
-        ),
-        (
-            "diff-backends",
-            vec![
-                fixture_model_path().to_string_lossy().into_owned(),
-                "--population".to_owned(),
-                state.to_string_lossy().into_owned(),
-                "--enable".to_owned(),
-                GROUPED_OBSERVATIONS_FEATURE.to_owned(),
-            ],
-        ),
-    ] {
-        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
-            .arg(command)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr)
-            .contains("grouped-observations backend follow-up PRD"));
-    }
+    let params_a = temp.join("params-a.json");
+    let params_b = temp.join("params-b.json");
+    std::fs::write(&params_a, "{}\n").unwrap();
+    std::fs::write(&params_b, "{}\n").unwrap();
+    let compare = |out: &Path, enabled: bool, backend: Option<&str>| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+        command
+            .arg("compare")
+            .arg(fixture_model_path())
+            .arg("--population")
+            .arg(&state)
+            .args(["--seed", "1", "--ticks", "1", "--params-a"])
+            .arg(&params_a)
+            .arg("--params-b")
+            .arg(&params_b)
+            .arg("--out")
+            .arg(out);
+        if let Some(backend) = backend {
+            command.arg("--backend").arg(backend);
+        }
+        if enabled {
+            command.arg("--enable").arg(GROUPED_OBSERVATIONS_FEATURE);
+        }
+        command.output().unwrap()
+    };
+    let compare_off = compare(&temp.join("compare-off.csv"), false, None);
+    assert!(!compare_off.status.success());
+    assert!(String::from_utf8_lossy(&compare_off.stderr)
+        .contains("requires --enable grouped-observations"));
+    let compare_unknown = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("compare")
+        .arg(fixture_model_path())
+        .arg("--population")
+        .arg(&state)
+        .args(["--seed", "1", "--ticks", "1", "--params-a"])
+        .arg(&params_a)
+        .arg("--params-b")
+        .arg(&params_b)
+        .arg("--out")
+        .arg(temp.join("compare-unknown.csv"))
+        .args(["--enable", "future-feature"])
+        .output()
+        .unwrap();
+    assert!(!compare_unknown.status.success());
+    assert!(String::from_utf8_lossy(&compare_unknown.stderr)
+        .contains("unknown feature 'future-feature'"));
+    let compare_out = temp.join("compare.csv");
+    let compare_on = compare(&compare_out, true, None);
+    assert_success(&compare_on);
+    let compare_manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(format!("{}.manifest.json", compare_out.display())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        compare_manifest["enabled_features"],
+        serde_json::json!([GROUPED_OBSERVATIONS_FEATURE])
+    );
+    let model_contrast = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("compare")
+        .arg(fixture_model_path())
+        .arg(fixture_model_path())
+        .arg("--population")
+        .arg(&state)
+        .args(["--seed", "1", "--ticks", "1", "--out"])
+        .arg(temp.join("model-contrast.csv"))
+        .args(["--enable", GROUPED_OBSERVATIONS_FEATURE])
+        .output()
+        .unwrap();
+    assert!(!model_contrast.status.success());
+    assert!(String::from_utf8_lossy(&model_contrast.stderr)
+        .contains("feature-aware compare is limited to same-model parameter contrasts"));
+    let compare_cuda = compare(&temp.join("compare-cuda.csv"), true, Some("cuda"));
+    assert!(!compare_cuda.status.success());
+    assert!(String::from_utf8_lossy(&compare_cuda.stderr)
+        .contains("grouped observations run on the cpu backend only for now"));
+
+    let diff = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("diff-backends")
+        .arg(fixture_model_path())
+        .arg("--population")
+        .arg(&state)
+        .args(["--enable", GROUPED_OBSERVATIONS_FEATURE])
+        .output()
+        .unwrap();
+    assert!(!diff.status.success());
+    assert!(String::from_utf8_lossy(&diff.stderr)
+        .contains("grouped-observations backend follow-up PRD"));
     std::fs::remove_dir_all(temp).unwrap();
 }
 

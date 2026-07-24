@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>GPU Agent Memory Calculator · Sembla</title>
+  <style>
+    :root {
+      --ink: #f5f7f2;
+      --muted: #aab4aa;
+      --subtle: #7e8b82;
+      --page: #09110f;
+      --panel: #101a17;
+      --panel-raised: #16231f;
+      --line: #2b3a34;
+      --line-strong: #415149;
+      --lime: #c7f36b;
+      --lime-deep: #92bf35;
+      --aqua: #65dfc2;
+      --orange: #ffab6b;
+      --red: #ff7e77;
+      --shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% -4%, rgba(101, 223, 194, 0.13), transparent 31rem),
+        radial-gradient(circle at 92% 2%, rgba(199, 243, 107, 0.09), transparent 28rem),
+        var(--page);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    button, input, select { font: inherit; }
+    button, select { cursor: pointer; }
+    a { color: var(--aqua); }
+    [hidden] { display: none !important; }
+
+    .wrap {
+      width: min(1180px, calc(100% - 32px));
+      margin-inline: auto;
+    }
+
+    .masthead {
+      padding: 54px 0 30px;
+      border-bottom: 1px solid rgba(65, 81, 73, 0.55);
+    }
+
+    .masthead-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: end;
+    }
+
+    .masthead-grid > *, .layout > *, .results, .panel { min-width: 0; }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--lime);
+      font: 700 0.75rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin: 0;
+      font-size: clamp(2.5rem, 6.2vw, 5.4rem);
+      line-height: 0.94;
+      letter-spacing: -0.065em;
+      text-wrap: balance;
+    }
+
+    .lede {
+      max-width: 700px;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.18rem);
+    }
+
+    .privacy-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 13px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(16, 26, 23, 0.72);
+      white-space: nowrap;
+      font-size: 0.82rem;
+    }
+
+    .privacy-chip::before {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--aqua);
+      box-shadow: 0 0 0 4px rgba(101, 223, 194, 0.12);
+      content: "";
+    }
+
+    main { padding: 30px 0 72px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.82fr) minmax(460px, 1.18fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(16, 26, 23, 0.91);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .controls { position: sticky; top: 18px; }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: start;
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-index {
+      color: var(--subtle);
+      font: 700 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.11em;
+    }
+
+    h2, h3, p { margin-top: 0; }
+    h2 { margin-bottom: 5px; font-size: 1.12rem; letter-spacing: -0.02em; }
+    h3 { margin-bottom: 4px; font-size: 0.94rem; }
+
+    .panel-head p, .section-note, .hint {
+      margin-bottom: 0;
+      color: var(--subtle);
+      font-size: 0.78rem;
+    }
+
+    .control-body { padding: 22px 24px 25px; }
+
+    .preset-row {
+      display: flex;
+      gap: 8px;
+      max-width: 100%;
+      margin-bottom: 23px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .chip-button, .ghost-button, .mode-button, .primary-button {
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      color: var(--ink);
+      background: #12201c;
+      transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+    }
+
+    .chip-button {
+      flex: 0 0 auto;
+      padding: 8px 10px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    .chip-button:hover, .ghost-button:hover, .mode-button:hover {
+      border-color: var(--lime-deep);
+      color: var(--ink);
+    }
+
+    button:active { transform: translateY(1px); }
+    button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(101, 223, 194, 0.34);
+      outline-offset: 2px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px 13px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    label, .label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 650;
+    }
+
+    input, select {
+      width: 100%;
+      min-height: 43px;
+      padding: 9px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      color: var(--ink);
+      background: #0c1512;
+    }
+
+    input:hover, select:hover { border-color: #5b6d64; }
+
+    .divider {
+      height: 1px;
+      margin: 24px 0;
+      background: var(--line);
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 5px;
+      margin-bottom: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0c1512;
+    }
+
+    .mode-button {
+      padding: 9px 12px;
+      border-color: transparent;
+      color: var(--subtle);
+      background: transparent;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .mode-button[aria-selected="true"] {
+      color: #10160e;
+      border-color: var(--lime);
+      background: var(--lime);
+    }
+
+    .advanced-table {
+      display: grid;
+      gap: 8px;
+    }
+
+    .dimension-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 90px 60px;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(12, 21, 18, 0.66);
+    }
+
+    .dimension-row label { margin: 0; }
+    .dimension-row small { display: block; color: var(--subtle); font-weight: 400; }
+    .dimension-row input { min-height: 36px; padding: 6px 8px; }
+    .bytes-tag { color: var(--subtle); text-align: right; font: 0.72rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    details {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(12, 21, 18, 0.5);
+    }
+
+    summary {
+      padding: 13px 14px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .details-body { padding: 2px 14px 15px; }
+
+    .results { display: grid; gap: 22px; }
+
+    .hero-result {
+      position: relative;
+      min-height: 286px;
+      padding: 27px;
+      border: 1px solid #3d5147;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(145deg, rgba(199, 243, 107, 0.11), transparent 43%),
+        var(--panel-raised);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero-result::after {
+      position: absolute;
+      right: -80px;
+      top: -105px;
+      width: 270px;
+      height: 270px;
+      border: 45px solid rgba(101, 223, 194, 0.055);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .result-top {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .big-number {
+      margin: 10px 0 2px;
+      color: var(--lime);
+      font-size: clamp(2.6rem, 6vw, 4.8rem);
+      font-weight: 760;
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+    }
+
+    .big-number-unit { color: var(--muted); font-size: 0.95rem; }
+
+    .gpu-picker { width: min(250px, 48%); }
+    .gpu-picker label { color: var(--subtle); }
+
+    .fit-line {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 28px 0 8px;
+      color: var(--muted);
+      font-size: 0.79rem;
+    }
+
+    .fit-line strong { color: var(--ink); }
+
+    .meter {
+      position: relative;
+      z-index: 1;
+      height: 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: #09110f;
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--aqua), var(--lime));
+      transition: width 240ms ease, background 180ms ease;
+    }
+
+    .result-note {
+      position: relative;
+      z-index: 1;
+      margin: 13px 0 0;
+      color: var(--subtle);
+      font-size: 0.76rem;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 19px 17px;
+      border-right: 1px solid var(--line);
+    }
+
+    .metric:last-child { border-right: 0; }
+    .metric-label { color: var(--subtle); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .metric-value { display: block; margin-top: 9px; font-size: 1.17rem; line-height: 1.15; letter-spacing: -0.025em; }
+    .metric-sub { display: block; margin-top: 5px; color: var(--subtle); font-size: 0.7rem; }
+
+    .table-panel { overflow: hidden; }
+
+    .table-tools {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .table-tools select { width: 165px; min-height: 38px; font-size: 0.76rem; }
+
+    .ghost-button, .primary-button {
+      padding: 9px 12px;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .primary-button {
+      color: #10160e;
+      border-color: var(--lime);
+      background: var(--lime);
+    }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    caption {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    th, td {
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--subtle);
+      background: #0e1815;
+      font-size: 0.67rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: rgba(101, 223, 194, 0.035); }
+
+    .gpu-name { color: var(--ink); font-weight: 700; }
+    .gpu-class { display: block; margin-top: 2px; color: var(--subtle); font-size: 0.68rem; font-weight: 400; }
+    .capacity-binary { display: block; color: var(--subtle); font-size: 0.67rem; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 0.69rem;
+      font-weight: 800;
+    }
+
+    .status::before { width: 6px; height: 6px; border-radius: 50%; content: ""; background: currentColor; }
+    .status.good { color: var(--aqua); background: rgba(101, 223, 194, 0.1); }
+    .status.tight { color: var(--orange); background: rgba(255, 171, 107, 0.1); }
+    .status.no { color: var(--red); background: rgba(255, 126, 119, 0.1); }
+
+    .formula-panel { padding: 23px 24px; }
+
+    .formula {
+      margin: 15px 0 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--muted);
+      background: #0c1512;
+      font: 0.73rem/1.65 ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .assumptions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 28px;
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+      color: var(--subtle);
+      font-size: 0.75rem;
+    }
+
+    .assumptions li { position: relative; padding-left: 15px; }
+    .assumptions li::before { position: absolute; left: 0; top: 0.56em; width: 5px; height: 5px; border-radius: 50%; background: var(--line-strong); content: ""; }
+
+    .footer-note {
+      margin: 24px 0 0;
+      color: var(--subtle);
+      text-align: center;
+      font-size: 0.72rem;
+    }
+
+    @media (max-width: 940px) {
+      .layout { grid-template-columns: 1fr; }
+      .controls { position: static; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+    }
+
+    @media (max-width: 620px) {
+      .wrap { width: min(100% - 20px, 1180px); }
+      .masthead { padding-top: 35px; }
+      .masthead-grid { grid-template-columns: 1fr; }
+      .privacy-chip { justify-self: start; }
+      .panel-head { flex-direction: column; padding: 19px 17px 15px; }
+      .control-body, .formula-panel { padding: 18px 17px 20px; }
+      .field-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .hero-result { padding: 21px 18px; }
+      .result-top { flex-direction: column; }
+      .gpu-picker { width: 100%; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .metric { border-right: 0; border-bottom: 1px solid var(--line); }
+      .metric:nth-child(3) { border-bottom: 1px solid var(--line); }
+      .metric:last-child { border-bottom: 0; }
+      .assumptions { grid-template-columns: 1fr; }
+      .dimension-row { grid-template-columns: minmax(0, 1fr) 76px 48px; }
+      .table-tools { width: 100%; flex-wrap: wrap; }
+      .table-tools > div { flex: 1 1 160px; min-width: 0; }
+      .table-tools select { width: 100%; }
+      .table-tools .ghost-button { flex: 0 0 auto; }
+      th, td { padding-inline: 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap masthead-grid">
+      <div>
+        <p class="eyebrow">Sembla capacity lab / 01</p>
+        <h1>How much agent state fits on a GPU?</h1>
+        <p class="lede">Estimate the resident memory for many systems, agents, replicas, and attributes—then compare the working set against representative GPU capacities.</p>
+      </div>
+      <div class="privacy-chip">Runs entirely in your browser</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="layout">
+      <section class="panel controls" aria-labelledby="inputs-heading">
+        <div class="panel-head">
+          <div>
+            <h2 id="inputs-heading">Workload</h2>
+            <p>Describe one simulation batch.</p>
+          </div>
+          <span class="section-index">INPUT</span>
+        </div>
+
+        <div class="control-body">
+          <div class="preset-row" aria-label="Example workloads">
+            <button class="chip-button" type="button" data-preset="population">26M population</button>
+            <button class="chip-button" type="button" data-preset="ensemble">10k × 100k ensemble</button>
+            <button class="chip-button" type="button" data-preset="large">100M agents</button>
+            <button class="chip-button" type="button" data-preset="reset">Reset</button>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label for="systems">Systems</label>
+              <input id="systems" data-input type="number" min="1" step="1" value="1">
+              <span class="hint">Independent populations</span>
+            </div>
+            <div class="field">
+              <label for="agents">Agents / system</label>
+              <input id="agents" data-input type="number" min="1" step="1" value="26000000">
+              <span class="hint">Rows in each system</span>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="mode-switch" role="tablist" aria-label="Attribute entry mode">
+            <button id="basic-tab" class="mode-button" type="button" role="tab" aria-selected="true" aria-controls="basic-mode" tabindex="0">Basic dimensions</button>
+            <button id="advanced-tab" class="mode-button" type="button" role="tab" aria-selected="false" aria-controls="advanced-mode" tabindex="-1">Typed attributes</button>
+          </div>
+
+          <div id="basic-mode" role="tabpanel" aria-labelledby="basic-tab">
+            <div class="field-grid">
+              <div class="field">
+                <label for="dimensions">Dimensions / agent</label>
+                <input id="dimensions" data-input type="number" min="0" step="1" value="12">
+              </div>
+              <div class="field">
+                <label for="precision">Storage / dimension</label>
+                <select id="precision" data-input>
+                  <option value="8" selected>FP64 / INT64 · 8 B</option>
+                  <option value="4">FP32 / INT32 · 4 B</option>
+                  <option value="2">FP16 / BF16 · 2 B</option>
+                  <option value="1">INT8 / packed byte · 1 B</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="advanced-mode" role="tabpanel" aria-labelledby="advanced-tab" hidden>
+            <p class="section-note" style="margin-bottom: 11px;">Sembla-compatible types, counted per agent.</p>
+            <div class="advanced-table">
+              <div class="dimension-row">
+                <label for="real-count">Real <small>f64 state</small></label>
+                <input id="real-count" data-input type="number" min="0" step="1" value="6">
+                <span class="bytes-tag">8 B</span>
+              </div>
+              <div class="dimension-row">
+                <label for="int-count">Integer <small>i64 state</small></label>
+                <input id="int-count" data-input type="number" min="0" step="1" value="2">
+                <span class="bytes-tag">8 B</span>
+              </div>
+              <div class="dimension-row">
+                <label for="enum-count">Enum <small>u16 variant</small></label>
+                <input id="enum-count" data-input type="number" min="0" step="1" value="2">
+                <span class="bytes-tag">2 B</span>
+              </div>
+              <div class="dimension-row">
+                <label for="ref-count">Reference <small>u32 row index</small></label>
+                <input id="ref-count" data-input type="number" min="0" step="1" value="2">
+                <span class="bytes-tag">4 B</span>
+              </div>
+              <div class="dimension-row">
+                <label for="fp32-count">FP32 <small>generic extra</small></label>
+                <input id="fp32-count" data-input type="number" min="0" step="1" value="0">
+                <span class="bytes-tag">4 B</span>
+              </div>
+              <div class="dimension-row">
+                <label for="byte-count">Byte / flag <small>generic packed</small></label>
+                <input id="byte-count" data-input type="number" min="0" step="1" value="0">
+                <span class="bytes-tag">1 B</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label for="replicas">Replicas / system</label>
+              <input id="replicas" data-input type="number" min="1" step="1" value="1">
+              <span class="hint">Concurrent runs or particles</span>
+            </div>
+            <div class="field">
+              <label for="buffers">Resident state copies</label>
+              <input id="buffers" data-input type="number" min="1" step="1" value="2">
+              <span class="hint">2 = read-old / write-new</span>
+            </div>
+          </div>
+
+          <details>
+            <summary>Workspace, overhead &amp; fit target</summary>
+            <div class="details-body">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="scratch">Scratch bytes / agent</label>
+                  <input id="scratch" data-input type="number" min="0" step="1" value="16">
+                </div>
+                <div class="field">
+                  <label for="shared">Shared MiB / system replica</label>
+                  <input id="shared" data-input type="number" min="0" step="0.1" value="32">
+                </div>
+                <div class="field">
+                  <label for="overhead">Extra workload overhead</label>
+                  <input id="overhead" data-input type="number" min="0" max="1000" step="1" value="15">
+                  <span class="hint">Percent after state + scratch</span>
+                </div>
+                <div class="field">
+                  <label for="reserve">GPU capacity reserve</label>
+                  <input id="reserve" data-input type="number" min="0" max="95" step="1" value="10">
+                  <span class="hint">Leave room for context + variance</span>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>Add a custom GPU</summary>
+            <div class="details-body">
+              <div class="field-grid">
+                <div class="field full">
+                  <label for="custom-name">GPU name</label>
+                  <input id="custom-name" type="text" value="Custom GPU" maxlength="60">
+                </div>
+                <div class="field">
+                  <label for="custom-gb">Memory (GB)</label>
+                  <input id="custom-gb" type="number" min="0.1" step="0.1" value="64">
+                </div>
+                <div class="field" style="align-self: end;">
+                  <button id="add-gpu" class="primary-button" type="button" style="width: 100%; min-height: 43px;">Add GPU</button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <div class="results">
+        <section class="hero-result" aria-labelledby="estimate-heading" aria-live="polite">
+          <div class="result-top">
+            <div>
+              <p class="eyebrow">Estimated working set</p>
+              <h2 id="estimate-heading" class="big-number"><span id="working-gib">—</span></h2>
+              <div id="working-secondary" class="big-number-unit">—</div>
+            </div>
+            <div class="gpu-picker">
+              <label for="selected-gpu">Compare with</label>
+              <select id="selected-gpu"></select>
+            </div>
+          </div>
+          <div class="fit-line">
+            <span id="fit-message">Calculating…</span>
+            <strong id="fit-percent">—</strong>
+          </div>
+          <div class="meter" role="progressbar" aria-label="Share of selected GPU memory" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="meter-fill" class="meter-fill"></div>
+          </div>
+          <p id="fit-detail" class="result-note">The target applies your capacity reserve before deciding whether the workload fits.</p>
+        </section>
+
+        <section class="metric-grid" aria-label="Memory breakdown">
+          <div class="metric">
+            <span class="metric-label">Total agents</span>
+            <strong id="total-agents" class="metric-value">—</strong>
+            <span id="agent-breakdown" class="metric-sub">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Bytes / agent</span>
+            <strong id="bytes-agent" class="metric-value">—</strong>
+            <span id="dimension-total" class="metric-sub">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Raw attributes</span>
+            <strong id="raw-state" class="metric-value">—</strong>
+            <span class="metric-sub">Before buffers + workspace</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Resident state</span>
+            <strong id="resident-state" class="metric-value">—</strong>
+            <span id="buffer-breakdown" class="metric-sub">—</span>
+          </div>
+        </section>
+
+        <section class="panel table-panel" aria-labelledby="comparison-heading">
+          <div class="panel-head">
+            <div>
+              <h2 id="comparison-heading">GPU comparison</h2>
+              <p>Capacity estimates at the selected reserve target.</p>
+            </div>
+            <div class="table-tools">
+              <div>
+                <label for="class-filter">Show</label>
+                <select id="class-filter">
+                  <option value="all">All GPUs</option>
+                  <option value="Consumer">Consumer</option>
+                  <option value="Workstation">Workstation</option>
+                  <option value="Datacenter">Datacenter</option>
+                </select>
+              </div>
+              <button id="copy-summary" class="ghost-button" type="button">Copy summary</button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <caption>Estimated workload fit across representative GPUs</caption>
+              <thead>
+                <tr>
+                  <th scope="col">GPU</th>
+                  <th scope="col">VRAM</th>
+                  <th scope="col">Used</th>
+                  <th scope="col">1 GPU</th>
+                  <th scope="col">GPUs needed*</th>
+                  <th scope="col">Max agents / GPU†</th>
+                </tr>
+              </thead>
+              <tbody id="gpu-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel formula-panel" aria-labelledby="method-heading">
+          <div class="panel-head" style="margin: -23px -24px 0; box-shadow: none;">
+            <div>
+              <h2 id="method-heading">Method &amp; assumptions</h2>
+              <p>Transparent arithmetic, not a benchmark.</p>
+            </div>
+            <span class="section-index">MODEL</span>
+          </div>
+          <div id="formula" class="formula">—</div>
+          <ul class="assumptions">
+            <li>GPU vendors advertise decimal GB; results also show binary GiB.</li>
+            <li>Multi-GPU counts assume perfect, even sharding with no duplicated metadata.</li>
+            <li>Capacity does not imply enough memory bandwidth, compute, or interconnect throughput.</li>
+            <li>Sembla’s exact CUDA scratch space varies with transitions, candidates, aggregates, and outputs.</li>
+            <li>† Max agents assumes one system replica with the same per-agent shape and current overheads.</li>
+            <li>Catalog capacities are representative; verify the exact SKU before purchasing or renting.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+    <p class="footer-note">A planning estimate only. Validate with a representative allocation and workload on the target device.</p>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const DECIMAL_GB = 1e9;
+      const MIB = 1024 ** 2;
+      const GIB = 1024 ** 3;
+
+      const gpus = [
+        { id: "rtx-4080-super", name: "NVIDIA GeForce RTX 4080 SUPER", gb: 16, group: "Consumer" },
+        { id: "rtx-3090", name: "NVIDIA GeForce RTX 3090", gb: 24, group: "Consumer" },
+        { id: "rtx-4090", name: "NVIDIA GeForce RTX 4090", gb: 24, group: "Consumer" },
+        { id: "rx-7900-xtx", name: "AMD Radeon RX 7900 XTX", gb: 24, group: "Consumer" },
+        { id: "rtx-5090", name: "NVIDIA GeForce RTX 5090", gb: 32, group: "Consumer" },
+        { id: "rtx-a6000", name: "NVIDIA RTX A6000", gb: 48, group: "Workstation" },
+        { id: "rtx-6000-ada", name: "NVIDIA RTX 6000 Ada Generation", gb: 48, group: "Workstation" },
+        { id: "radeon-pro-w7900", name: "AMD Radeon PRO W7900", gb: 48, group: "Workstation" },
+        { id: "rtx-pro-6000", name: "NVIDIA RTX PRO 6000 Blackwell", gb: 96, group: "Workstation" },
+        { id: "l4", name: "NVIDIA L4", gb: 24, group: "Datacenter" },
+        { id: "a100-40", name: "NVIDIA A100 40GB", gb: 40, group: "Datacenter" },
+        { id: "l40s", name: "NVIDIA L40S", gb: 48, group: "Datacenter" },
+        { id: "a100-80", name: "NVIDIA A100 80GB", gb: 80, group: "Datacenter" },
+        { id: "h100-sxm", name: "NVIDIA H100 SXM", gb: 80, group: "Datacenter" },
+        { id: "h100-nvl", name: "NVIDIA H100 NVL (per GPU)", gb: 94, group: "Datacenter" },
+        { id: "h200", name: "NVIDIA H200", gb: 141, group: "Datacenter" },
+        { id: "b200", name: "NVIDIA B200", gb: 180, group: "Datacenter" },
+        { id: "mi300x", name: "AMD Instinct MI300X", gb: 192, group: "Datacenter" },
+        { id: "mi325x", name: "AMD Instinct MI325X", gb: 256, group: "Datacenter" }
+      ];
+
+      const defaults = {
+        systems: 1,
+        agents: 26000000,
+        dimensions: 12,
+        precision: 8,
+        replicas: 1,
+        buffers: 2,
+        scratch: 16,
+        shared: 32,
+        overhead: 15,
+        reserve: 10,
+        real: 6,
+        int: 2,
+        enum: 2,
+        ref: 2,
+        fp32: 0,
+        byte: 0
+      };
+
+      const presets = {
+        population: { systems: 1, agents: 26000000, dimensions: 12, precision: 8, replicas: 1, buffers: 2, scratch: 16, shared: 32, overhead: 15, reserve: 10 },
+        ensemble: { systems: 10000, agents: 100000, dimensions: 16, precision: 8, replicas: 1, buffers: 2, scratch: 16, shared: 1, overhead: 20, reserve: 10 },
+        large: { systems: 1, agents: 100000000, dimensions: 24, precision: 8, replicas: 1, buffers: 2, scratch: 24, shared: 64, overhead: 20, reserve: 10 },
+        reset: defaults
+      };
+
+      const el = (id) => document.getElementById(id);
+      const inputIds = ["systems", "agents", "dimensions", "precision", "replicas", "buffers", "scratch", "shared", "overhead", "reserve"];
+      const typedFields = [
+        { id: "real-count", key: "real", bytes: 8 },
+        { id: "int-count", key: "int", bytes: 8 },
+        { id: "enum-count", key: "enum", bytes: 2 },
+        { id: "ref-count", key: "ref", bytes: 4 },
+        { id: "fp32-count", key: "fp32", bytes: 4 },
+        { id: "byte-count", key: "byte", bytes: 1 }
+      ];
+
+      let mode = "basic";
+      let selectedGpuId = "rtx-4090";
+      let latest = null;
+
+      const nonNegative = (id, fallback = 0) => {
+        const value = Number(el(id).value);
+        return Number.isFinite(value) ? Math.max(0, value) : fallback;
+      };
+
+      const positive = (id, fallback = 1) => Math.max(1, nonNegative(id, fallback));
+
+      const integer = (value) => Math.floor(Math.max(0, value));
+
+      const formatCount = (value) => {
+        if (!Number.isFinite(value)) return "Too large";
+        if (value < 1e6) return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+        return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }).format(value);
+      };
+
+      const formatBytes = (bytes, precision = 2) => {
+        if (!Number.isFinite(bytes)) return "Too large";
+        const units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
+        let value = Math.max(0, bytes);
+        let index = 0;
+        while (value >= 1024 && index < units.length - 1) {
+          value /= 1024;
+          index += 1;
+        }
+        const digits = value >= 100 ? 0 : value >= 10 ? 1 : precision;
+        return `${value.toLocaleString("en-US", { maximumFractionDigits: digits })} ${units[index]}`;
+      };
+
+      const formatPercent = (ratio) => {
+        if (!Number.isFinite(ratio)) return "—";
+        const percent = ratio * 100;
+        if (percent > 0 && percent < 0.01) return "<0.01%";
+        return `${percent.toLocaleString("en-US", { maximumFractionDigits: percent >= 100 ? 0 : 1 })}%`;
+      };
+
+      function getShape() {
+        if (mode === "basic") {
+          const dimensions = integer(nonNegative("dimensions"));
+          const bytesPerDimension = positive("precision", 8);
+          return { dimensions, bytesPerAgent: dimensions * bytesPerDimension, description: `${formatCount(dimensions)} × ${bytesPerDimension} B` };
+        }
+
+        let dimensions = 0;
+        let bytesPerAgent = 0;
+        const parts = [];
+        typedFields.forEach(({ id, bytes }) => {
+          const count = integer(nonNegative(id));
+          dimensions += count;
+          bytesPerAgent += count * bytes;
+          if (count > 0) parts.push(`${count}×${bytes} B`);
+        });
+        return { dimensions, bytesPerAgent, description: parts.join(" + ") || "0 typed attributes" };
+      }
+
+      function calculate() {
+        const systems = integer(positive("systems"));
+        const agentsPerSystem = integer(positive("agents"));
+        const replicas = integer(positive("replicas"));
+        const buffers = integer(positive("buffers"));
+        const scratchPerAgent = nonNegative("scratch");
+        const sharedPerSystem = nonNegative("shared") * MIB;
+        const overheadRate = nonNegative("overhead") / 100;
+        const reserveRate = Math.min(0.95, nonNegative("reserve") / 100);
+        const shape = getShape();
+
+        const systemReplicas = systems * replicas;
+        const totalAgents = systemReplicas * agentsPerSystem;
+        const rawState = totalAgents * shape.bytesPerAgent;
+        const residentState = rawState * buffers;
+        const scratch = totalAgents * scratchPerAgent;
+        const shared = systemReplicas * sharedPerSystem;
+        const subtotal = residentState + scratch + shared;
+        const workingSet = subtotal * (1 + overheadRate);
+        const effectivePerAgent = (shape.bytesPerAgent * buffers + scratchPerAgent) * (1 + overheadRate);
+        const oneSystemFixed = sharedPerSystem * (1 + overheadRate);
+
+        return {
+          systems,
+          agentsPerSystem,
+          replicas,
+          buffers,
+          totalAgents,
+          shape,
+          rawState,
+          residentState,
+          scratch,
+          shared,
+          overheadRate,
+          reserveRate,
+          workingSet,
+          effectivePerAgent,
+          oneSystemFixed
+        };
+      }
+
+      function statusFor(gpu, result) {
+        const capacity = gpu.gb * DECIMAL_GB;
+        const usable = capacity * (1 - result.reserveRate);
+        const utilization = result.workingSet / capacity;
+        const fitsTarget = result.workingSet <= usable;
+        const tight = fitsTarget && result.workingSet > usable * 0.8;
+        const needed = result.workingSet === 0 ? 0 : Math.ceil(result.workingSet / usable);
+        const agentBudget = Math.max(0, usable - result.oneSystemFixed);
+        const maxAgents = result.oneSystemFixed > usable
+          ? 0
+          : result.effectivePerAgent > 0
+            ? Math.floor(agentBudget / result.effectivePerAgent)
+            : Infinity;
+        return { capacity, usable, utilization, fitsTarget, tight, needed, maxAgents };
+      }
+
+      function populateGpuSelect() {
+        const current = selectedGpuId;
+        el("selected-gpu").innerHTML = gpus
+          .slice()
+          .sort((a, b) => a.gb - b.gb || a.name.localeCompare(b.name))
+          .map((gpu) => `<option value="${gpu.id}">${escapeHtml(gpu.name)} · ${gpu.gb} GB</option>`)
+          .join("");
+        selectedGpuId = gpus.some((gpu) => gpu.id === current) ? current : gpus[0].id;
+        el("selected-gpu").value = selectedGpuId;
+      }
+
+      function renderHero(result) {
+        const gpu = gpus.find((item) => item.id === selectedGpuId) || gpus[0];
+        const fit = statusFor(gpu, result);
+        const gb = result.workingSet / DECIMAL_GB;
+        const meter = el("meter-fill");
+        const progress = meter.parentElement;
+        const clippedPercent = Math.min(100, Math.max(0, fit.utilization * 100));
+
+        el("working-gib").textContent = formatBytes(result.workingSet);
+        el("working-secondary").textContent = gb < 0.01
+          ? `${Math.round(result.workingSet).toLocaleString("en-US")} bytes decimal`
+          : `${gb.toLocaleString("en-US", { maximumFractionDigits: gb >= 100 ? 1 : 2 })} GB decimal`;
+        el("fit-percent").textContent = formatPercent(fit.utilization);
+        meter.style.width = `${clippedPercent}%`;
+        progress.setAttribute("aria-valuenow", String(Math.round(clippedPercent)));
+
+        if (fit.fitsTarget) {
+          el("fit-message").innerHTML = `<strong>Fits on one ${escapeHtml(gpu.name)}</strong>`;
+          el("fit-detail").textContent = `${formatBytes(fit.usable)} usable after a ${(result.reserveRate * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}% reserve; ${formatBytes(Math.max(0, fit.usable - result.workingSet))} remains inside the target.`;
+          meter.style.background = fit.tight
+            ? "linear-gradient(90deg, var(--orange), var(--red))"
+            : "linear-gradient(90deg, var(--aqua), var(--lime))";
+        } else {
+          el("fit-message").innerHTML = `<strong>Needs about ${formatCount(fit.needed)} × ${escapeHtml(gpu.name)}</strong>`;
+          el("fit-detail").textContent = `One device has ${formatBytes(fit.usable)} usable at the reserve target. Multi-GPU assumes ideal sharding.`;
+          meter.style.background = "linear-gradient(90deg, var(--orange), var(--red))";
+        }
+      }
+
+      function renderMetrics(result) {
+        el("total-agents").textContent = formatCount(result.totalAgents);
+        const systemLabel = result.systems === 1 ? "system" : "systems";
+        const replicaLabel = result.replicas === 1 ? "replica" : "replicas";
+        el("agent-breakdown").textContent = `${formatCount(result.systems)} ${systemLabel} × ${formatCount(result.agentsPerSystem)} × ${formatCount(result.replicas)} ${replicaLabel}`;
+        el("bytes-agent").textContent = formatBytes(result.shape.bytesPerAgent);
+        el("dimension-total").textContent = `${formatCount(result.shape.dimensions)} dimensions · ${result.shape.description}`;
+        el("raw-state").textContent = formatBytes(result.rawState);
+        el("resident-state").textContent = formatBytes(result.residentState);
+        el("buffer-breakdown").textContent = `${formatCount(result.buffers)} resident state ${result.buffers === 1 ? "copy" : "copies"}`;
+      }
+
+      function renderTable(result) {
+        const filter = el("class-filter").value;
+        const rows = gpus
+          .filter((gpu) => filter === "all" || gpu.group === filter)
+          .sort((a, b) => a.gb - b.gb || a.name.localeCompare(b.name))
+          .map((gpu) => {
+            const fit = statusFor(gpu, result);
+            const statusClass = !fit.fitsTarget ? "no" : fit.tight ? "tight" : "good";
+            const statusLabel = !fit.fitsTarget ? "Over target" : fit.tight ? "Tight fit" : "Fits";
+            const maxAgents = fit.maxAgents === Infinity ? "Unlimited*" : formatCount(fit.maxAgents);
+            return `
+              <tr>
+                <td><span class="gpu-name">${escapeHtml(gpu.name)}</span><span class="gpu-class">${escapeHtml(gpu.group)}</span></td>
+                <td>${gpu.gb.toLocaleString("en-US")} GB<span class="capacity-binary">${(fit.capacity / GIB).toLocaleString("en-US", { maximumFractionDigits: 1 })} GiB</span></td>
+                <td>${formatPercent(fit.utilization)}</td>
+                <td><span class="status ${statusClass}">${statusLabel}</span></td>
+                <td>${formatCount(fit.needed)}</td>
+                <td>${maxAgents}</td>
+              </tr>`;
+          });
+        el("gpu-rows").innerHTML = rows.join("") || `<tr><td colspan="6">No GPUs in this category.</td></tr>`;
+      }
+
+      function renderFormula(result) {
+        const overheadPercent = (result.overheadRate * 100).toLocaleString("en-US", { maximumFractionDigits: 1 });
+        el("formula").innerHTML = [
+          `raw = ${formatCount(result.totalAgents)} agents × ${formatBytes(result.shape.bytesPerAgent)} = <strong>${formatBytes(result.rawState)}</strong>`,
+          `resident = raw × ${formatCount(result.buffers)} buffers = <strong>${formatBytes(result.residentState)}</strong>`,
+          `working = (resident + ${formatBytes(result.scratch)} scratch + ${formatBytes(result.shared)} shared) × (1 + ${overheadPercent}%)`,
+          `working = <strong>${formatBytes(result.workingSet)}</strong>`
+        ].join("<br>");
+      }
+
+      function render() {
+        latest = calculate();
+        renderHero(latest);
+        renderMetrics(latest);
+        renderTable(latest);
+        renderFormula(latest);
+      }
+
+      function setMode(nextMode) {
+        mode = nextMode;
+        const basic = mode === "basic";
+        el("basic-tab").setAttribute("aria-selected", String(basic));
+        el("advanced-tab").setAttribute("aria-selected", String(!basic));
+        el("basic-tab").tabIndex = basic ? 0 : -1;
+        el("advanced-tab").tabIndex = basic ? -1 : 0;
+        el("basic-mode").hidden = !basic;
+        el("advanced-mode").hidden = basic;
+        render();
+      }
+
+      function setPreset(name) {
+        const preset = presets[name];
+        if (!preset) return;
+        Object.entries(preset).forEach(([key, value]) => {
+          const id = key === "real" || key === "int" || key === "enum" || key === "ref" || key === "fp32" || key === "byte"
+            ? `${key}-count`
+            : key;
+          if (el(id)) el(id).value = value;
+        });
+        if (name === "reset") setMode("basic");
+        render();
+      }
+
+      function addCustomGpu() {
+        const name = el("custom-name").value.trim() || "Custom GPU";
+        const gb = Number(el("custom-gb").value);
+        if (!Number.isFinite(gb) || gb <= 0) {
+          el("custom-gb").focus();
+          return;
+        }
+        const id = `custom-${Date.now()}`;
+        gpus.push({ id, name, gb, group: "Custom" });
+        selectedGpuId = id;
+        populateGpuSelect();
+        el("class-filter").value = "all";
+        render();
+      }
+
+      function summaryText(result) {
+        const gpu = gpus.find((item) => item.id === selectedGpuId) || gpus[0];
+        const fit = statusFor(gpu, result);
+        return [
+          "GPU agent-memory estimate",
+          `Workload: ${formatCount(result.systems)} systems × ${formatCount(result.agentsPerSystem)} agents × ${formatCount(result.replicas)} replicas`,
+          `Shape: ${formatCount(result.shape.dimensions)} dimensions, ${formatBytes(result.shape.bytesPerAgent)} per agent`,
+          `Raw attributes: ${formatBytes(result.rawState)}`,
+          `Resident state (${result.buffers} copies): ${formatBytes(result.residentState)}`,
+          `Estimated working set: ${formatBytes(result.workingSet)} (${(result.workingSet / DECIMAL_GB).toLocaleString("en-US", { maximumFractionDigits: 2 })} GB)`,
+          `${gpu.name}: ${formatPercent(fit.utilization)} of physical VRAM; ${fit.fitsTarget ? "fits" : `about ${fit.needed} GPUs needed`} at ${(result.reserveRate * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}% reserve`,
+          "Capacity estimate only; multi-GPU counts assume ideal sharding."
+        ].join("\n");
+      }
+
+      async function copySummary() {
+        const button = el("copy-summary");
+        try {
+          await navigator.clipboard.writeText(summaryText(latest));
+          button.textContent = "Copied";
+        } catch (_) {
+          const area = document.createElement("textarea");
+          area.value = summaryText(latest);
+          area.style.position = "fixed";
+          area.style.opacity = "0";
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand("copy");
+          area.remove();
+          button.textContent = "Copied";
+        }
+        window.setTimeout(() => { button.textContent = "Copy summary"; }, 1400);
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      document.querySelectorAll("[data-input]").forEach((node) => node.addEventListener("input", render));
+      typedFields.forEach(({ id }) => el(id).addEventListener("input", render));
+      document.querySelectorAll("[data-preset]").forEach((button) => button.addEventListener("click", () => setPreset(button.dataset.preset)));
+      const modeTabs = [el("basic-tab"), el("advanced-tab")];
+      el("basic-tab").addEventListener("click", () => setMode("basic"));
+      el("advanced-tab").addEventListener("click", () => setMode("advanced"));
+      modeTabs.forEach((tab, index) => tab.addEventListener("keydown", (event) => {
+        let nextIndex = null;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % modeTabs.length;
+        if (event.key === "ArrowLeft") nextIndex = (index - 1 + modeTabs.length) % modeTabs.length;
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = modeTabs.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault();
+        setMode(nextIndex === 0 ? "basic" : "advanced");
+        modeTabs[nextIndex].focus();
+      }));
+      el("selected-gpu").addEventListener("change", (event) => { selectedGpuId = event.target.value; renderHero(latest); });
+      el("class-filter").addEventListener("change", () => renderTable(latest));
+      el("add-gpu").addEventListener("click", addCustomGpu);
+      el("copy-summary").addEventListener("click", copySummary);
+
+      populateGpuSelect();
+      render();
+    })();
+  </script>
+</body>
+</html>

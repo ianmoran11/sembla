@@ -976,12 +976,6 @@ fn validate_plan_identity_values(manifest: &RunManifest) -> Result<(), String> {
         }
         return Ok(());
     };
-    if !matches!(
-        manifest.manifest_kind,
-        ManifestKind::Run | ManifestKind::Sweep
-    ) {
-        return Err("plan identity tuple is supported only for run and sweep manifests".to_owned());
-    }
     if plan.plan_schema != sembla_ir::EXECUTABLE_PLAN_SCHEMA {
         return Err(format!(
             "unsupported plan.plan_schema '{}' (supported: '{}')",

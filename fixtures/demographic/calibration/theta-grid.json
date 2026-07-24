@@ -1,0 +1,8 @@
+[
+  {"birth_rate":0.020,"mortality_young":0.001,"mortality_adult":0.0025,"mortality_old":0.012,"overseas_arrival_rate":0.020,"emigration_rate":0.0015,"internal_departure_rate":0.0025,"internal_arrival_rate":0.018},
+  {"birth_rate":0.025,"mortality_young":0.001,"mortality_adult":0.0025,"mortality_old":0.012,"overseas_arrival_rate":0.020,"emigration_rate":0.0020,"internal_departure_rate":0.0025,"internal_arrival_rate":0.018},
+  {"birth_rate":0.030,"mortality_young":0.001,"mortality_adult":0.0030,"mortality_old":0.012,"overseas_arrival_rate":0.020,"emigration_rate":0.0025,"internal_departure_rate":0.0025,"internal_arrival_rate":0.018},
+  {"birth_rate":0.020,"mortality_young":0.001,"mortality_adult":0.0030,"mortality_old":0.012,"overseas_arrival_rate":0.020,"emigration_rate":0.0020,"internal_departure_rate":0.0025,"internal_arrival_rate":0.018},
+  {"birth_rate":0.025,"mortality_young":0.001,"mortality_adult":0.0035,"mortality_old":0.012,"overseas_arrival_rate":0.020,"emigration_rate":0.0025,"internal_departure_rate":0.0025,"internal_arrival_rate":0.018},
+  {"birth_rate":0.030,"mortality_young":0.001,"mortality_adult":0.0035,"mortality_old":0.012,"overseas_arrival_rate":0.020,"emigration_rate":0.0015,"internal_departure_rate":0.0025,"internal_arrival_rate":0.018}
+]

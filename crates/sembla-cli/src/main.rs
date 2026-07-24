@@ -17,10 +17,10 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 const GROUPED_SCOPE_FOLLOW_UP: &str =
-    "--enable grouped-observations is not yet supported for compare or diff-backends; see the grouped-observations backend follow-up PRD";
+    "--enable grouped-observations is not yet supported for diff-backends; see the grouped-observations backend follow-up PRD";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -329,6 +329,7 @@ struct CompareOptions {
     params_a: Option<String>,
     params_b: Option<String>,
     backend: BackendSelection,
+    enabled_features: FeatureSet,
 }
 
 fn compare_command(arguments: &[String]) -> i32 {
@@ -374,6 +375,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
     let mut params_a = None;
     let mut params_b = None;
     let mut backend = None;
+    let mut enabled_features = FeatureSet::new();
     for pair in flags.chunks_exact(2) {
         let flag = pair[0].as_str();
         let value = pair[1].clone();
@@ -390,7 +392,9 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
             "--params-a" => set_once(&mut params_a, value, flag)?,
             "--params-b" => set_once(&mut params_b, value, flag)?,
             "--backend" => set_once(&mut backend, parse_backend(&value)?, flag)?,
-            "--enable" => return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned()),
+            "--enable" => {
+                enabled_features.insert(parse_feature(&value)?);
+            }
             _ => return Err(format!("unknown compare flag '{flag}'")),
         }
     }
@@ -400,6 +404,9 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
         }
         2 if params_a.is_some() || params_b.is_some() => {
             return Err("model contrast does not accept '--params-a' or '--params-b'".to_owned())
+        }
+        2 if !enabled_features.is_empty() => {
+            return Err("model contrast does not accept '--enable'; feature-aware compare is limited to same-model parameter contrasts".to_owned())
         }
         _ => {}
     }
@@ -412,6 +419,7 @@ fn parse_compare_options(arguments: &[String]) -> Result<CompareOptions, String>
         params_a,
         params_b,
         backend: backend.unwrap_or_default(),
+        enabled_features,
     })
 }
 
@@ -2812,19 +2820,63 @@ struct CompareTick {
 
 #[derive(Clone, Debug)]
 struct CompareArmOutcome {
-    ticks: Vec<CompareTick>,
+    series: ReportedSeries,
     hashes: ExecutionHashes,
     identity: manifest::BackendIdentity,
+}
+
+fn legacy_compare_ticks(series: &ReportedSeries) -> Result<Vec<CompareTick>, String> {
+    let column = |name: &str| {
+        series
+            .columns
+            .iter()
+            .position(|column| column == name)
+            .ok_or_else(|| format!("compare arm is missing reported column '{name}'"))
+    };
+    let indices = [
+        column("S")?,
+        column("I")?,
+        column("R")?,
+        column("fired_infect")?,
+        column("fired_recover")?,
+        column("deferred_total")?,
+    ];
+    series
+        .rows
+        .iter()
+        .map(|row| {
+            Ok(CompareTick {
+                counts: [
+                    row[indices[0]].as_usize("compare S value")?,
+                    row[indices[1]].as_usize("compare I value")?,
+                    row[indices[2]].as_usize("compare R value")?,
+                ],
+                fired_infect: row[indices[3]].as_usize("compare infect firing")?,
+                fired_recover: row[indices[4]].as_usize("compare recover firing")?,
+                deferred_total: row[indices[5]].as_usize("compare deferred total")?,
+            })
+        })
+        .collect()
+}
+
+fn reported_difference(left: ReportedValue, right: ReportedValue) -> Result<String, String> {
+    match (left, right) {
+        (ReportedValue::Unsigned(left), ReportedValue::Unsigned(right)) => {
+            Ok((right as i128 - left as i128).to_string())
+        }
+        (ReportedValue::Int(left), ReportedValue::Int(right)) => {
+            Ok((right as i128 - left as i128).to_string())
+        }
+        (ReportedValue::Real(left), ReportedValue::Real(right)) => Ok((right - left).to_string()),
+        _ => Err("compare reported column changed numeric type between arms".to_owned()),
+    }
 }
 
 fn compare_result(options: CompareOptions) -> Result<(), String> {
     let path_a = &options.models[0];
     let path_b = options.models.get(1).unwrap_or(path_a);
-    if input_uses_grouped_views(path_a)? || input_uses_grouped_views(path_b)? {
-        return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned());
-    }
-    let input_a = read_executable_input(path_a, None, &FeatureSet::new())?;
-    let input_b = read_executable_input(path_b, None, &FeatureSet::new())?;
+    let input_a = read_executable_input(path_a, None, &options.enabled_features)?;
+    let input_b = read_executable_input(path_b, None, &options.enabled_features)?;
     if input_a.plan.is_some() != input_b.plan.is_some() {
         let (legacy_path, plan_path) = if input_a.plan.is_some() {
             (path_b, path_a)
@@ -2835,6 +2887,15 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
             "compare requires both inputs to use the same identity scheme; got legacy model '{legacy_path}' and plan envelope '{plan_path}'"
         ));
     }
+    let plan_identity = if options.models.len() == 1 {
+        input_a
+            .plan
+            .as_ref()
+            .map(manifest::plan_identity_tuples)
+            .transpose()?
+    } else {
+        None
+    };
     let model_a = input_a.model;
     let model_b = input_b.model;
     let params_a = resolve_params(&model_a, options.params_a.as_deref())?;
@@ -2854,6 +2915,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
         options.seed,
         options.ticks,
         options.backend,
+        &options.enabled_features,
     )?;
     let arm_b = compare_arm(
         &model_b,
@@ -2862,6 +2924,7 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
         options.seed,
         options.ticks,
         options.backend,
+        &options.enabled_features,
     )?;
 
     let mut csv = String::new();
@@ -2880,28 +2943,93 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     csv.push_str(&format!("# seed={}\n", options.seed));
     csv.push_str(&format!("# dt_a={}\n", model_a.model().dt));
     csv.push_str(&format!("# dt_b={}\n", model_b.model().dt));
-    csv.push_str("tick,S_a,I_a,R_a,S_b,I_b,R_b,dS,dI,dR,fired_infect_a,fired_recover_a,deferred_a,fired_infect_b,fired_recover_b,deferred_b\n");
-    for (tick, (tick_a, tick_b)) in arm_a.ticks.iter().zip(&arm_b.ticks).enumerate() {
-        let difference = |a: usize, b: usize| b as i128 - a as i128;
-        csv.push_str(&format!(
-            "{tick},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
-            tick_a.counts[0],
-            tick_a.counts[1],
-            tick_a.counts[2],
-            tick_b.counts[0],
-            tick_b.counts[1],
-            tick_b.counts[2],
-            difference(tick_a.counts[0], tick_b.counts[0]),
-            difference(tick_a.counts[1], tick_b.counts[1]),
-            difference(tick_a.counts[2], tick_b.counts[2]),
-            tick_a.fired_infect,
-            tick_a.fired_recover,
-            tick_a.deferred_total,
-            tick_b.fired_infect,
-            tick_b.fired_recover,
-            tick_b.deferred_total,
-        ));
+
+    let legacy_a = legacy_compare_ticks(&arm_a.series);
+    let legacy_b = legacy_compare_ticks(&arm_b.series);
+    match (legacy_a, legacy_b) {
+        (Ok(ticks_a), Ok(ticks_b)) => {
+            csv.push_str("tick,S_a,I_a,R_a,S_b,I_b,R_b,dS,dI,dR,fired_infect_a,fired_recover_a,deferred_a,fired_infect_b,fired_recover_b,deferred_b\n");
+            for (tick, (tick_a, tick_b)) in ticks_a.iter().zip(&ticks_b).enumerate() {
+                let difference = |a: usize, b: usize| b as i128 - a as i128;
+                csv.push_str(&format!(
+                    "{tick},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+                    tick_a.counts[0],
+                    tick_a.counts[1],
+                    tick_a.counts[2],
+                    tick_b.counts[0],
+                    tick_b.counts[1],
+                    tick_b.counts[2],
+                    difference(tick_a.counts[0], tick_b.counts[0]),
+                    difference(tick_a.counts[1], tick_b.counts[1]),
+                    difference(tick_a.counts[2], tick_b.counts[2]),
+                    tick_a.fired_infect,
+                    tick_a.fired_recover,
+                    tick_a.deferred_total,
+                    tick_b.fired_infect,
+                    tick_b.fired_recover,
+                    tick_b.deferred_total,
+                ));
+            }
+        }
+        (Err(error), _) | (_, Err(error)) if options.models.len() != 1 => return Err(error),
+        _ => {
+            if arm_a.series.columns != arm_b.series.columns {
+                return Err(format!(
+                    "generic parameter compare requires identical reported columns; arm_a={:?} arm_b={:?}",
+                    arm_a.series.columns, arm_b.series.columns
+                ));
+            }
+            let mut headers = vec!["tick".to_owned()];
+            headers.extend(
+                arm_a
+                    .series
+                    .columns
+                    .iter()
+                    .map(|column| format!("{column}_a")),
+            );
+            headers.extend(
+                arm_b
+                    .series
+                    .columns
+                    .iter()
+                    .map(|column| format!("{column}_b")),
+            );
+            headers.extend(
+                arm_a
+                    .series
+                    .columns
+                    .iter()
+                    .map(|column| format!("d{column}")),
+            );
+            csv.push_str(
+                &headers
+                    .iter()
+                    .map(|header| csv_field(header))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+            csv.push('\n');
+            for (tick, (row_a, row_b)) in
+                arm_a.series.rows.iter().zip(&arm_b.series.rows).enumerate()
+            {
+                csv.push_str(&tick.to_string());
+                for value in row_a {
+                    csv.push(',');
+                    csv.push_str(&value.csv());
+                }
+                for value in row_b {
+                    csv.push(',');
+                    csv.push_str(&value.csv());
+                }
+                for (left, right) in row_a.iter().zip(row_b) {
+                    csv.push(',');
+                    csv.push_str(&reported_difference(*left, *right)?);
+                }
+                csv.push('\n');
+            }
+        }
     }
+
     std::fs::write(&options.out, csv.as_bytes())
         .map_err(|error| format!("{}: {error}", options.out))?;
     let compare_sha256 = hex(&Sha256::digest(csv.as_bytes()));
@@ -2916,6 +3044,11 @@ fn compare_result(options: CompareOptions) -> Result<(), String> {
     );
     run_manifest.backend_identity = Some(arm_a.identity.clone());
     run_manifest.initial_state = initial_state_hash.map(state_artifact_tuple);
+    run_manifest.enabled_features = options.enabled_features.iter().cloned().collect();
+    if let Some((identity, linked_source)) = plan_identity {
+        run_manifest.plan = Some(identity);
+        run_manifest.linked_source = linked_source;
+    }
     if arm_a.identity != arm_b.identity {
         return Err("backend device identity changed between compare arms".to_owned());
     }
@@ -2950,45 +3083,21 @@ fn compare_arm(
     seed: u64,
     ticks: u32,
     backend: BackendSelection,
+    enabled_features: &FeatureSet,
 ) -> Result<CompareArmOutcome, String> {
-    let execution = execute_backend_output(model, initial, params, seed, ticks, backend)?;
-    let output = execution.output;
-    let column = |name: &str| {
-        output
-            .series
-            .columns
-            .iter()
-            .position(|column| column == name)
-            .ok_or_else(|| format!("compare arm is missing reported column '{name}'"))
-    };
-    let indices = [
-        column("S")?,
-        column("I")?,
-        column("R")?,
-        column("fired_infect")?,
-        column("fired_recover")?,
-        column("deferred_total")?,
-    ];
-    let ticks = output
-        .series
-        .rows
-        .iter()
-        .map(|row| {
-            Ok(CompareTick {
-                counts: [
-                    row[indices[0]].as_usize("compare S value")?,
-                    row[indices[1]].as_usize("compare I value")?,
-                    row[indices[2]].as_usize("compare R value")?,
-                ],
-                fired_infect: row[indices[3]].as_usize("compare infect firing")?,
-                fired_recover: row[indices[4]].as_usize("compare recover firing")?,
-                deferred_total: row[indices[5]].as_usize("compare deferred total")?,
-            })
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-    Ok(CompareArmOutcome {
+    let execution = execute_backend_output_with_features(
+        model,
+        initial,
+        params,
+        seed,
         ticks,
-        hashes: execution_hashes(&output, &execution.state),
+        backend,
+        enabled_features,
+    )?;
+    let hashes = execution_hashes(&execution.output, &execution.state);
+    Ok(CompareArmOutcome {
+        series: execution.output.series,
+        hashes,
         identity: execution.identity,
     })
 }

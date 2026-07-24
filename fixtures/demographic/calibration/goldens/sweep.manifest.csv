@@ -1,0 +1,9 @@
+# theta_source=file
+# parameter_status,birth_rate=file,emigration_rate=file,internal_arrival_rate=file,internal_departure_rate=file,mortality_adult=file,mortality_old=file,mortality_young=file,overseas_arrival_rate=file
+k,birth_rate,emigration_rate,internal_arrival_rate,internal_departure_rate,mortality_adult,mortality_old,mortality_young,overseas_arrival_rate
+0,0.02,0.0015,0.018,0.0025,0.0025,0.012,0.001,0.02
+1,0.025,0.002,0.018,0.0025,0.0025,0.012,0.001,0.02
+2,0.03,0.0025,0.018,0.0025,0.003,0.012,0.001,0.02
+3,0.02,0.002,0.018,0.0025,0.003,0.012,0.001,0.02
+4,0.025,0.0025,0.018,0.0025,0.0035,0.012,0.001,0.02
+5,0.03,0.0015,0.018,0.0025,0.0035,0.012,0.001,0.02
