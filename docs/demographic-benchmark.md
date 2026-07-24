@@ -1,0 +1,150 @@
+# Demographic slot benchmark
+
+This benchmark is manual benchmark/test tooling. It is not scientific
+population generation and does not change the `demographic_slots` model's
+interpretation. The synthetic rows exist only to measure the architecture.
+
+## What is measured
+
+`scripts/bench-demographic.sh` builds the release CLI and, for each requested
+scale, records:
+
+- deterministic `synth-state` wall time, peak RSS, and artifact bytes;
+- a real state-artifact load through a summary-free working model at
+  `--ticks 0` (the canonical summaries reject an empty run, while summaries do
+  not affect the state schema);
+- 24-tick wall time and peak RSS for the full benchmark model, the same model
+  without `age_monthly`, and the same model without grouped views;
+- state-export wall time, peak RSS, and bytes; and
+- ticks/second, ageing cost share `(full - no-ageing) / full`, and grouped
+  observation cost share `(full - no-grouped) / full`.
+
+The script uses `/usr/bin/time -l` on Darwin and `/usr/bin/time -v` on Linux.
+It records OS, release, architecture, CPU description, RAM, and a supplied
+machine class, but never a hostname or workspace path. A negative cost share is
+retained: a single noisy local measurement is evidence, not a regression gate.
+
+## Synthetic-state contract
+
+```text
+sembla synth-state --model <model-or-plan.json> --slots N --areas K \
+  --present-fraction F --streams birth:B,overseas:O,internal:I \
+  --seed S --out state.artifact
+```
+
+The command is deliberately scoped to the documented demographic column roles:
+`area.area_key`; the occupancy, event, sex, age, generation, entry-stream,
+entry-age, area-ref, and slot-resource-ref columns on `person_slot`; and the
+empty `slot_resource` table. Other shapes are rejected deterministically.
+Values use fixed arithmetic coordinate mixing, never OS randomness. The
+present count is `floor(slots * present-fraction)`; stream values are integer
+weights used to partition the remaining rows, with the final stream receiving
+rounding remainder.
+
+Because `sembla.state/v1` enforces declared row counts exactly, the command
+writes a canonical legacy companion model to `<out>.model.json`. It rewrites
+only `area`, `person_slot`, and `slot_resource` row declarations. A plan input
+is validated and its model is emitted as the companion; plan identity is not
+silently rewritten. Both outputs refuse overwrite.
+
+The artifact writer validates the caller's columns and streams the canonical
+header and little-endian column payloads through a bounded 64 KiB encoding
+buffer. It no longer constructs or clones an artifact-sized byte vector.
+Small-scale tests and the frozen demographic state fixture verify round-trip
+and byte identity.
+
+## Local evidence
+
+The managed-run evidence is in
+[`evidence/demographic-bench/local-2026-07-24/`](evidence/demographic-bench/local-2026-07-24/README.md).
+It was produced with:
+
+```sh
+scripts/bench-demographic.sh \
+  --scales 10000,100000,1000000 \
+  --seed 9009 \
+  --ticks 24 \
+  --out docs/evidence/demographic-bench/local-2026-07-24 \
+  --machine-class "Apple M2 Pro, 16 GiB, CPU-only moderate-memory local"
+```
+
+| Slots | Artifact | Full | No ageing | No grouped | ticks/s | Ageing share | Grouped share | Peak RSS |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 10,000 | 0.46 MiB | 0.51 s | 0.48 s | 0.46 s | 47.059 | 5.9% | 9.8% | 22.9 MiB |
+| 100,000 | 4.58 MiB | 5.36 s | 4.87 s | 4.82 s | 4.478 | 9.1% | 10.1% | 129.1 MiB |
+| 1,000,000 | 45.78 MiB | 54.68 s | 51.50 s | 56.77 s | 0.439 | **5.8%** | -3.8% | 551.8 MiB |
+
+The measured artifact is approximately 48 bytes/slot for this exact schema.
+That is distinct from the use case's earlier 64–80 bytes/slot raw estimate and
+from a double-buffered `StateStore` plus runtime overhead. The 1M peak RSS is a
+measurement; multiplication to larger scales below is only extrapolation.
+
+## Hardware evidence template — pending
+
+The local 16 GiB machine is not evidence for 10M or 50M. CPU runs require a
+machine with at least 32 GiB RAM for 50M, sufficient fast local storage, and no
+competing workload. CUDA runs require an H100-class device with enough device
+and host memory. Grouped observations are CPU-only under DECISIONS §K6, so CUDA
+uses the no-grouped variant and does not report grouped or ageing shares.
+
+Exact CPU command:
+
+```sh
+scripts/bench-demographic.sh \
+  --scales 10000000,50000000 \
+  --seed 9009 --ticks 24 --backend cpu \
+  --out demographic-bench-cpu-hardware \
+  --machine-class "REPLACE: >=32 GiB dedicated CPU benchmark host"
+```
+
+Exact CUDA command:
+
+```sh
+scripts/bench-demographic.sh \
+  --scales 10000000,50000000 \
+  --seed 9009 --ticks 24 --backend cuda \
+  --out demographic-bench-h100 \
+  --machine-class "REPLACE: H100-class dedicated CUDA benchmark host"
+```
+
+| Hardware run | State | Load | Runtime | ticks/s | Peak RSS | Export | Status |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 10M CPU full/no-ageing/no-grouped | pending | pending | pending | pending | pending | pending | **pending** |
+| 50M CPU full/no-ageing/no-grouped | pending | pending | pending | pending | pending | pending | **pending** |
+| 10M CUDA no-grouped | pending | pending | pending | pending | pending | pending | **pending** |
+| 50M CUDA no-grouped | pending | pending | pending | pending | pending | pending | **pending** |
+
+No hardware number in this table is inferred or fabricated. The script accepts
+`50000000`; generation retains one typed column set and the state writer adds
+only bounded encoding storage rather than another artifact-sized copy.
+
+## Interpretation
+
+The three variants intentionally differ by exactly one named concern, guarded
+against canonical-model drift by `synth_state.rs`. The cost-share arithmetic is
+most useful at 1M, where timer quantization is negligible. It does not isolate
+cache, allocator, thermal, or background-process effects. The negative 1M
+grouped share demonstrates that a single local run cannot support a grouped
+performance claim; it is recorded rather than adjusted.
+
+Linear artifact extrapolation is about 458 MiB at 10M and 2.24 GiB at 50M.
+Linear peak-RSS extrapolation from 1M would be roughly 27 GiB at 50M, which is
+why the 50M row requires at least 32 GiB and remains pending. These are planning
+extrapolations, not measurements.
+
+## Determination
+
+The binding §K2 trigger asks whether one monthly `age_months` write per present
+slot is a material cost. The stated threshold is greater than 10% of tick wall
+time at 1M slots. On the managed-run machine the measured ageing share is
+**5.8%** (`54.68 s` full versus `51.50 s` without `age_monthly`), below that
+threshold. A simple scale-linear extrapolation preserves a share rather than
+turning 5.8% into a larger percentage; however, cache and memory-bandwidth
+behavior at 10M/50M is unknown and the hardware rows remain pending.
+
+**Recommendation:** do not open the deferred `Expr::Tick`/derived-age design
+from this local evidence. Keep the explicit monthly ageing write and revisit
+only if the pending hardware measurements exceed 10% or show a stated
+nonlinear scaling reason. This is an evidence-backed recommendation, not the
+decision itself; any decision to open `Expr::Tick` requires a future DECISIONS
+§K amendment.

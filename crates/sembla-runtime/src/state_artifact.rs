@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::io::Write as _;
+use std::io::{BufWriter, Write as _};
 use std::path::{Path, PathBuf};
 
 use sembla_ir::{domain_digest, to_canonical_string, AttrType, HashRecordV1, ValidatedModel};
@@ -277,13 +277,23 @@ pub struct StateArtifact {
 }
 
 /// Writes canonical deterministic state-artifact bytes.
+///
+/// The header and column payloads are streamed directly to the destination.
+/// Only a bounded encoding buffer is allocated in addition to the caller's
+/// column vectors, so large synthetic artifacts do not acquire a second
+/// artifact-sized in-memory copy.
 pub fn write(
     path: impl AsRef<Path>,
     model: &ValidatedModel,
     tables: &[TableInit],
 ) -> Result<(), StateArtifactError> {
-    let bytes = artifact_bytes(model, tables)?;
-    fs::write(path.as_ref(), bytes).map_err(|error| io_error(path.as_ref(), error))
+    let path = path.as_ref();
+    let (header_json, header_len) = prepare_writer(model, tables)?;
+    let file = fs::File::create(path).map_err(|error| io_error(path, error))?;
+    let mut writer = BufWriter::new(file);
+    write_prepared(&mut writer, model, tables, &header_json, header_len)
+        .and_then(|()| writer.flush())
+        .map_err(|error| io_error(path, error))
 }
 
 /// Writes a canonical artifact while atomically refusing to replace an existing path.
@@ -293,8 +303,8 @@ pub fn write_new(
     tables: &[TableInit],
 ) -> Result<(), StateArtifactError> {
     let path = path.as_ref();
-    let bytes = artifact_bytes(model, tables)?;
-    let mut file = match fs::OpenOptions::new()
+    let (header_json, header_len) = prepare_writer(model, tables)?;
+    let file = match fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(path)
@@ -307,8 +317,11 @@ pub fn write_new(
         }
         Err(error) => return Err(io_error(path, error)),
     };
-    if let Err(error) = file.write_all(&bytes) {
-        drop(file);
+    let mut writer = BufWriter::new(file);
+    if let Err(error) = write_prepared(&mut writer, model, tables, &header_json, header_len)
+        .and_then(|()| writer.flush())
+    {
+        drop(writer);
         let _ = fs::remove_file(path);
         return Err(io_error(path, error));
     }
@@ -366,55 +379,48 @@ pub fn committed_table_inits(
     Ok(tables)
 }
 
-fn artifact_bytes(
+fn prepare_writer(
     model: &ValidatedModel,
     tables: &[TableInit],
-) -> Result<Vec<u8>, StateArtifactError> {
-    let normalized = normalize_writer_inputs(model, tables)?;
+) -> Result<(String, u32), StateArtifactError> {
+    validate_writer_inputs(model, tables)?;
     let header = header_for_model(model)?;
     let header_json = canonical_header(&header)?;
     let header_len =
         u32::try_from(header_json.len()).map_err(|_| StateArtifactError::HeaderTooLarge {
             length: header_json.len(),
         })?;
+    expected_file_len(&header, PREFIX_LEN + header_json.len())?;
+    Ok((header_json, header_len))
+}
 
-    let mut payload_len = 0usize;
-    for table in &normalized {
-        for column in &table.columns {
-            let byte_len = column_data_len(&column.data)
-                .checked_mul(column_data_type(&column.data).width())
-                .ok_or_else(|| StateArtifactError::PayloadSizeOverflow {
-                    box_name: table.box_name.clone(),
-                    table: table.table_name.clone(),
-                    column: column.name.clone(),
-                })?;
-            payload_len = payload_len.checked_add(byte_len).ok_or_else(|| {
-                StateArtifactError::PayloadSizeOverflow {
-                    box_name: table.box_name.clone(),
-                    table: table.table_name.clone(),
-                    column: column.name.clone(),
-                }
-            })?;
+fn write_prepared(
+    writer: &mut impl std::io::Write,
+    model: &ValidatedModel,
+    tables: &[TableInit],
+    header_json: &str,
+    header_len: u32,
+) -> std::io::Result<()> {
+    writer.write_all(STATE_MAGIC)?;
+    writer.write_all(&header_len.to_le_bytes())?;
+    writer.write_all(header_json.as_bytes())?;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let input = tables
+                .iter()
+                .find(|input| input.box_name == model_box.name && input.table_name == table.name)
+                .expect("writer inputs were validated");
+            for attr in &table.attrs {
+                let column = input
+                    .columns
+                    .iter()
+                    .find(|column| column.name == attr.name)
+                    .expect("writer columns were validated");
+                write_column_bytes(writer, &column.data)?;
+            }
         }
     }
-    let capacity = PREFIX_LEN
-        .checked_add(header_json.len())
-        .and_then(|size| size.checked_add(payload_len))
-        .ok_or_else(|| StateArtifactError::PayloadSizeOverflow {
-            box_name: "<writer>".to_owned(),
-            table: "<writer>".to_owned(),
-            column: "<file>".to_owned(),
-        })?;
-    let mut bytes = Vec::with_capacity(capacity);
-    bytes.extend_from_slice(STATE_MAGIC);
-    bytes.extend_from_slice(&header_len.to_le_bytes());
-    bytes.extend_from_slice(header_json.as_bytes());
-    for table in &normalized {
-        for column in &table.columns {
-            append_column_bytes(&mut bytes, &column.data);
-        }
-    }
-    Ok(bytes)
+    Ok(())
 }
 
 /// Reads and structurally validates a canonical state artifact.
@@ -1296,10 +1302,10 @@ fn header_for_model(model: &ValidatedModel) -> Result<Header, StateArtifactError
     Ok(header)
 }
 
-fn normalize_writer_inputs(
+fn validate_writer_inputs(
     model: &ValidatedModel,
     inputs: &[TableInit],
-) -> Result<Vec<TableInit>, StateArtifactError> {
+) -> Result<(), StateArtifactError> {
     let mut seen = HashSet::new();
     for table in inputs {
         if !seen.insert((table.box_name.as_str(), table.table_name.as_str())) {
@@ -1343,7 +1349,6 @@ fn normalize_writer_inputs(
         }
     }
 
-    let mut normalized = Vec::new();
     for model_box in &model.model().boxes {
         for table in &model_box.tables {
             let input = inputs
@@ -1363,7 +1368,6 @@ fn normalize_writer_inputs(
                     });
                 }
             }
-            let mut columns = Vec::new();
             for attr in &table.attrs {
                 let column = input
                     .columns
@@ -1389,7 +1393,6 @@ fn normalize_writer_inputs(
                     input.row_count,
                     ref_target_rows,
                 )?;
-                columns.push(column.clone());
             }
             for column in &input.columns {
                 if !table.attrs.iter().any(|attr| attr.name == column.name) {
@@ -1400,12 +1403,6 @@ fn normalize_writer_inputs(
                     });
                 }
             }
-            normalized.push(TableInit::new(
-                model_box.name.clone(),
-                table.name.clone(),
-                input.row_count,
-                columns,
-            ));
         }
     }
     for input in inputs {
@@ -1422,7 +1419,7 @@ fn normalize_writer_inputs(
             });
         }
     }
-    Ok(normalized)
+    Ok(())
 }
 
 fn column_header_for_attr(box_name: &str, attr: &sembla_ir::Attr) -> ColumnHeader {
@@ -1592,21 +1589,47 @@ fn column_data_len(data: &ColumnData) -> usize {
     }
 }
 
-fn append_column_bytes(output: &mut Vec<u8>, data: &ColumnData) {
+fn write_column_bytes(output: &mut impl std::io::Write, data: &ColumnData) -> std::io::Result<()> {
+    const CHUNK_VALUES: usize = 8_192;
     match data {
-        ColumnData::Real(values) => values
-            .iter()
-            .for_each(|value| output.extend_from_slice(&value.to_bits().to_le_bytes())),
-        ColumnData::Int(values) => values
-            .iter()
-            .for_each(|value| output.extend_from_slice(&value.to_le_bytes())),
-        ColumnData::Enum(values) => values
-            .iter()
-            .for_each(|value| output.extend_from_slice(&value.to_le_bytes())),
-        ColumnData::Ref(values) => values
-            .iter()
-            .for_each(|value| output.extend_from_slice(&value.to_le_bytes())),
+        ColumnData::Real(values) => {
+            for chunk in values.chunks(CHUNK_VALUES) {
+                let mut encoded = Vec::with_capacity(chunk.len() * 8);
+                for value in chunk {
+                    encoded.extend_from_slice(&value.to_bits().to_le_bytes());
+                }
+                output.write_all(&encoded)?;
+            }
+        }
+        ColumnData::Int(values) => {
+            for chunk in values.chunks(CHUNK_VALUES) {
+                let mut encoded = Vec::with_capacity(chunk.len() * 8);
+                for value in chunk {
+                    encoded.extend_from_slice(&value.to_le_bytes());
+                }
+                output.write_all(&encoded)?;
+            }
+        }
+        ColumnData::Enum(values) => {
+            for chunk in values.chunks(CHUNK_VALUES) {
+                let mut encoded = Vec::with_capacity(chunk.len() * 2);
+                for value in chunk {
+                    encoded.extend_from_slice(&value.to_le_bytes());
+                }
+                output.write_all(&encoded)?;
+            }
+        }
+        ColumnData::Ref(values) => {
+            for chunk in values.chunks(CHUNK_VALUES) {
+                let mut encoded = Vec::with_capacity(chunk.len() * 4);
+                for value in chunk {
+                    encoded.extend_from_slice(&value.to_le_bytes());
+                }
+                output.write_all(&encoded)?;
+            }
+        }
     }
+    Ok(())
 }
 
 fn decode_column(column_type: ColumnType, bytes: &[u8]) -> ColumnData {

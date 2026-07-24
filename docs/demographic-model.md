@@ -174,3 +174,6 @@ Per §K9, an unacceptable reported balance residual triggers Option D Phase 6
 paired migration design. Evidence that mother or household identity is
 scientifically required triggers a design-options note first; it does not
 justify silently adding cross-row or mother-linked semantics here.
+
+The manual scale measurements and the §K2 `Expr::Tick` recommendation are in
+[the demographic benchmark report](demographic-benchmark.md).
