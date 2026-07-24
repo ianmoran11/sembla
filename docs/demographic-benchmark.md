@@ -79,6 +79,36 @@ That is distinct from the use case's earlier 64–80 bytes/slot raw estimate and
 from a double-buffered `StateStore` plus runtime overhead. The 1M peak RSS is a
 measurement; multiplication to larger scales below is only extrapolation.
 
+### Extended curve — 2026-07-25
+
+[`evidence/demographic-bench/local-2026-07-25/`](evidence/demographic-bench/local-2026-07-25/README.md)
+extends the same machine class to 10M:
+
+| Slots | s/tick | × vs 1M | Peak RSS | Artifact B/slot | Ageing share | Grouped share |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1,000,000 | 2.28 | 1.00 | 0.54 GiB | 48.0 | 5.8% | −3.8% |
+| 2,000,000 | 4.52 | 1.99 | 0.72 GiB | 48.0 | 8.1% | 7.9% |
+| 5,000,000 | 11.95 | 5.25 | 1.50 GiB | 48.0 | 3.0% | 6.3% |
+| 10,000,000 | 24.71 | 10.85 | 1.90 GiB | 48.0 | 11.6% | 12.3% |
+
+Three results change how the numbers below should be read.
+
+**Tick cost is measured linear** over a 10× range (10× slots → 10.85× wall
+time), so time extrapolation is now supported rather than assumed: about 67
+s/tick at 27M and 124 s/tick at 50M, making a 12-tick annual window roughly 13
+and 25 minutes respectively.
+
+**Artifact size is exactly 48 bytes/slot** across the whole range, confirming the
+1M figure as a constant.
+
+**The peak-RSS extrapolation below is far too conservative.** A linear
+projection from 1M predicts 5.5 GiB at 10M; the measurement is 1.90 GiB, and the
+slope decreases with scale. The "roughly 27 GiB at 50M" figure below is
+therefore an overestimate — a linear projection from the 10M point gives about
+9.7 GiB — but the sublinearity is not characterised, and this 16 GiB machine may
+have been reclaiming under pressure at 10M, so the 50M CPU precondition below is
+left unchanged until a memory-comfortable host measures it.
+
 ## Hardware evidence template — pending
 
 The local 16 GiB machine is not evidence for 10M or 50M. CPU runs require a
@@ -86,6 +116,17 @@ machine with at least 32 GiB RAM for 50M, sufficient fast local storage, and no
 competing workload. CUDA runs require an H100-class device with enough device
 and host memory. Grouped observations are CPU-only under DECISIONS §K6, so CUDA
 uses the no-grouped variant and does not report grouped or ageing shares.
+
+**Automated collection (2026-07-25).** All four rows come from one provisioned
+Hyperstack GPU VM — it carries both the CUDA device and the RAM the 50M CPU row
+needs — via
+[`spikes/precision/infra-hyperstack/run-demographic-benchmark.sh`](../spikes/precision/infra-hyperstack/run-demographic-benchmark.sh)
+(module README §4b). After that module's reviewed paid apply, the script waits
+for bootstrap, builds `sembla-cli --features cuda`, runs both backends, retrieves
+a checksummed evidence directory with GPU/RAM/commit provenance, and then runs
+the mandatory destroy itself, failing loudly if any paid resource survives in
+state. The manual commands below remain correct for a host provisioned by other
+means.
 
 Exact CPU command:
 
@@ -148,3 +189,17 @@ only if the pending hardware measurements exceed 10% or show a stated
 nonlinear scaling reason. This is an evidence-backed recommendation, not the
 decision itself; any decision to open `Expr::Tick` requires a future DECISIONS
 §K amendment.
+
+**Amended 2026-07-25 — the trigger condition is now ambiguous, not answered.**
+The 10M measurement puts the ageing share at **11.6%**, above the 10% threshold
+named above. That does not settle it. The four measured shares are 5.8%, 8.1%,
+3.0%, and 11.6%, which is not a trend — it is a single unreplicated difference of
+two wall-clock timings at each scale, and the 5M and 10M points cannot both
+describe smooth behaviour. The §K2 threshold is also specified *at 1M*, where the
+measurement remains 5.8%.
+
+The recommendation is therefore unchanged, with its evidentiary basis restated:
+`Expr::Tick` stays closed not because the cost is known small, but because the
+cost is not yet known at all. Resolving it needs replicated runs at a fixed
+scale with a reported spread, not another single point — the same replication
+discipline any threshold decision requires.

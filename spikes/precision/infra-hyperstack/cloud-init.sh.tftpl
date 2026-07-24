@@ -58,6 +58,7 @@ trap on_exit EXIT
 console_note "starting bootstrap"
 SSH_CIDR="$(printf '%s' '${ssh_cidr_b64}' | base64 -d)"
 CONSOLE_PASSWORD_HASH="$(printf '%s' '${console_password_hash_b64}' | base64 -d)"
+SSH_HOST_PRIVATE_KEY="$(printf '%s' '${ssh_host_private_key_b64}' | base64 -d)"
 REPOSITORY_URL="$(printf '%s' '${repository_url_b64}' | base64 -d)"
 REGION_NAME="$(printf '%s' '${region_name_b64}' | base64 -d)"
 ENVIRONMENT_NAME="$(printf '%s' '${environment_name_b64}' | base64 -d)"
@@ -82,10 +83,46 @@ LoginGraceTime 30
 PermitRootLogin prohibit-password
 EOF
 chmod 0600 /etc/ssh/sshd_config.d/00-sembla-key-only.conf
+
+# Optional pre-seeded ED25519 host key. When supplied, the collector already
+# knows this fingerprint from before the VM existed, so there is no
+# trust-on-first-use window and no console read. When empty, the image's own
+# host key stands and the VNC verification path in README §4 applies unchanged.
+if [[ -n "$SSH_HOST_PRIVATE_KEY" ]]; then
+  ( umask 077; printf '%s\n' "$SSH_HOST_PRIVATE_KEY" > /etc/ssh/ssh_host_ed25519_key )
+  chown root:root /etc/ssh/ssh_host_ed25519_key
+  chmod 0600 /etc/ssh/ssh_host_ed25519_key
+  ssh-keygen -y -f /etc/ssh/ssh_host_ed25519_key > /etc/ssh/ssh_host_ed25519_key.pub
+  chmod 0644 /etc/ssh/ssh_host_ed25519_key.pub
+  # Offer exactly the pinned identity: no other host key may be presented.
+  rm -f /etc/ssh/ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key.pub \
+    /etc/ssh/ssh_host_ecdsa_key /etc/ssh/ssh_host_ecdsa_key.pub
+  cat > /etc/ssh/sshd_config.d/01-sembla-host-key.conf <<'EOF'
+HostKey /etc/ssh/ssh_host_ed25519_key
+EOF
+  chmod 0600 /etc/ssh/sshd_config.d/01-sembla-host-key.conf
+  # Limit on-VM persistence of the seeded key. Unlinking does not disturb the
+  # already-running bootstrap, which read its script before this point. The
+  # provider-side user-data copy is the documented residual exposure.
+  rm -f /var/lib/cloud/instance/user-data.txt \
+    /var/lib/cloud/instance/user-data.txt.i \
+    /var/lib/cloud/instances/*/user-data.txt \
+    /var/lib/cloud/instances/*/user-data.txt.i 2>/dev/null || true
+  unset SSH_HOST_PRIVATE_KEY
+  console_note "pre-seeded ED25519 host key installed; fingerprint was known before first boot"
+fi
+
 /usr/sbin/sshd -t
 systemctl restart ssh
 systemctl is-active --quiet ssh
 assert_key_only_ssh
+if [[ -f /etc/ssh/sshd_config.d/01-sembla-host-key.conf ]]; then
+  # Fail closed: a running sshd that is not serving the pinned key would make
+  # the collector's fingerprint comparison meaningless.
+  /usr/sbin/sshd -T | grep -qx 'hostkey /etc/ssh/ssh_host_ed25519_key'
+  ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}' \
+    > "$STATUS_DIR/ssh-host-fingerprint"
+fi
 printf '%s:%s\n' ${ssh_user} "$CONSOLE_PASSWORD_HASH" | chpasswd --encrypted
 console_note "temporary VNC console recovery enabled; SSH remains key-only"
 

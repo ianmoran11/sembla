@@ -17,8 +17,27 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
 - SSH is allowed only on TCP/22 from one canonical public IPv4 `/32` and remains key-only. A temporary password enables trusted VNC-console recovery but is never accepted by `sshd`. Its plaintext is never passed to Terraform; the sensitive hash remains only in ignored local plan/state and rendered guest user-data until deletion.
 - Hyperstack creates VMs with no default ingress. Terraform adds the `/32` rule
   after VM creation; broad IPv4/IPv6 egress is provider-managed.
-- Collection requires an ED25519 SSH host-key fingerprint independently read
-  from Hyperstack's trusted VNC console; trust-on-first-use is not accepted.
+- Collection requires an ED25519 SSH host-key fingerprint that is known
+  independently of the connection being secured; trust-on-first-use is never
+  accepted. **Amended 2026-07-25 — two sound paths, pick one:**
+  - *Pre-seeded (preferred, and the only unattended one).* `prepare-host-key.sh`
+    generates an ephemeral ED25519 host keypair locally; `TF_VAR_ssh_host_private_key`
+    carries it into rendered user-data, and cloud-init installs it as the VM's
+    only host key before sshd is restarted, failing the bootstrap if sshd does
+    not then serve it. The fingerprint is therefore known *before the VM exists*,
+    which removes the trust-on-first-use window entirely rather than closing it
+    by hand. The collector waits for a key matching the pinned fingerprint and
+    never accepts another, so the brief pre-cloud-init window in which the image's
+    own key is served is a retry, not an acceptance.
+    **Residual exposure, stated plainly:** the host private key is in rendered
+    user-data and in local Terraform state (0600, ignored by this module's
+    allowlist `.gitignore`), and cloud-init unlinks the on-VM user-data cache
+    after installing it. The provider-side copy remains until the VM is
+    destroyed. The key is single-use, per-VM, and worthless after destroy — but
+    it is a key in user-data, and that is the trade being made.
+  - *Console-read (original).* Leave `TF_VAR_ssh_host_private_key` unset and read
+    the fingerprint from Hyperstack's trusted VNC console as in §4. Unchanged,
+    still supported, still requires a human at a browser.
 - Port randomization is disabled because automation uses direct port 22.
 - VM labels and optional volumes are deliberately omitted due to known alpha
   provider consistency/lifecycle bugs.
@@ -38,6 +57,8 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
 - `main.tf` — zero-resource defaults, live selection guards, one VM, and exact `/32` rule;
 - `cloud-init.sh.tftpl` — early guest firewall/poweroff timer and CUDA/Rust bootstrap;
 - `prepare-console-password.sh` — Bash/OpenSSL 3 helper that reads the one-time VNC password without echo and emits only a hash export;
+- `prepare-host-key.sh` — generates the ephemeral ED25519 host keypair and emits only the two exports, so the fingerprint is known before first boot;
+- `run-demographic-benchmark.sh` — unattended demographic-benchmark collection and mandatory destroy (§4b);
 - `remote-run-spike.sh` — one CUDA+Vulkan benchmark invocation with Hyperstack provenance;
 - `collect-runs.sh` — resolves the state IP, performs bounded/backed-off SSH readiness checks, then seeds, executes, and retrieves the required three independent runs;
 - `verify-artifacts.py` — rejects incomplete, unbound, wrong-device, host-key, or cross-run evidence;
@@ -217,6 +238,60 @@ and `unexplained_arithmetic_mirror_difference_count` on answered native rows.
 A successful artifact verification means the three runs are structurally valid;
 it does not claim every candidate qualifies. Local artifact directories are
 ignored by Git.
+
+## 4b. Demographic benchmark collection (unattended)
+
+`run-demographic-benchmark.sh` reuses everything above — same VM, same host-key
+trust model, same `/32` rule — with a different remote payload: it builds
+`sembla-cli --features cuda` and runs `scripts/bench-demographic.sh` for both
+backends, filling all four pending hardware rows of
+[`docs/demographic-benchmark.md`](../../../docs/demographic-benchmark.md) from
+one session. A GPU host carries both the CUDA device and the ≥32 GiB the 50M CPU
+row needs, so CPU and CUDA scales come from the same machine and the same commit.
+
+It adds **no Terraform resources.** Run it after §3's reviewed paid apply, in
+place of §4's collector. With the pre-seeded host key there is no interactive
+step at all — generate the key, apply, collect:
+
+```bash
+eval "$(bash prepare-host-key.sh)"       # exports the key and its fingerprint
+# ... §3's reviewed paid apply, with TF_VAR_ssh_host_private_key now in scope ...
+bash run-demographic-benchmark.sh        # unattended through to destroy
+rm -rf "$SEMBLA_HOST_KEY_DIR"            # the key dies with the VM
+```
+
+`prepare-host-key.sh` prints the fingerprint to stderr and exports it as
+`SSH_HOST_KEY_FINGERPRINT`, so the collector pins a value that existed before the
+VM did. On the console-read path, export that variable by hand instead and leave
+`TF_VAR_ssh_host_private_key` unset; everything downstream is identical.
+
+Everything after that point is unattended: it waits for bootstrap, builds,
+benchmarks CUDA then CPU, retrieves an evidence directory with `SHA256SUMS` and
+GPU/RAM/commit provenance into `docs/evidence/demographic-bench/hyperstack-<UTC>/`,
+verifies the checksums locally, then runs §5's destroy itself and **fails loudly
+if any paid resource survives in state**.
+
+The remote run is **detached** (`setsid nohup`, status in `~/bench.status`), so a
+sleeping laptop, a closed lid, or a dropped network connection cannot kill hours
+of GPU time. Re-running the script rejoins a run already in progress instead of
+starting a second one; it only starts a new run when no benchmark PID is alive.
+Before a 50M collection, check that `emergency_poweroff_hours` exceeds the
+expected run time — that timer powers the guest off mid-run otherwise, and
+billing continues through a `SHUTOFF` anyway. `KEEP_VM=1` opts out of the destroy;
+nothing else does. Scales, ticks, and seed are overridable
+(`BENCH_SCALES_CUDA`, `BENCH_SCALES_CPU`, `BENCH_TICKS`, `BENCH_SEED`); the
+defaults match the committed local evidence so the rows are comparable.
+
+The remote payload refuses a CPU scale the host cannot hold in RAM rather than
+producing a measurement of the pager. The CUDA arm benchmarks the no-grouped
+model only, because grouped observations are CPU-only under DECISIONS §K6 — that
+restriction is the subject of a scheduled decision, not an oversight.
+
+> [!NOTE]
+> The paid apply itself still requires reviewing and approving a saved plan
+> (§3). That gate is deliberate — it is the billing control, not a trust
+> control — and this script does not bypass it. Everything after the apply is
+> unattended, including the destroy.
 
 ## 5. Destroy immediately
 

@@ -11,7 +11,9 @@
 !main.tf
 !outputs.tf
 !prepare-console-password.sh
+!prepare-host-key.sh
 !remote-run-spike.sh
+!run-demographic-benchmark.sh
 !review-paid-plan.py
 !variables.tf
 !verify-artifacts.py

@@ -1,0 +1,130 @@
+{
+  "configuration": {
+    "areas": 4,
+    "backend": "cpu",
+    "present_fraction": 0.8,
+    "seed": 9009,
+    "streams": "birth:600,overseas:250,internal:150",
+    "ticks": 24
+  },
+  "evidence_date_utc": "2026-07-24",
+  "machine": {
+    "arch": "arm64",
+    "class": "Apple M2 Pro, 16 GiB, CPU-only moderate-memory local",
+    "cpu": "Apple M2 Pro",
+    "os": "Darwin",
+    "os_release": "24.5.0",
+    "ram_bytes": 17179869184
+  },
+  "results": [
+    {
+      "derived": {
+        "ageing_cost_share": 0.080762501,
+        "grouped_observation_cost_share": 0.079473248,
+        "ticks_per_second": 0.221014826
+      },
+      "export_state": {
+        "artifact_bytes": 96000879,
+        "peak_rss_bytes": 496680960,
+        "wall_seconds": 1.44
+      },
+      "full": {
+        "peak_rss_bytes": 774209536,
+        "wall_seconds": 108.59
+      },
+      "load": {
+        "peak_rss_bytes": 423510016,
+        "summary_free_working_model": true,
+        "ticks": 0,
+        "wall_seconds": 0.68
+      },
+      "no_ageing": {
+        "peak_rss_bytes": 438943744,
+        "wall_seconds": 99.82
+      },
+      "no_grouped": {
+        "peak_rss_bytes": 767705088,
+        "wall_seconds": 99.96
+      },
+      "scale": 2000000,
+      "synth_state": {
+        "artifact_bytes": 96000879,
+        "peak_rss_bytes": 100302848,
+        "wall_seconds": 0.7
+      }
+    },
+    {
+      "derived": {
+        "ageing_cost_share": 0.03005474,
+        "grouped_observation_cost_share": 0.06255012,
+        "ticks_per_second": 0.083679091
+      },
+      "export_state": {
+        "artifact_bytes": 240000879,
+        "peak_rss_bytes": 1129480192,
+        "wall_seconds": 3.78
+      },
+      "full": {
+        "peak_rss_bytes": 1160052736,
+        "wall_seconds": 286.81
+      },
+      "load": {
+        "peak_rss_bytes": 730480640,
+        "summary_free_working_model": true,
+        "ticks": 0,
+        "wall_seconds": 1.72
+      },
+      "no_ageing": {
+        "peak_rss_bytes": 927973376,
+        "wall_seconds": 278.19
+      },
+      "no_grouped": {
+        "peak_rss_bytes": 1609711616,
+        "wall_seconds": 268.87
+      },
+      "scale": 5000000,
+      "synth_state": {
+        "artifact_bytes": 240000879,
+        "peak_rss_bytes": 243924992,
+        "wall_seconds": 0.26
+      }
+    },
+    {
+      "derived": {
+        "ageing_cost_share": 0.115706939,
+        "grouped_observation_cost_share": 0.122873282,
+        "ticks_per_second": 0.040468763
+      },
+      "export_state": {
+        "artifact_bytes": 480000881,
+        "peak_rss_bytes": 1532297216,
+        "wall_seconds": 8.24
+      },
+      "full": {
+        "peak_rss_bytes": 2038890496,
+        "wall_seconds": 593.05
+      },
+      "load": {
+        "peak_rss_bytes": 1444020224,
+        "summary_free_working_model": true,
+        "ticks": 0,
+        "wall_seconds": 3.53
+      },
+      "no_ageing": {
+        "peak_rss_bytes": 1493450752,
+        "wall_seconds": 524.43
+      },
+      "no_grouped": {
+        "peak_rss_bytes": 1918582784,
+        "wall_seconds": 520.18
+      },
+      "scale": 10000000,
+      "synth_state": {
+        "artifact_bytes": 480000881,
+        "peak_rss_bytes": 483573760,
+        "wall_seconds": 0.61
+      }
+    }
+  ],
+  "schema_version": "sembla.demographic-benchmark/v1"
+}
