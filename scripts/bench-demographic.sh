@@ -168,6 +168,12 @@ for name, path in templates.items():
 load = json.loads((out / "full.json").read_text())
 load["summaries"] = []
 (out / "load-only.json").write_text(json.dumps(load, separators=(",", ":")) + "\n")
+# CUDA cannot run grouped views (DECISIONS §K6) and a zero-tick run cannot
+# reduce summaries, so the CUDA export needs a model with neither.
+load_no_grouped = json.loads((out / "no-grouped.json").read_text())
+load_no_grouped["summaries"] = []
+(out / "load-only-no-grouped.json").write_text(
+    json.dumps(load_no_grouped, separators=(",", ":")) + "\n")
 PY
 }
 
@@ -240,7 +246,7 @@ PY
       "${common[@]}" --backend cpu --ticks 0 --enable grouped-observations \
       --export-state "$exported"
   else
-    measure "${scale}-export" "$sembla" run "$scale_dir/no-grouped.json" \
+    measure "${scale}-export" "$sembla" run "$scale_dir/load-only-no-grouped.json" \
       "${common[@]}" --backend cuda --ticks 0 --export-state "$exported"
   fi
   export_seconds="$MEASURE_SECONDS"
