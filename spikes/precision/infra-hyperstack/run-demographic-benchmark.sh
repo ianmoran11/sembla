@@ -317,7 +317,11 @@ source /etc/sembla-spike.env
 export PATH="$HOME/.cargo/bin:$CUDA_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 
-SCALES_CUDA="$1"; SCALES_CPU="$2"; TICKS="$3"; SEED="$4"
+# Config arrives via ~/bench.env, not positional args: an empty argument
+# cannot survive being embedded in a nested single-quoted bash -c string.
+. ~/bench.env
+SCALES_CUDA="${BENCH_SCALES_CUDA-}"; SCALES_CPU="${BENCH_SCALES_CPU-}"
+TICKS="${BENCH_TICKS:-24}"; SEED="${BENCH_SEED:-9009}"
 OUT_ROOT="$HOME/demographic-bench"
 rm -rf "$OUT_ROOT"; mkdir -p "$OUT_ROOT"
 
@@ -382,7 +386,6 @@ REMOTE_EOF
 scp "${SSH_OPTIONS[@]}" "$REMOTE_SCRIPT" "$REMOTE:bench-payload.sh" >/dev/null
 REMOTE_SCRIPT_DONE=1
 
-REMOTE_ARGS="$(printf '%q %q %q %q' "$BENCH_SCALES_CUDA" "$BENCH_SCALES_CPU" "$BENCH_TICKS" "$BENCH_SEED")"
 ssh "${SSH_OPTIONS[@]}" "$REMOTE" "bash -s" <<REMOTE_LAUNCH
 set -Eeuo pipefail
 if [[ -f ~/bench.pid ]] && kill -0 "\$(cat ~/bench.pid)" 2>/dev/null; then
@@ -390,8 +393,14 @@ if [[ -f ~/bench.pid ]] && kill -0 "\$(cat ~/bench.pid)" 2>/dev/null; then
   exit 0
 fi
 rm -f ~/bench.log ~/bench.status
+cat > ~/bench.env <<'ENVEOF'
+BENCH_SCALES_CUDA=$BENCH_SCALES_CUDA
+BENCH_SCALES_CPU=$BENCH_SCALES_CPU
+BENCH_TICKS=$BENCH_TICKS
+BENCH_SEED=$BENCH_SEED
+ENVEOF
 setsid nohup bash -c '
-  if bash ~/bench-payload.sh $REMOTE_ARGS; then
+  if bash ~/bench-payload.sh; then
     echo SEMBLA_BENCH_COMPLETE > ~/bench.status
   else
     echo "SEMBLA_BENCH_FAILED rc=\$?" > ~/bench.status

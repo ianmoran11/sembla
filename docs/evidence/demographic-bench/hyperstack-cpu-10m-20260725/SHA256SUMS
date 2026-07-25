@@ -1,0 +1,5 @@
+3e39ca07b36aa4a196170a2948706e7381f6e679c2d9ba8d70c1fe13670496ba  ./cpu/bench-results.json
+9edfef669bbe25a2cb38bc7d990ec07982c23144e660cfcfb72c6f7430bfcb21  ./cpu/bench-results.md
+08d9791d444f74a1ff25478d9f5cdb401fdca1def0e818038ae7ee9325b41eb3  ./nvidia-smi.txt
+d4fe9b4be3fe7f65a3ab4e0332d663b46e118cfcd0102a9eb36204af12e52ae6  ./provenance.txt
+a8293ece71b0b0a6e561bd81a1ab3b9732d5be3fce39354944af5932acb783ac  ./repository-commit.txt

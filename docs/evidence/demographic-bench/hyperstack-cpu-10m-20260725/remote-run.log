@@ -1,0 +1,6 @@
+=== building sembla-cli with CUDA ===
+    Finished `release` profile [optimized] target(s) in 0.02s
+=== bench backend=cpu scales=10000000 ===
+benchmarked scale=10000000 backend=cpu
+wrote /home/ubuntu/demographic-bench/cpu/bench-results.json and /home/ubuntu/demographic-bench/cpu/bench-results.md
+SEMBLA_BENCH_COMPLETE

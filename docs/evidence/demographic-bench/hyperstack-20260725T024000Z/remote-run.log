@@ -1,0 +1,6 @@
+=== building sembla-cli with CUDA ===
+    Finished `release` profile [optimized] target(s) in 0.01s
+=== bench backend=cuda scales=10000000,50000000 ===
+Traceback (most recent call last):
+  File "<stdin>", line 27, in <module>
+ValueError: could not convert string to float: ''

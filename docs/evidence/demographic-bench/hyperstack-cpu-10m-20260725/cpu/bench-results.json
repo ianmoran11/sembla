@@ -1,0 +1,58 @@
+{
+  "configuration": {
+    "areas": 4,
+    "backend": "cpu",
+    "present_fraction": 0.8,
+    "seed": 9009,
+    "streams": "birth:600,overseas:250,internal:150",
+    "ticks": 24
+  },
+  "evidence_date_utc": "2026-07-25",
+  "machine": {
+    "arch": "x86_64",
+    "class": "Hyperstack NVIDIA H100 PCIe, 177 GiB host RAM, backend cpu",
+    "cpu": "AMD EPYC 9554 64-Core Processor",
+    "os": "Linux",
+    "os_release": "6.8.0-90-generic",
+    "ram_bytes": 190128123904
+  },
+  "results": [
+    {
+      "derived": {
+        "ageing_cost_share": 0.121628636,
+        "grouped_observation_cost_share": 0.088574217,
+        "ticks_per_second": 0.049830783
+      },
+      "export_state": {
+        "artifact_bytes": 480000881,
+        "peak_rss_bytes": 2404720640,
+        "wall_seconds": 5.89
+      },
+      "full": {
+        "peak_rss_bytes": 2804297728,
+        "wall_seconds": 481.63
+      },
+      "load": {
+        "peak_rss_bytes": 1924710400,
+        "summary_free_working_model": true,
+        "ticks": 0,
+        "wall_seconds": 2.87
+      },
+      "no_ageing": {
+        "peak_rss_bytes": 1924943872,
+        "wall_seconds": 423.05
+      },
+      "no_grouped": {
+        "peak_rss_bytes": 2804146176,
+        "wall_seconds": 438.97
+      },
+      "scale": 10000000,
+      "synth_state": {
+        "artifact_bytes": 480000881,
+        "peak_rss_bytes": 464715776,
+        "wall_seconds": 0.88
+      }
+    }
+  ],
+  "schema_version": "sembla.demographic-benchmark/v1"
+}

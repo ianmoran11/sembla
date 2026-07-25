@@ -1,0 +1,5 @@
+gpu=NVIDIA H100 PCIe
+host_ram_gib=177
+cuda_home=/usr/local/cuda-12.8
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
