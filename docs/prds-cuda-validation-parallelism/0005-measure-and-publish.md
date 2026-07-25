@@ -68,12 +68,15 @@ here**; that trigger has its own process.
 - `docs/demographic-benchmark.md`
 - `docs/forward-roadmap.md`
 - `spikes/precision/infra-hyperstack/RUNBOOK.md`
+- `spikes/precision/infra-hyperstack/run-demographic-benchmark.sh` — benchmark-harness-only revision needed to enforce the frozen protocol
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
 
 ## Non-goals
 
-No code changes. No tuning to reach the gate — if the measurement misses, that
-is the finding. No 50M row; §L4 is decided at 10M. No grouped-observation work.
+No production or runtime code changes. The benchmark collector may change only
+to enforce and prove the frozen protocol; no tuning to reach the gate — if the
+measurement misses, that is the finding. No 50M row; §L4 is decided at 10M. No
+grouped-observation work.
 
 ## Acceptance criteria
 
@@ -92,3 +95,11 @@ is the finding. No 50M row; §L4 is decided at 10M. No grouped-observation work.
 Written before PRD 0002 lands. If 0002 changes the shape of the fix, the run
 procedure here may need explicit revision — but §L4's gate and protocol are
 frozen and must not be revised to fit a result.
+
+Implementation amendment: the existing collector ran one measurement per
+backend, synthesized a separate state for each arm, and emitted no cross-arm
+assertions, medians, or spread. It therefore could not implement §L4 as written.
+The collector is narrowly allowed above so it can build and hash one binary,
+synthesize and hash one shared state, run three replicates per backend, and
+publish assertion-rich aggregate evidence. This does not permit production code
+changes or any revision of the frozen case or gate.

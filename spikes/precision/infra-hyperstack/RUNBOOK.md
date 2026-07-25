@@ -122,9 +122,35 @@ approve. That avoids typing a long key into a VNC console.
   already makes sshd serve only the listed key. Deleting the others risks
   sshd failing per-connection after the banner — unrecoverable remotely.
 
+## PRD 0005 frozen protocol
+
+`run-demographic-benchmark.sh` now implements only the frozen §L4 collection:
+10,000,000 slots, 24 ticks, seed 9009, three replicates per backend, and the
+no-grouped model. It refuses the old `BENCH_SCALES_*`, `BENCH_TICKS`, and
+`BENCH_SEED` overrides rather than allowing an accidental non-gate run. There is
+no 50M row in this collection.
+
+The remote payload builds and hashes one release binary, synthesizes and hashes
+one state artifact, and interleaves three CUDA and three CPU no-grouped runs
+against those exact paths. It aborts if the repository commit, binary, or state
+hash changes, or if any gate output differs across backend or replicate. Three
+paired CPU full/no-ageing runs report the ageing-share median and spread without
+making the §K2 decision.
+
+The retrieved directory contains raw timing/output files, `bench-results.json`,
+`bench-results.md`, a verdict `README.md`, separate GPU/CPU/RAM provenance,
+explicit assertion results, and `SHA256SUMS`. The collector requires a new local
+evidence directory, preserves the remote manifest as `SHA256SUMS.remote`, and
+verifies it before destroying the VM; a final manifest then covers the remote
+evidence plus local collection and teardown logs. Resumption uses an immutable,
+content-hashed remote payload and refuses to overwrite a different live or
+completed payload. Do not edit the generated verdict to make a failed gate pass;
+a ratio below 3× is a complete result.
+
 ## Timing, cost, and capacity
 
-Measured on `n3-H100x1` (H100 PCIe 80GB, 28 vCPU, 177 GiB RAM), CANADA-1:
+Measured provisioning timings on `n3-H100x1` (H100 PCIe 80GB, 28 vCPU, 177 GiB
+RAM), CANADA-1:
 
 | Phase | Duration |
 |---|---|
@@ -132,14 +158,13 @@ Measured on `n3-H100x1` (H100 PCIe 80GB, 28 vCPU, 177 GiB RAM), CANADA-1:
 | Floating IP attach after ACTIVE | seconds to minutes — **poll, don't assume** |
 | cloud-init bootstrap to `ready` | ~2 minutes |
 | `cargo build --release --features cuda` | ~13s warm, few minutes cold |
-| Full benchmark, both backends, 10M + 50M | ~4–5 hours |
+| Frozen §L4 benchmark | budget roughly 1–2 hours; the collector timeout is 12h |
 
-At $2.50672/hr that is roughly **$12** for a complete run. Discovery, planning,
-and `terraform destroy` are free.
-
-Capacity notes: the 50M CPU row needs ~20 GiB by the collector's budget
-(400 B/slot + 2 GiB); the H100 flavor's 177 GiB is ample. A state artifact is
-48 bytes/slot exactly — 2.24 GiB at 50M.
+At $2.50672/hr, budget roughly **$3–$5** plus any public-IP charge for the
+expected run. Discovery, planning, and `terraform destroy` are free. The 10M
+state is 48 bytes/slot (about 458 MiB), and the H100 flavor's 177 GiB host RAM is
+ample. Keep the eight-hour emergency timer and the independent destroy watchdog;
+neither a guest poweroff nor a benchmark failure stops billing.
 
 ## Failure playbook
 
@@ -175,6 +200,8 @@ python3 review-paid-plan.py hyperstack-paid.tfplan     # human approval gate
 terraform apply hyperstack-paid.tfplan
 bash destroy-deadline.sh arm 7
 bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
+# On success, verify the new hyperstack-l4-<UTC>/SHA256SUMS once more before
+# using bench-results.json to update the verdict documents.
 ```
 
 Run the collector under `tmux` if driving from a phone or an unreliable link:

@@ -6,19 +6,16 @@
 # host-key trust model, the /32 SSH rule, and the mandatory destroy are inherited
 # from `collect-runs.sh` and the module README.
 #
-# It fills the four pending rows of docs/demographic-benchmark.md from one VM:
-# a GPU host has both the CUDA device and the >=32 GiB of RAM the 50M CPU row
-# requires, so CPU and CUDA scales are collected in a single session.
+# It executes DECISIONS.md §L's frozen gate on one VM: one 10M state artifact,
+# one release binary, three no-grouped replicates per backend, and three paired
+# full/no-ageing CPU replicates for the separately reported §K2 trigger input.
 #
 # Required environment:
 #   HYPERSTACK_API_KEY          - needed only for the terraform destroy at the end
 #   SSH_HOST_KEY_FINGERPRINT    - SHA256:... read from the Hyperstack VNC console
 # Optional environment:
 #   SSH_PRIVATE_KEY_PATH        - default ~/.ssh/sembla_hyperstack
-#   BENCH_SCALES_CUDA           - default 10000000,50000000
-#   BENCH_SCALES_CPU            - default 10000000,50000000
-#   BENCH_TICKS / BENCH_SEED    - default 24 / 9009 (match the local evidence)
-#   ARTIFACT_DIR                - default docs/evidence/demographic-bench/hyperstack-<UTC>
+#   ARTIFACT_DIR                - default docs/evidence/demographic-bench/hyperstack-l4-<UTC>
 #   TFVARS_FILE                 - default terraform.tfvars
 #   KEEP_VM=1                   - skip the automatic destroy (billing continues)
 #   BOOTSTRAP_TIMEOUT_SECONDS   - default 1800
@@ -27,7 +24,7 @@
 # The remote run is detached, so a dropped connection loses nothing: re-running
 # this script rejoins the run in progress rather than starting a second one.
 # Check that the VM's emergency poweroff timer (emergency_poweroff_hours)
-# exceeds the expected run time before starting a 50M collection.
+# exceeds the expected run time before starting the frozen collection.
 set -Eeuo pipefail
 
 MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,15 +32,9 @@ REPO_ROOT="$(cd "$MODULE_DIR/../../.." && pwd)"
 SSH_PRIVATE_KEY_PATH="${SSH_PRIVATE_KEY_PATH:-$HOME/.ssh/sembla_hyperstack}"
 KNOWN_HOSTS_FILE="$MODULE_DIR/.hyperstack_known_hosts"
 TFVARS_FILE="${TFVARS_FILE:-terraform.tfvars}"
-# Note the ":-" is deliberately absent: an EMPTY value must mean "skip this
-# backend", not "use the default". With ":-" it silently ran the full list.
-BENCH_SCALES_CUDA="${BENCH_SCALES_CUDA-10000000,50000000}"
-BENCH_SCALES_CPU="${BENCH_SCALES_CPU-10000000,50000000}"
-BENCH_TICKS="${BENCH_TICKS:-24}"
-BENCH_SEED="${BENCH_SEED:-9009}"
 BOOTSTRAP_TIMEOUT_SECONDS="${BOOTSTRAP_TIMEOUT_SECONDS:-1800}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-ARTIFACT_DIR="${ARTIFACT_DIR:-$REPO_ROOT/docs/evidence/demographic-bench/hyperstack-$STAMP}"
+ARTIFACT_DIR="${ARTIFACT_DIR:-$REPO_ROOT/docs/evidence/demographic-bench/hyperstack-l4-$STAMP}"
 
 DESTROYED=false
 REMOTE_SCRIPT=""
@@ -68,16 +59,17 @@ if [[ ! -f "$SSH_PRIVATE_KEY_PATH" ]]; then
   echo "SSH private key not found: $SSH_PRIVATE_KEY_PATH" >&2
   exit 2
 fi
-for scales in "$BENCH_SCALES_CUDA" "$BENCH_SCALES_CPU"; do
-  if [[ -n "$scales" && ! "$scales" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]]; then
-    echo "invalid scale list: $scales" >&2
+for legacy_override in BENCH_SCALES_CUDA BENCH_SCALES_CPU BENCH_TICKS BENCH_SEED; do
+  if [[ -n "${!legacy_override:-}" ]]; then
+    echo "$legacy_override is not configurable for the frozen §L4 protocol" >&2
     exit 2
   fi
 done
-if [[ -z "$BENCH_SCALES_CUDA" && -z "$BENCH_SCALES_CPU" ]]; then
-  echo "nothing to do: both scale lists are empty" >&2
+if [[ -e "$ARTIFACT_DIR" ]]; then
+  echo "evidence directory already exists; choose a new ARTIFACT_DIR: $ARTIFACT_DIR" >&2
   exit 2
 fi
+mkdir -p "$ARTIFACT_DIR"
 
 cd "$MODULE_DIR"
 
@@ -215,8 +207,6 @@ fi
 echo "Public IP: $PUBLIC_IP"
 SSH_USER="$(terraform output -raw ssh_user)"
 
-mkdir -p "$ARTIFACT_DIR"
-
 # --- host-key verification: pinned fingerprint only, never trust-on-first-use ---
 # The pinned key is either pre-seeded (prepare-host-key.sh, known before the VM
 # existed) or read from the trusted VNC console. Either way the loop waits for a
@@ -317,90 +307,378 @@ source /etc/sembla-spike.env
 export PATH="$HOME/.cargo/bin:$CUDA_HOME/bin:$PATH"
 export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 
-# Config arrives via ~/bench.env, not positional args: an empty argument
-# cannot survive being embedded in a nested single-quoted bash -c string.
-. ~/bench.env
-SCALES_CUDA="${BENCH_SCALES_CUDA-}"; SCALES_CPU="${BENCH_SCALES_CPU-}"
-TICKS="${BENCH_TICKS:-24}"; SEED="${BENCH_SEED:-9009}"
+# The frozen protocol is deliberately not configurable here. Changing any of
+# these values would create a benchmark, but not §L4 gate evidence.
+SCALE=10000000
+TICKS=24
+SEED=9009
+AREAS=4
+PRESENT_FRACTION=0.8
+STREAMS='birth:600,overseas:250,internal:150'
+REPLICATES=3
 OUT_ROOT="$HOME/demographic-bench"
-rm -rf "$OUT_ROOT"; mkdir -p "$OUT_ROOT"
+WORK="$OUT_ROOT/work"
+RUNS="$OUT_ROOT/runs"
+rm -rf "$OUT_ROOT"
+mkdir -p "$WORK" "$RUNS"
+export LC_ALL=C
 
 command -v nvidia-smi >/dev/null
-nvidia-smi --query-gpu=name,driver_version,memory.total,pci.bus_id \
-  --format=csv,noheader > "$OUT_ROOT/nvidia-smi.txt"
-GPU_NAME="$(awk -F', *' 'NR==1 {print $1}' "$OUT_ROOT/nvidia-smi.txt")"
+command -v sha256sum >/dev/null
+command -v /usr/bin/time >/dev/null
+nvidia-smi --query-gpu=name,driver_version,memory.total,pci.bus_id,uuid \
+  --format=csv,noheader > "$OUT_ROOT/gpu-provenance.txt"
+nvidia-smi -q >> "$OUT_ROOT/gpu-provenance.txt"
+lscpu > "$OUT_ROOT/cpu-provenance.txt"
+cat /proc/meminfo > "$OUT_ROOT/ram-provenance.txt"
+GPU_NAME="$(awk -F', *' 'NR==1 {print $1}' "$OUT_ROOT/gpu-provenance.txt")"
 RAM_GIB="$(awk '/MemTotal:/ {printf "%.0f", $2/1048576}' /proc/meminfo)"
-git -C "$SPIKE_DIR" rev-parse HEAD > "$OUT_ROOT/repository-commit.txt"
-{
-  echo "gpu=$GPU_NAME"
-  echo "host_ram_gib=$RAM_GIB"
-  echo "cuda_home=$CUDA_HOME"
-  nvcc --version | tail -2
-} > "$OUT_ROOT/provenance.txt"
+SESSION_ID="$(cat /proc/sys/kernel/random/uuid)"
+printf '%s\n' "$SESSION_ID" > "$OUT_ROOT/session-id.txt"
+HOST_ID="$({ cat /etc/machine-id; head -1 "$OUT_ROOT/gpu-provenance.txt"; } | sha256sum | awk '{print $1}')"
+printf '%s\n' "$HOST_ID" > "$OUT_ROOT/host-identity.sha256"
 
 cd "$SPIKE_DIR"
-echo "=== building sembla-cli with CUDA ==="
-cargo build --locked --release -p sembla-cli --features cuda
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo 'remote repository has tracked changes; refusing gate evidence' >&2
+  exit 4
+fi
+COMMIT_BEFORE="$(git rev-parse HEAD)"
+printf '%s\n' "$COMMIT_BEFORE" > "$OUT_ROOT/repository-commit.txt"
+STARTED_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-run_bench() {
-  local backend="$1" scales="$2" out="$3"
-  [[ -z "$scales" ]] && return 0
-  echo "=== bench backend=$backend scales=$scales ==="
-  MACHINE_CLASS="Hyperstack $GPU_NAME, ${RAM_GIB} GiB host RAM, backend $backend"
-  scripts/bench-demographic.sh \
-    --scales "$scales" --seed "$SEED" --ticks "$TICKS" \
-    --backend "$backend" --out "$out" \
-    --machine-class "$MACHINE_CLASS" \
-    --sembla "$SPIKE_DIR/target/release/sembla"
+echo '=== building one sembla-cli binary with CUDA ==='
+cargo build --locked --release -p sembla-cli --features cuda
+BIN="$SPIKE_DIR/target/release/sembla"
+BIN_SHA="$(sha256sum "$BIN" | awk '{print $1}')"
+printf '%s  target/release/sembla\n' "$BIN_SHA" > "$OUT_ROOT/binary.sha256"
+
+STATE="$WORK/initial.state"
+echo '=== synthesizing one shared 10M state artifact ==='
+"$BIN" synth-state \
+  --model fixtures/demographic/benchmark/demographic_slots.full.json \
+  --slots "$SCALE" --areas "$AREAS" --present-fraction "$PRESENT_FRACTION" \
+  --streams "$STREAMS" --seed "$SEED" --out "$STATE" \
+  > "$OUT_ROOT/synth-state.stdout" 2> "$OUT_ROOT/synth-state.stderr"
+STATE_SHA="$(sha256sum "$STATE" | awk '{print $1}')"
+printf '%s  initial.state\n' "$STATE_SHA" > "$OUT_ROOT/initial-state.sha256"
+
+python3 - "$SCALE" "$STATE.model.json" "$WORK" <<'PY'
+import json, pathlib, sys
+scale = int(sys.argv[1])
+full_companion = pathlib.Path(sys.argv[2])
+out = pathlib.Path(sys.argv[3])
+root = pathlib.Path.cwd()
+templates = {
+    "full": full_companion,
+    "no-ageing": root / "fixtures/demographic/benchmark/demographic_slots.no-ageing.json",
+    "no-grouped": root / "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+}
+for name, path in templates.items():
+    model = json.loads(path.read_text())
+    for box in model["boxes"]:
+        for table in box["tables"]:
+            if table["name"] in {"person_slot", "slot_resource"}:
+                table["size_hint"] = scale
+    (out / f"{name}.json").write_text(
+        json.dumps(model, separators=(",", ":")) + "\n"
+    )
+PY
+(
+  cd "$WORK"
+  sha256sum full.json no-ageing.json no-grouped.json > "$OUT_ROOT/models.sha256"
+)
+
+measure() {
+  local label="$1"; shift
+  echo "=== measurement $label ==="
+  /usr/bin/time -f '{"wall_seconds":%e,"peak_rss_kib":%M}' \
+    -o "$RUNS/$label.time.json" \
+    "$@" > "$RUNS/$label.stdout" 2> "$RUNS/$label.stderr"
+  python3 - "$RUNS/$label.time.json" <<'PY'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1])
+row = json.loads(p.read_text())
+if row["wall_seconds"] <= 0 or row["peak_rss_kib"] <= 0:
+    raise SystemExit(f"invalid timing record: {row}")
+PY
 }
 
-# Refuse a CPU scale this host cannot hold: a swapping run measures the pager,
-# not the model. The budget is 400 B/slot plus 2 GiB, roughly twice the measured
-# local peak RSS (1.90 GiB at 10M, docs/evidence/demographic-bench/local-2026-07-25),
-# because that measurement is sublinear and taken on a machine under memory
-# pressure, so it is an optimistic basis for a guard.
-if [[ -n "$SCALES_CPU" ]]; then
-  LARGEST_CPU="$(printf '%s\n' "${SCALES_CPU//,/$'\n'}" | sort -n | tail -1)"
-  NEEDED_GIB=$(( 2 + (LARGEST_CPU * 400) / (1024 * 1024 * 1024) ))
-  if (( RAM_GIB < NEEDED_GIB )); then
-    echo "refusing CPU scale $LARGEST_CPU: host has ${RAM_GIB} GiB, budget is ${NEEDED_GIB} GiB" >&2
-    echo "a swapping run measures paging, not the model" >&2
-    echo "set BENCH_SCALES_CPU to a smaller list if this host is intentional" >&2
-    exit 3
+# Interleave the gate arms. Every command below names the same state path and
+# binary path; their hashes are asserted again after the final replicate.
+for replicate in 1 2 3; do
+  measure "cuda-$replicate" "$BIN" run "$WORK/no-grouped.json" \
+    --seed "$SEED" --population "$STATE" --backend cuda --ticks "$TICKS" \
+    --out "$RUNS/cuda-$replicate.csv"
+  measure "cpu-$replicate" "$BIN" run "$WORK/no-grouped.json" \
+    --seed "$SEED" --population "$STATE" --backend cpu --ticks "$TICKS" \
+    --out "$RUNS/cpu-$replicate.csv"
+  measure "ageing-full-$replicate" "$BIN" run "$WORK/full.json" \
+    --seed "$SEED" --population "$STATE" --backend cpu --ticks "$TICKS" \
+    --enable grouped-observations --out "$RUNS/ageing-full-$replicate.csv"
+  measure "ageing-no-ageing-$replicate" "$BIN" run "$WORK/no-ageing.json" \
+    --seed "$SEED" --population "$STATE" --backend cpu --ticks "$TICKS" \
+    --enable grouped-observations --out "$RUNS/ageing-no-ageing-$replicate.csv"
+done
+
+# Differential corpus coverage is separate, but gate evidence must not time an
+# incorrect arm. Require exact equality of results, summaries, and the printed
+# results/final-state/observation hash tuple across all six gate replicates.
+GATE_RESULTS_SHA="$(sha256sum "$RUNS/cuda-1.csv" | awk '{print $1}')"
+GATE_SUMMARIES_SHA="$(sha256sum "$RUNS/cuda-1.csv.summaries.csv" | awk '{print $1}')"
+GATE_HASHES_SHA="$(sha256sum "$RUNS/cuda-1.stdout" | awk '{print $1}')"
+for arm in cuda-{1,2,3} cpu-{1,2,3}; do
+  if [[ "$(sha256sum "$RUNS/$arm.csv" | awk '{print $1}')" != "$GATE_RESULTS_SHA" ]]; then
+    echo "gate results differ across backend/replicate: $arm" >&2
+    exit 5
   fi
+  if [[ "$(sha256sum "$RUNS/$arm.csv.summaries.csv" | awk '{print $1}')" != "$GATE_SUMMARIES_SHA" ]]; then
+    echo "gate summaries differ across backend/replicate: $arm" >&2
+    exit 5
+  fi
+  if [[ "$(sha256sum "$RUNS/$arm.stdout" | awk '{print $1}')" != "$GATE_HASHES_SHA" ]]; then
+    echo "gate result/final-state/observation hashes differ across backend/replicate: $arm" >&2
+    exit 5
+  fi
+done
+{
+  printf '%s  results.csv (all CPU/CUDA replicates identical)\n' "$GATE_RESULTS_SHA"
+  printf '%s  summaries.csv (all CPU/CUDA replicates identical)\n' "$GATE_SUMMARIES_SHA"
+  printf '%s  printed execution hashes (all CPU/CUDA replicates identical)\n' "$GATE_HASHES_SHA"
+} > "$OUT_ROOT/gate-outputs.sha256"
+
+COMMIT_AFTER="$(git rev-parse HEAD)"
+BIN_SHA_AFTER="$(sha256sum "$BIN" | awk '{print $1}')"
+STATE_SHA_AFTER="$(sha256sum "$STATE" | awk '{print $1}')"
+if [[ "$COMMIT_AFTER" != "$COMMIT_BEFORE" ]]; then
+  echo 'repository commit changed during benchmark' >&2
+  exit 5
 fi
+if [[ "$BIN_SHA_AFTER" != "$BIN_SHA" ]]; then
+  echo 'benchmark binary changed between arms' >&2
+  exit 5
+fi
+if [[ "$STATE_SHA_AFTER" != "$STATE_SHA" ]]; then
+  echo 'shared state artifact changed between arms' >&2
+  exit 5
+fi
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  echo 'remote repository gained tracked changes during benchmark' >&2
+  exit 5
+fi
+FINISHED_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-run_bench cuda "$SCALES_CUDA" "$OUT_ROOT/cuda"
-run_bench cpu "$SCALES_CPU" "$OUT_ROOT/cpu"
+python3 - "$OUT_ROOT" "$COMMIT_BEFORE" "$BIN_SHA" "$STATE_SHA" \
+  "$GATE_RESULTS_SHA" "$GATE_SUMMARIES_SHA" "$GATE_HASHES_SHA" \
+  "$HOST_ID" "$SESSION_ID" "$GPU_NAME" "$RAM_GIB" "$STARTED_UTC" "$FINISHED_UTC" <<'PY'
+import json, pathlib, statistics, sys
+(
+    root_s, commit, binary_sha, state_sha,
+    gate_results_sha, gate_summaries_sha, gate_hashes_sha,
+    host_id, session_id, gpu_name, ram_gib, started, finished,
+) = sys.argv[1:]
+root = pathlib.Path(root_s)
+runs = root / "runs"
 
+def timing(label):
+    return json.loads((runs / f"{label}.time.json").read_text())
+
+def series(prefix):
+    return [timing(f"{prefix}-{i}")["wall_seconds"] for i in range(1, 4)]
+
+def summary(values):
+    return {
+        "replicates": values,
+        "median_seconds": statistics.median(values),
+        "min_seconds": min(values),
+        "max_seconds": max(values),
+        "spread_seconds": max(values) - min(values),
+    }
+
+cuda = series("cuda")
+cpu = series("cpu")
+full = series("ageing-full")
+no_ageing = series("ageing-no-ageing")
+ageing = [(f - n) / f for f, n in zip(full, no_ageing)]
+speedup = statistics.median(cpu) / statistics.median(cuda)
+ageing_median = statistics.median(ageing)
+doc = {
+    "schema_version": "sembla.cuda-validation-l4-benchmark/v1",
+    "protocol": {
+        "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+        "slots": 10_000_000,
+        "ticks": 24,
+        "seed": 9009,
+        "areas": 4,
+        "present_fraction": 0.8,
+        "streams": "birth:600,overseas:250,internal:150",
+        "replicates_per_backend": 3,
+        "reported_statistic": "median",
+        "gate_cuda_speedup_at_least": 3.0,
+    },
+    "provenance": {
+        "repository_commit": commit,
+        "binary_sha256": binary_sha,
+        "initial_state_sha256": state_sha,
+        "gate_results_sha256": gate_results_sha,
+        "gate_summaries_sha256": gate_summaries_sha,
+        "gate_execution_hashes_sha256": gate_hashes_sha,
+        "host_identity_sha256": host_id,
+        "session_id": session_id,
+        "gpu_name": gpu_name,
+        "host_ram_gib": int(ram_gib),
+        "started_utc": started,
+        "finished_utc": finished,
+    },
+    "assertions": {
+        "one_host": True,
+        "one_session": True,
+        "repository_commit_identical_for_all_arms": True,
+        "binary_identical_for_all_arms": True,
+        "initial_state_identical_for_all_arms": True,
+        "gate_results_summaries_and_state_hashes_identical_for_all_arms": True,
+        "three_replicates_per_backend": len(cuda) == len(cpu) == 3,
+    },
+    "measurements": {
+        "cuda_no_grouped": summary(cuda),
+        "cpu_no_grouped": summary(cpu),
+        "cpu_full": summary(full),
+        "cpu_no_ageing": summary(no_ageing),
+        "ageing_cost_share": {
+            "replicates": ageing,
+            "median": ageing_median,
+            "min": min(ageing),
+            "max": max(ageing),
+            "spread": max(ageing) - min(ageing),
+        },
+    },
+    "verdict": {
+        "cpu_median_over_cuda_median": speedup,
+        "l4_gate_met": speedup >= 3.0,
+        "ageing_k2_threshold": 0.10,
+        "ageing_evidence_direction": "strengthens" if ageing_median >= 0.10 else "weakens",
+        "k2_decided_here": False,
+    },
+}
+(root / "bench-results.json").write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n")
+
+c = doc["measurements"]["cuda_no_grouped"]
+p = doc["measurements"]["cpu_no_grouped"]
+a = doc["measurements"]["ageing_cost_share"]
+v = doc["verdict"]
+verdict = "MET" if v["l4_gate_met"] else "NOT MET"
+ratio = v["cpu_median_over_cuda_median"]
+fmt = lambda xs: ", ".join(f"{x:.3f}" for x in xs)
+readme = f"""# CUDA validation §L4 frozen benchmark evidence
+
+This directory records one frozen-case session on one host at repository commit
+`{commit}`. The collector asserted that every arm used binary SHA-256
+`{binary_sha}` and initial-state SHA-256 `{state_sha}`; it aborted if the commit,
+binary, or state changed.
+
+## Gate result
+
+- CUDA no-grouped replicates: {fmt(c['replicates'])} s; median **{c['median_seconds']:.3f} s**; spread {c['min_seconds']:.3f}–{c['max_seconds']:.3f} s.
+- CPU no-grouped replicates: {fmt(p['replicates'])} s; median **{p['median_seconds']:.3f} s**; spread {p['min_seconds']:.3f}–{p['max_seconds']:.3f} s.
+- Same-host CPU-median / CUDA-median ratio: **{ratio:.3f}×**.
+- §L4 verdict: **{verdict}** (required: CUDA at least 3× faster).
+
+## Ageing share
+
+Paired full/no-ageing CPU replicates produce ageing shares
+{', '.join(f'{x:.2%}' for x in a['replicates'])}; median **{a['median']:.2%}**;
+spread {a['min']:.2%}–{a['max']:.2%}. This **{v['ageing_evidence_direction']}**
+the existing evidence for the §K2 10% trigger. It does **not** decide §K2.
+
+`bench-results.json` is the machine-readable record. `bench-results.md` lists all
+raw replicate timings. GPU, CPU, and RAM provenance are in the three named
+`*-provenance.txt` files. Verify the directory with `sha256sum -c SHA256SUMS`
+(or `shasum -a 256 -c SHA256SUMS` on macOS).
+"""
+(root / "README.md").write_text(readme)
+
+lines = [
+    "# Frozen demographic benchmark results", "",
+    f"Repository commit: `{commit}`; session: `{session_id}`; host identity: `{host_id}`.", "",
+    "| Measurement | Replicate 1 s | Replicate 2 s | Replicate 3 s | Median s | Min–max s |",
+    "|---|---:|---:|---:|---:|---:|",
+]
+for name, data in [
+    ("CUDA no-grouped", c), ("CPU no-grouped", p),
+    ("CPU full", doc["measurements"]["cpu_full"]),
+    ("CPU no-ageing", doc["measurements"]["cpu_no_ageing"]),
+]:
+    r = data["replicates"]
+    lines.append(
+        f"| {name} | {r[0]:.3f} | {r[1]:.3f} | {r[2]:.3f} | "
+        f"{data['median_seconds']:.3f} | {data['min_seconds']:.3f}–{data['max_seconds']:.3f} |"
+    )
+lines += [
+    "", f"§L4 ratio: **{ratio:.3f}×**; verdict: **{verdict}**.", "",
+    f"Ageing-share replicates: {', '.join(f'{x:.6f}' for x in a['replicates'])}; "
+    f"median **{a['median']:.6f}**; range {a['min']:.6f}–{a['max']:.6f}. "
+    f"This {v['ageing_evidence_direction']} the §K2 trigger evidence; §K2 is not decided here.", "",
+]
+(root / "bench-results.md").write_text("\n".join(lines))
+
+assert all(doc["assertions"].values())
+(root / "assertions.txt").write_text(
+    "PASS one host and one session\n"
+    "PASS repository commit identical for both backends and every replicate\n"
+    "PASS binary SHA-256 identical for both backends and every replicate\n"
+    "PASS initial-state SHA-256 identical for both backends and every replicate\n"
+    "PASS gate results, summaries, and execution hashes identical for both backends and every replicate\n"
+    "PASS exactly three no-grouped replicates per backend\n"
+)
+PY
+
+rm -rf "$WORK"
 cd "$OUT_ROOT"
-find . -type f \( -name '*.json' -o -name '*.md' -o -name '*.txt' \) -print0 \
-  | sort -z | xargs -0 sha256sum > SHA256SUMS
+find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+sha256sum -c SHA256SUMS >/dev/null
 tar -czf "$HOME/demographic-bench.tar.gz" -C "$HOME" demographic-bench
-echo "SEMBLA_BENCH_COMPLETE"
+echo SEMBLA_BENCH_COMPLETE
 REMOTE_EOF
 
-# The remote run is hours long at 50M. Detach it so a laptop sleeping, a network
-# drop, or a closed lid cannot kill the work — and so this driver can be re-run
-# to rejoin a run already in progress instead of starting a second one.
-scp "${SSH_OPTIONS[@]}" "$REMOTE_SCRIPT" "$REMOTE:bench-payload.sh" >/dev/null
-REMOTE_SCRIPT_DONE=1
-
-ssh "${SSH_OPTIONS[@]}" "$REMOTE" "bash -s" <<REMOTE_LAUNCH
+# The frozen run is long enough that a workstation interruption is plausible.
+# Detach it so a laptop sleeping, a network drop, or a closed lid cannot kill
+# the work. A retry must never overwrite a payload that a detached shell may
+# still be reading: identify the immutable payload by its content hash and
+# upload only when no matching run is active or complete.
+PAYLOAD_SHA="$(python3 - "$REMOTE_SCRIPT" <<'PY'
+import hashlib, pathlib, sys
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+REMOTE_STATE="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'bash -s' <<'REMOTE_STATE_EOF'
 set -Eeuo pipefail
-if [[ -f ~/bench.pid ]] && kill -0 "\$(cat ~/bench.pid)" 2>/dev/null; then
-  echo "rejoining the benchmark already running as PID \$(cat ~/bench.pid)"
-  exit 0
+payload_sha="$(cat ~/bench.payload.sha256 2>/dev/null || true)"
+if [[ -f ~/bench.pid ]] && kill -0 "$(cat ~/bench.pid)" 2>/dev/null; then
+  printf 'running %s\n' "$payload_sha"
+elif [[ "$(cat ~/bench.status 2>/dev/null || true)" == SEMBLA_BENCH_COMPLETE ]]; then
+  printf 'complete %s\n' "$payload_sha"
+else
+  printf 'idle\n'
 fi
+REMOTE_STATE_EOF
+)"
+case "$REMOTE_STATE" in
+  "running $PAYLOAD_SHA"|"complete $PAYLOAD_SHA")
+    echo "Rejoining benchmark state: $REMOTE_STATE"
+    ;;
+  running\ *|complete\ *)
+    echo "remote benchmark uses a different payload; refusing to overwrite it: $REMOTE_STATE" >&2
+    exit 1
+    ;;
+  idle)
+    REMOTE_PAYLOAD="bench-payload-$PAYLOAD_SHA.sh"
+    scp "${SSH_OPTIONS[@]}" "$REMOTE_SCRIPT" "$REMOTE:$REMOTE_PAYLOAD" >/dev/null
+    ssh "${SSH_OPTIONS[@]}" "$REMOTE" "bash -s" <<REMOTE_LAUNCH
+set -Eeuo pipefail
+printf '%s\n' '$PAYLOAD_SHA' > ~/bench.payload.sha256
 rm -f ~/bench.log ~/bench.status
-cat > ~/bench.env <<'ENVEOF'
-BENCH_SCALES_CUDA=$BENCH_SCALES_CUDA
-BENCH_SCALES_CPU=$BENCH_SCALES_CPU
-BENCH_TICKS=$BENCH_TICKS
-BENCH_SEED=$BENCH_SEED
-ENVEOF
 setsid nohup bash -c '
-  if bash ~/bench-payload.sh; then
+  if bash ~/$REMOTE_PAYLOAD; then
     echo SEMBLA_BENCH_COMPLETE > ~/bench.status
   else
     echo "SEMBLA_BENCH_FAILED rc=\$?" > ~/bench.status
@@ -409,6 +687,12 @@ setsid nohup bash -c '
 echo \$! > ~/bench.pid
 echo "started benchmark as PID \$(cat ~/bench.pid)"
 REMOTE_LAUNCH
+    ;;
+  *)
+    echo "unexpected remote benchmark state: $REMOTE_STATE" >&2
+    exit 1
+    ;;
+esac
 
 echo "Benchmark running detached on $REMOTE. Polling until it finishes."
 echo "A dropped connection is harmless: re-run this script to rejoin."
@@ -432,14 +716,23 @@ fi
 scp "${SSH_OPTIONS[@]}" "$REMOTE:demographic-bench.tar.gz" "$ARTIFACT_DIR/" >/dev/null
 tar -xzf "$ARTIFACT_DIR/demographic-bench.tar.gz" -C "$ARTIFACT_DIR" --strip-components=1
 rm -f "$ARTIFACT_DIR/demographic-bench.tar.gz"
+mv "$ARTIFACT_DIR/SHA256SUMS" "$ARTIFACT_DIR/SHA256SUMS.remote"
 
 if command -v sha256sum >/dev/null; then
-  (cd "$ARTIFACT_DIR" && sha256sum -c SHA256SUMS >/dev/null) \
-    && echo "Artifact checksums verified."
+  if ! (cd "$ARTIFACT_DIR" && sha256sum -c SHA256SUMS.remote >/dev/null); then
+    echo "artifact checksum verification failed; refusing teardown" >&2
+    exit 1
+  fi
 elif command -v shasum >/dev/null; then
-  (cd "$ARTIFACT_DIR" && shasum -a 256 -c SHA256SUMS >/dev/null) \
-    && echo "Artifact checksums verified."
+  if ! (cd "$ARTIFACT_DIR" && shasum -a 256 -c SHA256SUMS.remote >/dev/null); then
+    echo "artifact checksum verification failed; refusing teardown" >&2
+    exit 1
+  fi
+else
+  echo "no SHA-256 verification utility; refusing teardown" >&2
+  exit 1
 fi
+echo "Transferred artifact checksums verified."
 
 # --- mandatory teardown -------------------------------------------------------
 if [[ "${KEEP_VM:-0}" == "1" ]]; then
@@ -463,8 +756,30 @@ else
   echo "Terraform destroy completed and state is clean. Confirm in the Hyperstack console that no VM remains."
 fi
 
+# The remote checksum set proves transfer integrity. Regenerate it after local
+# collection and teardown so it also covers bootstrap/driver logs and the final
+# empty Terraform-state assertion, then verify the exact committed directory.
+python3 - "$ARTIFACT_DIR" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+lines = []
+for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    lines.append(f"{digest}  {path.relative_to(root).as_posix()}")
+(root / "SHA256SUMS").write_text("\n".join(lines) + "\n")
+PY
+if command -v sha256sum >/dev/null; then
+  (cd "$ARTIFACT_DIR" && sha256sum -c SHA256SUMS >/dev/null)
+elif command -v shasum >/dev/null; then
+  (cd "$ARTIFACT_DIR" && shasum -a 256 -c SHA256SUMS >/dev/null)
+else
+  echo "no SHA-256 verification utility for final evidence" >&2
+  exit 1
+fi
+echo "Final evidence checksums verified."
+
 echo
 echo "Evidence written to: $ARTIFACT_DIR"
-for f in "$ARTIFACT_DIR"/cuda/bench-results.md "$ARTIFACT_DIR"/cpu/bench-results.md; do
+for f in "$ARTIFACT_DIR/README.md" "$ARTIFACT_DIR/bench-results.md"; do
   [[ -f "$f" ]] && { echo; echo "--- $f ---"; cat "$f"; }
 done
