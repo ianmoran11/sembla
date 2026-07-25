@@ -130,6 +130,10 @@ order.
   regression pass every differential test.
 - `0005-measure-and-publish` — re-run the frozen case, commit evidence, correct
   `docs/demographic-benchmark.md` and the forward roadmap's scale note.
+- `0006-remaining-serial-kernels` — added 2026-07-26 after 0005's measurement:
+  three further kernels carry the same defect, excluded from 0002 on an
+  unverified assertion. Adds a corpus-wide test so kernel exclusions must be
+  named in code with a reason rather than claimed in prose.
 
 ## Acceptance notes
 
