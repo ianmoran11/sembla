@@ -125,8 +125,9 @@ order.
   deterministic minimum-index failure reporting.
 - `0003-diagnostic-equality-tests` — negative models must report identical
   status codes and candidate indices on CPU and CUDA.
-- `0004-differential-and-goldens` — existing corpus byte-unchanged; the
-  demographic no-grouped model joins it.
+- `0004-differential-corpus-membership` — existing corpus byte-unchanged; the
+  demographic no-grouped model joins it, closing the coverage gap that let this
+  regression pass every differential test.
 - `0005-measure-and-publish` — re-run the frozen case, commit evidence, correct
   `docs/demographic-benchmark.md` and the forward roadmap's scale note.
 
