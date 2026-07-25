@@ -27,6 +27,14 @@ seed, and state artifact, differing only in `--backend`. Evidence:
 `docs/evidence/demographic-bench/hyperstack-cuda-10m-20260725/` and
 `docs/evidence/demographic-bench/hyperstack-cpu-10m-20260725/`.
 
+**Evidence status correction (2026-07-25).** The checked-in CUDA arm records
+commit `f81fef9d90ad`; the CPU arm records `8857cb839220`. No `crates/**`, Cargo
+manifest/lockfile, or fixture files changed between those commits, and the
+benchmark-script delta affects only the CUDA zero-tick export step. The stored
+pair therefore supports the diagnostic 12.3× baseline but does not substantiate
+the same-commit, same-artifact sentence above and is not §L4 gate evidence. The
+frozen §L4 protocol remains unchanged.
+
 For contrast, ADR 0001 measured ~1,380 ticks/sec for SIR at 26M rows on the same
 GPU class. SIR declares no contests and dereferences no `Ref`, so it generates
 none of the code below.

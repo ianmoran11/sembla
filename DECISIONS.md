@@ -1268,3 +1268,87 @@ and silently forcing exact national migration balance are rejected.
 
 **Reason.** These caveats distinguish aggregate approximation choices from
 framework semantics and keep their measurable consequences visible.
+
+## L. CUDA validation parallelism (accepted 2026-07-25)
+
+### L1. The defect is validation, not execution
+
+**Decision.** The generated CUDA simulation kernels are parallel. Four
+validation kernels (`sembla_validate_claims`, `sembla_validate_transition`,
+`sembla_validate_effects`, and `sembla_validate_outputs`) instead execute a
+per-row loop on a single thread. Their cost is O(rows) serial per claim and per
+fallible expression per tick. The defect is validation, not execution.
+
+**Alternatives.** Attributing the slowdown to host/device transfer, to `f64`
+arithmetic, or to the model's rule count is rejected. Each is contradicted by
+the measurement that SIR at 26M rows on the same GPU class runs at ~1,380
+ticks/sec while generating none of these loops.
+
+**Reason.** The emitted source and the sustained 100% `utilization.gpu` reading
+(which reports kernel residency, not occupancy) jointly identify a serial
+kernel, not a stall.
+
+### L2. Validation remains a separate pass
+
+**Decision.** Per-row validation is parallelised in place. It is not fused into
+the execution kernels that already visit each row.
+
+**Alternatives.** Fusion, which is faster in principle, is rejected.
+
+**Reason.** Fusion entangles two independent concerns for a speedup not required
+to clear the §L4 gate, and the CPU oracle keeps them separate. Divergence in
+structure makes differential reasoning harder for no gain now.
+
+### L3. Failure reporting is order-independent by construction
+
+**Decision.** Validation reports the minimum failing candidate index, computed
+by parallel reduction, not the first writer.
+
+**Alternatives.** Reporting any failing candidate, or making the reported index
+depend on launch configuration, is rejected.
+
+**Reason.** Diagnostics are part of the observable contract compared by the
+differential harness. A diagnostic that varies with block count breaks Level A
+determinism as surely as a differing state hash.
+
+### L4. The gate is "worth using", not a throughput target
+
+**Decision.** The track succeeds when CUDA at the frozen case is at least **3×
+faster than the same host's CPU** on the same model, binary, commit, seed, and
+state artifact.
+
+**Alternatives.** A ticks/sec target and parity with SIR throughput are rejected.
+
+**Reason.** The decision the roadmap needs is whether the GPU is worth using for
+this model class. An absolute target invites tuning beyond the question being
+asked.
+
+### L5. Grouped observations stay CPU-only
+
+**Decision.** Unchanged from §K6 and §K9, grouped observations stay CPU-only.
+This track admits the demographic model to the differential corpus in its
+no-grouped configuration only.
+
+**Alternatives.** Opportunistically adding CUDA grouped support here is
+rejected.
+
+**Reason.** It is a separate deferred construct with its own follow-up folder.
+Bundling it would hide a semantic change inside a performance fix.
+
+### Frozen benchmark case
+
+Later PRDs in this track must use this case unchanged:
+
+```text
+model:    fixtures/demographic/benchmark/demographic_slots.no-grouped.json
+scale:    10,000,000 slots
+ticks:    24
+seed:     9009
+areas:    4      present fraction: 0.8
+streams:  birth:600,overseas:250,internal:150
+command:  scripts/bench-demographic.sh --scales 10000000 --ticks 24 --seed 9009
+```
+
+Both arms run on one host in one session. Replicates: **three per backend**, and
+the reported figure is the median; a single run is not evidence for a gate (the
+ageing-share readings this year show why).

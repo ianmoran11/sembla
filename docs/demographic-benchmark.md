@@ -160,6 +160,43 @@ No hardware number in this table is inferred or fabricated. The script accepts
 `50000000`; generation retains one typed column set and the state writer adds
 only bounded encoding storage rather than another artifact-sized copy.
 
+## Measured CUDA/CPU baseline — 2026-07-25
+
+The frozen 10M-slot no-grouped case measured CUDA as **12.3× slower than the CPU
+on the same host**:
+
+| Backend | Wall time | s/tick |
+|---|---:|---:|
+| CUDA (NVIDIA H100 PCIe) | 1h 30m 08s | 225.3 |
+| CPU (AMD EPYC 9554, same host) | 7m 19s | 18.3 |
+
+Both arms used the `demographic_slots` no-grouped model for 24 ticks with seed
+`9009`, on one Hyperstack host with an NVIDIA H100 PCIe, an AMD EPYC 9554,
+177 GiB host RAM, Linux 6.8.0-90-generic, and x86-64. The recorded toolchain is
+Rust 1.97.1, CUDA 12.8.93, and NVIDIA driver 570.195.03.
+
+The checked-in CUDA arm records commit `f81fef9d90ad`; the CPU arm records
+`8857cb839220`. No `crates/**`, Cargo manifest/lockfile, or fixture files changed
+between those commits, and the benchmark-script delta affects only the CUDA
+zero-tick export step, not the timed no-grouped run. The 12.3× ratio is retained
+as diagnostic baseline evidence, but this evidence pair does not establish an
+identical binary or state artifact and does not satisfy §L4's same-commit,
+same-artifact, three-replicate gate. The evidence directories are:
+
+- [`hyperstack-cuda-10m-20260725/`](evidence/demographic-bench/hyperstack-cuda-10m-20260725/)
+- [`hyperstack-cpu-10m-20260725/`](evidence/demographic-bench/hyperstack-cpu-10m-20260725/)
+
+DECISIONS §L1 records the cause: the generated CUDA simulation kernels are
+parallel, but `sembla_validate_claims`, `sembla_validate_transition`,
+`sembla_validate_effects`, and `sembla_validate_outputs` each run a per-row
+validation loop on one GPU thread, once per claim and per fallible expression
+per tick. The emitted source and sustained 100% `utilization.gpu` identify a
+resident serial kernel rather than an execution-kernel or transfer stall.
+
+The current CUDA path is not viable for models with contests or `Ref`
+dereferences. Existing SIR throughput figures do not generalise to those models:
+SIR generates none of the validation loops that dominate this benchmark.
+
 ## Interpretation
 
 The three variants intentionally differ by exactly one named concern, guarded
