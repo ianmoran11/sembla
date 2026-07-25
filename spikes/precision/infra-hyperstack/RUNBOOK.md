@@ -69,7 +69,7 @@ Diagnosis order, cheapest first:
 The collector forces `KexAlgorithms=curve25519-sha256` because OpenSSH 9.x
 defaults to the `sntrup761` hybrid, whose client public key is ~1200 bytes — a
 single packet large enough to vanish on a path with an MTU problem. This is
-defence in depth; it did **not** fix the ISP path.
+defence in depth; it did **not** fix the failing home network.
 
 ## Things that must not be changed casually
 
