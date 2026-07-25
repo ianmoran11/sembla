@@ -79,14 +79,20 @@ fi
 
 cd "$MODULE_DIR"
 
-PUBLIC_IP="$(terraform output -raw public_ip 2>/dev/null || true)"
-if [[ -z "$PUBLIC_IP" || "$PUBLIC_IP" == "null" ]]; then
-  PUBLIC_IP="$(
-    terraform show -json | python3 -c '
-import json
-import sys
-
-state = json.load(sys.stdin)
+# Hyperstack assigns the public IP a moment AFTER the VM is created, and a
+# refresh-only operation with non-creating variables can omit the conditional
+# output (module README, alpha-provider constraints). Resolve with retries --
+# output, then floating_ip in state, then one refresh -- because failing here
+# strands a VM that is already billing.
+resolve_public_ip() {
+  local ip
+  ip="$(terraform output -raw public_ip 2>/dev/null || true)"
+  if [[ -z "$ip" || "$ip" == "null" ]]; then
+    ip="$(terraform show -json 2>/dev/null | python3 -c 'import json,sys
+try:
+    state = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
 modules = [state.get("values", {}).get("root_module", {})]
 while modules:
     module = modules.pop()
@@ -94,25 +100,75 @@ while modules:
         if resource.get("address") == "hyperstack_core_virtual_machine.gpu[0]":
             print(resource.get("values", {}).get("floating_ip") or "")
             raise SystemExit
-    modules.extend(module.get("child_modules", []))
-'
-  )"
-fi
-SSH_USER="$(terraform output -raw ssh_user)"
-if ! python3 - "$PUBLIC_IP" <<'PY'
-import ipaddress
-import sys
+    modules.extend(module.get("child_modules", []))' || true)"
+  fi
+  printf '%s' "$ip"
+}
 
+is_global_ipv4() {
+  python3 -c 'import ipaddress,sys
 try:
-    address = ipaddress.ip_address(sys.argv[1])
+    a = ipaddress.ip_address(sys.argv[1])
 except ValueError:
     raise SystemExit(1)
-raise SystemExit(0 if address.version == 4 and address.is_global else 1)
+raise SystemExit(0 if a.version == 4 and a.is_global else 1)' "$1" 2>/dev/null
+}
+
+PUBLIC_IP="${PUBLIC_IP_OVERRIDE:-}"
+ip_deadline=$((SECONDS + ${IP_TIMEOUT_SECONDS:-600}))
+ip_refreshed=false
+while [[ -z "$PUBLIC_IP" ]] && (( SECONDS < ip_deadline )); do
+  candidate="$(resolve_public_ip)"
+  if is_global_ipv4 "$candidate"; then
+    PUBLIC_IP="$candidate"
+    break
+  fi
+  if [[ -n "${HYPERSTACK_API_KEY:-}" ]]; then
+    # Ask the provider API directly: it is authoritative and immediate, whereas
+    # Terraform state only learns the floating IP on a refresh. Refreshing ONCE
+    # is not enough -- the IP attaches seconds to minutes after creation, so a
+    # single early refresh sees nothing and the loop then spins uselessly.
+    candidate="$(
+      python3 - <<'PY' 2>/dev/null || true
+import json, os, urllib.request
+key = os.environ.get("HYPERSTACK_API_KEY", "")
+req = urllib.request.Request(
+    "https://infrahub-api.nexgencloud.com/v1/core/virtual-machines",
+    headers={"api_key": key, "Accept": "application/json",
+             # Hyperstack's edge rejects urllib's default user agent.
+             "User-Agent": "sembla-precision-discovery/1.0"}, method="GET")
+try:
+    data = json.load(urllib.request.urlopen(req, timeout=30))
+except Exception:
+    raise SystemExit
+for vm in (data.get("instances") or data.get("virtual_machines") or []):
+    ip = vm.get("floating_ip")
+    if ip:
+        print(ip)
+        break
 PY
-then
-  echo "Terraform state has no valid global public IPv4 for the paid VM." >&2
+    )"
+    if is_global_ipv4 "$candidate"; then
+      PUBLIC_IP="$candidate"
+      echo "Resolved public IP from the provider API."
+      # Bring state into line so later terraform operations agree.
+      terraform refresh -var-file="$TFVARS_FILE" \
+        -var=create_instance=true \
+        -var=accept_paid_creation=true >/dev/null 2>&1 || true
+      break
+    fi
+  fi
+  echo "Waiting for the public IP to be assigned."
+  sleep 15
+done
+if [[ -z "$PUBLIC_IP" ]] || ! is_global_ipv4 "$PUBLIC_IP"; then
+  echo "No global public IPv4 for the paid VM within the timeout." >&2
+  echo "The VM exists and is billing. Read its IP from the Hyperstack console" >&2
+  echo "and re-run with PUBLIC_IP_OVERRIDE=<ip>, or destroy it now." >&2
   exit 2
 fi
+echo "Public IP: $PUBLIC_IP"
+SSH_USER="$(terraform output -raw ssh_user)"
 
 mkdir -p "$ARTIFACT_DIR"
 
@@ -157,6 +213,12 @@ SSH_OPTIONS=(
   -o BatchMode=yes
   -o IdentitiesOnly=yes
   -o IPQoS=none
+  # OpenSSH 9.x defaults to the sntrup761 hybrid KEX, whose client public key is
+  # ~1200 bytes. On a path that silently drops packets near the MTU, that single
+  # packet vanishes, the server never completes KEX, and the connection dies at
+  # LoginGraceTime 30 -- indistinguishable from a hung host. curve25519 sends 32
+  # bytes instead. The server offers it first, so this costs nothing.
+  -o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org
   -o ConnectTimeout=10
   -o ConnectionAttempts=1
   -o ServerAliveInterval=15

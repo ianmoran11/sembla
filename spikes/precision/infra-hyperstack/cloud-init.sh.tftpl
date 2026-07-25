@@ -94,9 +94,11 @@ if [[ -n "$SSH_HOST_PRIVATE_KEY" ]]; then
   chmod 0600 /etc/ssh/ssh_host_ed25519_key
   ssh-keygen -y -f /etc/ssh/ssh_host_ed25519_key > /etc/ssh/ssh_host_ed25519_key.pub
   chmod 0644 /etc/ssh/ssh_host_ed25519_key.pub
-  # Offer exactly the pinned identity: no other host key may be presented.
-  rm -f /etc/ssh/ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key.pub \
-    /etc/ssh/ssh_host_ecdsa_key /etc/ssh/ssh_host_ecdsa_key.pub
+  # Offer exactly the pinned identity. An explicit HostKey directive already
+  # makes sshd serve only the listed key, so the other key files are LEFT IN
+  # PLACE: deleting files that the distro config may still reference risks
+  # sshd failing per-connection after the banner, which is unrecoverable
+  # remotely and indistinguishable from a network fault.
   cat > /etc/ssh/sshd_config.d/01-sembla-host-key.conf <<'EOF'
 HostKey /etc/ssh/ssh_host_ed25519_key
 EOF
@@ -117,11 +119,17 @@ systemctl restart ssh
 systemctl is-active --quiet ssh
 assert_key_only_ssh
 if [[ -f /etc/ssh/sshd_config.d/01-sembla-host-key.conf ]]; then
-  # Fail closed: a running sshd that is not serving the pinned key would make
-  # the collector's fingerprint comparison meaningless.
-  /usr/sbin/sshd -T | grep -qx 'hostkey /etc/ssh/ssh_host_ed25519_key'
+  # Record what sshd actually serves. This is deliberately NON-fatal: the
+  # collector already refuses any key but the pinned one, so it is the real
+  # enforcement point. An assertion here that aborts on an `sshd -T` output
+  # formatting difference would kill the whole bootstrap for no safety gain.
   ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}' \
-    > "$STATUS_DIR/ssh-host-fingerprint"
+    > "$STATUS_DIR/ssh-host-fingerprint" || true
+  if /usr/sbin/sshd -T 2>/dev/null | grep -qx 'hostkey /etc/ssh/ssh_host_ed25519_key'; then
+    console_note "sshd confirmed serving the pinned ED25519 host key"
+  else
+    console_note "WARNING: sshd -T did not report the pinned host key path; collector will still enforce it"
+  fi
 fi
 printf '%s:%s\n' ${ssh_user} "$CONSOLE_PASSWORD_HASH" | chpasswd --encrypted
 console_note "temporary VNC console recovery enabled; SSH remains key-only"

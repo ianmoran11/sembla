@@ -117,7 +117,17 @@ if mode == "darwin":
     rss = re.search(r"(?m)^\s*([0-9]+)\s+maximum resident set size\b", text)
     rss_bytes = int(rss.group(1)) if rss else 0
 else:
-    elapsed = re.search(r"Elapsed \(wall clock\) time[^:]*:\s*([^\s]+)", text)
+    # GNU time prints: "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.23".
+    # The label itself contains colons, so anchoring on the first colon captures
+    # "mm:ss" out of the label rather than the value. Match the whole line and
+    # take its final whitespace-separated token, which is the value in every
+    # documented GNU time format.
+    line = re.search(r"(?m)^.*Elapsed \(wall clock\) time.*$", text)
+    elapsed = None
+    if line:
+        tokens = line.group(0).split()
+        if tokens:
+            elapsed = re.fullmatch(r"[0-9]+(:[0-9]+)*(\.[0-9]+)?", tokens[-1])
     rss = re.search(r"Maximum resident set size \(kbytes\):\s*([0-9]+)", text)
     rss_bytes = int(rss.group(1)) * 1024 if rss else 0
 if not elapsed:
