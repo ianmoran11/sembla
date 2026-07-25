@@ -109,3 +109,17 @@ touching the already-parallel kernels.
 Criterion 8 may be expressed locally as a host-side unit test over the
 reduction logic if the implementation factors it out; the GPU run then confirms
 rather than establishes it.
+
+## Narrow test-seam revision for PRD 0003
+
+PRD 0003 demonstrated that `CudaBackend` otherwise exposes neither the raw
+committed status words nor a way to select distinct validation launch
+geometries. For criterion 8 only, this PRD is reopened to permit a private
+validation-launch override in `backend.rs`, set directly by a `cfg(test)` unit
+hardware test. The same private test may download the existing status buffer
+after an expected execution error.
+
+This seam adds no public API, changes no status code or message, and has no
+production setter. With no test override, all four validation kernels continue
+to use `LaunchConfig::for_num_elems(rows)` exactly as specified above. It does
+not authorize a new validation class or a change to output-field identity.

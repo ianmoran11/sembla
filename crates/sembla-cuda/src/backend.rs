@@ -53,6 +53,24 @@ struct Layout {
     owner_count: usize,
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ValidationLaunchGeometry {
+    grid: u32,
+    block: u32,
+}
+
+#[cfg(test)]
+impl ValidationLaunchGeometry {
+    fn config(self) -> LaunchConfig {
+        LaunchConfig {
+            grid_dim: (self.grid, 1, 1),
+            block_dim: (self.block, 1, 1),
+            shared_mem_bytes: 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CudaBackend {
     model: ValidatedModel,
@@ -114,6 +132,10 @@ pub struct CudaBackend {
     next_tick: u32,
     hash_mode: HashMode,
     device_identity: CudaDeviceIdentity,
+    // No public setter exists. The hardware unit test uses this private seam
+    // to confirm the four validation launches under explicit geometries.
+    #[cfg(test)]
+    validation_launch_override: Option<ValidationLaunchGeometry>,
 }
 
 impl CudaBackend {
@@ -377,6 +399,8 @@ impl CudaBackend {
             next_tick: 0,
             hash_mode,
             device_identity,
+            #[cfg(test)]
+            validation_launch_override: None,
         })
     }
 
@@ -535,6 +559,17 @@ impl CudaBackend {
         })
     }
 
+    fn validation_launch_config(&self, rows: u32, one: LaunchConfig) -> LaunchConfig {
+        if rows == 0 {
+            return one;
+        }
+        #[cfg(test)]
+        if let Some(geometry) = self.validation_launch_override {
+            return geometry.config();
+        }
+        LaunchConfig::for_num_elems(rows)
+    }
+
     fn execute_tick(&mut self) -> Result<(), CudaError> {
         let one = LaunchConfig {
             grid_dim: (1, 1, 1),
@@ -639,11 +674,7 @@ impl CudaBackend {
                 // Scalar input/aggregate checks inside the kernel still need
                 // one worker when the table is empty, so zero rows keeps a
                 // single-thread launch instead of a zero-block one.
-                let validation_config = if rows == 0 {
-                    one
-                } else {
-                    LaunchConfig::for_num_elems(rows)
-                };
+                let validation_config = self.validation_launch_config(rows, one);
                 {
                     let mut args = self.stream.launch_builder(&self.validate_transition);
                     args.arg(&self.state)
@@ -706,6 +737,7 @@ impl CudaBackend {
                     .arg(&mut self.status);
                 unsafe { args.launch(one) }.map_err(driver_error)?;
 
+                let claims_config = self.validation_launch_config(rows, one);
                 let mut args = self.stream.launch_builder(&self.validate_claims);
                 args.arg(&self.state)
                     .arg(&self.column_offsets)
@@ -720,7 +752,7 @@ impl CudaBackend {
                     .arg(&rule_id)
                     .arg(&self.enabled)
                     .arg(&mut self.status);
-                unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+                unsafe { args.launch(claims_config) }.map_err(driver_error)?;
                 let mut args = self.stream.launch_builder(&self.commit_validation_status);
                 args.arg(&mut self.status);
                 unsafe { args.launch(one) }.map_err(driver_error)?;
@@ -839,11 +871,7 @@ impl CudaBackend {
                     .arg(&mut self.effect_active);
                 unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
             }
-            let effects_config = if effects_rows == 0 {
-                one
-            } else {
-                LaunchConfig::for_num_elems(effects_rows)
-            };
+            let effects_config = self.validation_launch_config(effects_rows, one);
             let mut args = self.stream.launch_builder(&self.validate_effects);
             args.arg(&self.state)
                 .arg(&self.column_offsets)
@@ -991,11 +1019,7 @@ impl CudaBackend {
                 })?;
                 output_rows = output_rows.max(rows);
             }
-            let output_config = if output_rows == 0 {
-                one
-            } else {
-                LaunchConfig::for_num_elems(output_rows)
-            };
+            let output_config = self.validation_launch_config(output_rows, one);
             let mut args = self.stream.launch_builder(&self.validate_outputs);
             args.arg(&self.next_state)
                 .arg(&self.column_offsets)
@@ -1614,5 +1638,70 @@ mod probe_tests {
             classify_device_count(Err(DriverError(CUresult::CUDA_ERROR_NO_DEVICE))),
             Err(CudaError::NoDevice)
         );
+    }
+}
+
+#[cfg(test)]
+mod diagnostic_equality_hardware {
+    use super::{CudaBackend, HashMode, ValidationLaunchGeometry};
+    use sembla_runtime::eval::ParamEnv;
+
+    mod cases {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/support/diagnostic_cases.rs"
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
+    fn negative_corpus_matches_cpu_status_under_three_geometries() {
+        assert_eq!(cases::FAILING_ROWS, [2, 5, 7]);
+        for case in cases::CASES {
+            assert!(!case.expected_cpu_error.is_empty(), "{}", case.name);
+            let model = cases::load_model(&case);
+            let params = ParamEnv::defaults(&model);
+            let mut first_status = None;
+
+            for (grid, block) in cases::GEOMETRIES {
+                let mut backend = CudaBackend::new(
+                    &model,
+                    cases::initial_state(&case),
+                    &params,
+                    7,
+                    HashMode::FinalOnly,
+                )
+                .expect("CUDA device, driver, and NVRTC are required");
+                backend.validation_launch_override = Some(ValidationLaunchGeometry { grid, block });
+
+                let error = backend.run(1).unwrap_err();
+                assert!(
+                    error.to_string().contains(case.expected_cuda_error),
+                    "{} ({grid}x{block}): {error}",
+                    case.name
+                );
+                let words = backend
+                    .stream
+                    .memcpy_dtov(&backend.status)
+                    .expect("download validation status");
+                let committed = [words[0], words[1], words[2], words[3]];
+                assert_eq!(
+                    (committed[0], committed[1]),
+                    case.expected_status,
+                    "{} ({grid}x{block})",
+                    case.name
+                );
+                assert_eq!(
+                    committed,
+                    *first_status.get_or_insert(committed),
+                    "{} changed diagnostic under geometry {grid}x{block}",
+                    case.name
+                );
+                eprintln!(
+                    "diagnostic_case={} geometry={}x{} status={:?}",
+                    case.name, grid, block, committed
+                );
+            }
+        }
     }
 }

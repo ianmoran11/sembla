@@ -1,0 +1,47 @@
+{
+  "name": "claim_key_overflow",
+  "dt": 1.0,
+  "params": [],
+  "boxes": [
+    {
+      "name": "world",
+      "tables": [
+        {
+          "name": "Person",
+          "size_hint": 8,
+          "attrs": [
+            { "name": "mate", "ty": { "kind": "ref", "table": "Person" } },
+            { "name": "priority", "ty": { "kind": "int" } }
+          ]
+        }
+      ],
+      "transitions": [
+        {
+          "name": "pair",
+          "table": "Person",
+          "guard": { "kind": "bool", "value": true },
+          "hazard": { "kind": "real", "value": 1e300 },
+          "effects": [],
+          "contests": [
+            {
+              "resource": { "kind": "self_attr", "name": "mate" },
+              "ordering": {
+                "kind": "key",
+                "expr": {
+                  "kind": "mul",
+                  "lhs": { "kind": "self_attr", "name": "priority" },
+                  "rhs": { "kind": "int", "value": 2 }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "views": []
+    }
+  ],
+  "wires": [],
+  "summaries": []
+}

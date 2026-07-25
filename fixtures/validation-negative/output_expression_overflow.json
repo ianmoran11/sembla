@@ -1,0 +1,75 @@
+{
+  "name": "output_expression_overflow",
+  "dt": 1.0,
+  "params": [],
+  "boxes": [
+    {
+      "name": "source",
+      "tables": [
+        {
+          "name": "Person",
+          "size_hint": 8,
+          "attrs": [{ "name": "x", "ty": { "kind": "int" } }]
+        }
+      ],
+      "transitions": [],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "totals",
+          "schema": [
+            { "name": "safe", "ty": { "kind": "int" } },
+            { "name": "failing", "ty": { "kind": "int" } }
+          ],
+          "builder": {
+            "kind": "per_table",
+            "table": "Person",
+            "fields": [
+              {
+                "name": "safe",
+                "op": { "kind": "sum", "value": { "kind": "int", "value": 0 } },
+                "filter": null
+              },
+              {
+                "name": "failing",
+                "op": {
+                  "kind": "sum",
+                  "value": {
+                    "kind": "mul",
+                    "lhs": { "kind": "self_attr", "name": "x" },
+                    "rhs": { "kind": "int", "value": 3 }
+                  }
+                },
+                "filter": null
+              }
+            ]
+          }
+        }
+      ],
+      "views": []
+    },
+    {
+      "name": "sink",
+      "tables": [],
+      "transitions": [],
+      "inputs": [
+        {
+          "name": "totals",
+          "schema": [
+            { "name": "safe", "ty": { "kind": "int" } },
+            { "name": "failing", "ty": { "kind": "int" } }
+          ]
+        }
+      ],
+      "outputs": [],
+      "views": []
+    }
+  ],
+  "wires": [
+    {
+      "from": { "box": "source", "port": "totals" },
+      "to": { "box": "sink", "port": "totals" }
+    }
+  ],
+  "summaries": []
+}

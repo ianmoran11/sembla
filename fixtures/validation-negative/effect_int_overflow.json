@@ -1,0 +1,45 @@
+{
+  "name": "effect_int_overflow",
+  "dt": 1.0,
+  "params": [],
+  "boxes": [
+    {
+      "name": "world",
+      "tables": [
+        {
+          "name": "Person",
+          "size_hint": 8,
+          "attrs": [
+            { "name": "x", "ty": { "kind": "int" } },
+            { "name": "y", "ty": { "kind": "int" } }
+          ]
+        }
+      ],
+      "transitions": [
+        {
+          "name": "bump",
+          "table": "Person",
+          "guard": { "kind": "bool", "value": true },
+          "hazard": { "kind": "real", "value": 1e300 },
+          "effects": [
+            {
+              "kind": "set_attr",
+              "attr": "y",
+              "value": {
+                "kind": "mul",
+                "lhs": { "kind": "self_attr", "name": "x" },
+                "rhs": { "kind": "int", "value": 2 }
+              }
+            }
+          ],
+          "contests": []
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "views": []
+    }
+  ],
+  "wires": [],
+  "summaries": []
+}

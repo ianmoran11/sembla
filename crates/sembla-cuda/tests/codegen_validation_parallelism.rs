@@ -8,6 +8,10 @@
 
 use sembla_cuda::generate;
 
+#[allow(dead_code)]
+#[path = "support/diagnostic_cases.rs"]
+mod diagnostic_cases;
+
 /// One model exercising every parallelised validation path: a checked guard
 /// (transition), a contested resource with a checked key (claims), checked
 /// and enum/ref-typed effects (effects), and a wired Int output with a
@@ -321,6 +325,30 @@ fn reduction_matches_serial_under_simulated_launch_geometries() {
         assert_eq!(reduce_in_order(forward), expected);
         let reverse = per_worker.iter().rev().flatten().copied();
         assert_eq!(reduce_in_order(reverse), expected);
+    }
+}
+
+#[test]
+fn diagnostic_corpus_reduction_matches_each_frozen_status_identity() {
+    for case in diagnostic_cases::CASES {
+        let (code, expected_identity) = case.expected_status;
+        let failures = if case.kind == diagnostic_cases::CaseKind::Output {
+            // Output status[1] is the frozen target-field identity, not a row.
+            vec![(code, expected_identity, 0, 0); diagnostic_cases::FAILING_ROWS.len()]
+        } else {
+            diagnostic_cases::FAILING_ROWS
+                .iter()
+                .rev()
+                .map(|row| (code, *row as u64, 0, 0))
+                .collect()
+        };
+        assert_geometry_invariant(&failures);
+        assert_eq!(
+            reduce_in_order(failures),
+            Some((code, expected_identity)),
+            "{}",
+            case.name
+        );
     }
 }
 

@@ -1,0 +1,40 @@
+{
+  "name": "transition_guard_overflow",
+  "dt": 1.0,
+  "params": [],
+  "boxes": [
+    {
+      "name": "world",
+      "tables": [
+        {
+          "name": "Person",
+          "size_hint": 8,
+          "attrs": [{ "name": "x", "ty": { "kind": "int" } }]
+        }
+      ],
+      "transitions": [
+        {
+          "name": "bump",
+          "table": "Person",
+          "guard": {
+            "kind": "gt",
+            "lhs": {
+              "kind": "mul",
+              "lhs": { "kind": "self_attr", "name": "x" },
+              "rhs": { "kind": "int", "value": 2 }
+            },
+            "rhs": { "kind": "int", "value": 0 }
+          },
+          "hazard": { "kind": "real", "value": 1e300 },
+          "effects": [],
+          "contests": []
+        }
+      ],
+      "inputs": [],
+      "outputs": [],
+      "views": []
+    }
+  ],
+  "wires": [],
+  "summaries": []
+}

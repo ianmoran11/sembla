@@ -186,3 +186,24 @@ protect are unchanged and the full `--features cuda` suite is green.
 Hardware criteria 7–8 remain **pending** per §J14.2; criterion 8 is covered
 locally by the host-side reduction tests in
 `crates/sembla-cuda/tests/codegen_validation_parallelism.rs`.
+
+### 2026-07-25 — PRD 0003 implementation revision
+
+Added a four-case validation-diagnostic corpus with deterministic eight-row
+state and bad rows `[2, 5, 7]`. Plain CPU tests assert the semantic failure and
+earliest row; normalized expected CUDA diagnostics are `(10,2)` for claim-key
+overflow, `(3,2)` for transition overflow, `(5,2)` for effect overflow, and
+`(9,1)` for the existing output-field identity contract.
+
+The original PRD wording was corrected after implementation analysis found that
+validated state cannot contain an out-of-range stored Ref, `validate_claims`
+does not define that class, CPU `TickError` does not emit CUDA status words, and
+output code 9 identifies a target field rather than a source row. No new
+validation class or diagnostic meaning was introduced.
+
+PRD 0002 was narrowly reopened for a private test-only backend seam. A named
+ignored hardware unit test downloads raw status after expected rejection and
+runs every case under `1x1`, `1x32`, and `3x4`; production continues to use
+`LaunchConfig::for_num_elems`. The differential runner lists the corpus locally,
+skips GPU-less hardware criteria with a named reason, and remains strict when
+`SEMBLA_REQUIRE_CUDA=1`. Hardware criteria 6–7 remain **pending** per §J14.2.

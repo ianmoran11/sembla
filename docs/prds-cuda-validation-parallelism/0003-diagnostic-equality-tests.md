@@ -25,28 +25,48 @@ each triggering exactly one validation failure class, with **multiple failing
 rows at known indices** so that "first" and "minimum" are distinguishable and
 "any" is detectably wrong:
 
-- an out-of-range `Ref` dereference in a claim resource (`validate_claims`);
-- a guard/rate expression that overflows or divides by zero
-  (`validate_transition`);
+- a checked claim resource or ordering-key expression that overflows `Int`
+  (status code 10 in the claim-validation path);
+- a guard/rate expression that overflows (`validate_transition`);
 - an effect expression that overflows `Int` (`validate_effects`);
 - an output/summary expression that fails (`validate_outputs`).
 
-Each fixture must fail at **at least three** distinct row indices, and the
-lowest failing index must not be row 0 — otherwise every implementation agrees
-by accident.
+The original out-of-range stored-`Ref` case is not a reachable execution
+state: `StateStore` rejects it at construction, and `validate_claims` does not
+implement a stored-reference range diagnostic. Adding that validation class is
+outside this test PRD. Claim expressions are also checked eagerly with the
+transition expressions; this corpus freezes the observable code/identity rather
+than claiming a unique kernel owns code 10.
+
+Each fixture must contain **at least three** distinct bad source rows, and the
+lowest bad row must not be row 0 — otherwise every implementation agrees by
+accident. For candidate-bearing transition, claim, and effect diagnostics,
+`status[1]` is the minimum failing candidate. For outputs, the frozen contract
+uses the target output-field identity in `status[1]`; the CPU test asserts the
+earliest bad source row separately.
 
 ### 2. Equality assertions
 
-For each fixture: run CPU, run CUDA, assert both reject, and assert the emitted
-`status[0]` code and `status[1]` candidate index are **equal**. CPU is ground
-truth per DESIGN.md §8.
+For each fixture: run CPU and assert its semantic failure class and earliest
+source row. CPU `TickError` does not expose CUDA's numeric status array, so each
+case also freezes an explicit normalized CUDA `(status[0], status[1])` expected
+value derived from that CPU semantic result and the unchanged `device_status()`
+mapping. Run CUDA, assert rejection, and compare the raw emitted status words to
+that expected value. CPU remains ground truth per DESIGN.md §8; the
+normalization must not be represented as raw words emitted by CPU.
+
+Candidate-bearing cases compare the minimum candidate. The output case compares
+code 9 and its frozen target-field identity while separately retaining the CPU
+earliest-row assertion.
 
 ### 3. Launch-geometry invariance
 
-For each fixture, run CUDA under at least three launch configurations and assert
-an identical reported index. If PRD 0002 factored the reduction into
-host-testable logic, mirror this as a local unit test too; the GPU run then
-confirms rather than establishes it.
+For each fixture, run CUDA under at least three explicit launch configurations
+and assert identical committed status words. PRD 0002 is narrowly reopened to
+permit a private test-only launch override and raw-status observation inside a
+CUDA backend unit test; the normal launch choice and public API are unchanged.
+Mirror the fixture cases through the existing host-testable reduction too; the
+GPU run then confirms rather than establishes invariance.
 
 ### 4. Wire into the existing harness
 
@@ -63,20 +83,27 @@ are listed as pending.
 - `crates/sembla-cuda/scripts/run-differential-corpus.sh`
 - `docs/cuda-differential-harness.md`
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
+- `docs/prds-cuda-validation-parallelism/0003-diagnostic-equality-tests.md`
+  (this approved contract correction only)
+- `docs/prds-cuda-validation-parallelism/0002-parallel-validation-kernels.md`
+  and `crates/sembla-cuda/src/backend.rs` (narrow private test seam only)
 
 ## Non-goals
 
-No production-code changes; if a defect surfaces, this PRD records it and PRD
-0002 is revised rather than patched here. No new validation classes. No
-performance work. No grouped-observation cases (§L5).
+No production semantic, diagnostic, or public-API changes. The only production
+file change is the PRD-0002-authorized private launch override used by a
+`cfg(test)` hardware unit test; default launches and messages remain unchanged.
+No new validation classes, performance work, or grouped-observation cases
+(§L5).
 
 ## Acceptance criteria
 
 **Local:**
 
-1. At least four negative fixtures exist, each with ≥3 failing rows and a lowest
-   failing index ≠ 0.
-2. CPU runs assert the expected code and index for every fixture.
+1. At least four negative fixtures exist, each with ≥3 bad source rows and a
+   lowest bad row ≠ 0.
+2. CPU runs assert the expected failure class and earliest source row for every
+   fixture, and each case freezes its normalized expected CUDA code/identity.
 3. Every existing fixture, golden, and example is byte-unchanged.
 4. `cargo test --locked` and `scripts/check-rust.sh` green; corpus listing
    includes the new cases; GPU-less runs skip gracefully with a named reason.
@@ -84,8 +111,10 @@ performance work. No grouped-observation cases (§L5).
 
 **Hardware (pending per §J14.2):**
 
-6. For each fixture, CUDA reports the same `status[0]` and `status[1]` as CPU.
-7. For each fixture, three launch geometries report identical indices.
+6. For each fixture, CUDA raw `status[0]` and `status[1]` equal the normalized
+   CPU-grounded expected diagnostic.
+7. For each fixture, three explicit launch geometries report identical committed
+   status words.
 
 ## Note for the reviewer
 
