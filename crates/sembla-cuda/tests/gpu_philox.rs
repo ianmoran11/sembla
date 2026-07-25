@@ -47,7 +47,7 @@ fn device_philox_is_bit_identical_to_checked_cpu_vectors() {
             draw_u32x4(
                 coordinate.seed,
                 coordinate.tick,
-                coordinate.rule_id,
+                coordinate.rule_word,
                 coordinate.entity_id,
                 coordinate.draw_index,
             )

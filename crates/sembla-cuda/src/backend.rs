@@ -78,6 +78,9 @@ pub struct CudaBackend {
     finish_outputs: CudaFunction,
     check_output_errors: CudaFunction,
     philox_vectors_kernel: CudaFunction,
+    init_validation_scratch: CudaFunction,
+    commit_validation_status: CudaFunction,
+    mark_effect_active: CudaFunction,
     state: CudaSlice<u8>,
     next_state: CudaSlice<u8>,
     column_offsets: CudaSlice<u64>,
@@ -105,6 +108,7 @@ pub struct CudaBackend {
     owner_values: CudaSlice<u64>,
     output_partials: CudaSlice<u64>,
     output_errors: CudaSlice<u8>,
+    effect_active: CudaSlice<u32>,
     status: CudaSlice<u64>,
     seed: u64,
     next_tick: u32,
@@ -217,6 +221,9 @@ impl CudaBackend {
         let finish_outputs = load("sembla_finish_outputs")?;
         let check_output_errors = load("sembla_check_output_errors")?;
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
+        let init_validation_scratch = load("sembla_init_validation_scratch")?;
+        let commit_validation_status = load("sembla_commit_validation_status")?;
+        let mark_effect_active = load("sembla_mark_effect_active")?;
 
         let layout = build_layout(model, &initial_tables, &generated)?;
         let state_bytes = pack_initial_state(model, &initial_tables, &layout)?;
@@ -302,7 +309,13 @@ impl CudaBackend {
         let output_errors = stream
             .alloc_zeros::<u8>(output_field_count * 3)
             .map_err(driver_error)?;
-        let status = stream.alloc_zeros::<u64>(4).map_err(driver_error)?;
+        // status[0..=3] is the committed diagnostic; status[4..=8] is the
+        // per-tick validation-reduction scratch (lock, scan, candidate, code,
+        // branch) prepared by sembla_init_validation_scratch.
+        let status = stream.alloc_zeros::<u64>(9).map_err(driver_error)?;
+        let effect_active = stream
+            .alloc_zeros::<u32>(layout.candidate_offsets.len().max(1))
+            .map_err(driver_error)?;
 
         Ok(Self {
             model: model.clone(),
@@ -328,6 +341,9 @@ impl CudaBackend {
             finish_outputs,
             check_output_errors,
             philox_vectors_kernel,
+            init_validation_scratch,
+            commit_validation_status,
+            mark_effect_active,
             state,
             next_state,
             column_offsets,
@@ -355,6 +371,7 @@ impl CudaBackend {
             owner_values,
             output_partials,
             output_errors,
+            effect_active,
             status,
             seed,
             next_tick: 0,
@@ -532,6 +549,14 @@ impl CudaBackend {
                 .arg(&aggregate_error_count);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
+        {
+            let rule_count = self.layout.candidate_offsets.len() as u64;
+            let mut args = self.stream.launch_builder(&self.init_validation_scratch);
+            args.arg(&mut self.status)
+                .arg(&mut self.effect_active)
+                .arg(&rule_count);
+            unsafe { args.launch(one) }.map_err(driver_error)?;
+        }
         // Build all tick-start aggregates without committing errors. Each
         // aggregate leaves a device error fact which the ordered validators
         // surface only when the CPU evaluator would first reach that node.
@@ -597,6 +622,28 @@ impl CudaBackend {
 
             for (index, transition) in &transition_positions {
                 let rule_id = transition.rule_id;
+                let model_transition = &self.model.model().boxes[transition.box_index].transitions
+                    [transition.transition_index];
+                let table_index = self.model.model().boxes[transition.box_index]
+                    .tables
+                    .iter()
+                    .position(|table| table.name == model_transition.table)
+                    .expect("validated transition table");
+                let global_table = global_table(&self.model, transition.box_index, table_index);
+                let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
+                    CudaError::InvalidInput(format!(
+                        "rule {} row count exceeds u32 entity IDs",
+                        transition.rule_id
+                    ))
+                })?;
+                // Scalar input/aggregate checks inside the kernel still need
+                // one worker when the table is empty, so zero rows keeps a
+                // single-thread launch instead of a zero-block one.
+                let validation_config = if rows == 0 {
+                    one
+                } else {
+                    LaunchConfig::for_num_elems(rows)
+                };
                 {
                     let mut args = self.stream.launch_builder(&self.validate_transition);
                     args.arg(&self.state)
@@ -612,23 +659,14 @@ impl CudaBackend {
                         .arg(&self.candidate_offsets)
                         .arg(&rule_id)
                         .arg(&mut self.status);
+                    unsafe { args.launch(validation_config) }.map_err(driver_error)?;
+                }
+                {
+                    let mut args = self.stream.launch_builder(&self.commit_validation_status);
+                    args.arg(&mut self.status);
                     unsafe { args.launch(one) }.map_err(driver_error)?;
                 }
 
-                let model_transition = &self.model.model().boxes[transition.box_index].transitions
-                    [transition.transition_index];
-                let table_index = self.model.model().boxes[transition.box_index]
-                    .tables
-                    .iter()
-                    .position(|table| table.name == model_transition.table)
-                    .expect("validated transition table");
-                let global_table = global_table(&self.model, transition.box_index, table_index);
-                let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
-                    CudaError::InvalidInput(format!(
-                        "rule {} row count exceeds u32 entity IDs",
-                        transition.rule_id
-                    ))
-                })?;
                 if rows == 0 {
                     continue;
                 }
@@ -682,6 +720,9 @@ impl CudaBackend {
                     .arg(&rule_id)
                     .arg(&self.enabled)
                     .arg(&mut self.status);
+                unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+                let mut args = self.stream.launch_builder(&self.commit_validation_status);
+                args.arg(&mut self.status);
                 unsafe { args.launch(one) }.map_err(driver_error)?;
             }
 
@@ -760,6 +801,49 @@ impl CudaBackend {
                     .map_err(driver_error)?;
             }
 
+            // Reduce each effect-bearing rule's winners into a stable
+            // per-rule activity flag before the parallel effects validator
+            // reads it. This preserves the serial any_winner scan without an
+            // O(rows) rescan per worker.
+            let mut effects_rows = 0_u32;
+            for (_, transition) in &transition_positions {
+                let model_transition = &self.model.model().boxes[transition.box_index].transitions
+                    [transition.transition_index];
+                let table_index = self.model.model().boxes[transition.box_index]
+                    .tables
+                    .iter()
+                    .position(|table| table.name == model_transition.table)
+                    .expect("validated transition table");
+                let global_table = global_table(&self.model, transition.box_index, table_index);
+                let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
+                    CudaError::InvalidInput(format!(
+                        "rule {} row count exceeds u32 entity IDs",
+                        transition.rule_id
+                    ))
+                })?;
+                effects_rows = effects_rows.max(rows);
+                if model_transition.effects.is_empty() || rows == 0 {
+                    continue;
+                }
+                let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
+                    CudaError::InvalidInput("rule id exceeds host index width".to_owned())
+                })?;
+                let candidate_begin = self.layout.candidate_offsets[rule_index];
+                let rule_id = transition.rule_id;
+                let candidate_count = u64::from(rows);
+                let mut args = self.stream.launch_builder(&self.mark_effect_active);
+                args.arg(&self.wins)
+                    .arg(&candidate_begin)
+                    .arg(&candidate_count)
+                    .arg(&rule_id)
+                    .arg(&mut self.effect_active);
+                unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+            }
+            let effects_config = if effects_rows == 0 {
+                one
+            } else {
+                LaunchConfig::for_num_elems(effects_rows)
+            };
             let mut args = self.stream.launch_builder(&self.validate_effects);
             args.arg(&self.state)
                 .arg(&self.column_offsets)
@@ -773,8 +857,12 @@ impl CudaBackend {
                 .arg(&self.aggregate_offsets)
                 .arg(&self.candidate_offsets)
                 .arg(&self.wins)
+                .arg(&self.effect_active)
                 .arg(&box_index_u32)
                 .arg(&mut self.status);
+            unsafe { args.launch(effects_config) }.map_err(driver_error)?;
+            let mut args = self.stream.launch_builder(&self.commit_validation_status);
+            args.arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
         self.stream
@@ -867,6 +955,47 @@ impl CudaBackend {
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
         {
+            // The validator grid-strides each wired output's source table, so
+            // the launch covers the largest wired source table; scalar
+            // input/aggregate checks still get one worker when no wired
+            // table has rows.
+            let mut output_rows = 0_u32;
+            for wire in &self.model.model().wires {
+                let from_box = self
+                    .model
+                    .model()
+                    .boxes
+                    .iter()
+                    .position(|entry| entry.name == wire.from.r#box)
+                    .ok_or_else(|| CudaError::InvalidInput("wire source box missing".to_owned()))?;
+                let output = self.model.model().boxes[from_box]
+                    .outputs
+                    .iter()
+                    .find(|entry| entry.name == wire.from.port)
+                    .ok_or_else(|| {
+                        CudaError::InvalidInput("wire source output missing".to_owned())
+                    })?;
+                let sembla_ir::OutputBuilder::PerTable { table, .. } = &output.builder;
+                let table_index = self.model.model().boxes[from_box]
+                    .tables
+                    .iter()
+                    .position(|entry| entry.name == *table)
+                    .ok_or_else(|| {
+                        CudaError::InvalidInput("wire source table missing".to_owned())
+                    })?;
+                let global = global_table(&self.model, from_box, table_index);
+                let rows = u32::try_from(self.layout.row_counts[global]).map_err(|_| {
+                    CudaError::InvalidInput(
+                        "wired output row count exceeds CUDA launch capacity".to_owned(),
+                    )
+                })?;
+                output_rows = output_rows.max(rows);
+            }
+            let output_config = if output_rows == 0 {
+                one
+            } else {
+                LaunchConfig::for_num_elems(output_rows)
+            };
             let mut args = self.stream.launch_builder(&self.validate_outputs);
             args.arg(&self.next_state)
                 .arg(&self.column_offsets)
@@ -879,6 +1008,11 @@ impl CudaBackend {
                 .arg(&self.aggregate_facts)
                 .arg(&self.aggregate_offsets)
                 .arg(&mut self.status);
+            unsafe { args.launch(output_config) }.map_err(driver_error)?;
+        }
+        {
+            let mut args = self.stream.launch_builder(&self.commit_validation_status);
+            args.arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
         {

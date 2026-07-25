@@ -138,3 +138,51 @@ GPU: compilation, codegen text assertions, corpus listing, graceful skips,
 legacy goldens unchanged) and **hardware criteria** (executed on a rented GPU
 and recorded as evidence). Codegen changes are testable locally by asserting on
 the emitted CUDA source; only the timing gate needs hardware.
+
+## Status notes
+
+### 2026-07-25 — PRD 0002 implementation (attempt 2)
+
+Implemented the parallel validation protocol: the four target kernels
+grid-stride their row loops and report failures through a scratch-and-commit
+reduction (`status[4..=8]` scratch, `sembla_record_validation_failure` under a
+short lock with `atomicMin` on the candidate, single-thread
+`sembla_commit_validation_status` publishing candidate before code after every
+target launch). Diagnostics reproduce the serial CPU validator's first failure
+as the minimum of (emission-order scan, candidate, per-row branch); committed
+`status[0..=3]` layout, codes, and `device_status()` messages are unchanged.
+
+Three PRD clarifications were resolved during implementation and are recorded
+here per the review/advisor process:
+
+1. **Ordered output fold (narrow exception to "replace each row loop").**
+   `sembla_validate_outputs` grid-strides the independent per-row filter and
+   value checks, but the Int-typed ordered checked-addition prefix fold stays
+   on worker 0. Checked addition is order-sensitive, so strided partial sums
+   could both miss real overflow and report false overflow; a parallel
+   prefix-summary algorithm is deferred as substantially larger than this PRD.
+2. **Effect liveness prepass.** `sembla_validate_effects` validates a
+   transition's full column only when that transition has a winner. A new
+   parallel `sembla_mark_effect_active` kernel reduces `wins` into a per-rule
+   flag after conflict resolution (cleared per tick by
+   `sembla_init_validation_scratch`), replacing the serial `any_winner` rescan;
+   workers all observe the same stable flag.
+3. **`sir.generated.cu` fixture regenerated.** Intentional codegen changes
+   necessarily change the exact-source fixture; it was regenerated with the
+   canonical `examples/generate_sir_golden.rs` and the diff reviewed line by
+   line (only the intended emission changes appear). CSV/hash goldens,
+   `examples/**`, and `docs/evidence/**` remain byte-unchanged.
+
+Unrelated pre-existing repair: `tests/gpu_philox.rs` referenced a renamed
+`PhiloxCoordinate` field (`rule_id` → `rule_word`) and did not compile under
+`--features cuda`; fixed in place so the criterion-6 suite builds.
+
+Follow-up (attempt 3): the three emission-ordering assertions in
+`tests/gpu_semantics.rs` (`semantic_gpu_fixtures_validate_without_a_device`)
+were re-literalized from `if (aggregate_facts[0]` to `aggregate_facts[0] != 0U`
+to match the worker-guarded scalar-check emission; the ordering claims they
+protect are unchanged and the full `--features cuda` suite is green.
+
+Hardware criteria 7–8 remain **pending** per §J14.2; criterion 8 is covered
+locally by the host-side reduction tests in
+`crates/sembla-cuda/tests/codegen_validation_parallelism.rs`.

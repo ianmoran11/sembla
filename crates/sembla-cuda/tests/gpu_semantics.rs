@@ -576,7 +576,7 @@ fn semantic_gpu_fixtures_validate_without_a_device() {
         .0;
     assert!(
         validator.find("sembla_mul_i64(validation_left").unwrap()
-            < validator.find("if (aggregate_facts[0]").unwrap()
+            < validator.find("aggregate_facts[0] != 0U").unwrap()
     );
     let params = ParamEnv::defaults(&same_rule_order);
     let mut state = StateStore::new(
@@ -634,7 +634,7 @@ fn semantic_gpu_fixtures_validate_without_a_device() {
         .0;
     assert!(
         validator.find("sembla_mul_i64(validation_left").unwrap()
-            < validator.find("if (aggregate_facts[0]").unwrap()
+            < validator.find("aggregate_facts[0] != 0U").unwrap()
     );
     let params = ParamEnv::defaults(&effect_order);
     let mut state = StateStore::new(
@@ -671,7 +671,7 @@ fn semantic_gpu_fixtures_validate_without_a_device() {
         .0;
     assert!(
         validator.find("sembla_mul_i64(validation_left").unwrap()
-            < validator.find("if (aggregate_facts[0]").unwrap()
+            < validator.find("aggregate_facts[0] != 0U").unwrap()
     );
     let params = ParamEnv::defaults(&output_order);
     let mut state = StateStore::new(
