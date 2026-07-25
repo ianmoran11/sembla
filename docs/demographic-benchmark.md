@@ -121,7 +121,8 @@ uses the no-grouped variant and does not report grouped or ageing shares.
 Hyperstack GPU VM — it carries both the CUDA device and the RAM the 50M CPU row
 needs — via
 [`spikes/precision/infra-hyperstack/run-demographic-benchmark.sh`](../spikes/precision/infra-hyperstack/run-demographic-benchmark.sh)
-(module README §4b). After that module's reviewed paid apply, the script waits
+(module README §4b, with operating notes in
+[`spikes/precision/infra-hyperstack/RUNBOOK.md`](../spikes/precision/infra-hyperstack/RUNBOOK.md)). After that module's reviewed paid apply, the script waits
 for bootstrap, builds `sembla-cli --features cuda`, runs both backends, retrieves
 a checksummed evidence directory with GPU/RAM/commit provenance, and then runs
 the mandatory destroy itself, failing loudly if any paid resource survives in

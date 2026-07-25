@@ -241,6 +241,12 @@ ignored by Git.
 
 ## 4b. Demographic benchmark collection (unattended)
 
+> [!IMPORTANT]
+> Read [`RUNBOOK.md`](RUNBOOK.md) before running this. It carries the
+> preflight checklist, the network requirement, the failure playbook, and
+> the list of settings that must not be changed mid-run — every item there
+> cost time or money to learn on 2026-07-25.
+
 `run-demographic-benchmark.sh` reuses everything above — same VM, same host-key
 trust model, same `/32` rule — with a different remote payload: it builds
 `sembla-cli --features cuda` and runs `scripts/bench-demographic.sh` for both

@@ -4,6 +4,7 @@
 !.gitignore
 !.terraform.lock.hcl
 !README.md
+!RUNBOOK.md
 !cloud-init.sh.tftpl
 !collect-runs.sh
 !discover.sh
