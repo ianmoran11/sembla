@@ -38,16 +38,22 @@ Each item below has failed at least once in practice.
 
 **A path that passes `ssh-keyscan` can still be unable to carry an SSH session.**
 
-On 2026-07-25 three separate VMs were unreachable from a home ADSL/NBN
-connection: `ssh-keyscan` succeeded every time while authenticated SSH stalled
-for exactly 30 seconds and then died. That 30 seconds is `LoginGraceTime`
-expiring server-side. `sshd` logged connections closing at `[preauth]` while the
-client logged the server closing — each end blaming the other, which is the
-signature of a middlebox silently dropping the flow. A traceroute showed a
-private hop (`10.20.22.53`) inside the ISP, i.e. CGNAT or a tunnel.
+On 2026-07-25 three separate VMs were unreachable from one workstation's home
+network: `ssh-keyscan` succeeded every time while authenticated SSH stalled for
+exactly 30 seconds and then died. That 30 seconds is `LoginGraceTime` expiring
+server-side. `sshd` logged connections closing at `[preauth]` while the client
+logged the server closing — each end blaming the other.
 
 The same code, same region, same image, over a phone hotspot on cellular:
 connected in **2 seconds**.
+
+**The cause is not confirmed, and it is not provider-specific.** Over the same
+home network, `ssh -T git@github.com` fails identically on port 22 *and* 443,
+while raw TCP to those hosts carries the banner and the server's KEXINIT intact.
+So connections establish and only the key exchange dies — which points at local
+packet filtering (a VPN client's kill switch, for instance) at least as strongly
+as at the ISP. Rule out local software before blaming the network: quit any VPN
+client and retry a plain `ssh -T git@github.com`.
 
 Diagnosis order, cheapest first:
 
