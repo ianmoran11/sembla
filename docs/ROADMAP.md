@@ -3,6 +3,15 @@
 **Status:** Draft, 2026-07-15. Amended 2026-07-18: ADR 0001 closed (CUDA native
 `f64`); v0.4 calibration resolved to amortized NPE via an external workflow
 (DECISIONS.md §G5); synthetic population generation descoped from v0.5.
+Amended 2026-07-25: [`forward-roadmap.md`](forward-roadmap.md) adopted as a
+companion roadmap of record — it sequences the demographic and justice driver
+models and the tracks they need, under an evidence-gate discipline. This file
+retains the v0.2-v1.0 version milestones; the companion maps its stages onto
+them in its §0. Same amendment records the first measured CUDA regression:
+the demographic model runs 12.3x slower on an H100 than on the same host's CPU,
+because generated validation kernels walk every row on a single GPU thread
+(`docs/prds-cuda-validation-parallelism/`). SIR throughput figures do not
+generalise to models with contests or `Ref` dereferences.
 Amended 2026-07-22: composition implemented far beyond the v0.3 cut via the
 Option D track (`docs/prds-composition/`, DECISIONS.md §J); integration track
 started (`docs/prds-composition-integration/`). Planning horizon v0.2 → v1.0.
