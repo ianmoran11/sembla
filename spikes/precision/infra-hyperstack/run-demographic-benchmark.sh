@@ -35,8 +35,10 @@ REPO_ROOT="$(cd "$MODULE_DIR/../../.." && pwd)"
 SSH_PRIVATE_KEY_PATH="${SSH_PRIVATE_KEY_PATH:-$HOME/.ssh/sembla_hyperstack}"
 KNOWN_HOSTS_FILE="$MODULE_DIR/.hyperstack_known_hosts"
 TFVARS_FILE="${TFVARS_FILE:-terraform.tfvars}"
-BENCH_SCALES_CUDA="${BENCH_SCALES_CUDA:-10000000,50000000}"
-BENCH_SCALES_CPU="${BENCH_SCALES_CPU:-10000000,50000000}"
+# Note the ":-" is deliberately absent: an EMPTY value must mean "skip this
+# backend", not "use the default". With ":-" it silently ran the full list.
+BENCH_SCALES_CUDA="${BENCH_SCALES_CUDA-10000000,50000000}"
+BENCH_SCALES_CPU="${BENCH_SCALES_CPU-10000000,50000000}"
 BENCH_TICKS="${BENCH_TICKS:-24}"
 BENCH_SEED="${BENCH_SEED:-9009}"
 BOOTSTRAP_TIMEOUT_SECONDS="${BOOTSTRAP_TIMEOUT_SECONDS:-1800}"
