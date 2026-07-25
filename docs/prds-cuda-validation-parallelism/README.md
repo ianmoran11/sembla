@@ -207,3 +207,20 @@ runs every case under `1x1`, `1x32`, and `3x4`; production continues to use
 `LaunchConfig::for_num_elems`. The differential runner lists the corpus locally,
 skips GPU-less hardware criteria with a named reason, and remains strict when
 `SEMBLA_REQUIRE_CUDA=1`. Hardware criteria 6–7 remain **pending** per §J14.2.
+
+### 2026-07-25 — PRD 0004 implementation
+
+Admitted `fixtures/demographic/benchmark/demographic_slots.no-grouped.json`
+directly to the CUDA differential runner at the reduced corpus contract of
+numeric population 1,000, seed 7, and 20 ticks. The dedicated invocation records exact
+state-hash, results-CSV, and summaries-CSV equality in
+`demographic-corpus.log`; `--all-examples` and `--all-plan-fixtures` retain
+their existing meanings.
+
+Local tests freeze the listed demographic contract and verify that its model
+has no grouped views while exercising both contests and `Ref` attributes. A
+GPU-less CLI regression test executes the all-plan selector, requires rejection,
+and asserts the exact diagnostic naming `--enable grouped-observations`; a
+separate ignored hardware test runs every CUDA-supported plan fixture.
+Existing examples, plan fixtures, goldens, and tracked CUDA evidence are
+byte-unchanged. Hardware criterion 5 remains **pending** per §J14.2.

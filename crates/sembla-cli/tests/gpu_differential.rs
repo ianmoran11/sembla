@@ -29,6 +29,39 @@ fn assert_success(output: &Output) {
     );
 }
 
+const GROUPED_DIAGNOSTIC: &str = "--enable grouped-observations is not yet supported for diff-backends; see the grouped-observations backend follow-up PRD";
+
+fn plan_fixture_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    for directory in ["fixtures/plans", "fixtures/plans/linked"] {
+        paths.extend(
+            std::fs::read_dir(repository_path(directory))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| {
+                    path.is_file()
+                        && path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .is_some_and(|name| name.ends_with(".plan.json"))
+                }),
+        );
+    }
+    paths.sort();
+    paths
+}
+
+fn plan_uses_grouped_views(path: &Path) -> bool {
+    let source = std::fs::read_to_string(path).unwrap();
+    let sembla_ir::ParsedInput::Plan(plan) = sembla_ir::parse_input(&source).unwrap() else {
+        panic!("{} is not a plan", path.display());
+    };
+    plan.model
+        .boxes
+        .iter()
+        .any(|model_box| !model_box.grouped_views.is_empty())
+}
+
 #[test]
 #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
 fn differential_corpus_passes() {
@@ -50,23 +83,63 @@ fn differential_corpus_passes() {
 }
 
 #[test]
-#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
-fn composition_plan_differential_corpus_passes() {
+fn composition_plan_differential_corpus_rejects_grouped() {
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .current_dir(repository_path("."))
         .args([
             "diff-backends",
             "--all-plan-fixtures",
             "--population",
-            "1000",
+            "1",
             "--seed",
-            "7",
+            "1",
             "--ticks",
-            "20",
+            "1",
         ])
         .output()
         .unwrap();
-    assert_success(&output);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap().trim_end(),
+        GROUPED_DIAGNOSTIC
+    );
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
+fn supported_composition_plan_differential_corpus_passes() {
+    let mut grouped = 0;
+    let mut supported = 0;
+    for plan in plan_fixture_paths() {
+        if plan_uses_grouped_views(&plan) {
+            grouped += 1;
+            continue;
+        }
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .current_dir(repository_path("."))
+            .arg("diff-backends")
+            .arg(&plan)
+            .args(["--population", "1000", "--seed", "7", "--ticks", "20"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "plan={}\nstdout={}\nstderr={}",
+            plan.display(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        supported += 1;
+    }
+    assert!(
+        grouped > 0,
+        "plan corpus must retain its grouped rejection case"
+    );
+    assert!(
+        supported > 0,
+        "plan corpus must retain CUDA-supported members"
+    );
 }
 
 #[test]

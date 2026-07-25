@@ -30,11 +30,47 @@ with every other plan in those two directories. Invalid and golden subtrees are
 not traversed. Population initialization is unchanged from `run`: composed
 models honor each table's nonzero authored `size_hint`, while the supplied
 numeric population initializes tables without such a hint. Plans never accept
-a `--dt` override.
+a `--dt` override. The existing grouped-observation plan remains part of this
+exact enumeration and must be rejected; the runner accepts only its exact
+`--enable grouped-observations` follow-up diagnostic and treats success or any
+other failure as an error. A separate ignored hardware test walks the same two
+directories and runs every non-grouped plan individually, so the required
+rejection does not prevent supported plan members from receiving differential
+coverage.
 
 ```sh
 cargo run --release -p sembla-cli --features cuda -- diff-backends \
   --all-plan-fixtures --population 1000 --seed 7 --ticks 20
+```
+
+## Demographic no-grouped corpus member
+
+The differential runner also admits
+`fixtures/demographic/benchmark/demographic_slots.no-grouped.json` explicitly at
+a reduced numeric population of 1,000, seed 7, and 20 ticks. This direct
+single-model admission leaves both `--all-examples` and `--all-plan-fixtures`
+with their existing meanings. The grouped configuration remains CPU-only; a
+differential request for it is rejected deterministically with the diagnostic
+naming `--enable grouped-observations` and the grouped-observations backend
+follow-up.
+
+Before this member was added, the CUDA differential corpus contained no model
+that exercised contests or `Ref` dereferences. That coverage gap allowed the
+12.3× regression on the demographic path to go undetected while every existing
+differential test passed. Differential correctness testing proves that CPU and
+CUDA produce the same state and observations for the cases it contains; it does
+not establish that the CUDA path is usable at production scale. Correctness and
+usability testing are separate obligations.
+
+The runner compares the demographic model under the same exact state-hash,
+results-CSV, and summaries-CSV contract as every other differential member and
+records its verdict in `demographic-corpus.log`. Hardware execution remains
+pending under DECISIONS.md §J14.2 until the strict runner is executed on a CUDA
+host. List this member and its frozen corpus parameters without probing
+hardware:
+
+```sh
+crates/sembla-cuda/scripts/run-differential-corpus.sh --list
 ```
 
 ## Negative validation-diagnostic corpus

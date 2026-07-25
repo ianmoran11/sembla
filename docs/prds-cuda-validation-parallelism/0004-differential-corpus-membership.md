@@ -46,6 +46,7 @@ If the model enters through a plan fixture, it enters via `--all-plan-fixtures`.
 
 - `crates/sembla-cuda/tests/**`
 - `crates/sembla-cuda/scripts/run-differential-corpus.sh`
+- `crates/sembla-cli/tests/gpu_differential.rs` — grouped-rejection and supported-plan corpus tests only
 - `crates/sembla-cli/src/main.rs` — only if corpus enumeration needs it
 - `fixtures/plans/**` — new fixtures only
 - `docs/cuda-differential-harness.md`
@@ -78,3 +79,9 @@ change to `--all-examples` behaviour, no edits to existing fixtures or evidence.
 
 Written before PRD 0002 lands. If 0002 changes how models are admitted to the
 corpus, revise this PRD explicitly rather than reinterpreting it.
+
+Attempt-1 review amendment: `crates/sembla-cli/tests/gpu_differential.rs` is
+narrowly allowed so the existing stale all-plan success test can be split into
+an executable GPU-less grouped-rejection contract and an ignored hardware test
+for every CUDA-supported plan fixture. CLI enumeration and production behavior
+remain unchanged.

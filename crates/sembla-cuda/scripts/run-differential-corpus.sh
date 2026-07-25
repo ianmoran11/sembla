@@ -10,6 +10,7 @@ diagnostic_case=fixtures/validation-negative/claim_key_overflow.json expected_st
 diagnostic_case=fixtures/validation-negative/transition_guard_overflow.json expected_status=3,2
 diagnostic_case=fixtures/validation-negative/effect_int_overflow.json expected_status=5,2
 diagnostic_case=fixtures/validation-negative/output_expression_overflow.json expected_status=9,1
+corpus_model=fixtures/demographic/benchmark/demographic_slots.no-grouped.json configuration=no-grouped population=1000 seed=7 ticks=20
 launch_geometry=1x1
 launch_geometry=1x32
 launch_geometry=3x4
@@ -73,6 +74,13 @@ cargo test --locked --release -p sembla-cuda --features cuda --lib \
   2>&1 | tee "$out/diagnostic-corpus.log"
 status=${PIPESTATUS[0]}
 if [[ $status -eq 0 ]]; then
+  cargo run --locked --release -p sembla-cli --features cuda -- diff-backends \
+    fixtures/demographic/benchmark/demographic_slots.no-grouped.json \
+    --population 1000 --seed 7 --ticks 20 \
+    2>&1 | tee "$out/demographic-corpus.log"
+  status=${PIPESTATUS[0]}
+fi
+if [[ $status -eq 0 ]]; then
   cargo test --locked --release -p sembla-cli --features cuda --test gpu_differential -- --ignored --nocapture \
     2>&1 | tee "$out/tests.log"
   status=${PIPESTATUS[0]}
@@ -87,7 +95,18 @@ if [[ $status -eq 0 ]]; then
   cargo run --locked --release -p sembla-cli --features cuda -- diff-backends \
     --all-plan-fixtures --population 1000 --seed 7 --ticks 20 \
     2>&1 | tee "$out/plan-corpus.log"
-  status=${PIPESTATUS[0]}
+  plan_status=${PIPESTATUS[0]}
+  grouped_diagnostic="--enable grouped-observations is not yet supported for diff-backends; see the grouped-observations backend follow-up PRD"
+  if [[ $plan_status -eq 0 ]]; then
+    echo "error: --all-plan-fixtures unexpectedly accepted grouped observations" \
+      | tee -a "$out/plan-corpus.log" >&2
+    status=1
+  elif grep -Fqx -- "$grouped_diagnostic" "$out/plan-corpus.log"; then
+    echo "plan_corpus_grouped_rejection=expected" | tee -a "$out/provenance.txt"
+    status=0
+  else
+    status=$plan_status
+  fi
 fi
 set -e
 if [[ $status -eq 0 && "${SEMBLA_RUN_FULL_RATE:-0}" == "1" ]]; then
@@ -114,6 +133,7 @@ fi
 evidence_files=(provenance.txt)
 [[ -f "$out/diagnostic-corpus.log" ]] && evidence_files+=(diagnostic-corpus.log)
 [[ -f "$out/tests.log" ]] && evidence_files+=(tests.log)
+[[ -f "$out/demographic-corpus.log" ]] && evidence_files+=(demographic-corpus.log)
 [[ -f "$out/corpus.log" ]] && evidence_files+=(corpus.log)
 [[ -f "$out/plan-corpus.log" ]] && evidence_files+=(plan-corpus.log)
 [[ -f "$out/full-rate-population.log" ]] && evidence_files+=(full-rate-population.log)
