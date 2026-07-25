@@ -83,6 +83,7 @@ locals {
     repository_url_b64        = base64encode(var.repository_url)
     ssh_cidr_b64              = base64encode(var.ssh_cidr)
     ssh_host_private_key_b64  = base64encode(var.ssh_host_private_key)
+    tailscale_auth_key_b64    = base64encode(var.tailscale_auth_key)
     ssh_user                  = var.ssh_user
   })
   # VM Update is unsupported in provider 1.50.2-alpha and user_data is not

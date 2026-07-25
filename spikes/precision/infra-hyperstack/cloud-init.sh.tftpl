@@ -59,6 +59,7 @@ console_note "starting bootstrap"
 SSH_CIDR="$(printf '%s' '${ssh_cidr_b64}' | base64 -d)"
 CONSOLE_PASSWORD_HASH="$(printf '%s' '${console_password_hash_b64}' | base64 -d)"
 SSH_HOST_PRIVATE_KEY="$(printf '%s' '${ssh_host_private_key_b64}' | base64 -d)"
+TAILSCALE_AUTH_KEY="$(printf '%s' '${tailscale_auth_key_b64}' | base64 -d)"
 REPOSITORY_URL="$(printf '%s' '${repository_url_b64}' | base64 -d)"
 REGION_NAME="$(printf '%s' '${region_name_b64}' | base64 -d)"
 ENVIRONMENT_NAME="$(printf '%s' '${environment_name_b64}' | base64 -d)"
@@ -247,5 +248,31 @@ chown -R ${ssh_user}:${ssh_user} "$SPIKE_DIR" /home/${ssh_user}/run-spike.sh
 echo 'Sembla precision bootstrap ready; benchmark not started automatically.'
 printf '%s\n' "ready" > "$STATUS_DIR/ready"
 write_bootstrap_diagnostics
+# Optional tailnet join. The collector then reaches this host over WireGuard,
+# which does not depend on the operator's ISP carrying an SSH session, needs no
+# inbound security-group rule, and survives the operator's public IP changing.
+if [[ -n "$TAILSCALE_AUTH_KEY" ]]; then
+  if curl -fsSL https://tailscale.com/install.sh | sh; then
+    # --ssh=false: Tailscale SSH is deliberately NOT enabled. Authentication
+    # stays with the pinned host key and the operator keypair; the tailnet is a
+    # transport, not an additional way in.
+    if tailscale up --authkey="$TAILSCALE_AUTH_KEY" --hostname=sembla-bench \
+        --ssh=false --accept-routes=false --timeout=120s; then
+      # The guest firewall drops tcp/22 from anything but the operator /32, and
+      # tailnet peers arrive as 100.x on tailscale0 — so without this rule the
+      # tailnet path is established but unusable. Insert above the DROP.
+      iptables -I INPUT 3 -i tailscale0 -p tcp --dport 22 -j ACCEPT
+      netfilter-persistent save || true
+      tailscale ip -4 > "$STATUS_DIR/tailscale-ip" 2>/dev/null || true
+      console_note "joined tailnet as sembla-bench ($(cat "$STATUS_DIR/tailscale-ip" 2>/dev/null))"
+    else
+      console_note "WARNING: tailscale up failed; public-IP path remains"
+    fi
+  else
+    console_note "WARNING: tailscale install failed; public-IP path remains"
+  fi
+  unset TAILSCALE_AUTH_KEY
+fi
+
 console_note "READY; benchmark not started automatically"
 trap - EXIT

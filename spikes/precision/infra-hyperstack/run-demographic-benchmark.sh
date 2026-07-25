@@ -105,6 +105,19 @@ while modules:
   printf '%s' "$ip"
 }
 
+is_tailnet_ipv4() {
+  python3 -c 'import ipaddress,sys
+try:
+    a = ipaddress.ip_address(sys.argv[1])
+except ValueError:
+    raise SystemExit(1)
+raise SystemExit(0 if a.version == 4 and a in ipaddress.ip_network("100.64.0.0/10") else 1)' "$1" 2>/dev/null
+}
+
+is_usable_ssh_target() {
+  is_global_ipv4 "$1" || is_tailnet_ipv4 "$1"
+}
+
 is_global_ipv4() {
   python3 -c 'import ipaddress,sys
 try:
@@ -114,7 +127,37 @@ except ValueError:
 raise SystemExit(0 if a.version == 4 and a.is_global else 1)' "$1" 2>/dev/null
 }
 
+# Prefer the tailnet when the guest joined one: WireGuard does not depend on the
+# operator's ISP carrying an SSH session, needs no inbound rule, and survives the
+# operator's public IP changing mid-run. Falls back to the public IP silently.
+resolve_tailscale_ip() {
+  command -v tailscale >/dev/null || return 0
+  tailscale status --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit
+want = sys.argv[1] if len(sys.argv) > 1 else "sembla-bench"
+for peer in (data.get("Peer") or {}).values():
+    name = (peer.get("HostName") or "").lower()
+    if name == want or name.startswith(want + "-"):
+        if peer.get("Online"):
+            for ip in peer.get("TailscaleIPs") or []:
+                if ":" not in ip:
+                    print(ip)
+                    raise SystemExit
+' "${TAILSCALE_NODE:-sembla-bench}" 2>/dev/null || true
+}
+
 PUBLIC_IP="${PUBLIC_IP_OVERRIDE:-}"
+if [[ -z "$PUBLIC_IP" ]]; then
+  TS_IP="$(resolve_tailscale_ip)"
+  if [[ -n "$TS_IP" ]]; then
+    echo "Found tailnet node ${TAILSCALE_NODE:-sembla-bench} at $TS_IP; using it instead of the public IP."
+    PUBLIC_IP="$TS_IP"
+  fi
+fi
 ip_deadline=$((SECONDS + ${IP_TIMEOUT_SECONDS:-600}))
 ip_refreshed=false
 while [[ -z "$PUBLIC_IP" ]] && (( SECONDS < ip_deadline )); do
@@ -161,7 +204,7 @@ PY
   echo "Waiting for the public IP to be assigned."
   sleep 15
 done
-if [[ -z "$PUBLIC_IP" ]] || ! is_global_ipv4 "$PUBLIC_IP"; then
+if [[ -z "$PUBLIC_IP" ]] || ! is_usable_ssh_target "$PUBLIC_IP"; then
   echo "No global public IPv4 for the paid VM within the timeout." >&2
   echo "The VM exists and is billing. Read its IP from the Hyperstack console" >&2
   echo "and re-run with PUBLIC_IP_OVERRIDE=<ip>, or destroy it now." >&2

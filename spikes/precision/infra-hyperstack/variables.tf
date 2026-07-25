@@ -132,6 +132,18 @@ variable "ssh_host_private_key" {
   }
 }
 
+variable "tailscale_auth_key" {
+  description = "Optional Tailscale auth key. When set, the guest joins the operator's tailnet as 'sembla-bench' and the collector reaches it over WireGuard instead of the public IP. Use an EPHEMERAL, pre-authorized, tagged key so the node removes itself on shutdown. Supply only through TF_VAR_tailscale_auth_key; never in tfvars."
+  type        = string
+  sensitive   = true
+  default     = ""
+
+  validation {
+    condition     = var.tailscale_auth_key == "" || can(regex("^tskey-(auth|client)-[A-Za-z0-9-]+$", var.tailscale_auth_key))
+    error_message = "tailscale_auth_key must be empty or a tskey-auth-… / tskey-client-… key supplied through TF_VAR_tailscale_auth_key."
+  }
+}
+
 variable "expected_gpu_model" {
   description = "GPU model substring expected from both the live flavor and nvidia-smi, for example A100."
   type        = string

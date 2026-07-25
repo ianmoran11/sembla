@@ -71,6 +71,44 @@ defaults to the `sntrup761` hybrid, whose client public key is ~1200 bytes — a
 single packet large enough to vanish on a path with an MTU problem. This is
 defence in depth; it did **not** fix the failing home network.
 
+## Reaching the VM over Tailscale (recommended)
+
+Set `TF_VAR_tailscale_auth_key` and the guest joins your tailnet as
+`sembla-bench` during bootstrap. The collector then finds it automatically via
+`tailscale status` and connects over WireGuard instead of the public IP.
+
+Why this is the better path:
+
+- **It does not need your ISP to carry an SSH session.** WireGuard is UDP, so a
+  network that mangles TCP SSH is irrelevant.
+- **No `/32` rule to maintain**, and nothing breaks when your public IP rotates
+  mid-run — the failure that stranded a run on 2026-07-25.
+- **Nothing new is trusted.** `tailscale up --ssh=false` deliberately does *not*
+  enable Tailscale SSH: authentication stays with the pinned host key and your
+  keypair. The tailnet is transport only.
+
+Use an **ephemeral, pre-authorized, tagged** auth key so the node removes itself
+from your tailnet when the VM dies. The guest also opens tcp/22 on `tailscale0`
+— without that the tailnet path is established but unusable, because the guest
+firewall drops port 22 from anything but the operator `/32`.
+
+Override the node name with `TAILSCALE_NODE=<name>`; force the public path with
+`PUBLIC_IP_OVERRIDE=<ip>`.
+
+### Retrofitting a VM that is already running
+
+A VM created without the auth key can still be pulled onto the tailnet from the
+VNC console, which is useful for rescuing a run when SSH is unavailable:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sudo sh
+sudo tailscale up --hostname=sembla-bench --ssh=false
+sudo iptables -I INPUT 3 -i tailscale0 -p tcp --dport 22 -j ACCEPT
+```
+
+`tailscale up` without `--authkey` prints a login URL — open it on a phone and
+approve. That avoids typing a long key into a VNC console.
+
 ## Things that must not be changed casually
 
 - **`ssh_cidr` is part of the VM's identity.** It feeds the rendered bootstrap,
