@@ -127,7 +127,9 @@ else:
     if line:
         tokens = line.group(0).split()
         if tokens:
-            elapsed = re.fullmatch(r"[0-9]+(:[0-9]+)*(\.[0-9]+)?", tokens[-1])
+            # Group 1 must be the whole value: the shared code below reads
+            # elapsed.group(1), so inner groups are non-capturing.
+            elapsed = re.fullmatch(r"([0-9]+(?::[0-9]+)*(?:\.[0-9]+)?)", tokens[-1])
     rss = re.search(r"Maximum resident set size \(kbytes\):\s*([0-9]+)", text)
     rss_bytes = int(rss.group(1)) * 1024 if rss else 0
 if not elapsed:
