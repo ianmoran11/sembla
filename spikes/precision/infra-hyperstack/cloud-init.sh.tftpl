@@ -59,6 +59,7 @@ console_note "starting bootstrap"
 SSH_CIDR="$(printf '%s' '${ssh_cidr_b64}' | base64 -d)"
 CONSOLE_PASSWORD_HASH="$(printf '%s' '${console_password_hash_b64}' | base64 -d)"
 SSH_HOST_PRIVATE_KEY="$(printf '%s' '${ssh_host_private_key_b64}' | base64 -d)"
+EVIDENCE_DEPLOY_KEY="$(printf '%s' '${evidence_deploy_key_b64}' | base64 -d)"
 TAILSCALE_AUTH_KEY="$(printf '%s' '${tailscale_auth_key_b64}' | base64 -d)"
 REPOSITORY_URL="$(printf '%s' '${repository_url_b64}' | base64 -d)"
 REGION_NAME="$(printf '%s' '${region_name_b64}' | base64 -d)"
@@ -218,6 +219,49 @@ sudo -u ${ssh_user} git clone "$REPOSITORY_URL" "$SPIKE_DIR"
 sudo -u ${ssh_user} git -C "$SPIKE_DIR" checkout --detach "$REPOSITORY_REF"
 ACTUAL_REF="$(sudo -u ${ssh_user} git -C "$SPIKE_DIR" rev-parse HEAD)"
 test "$ACTUAL_REF" = "$REPOSITORY_REF"
+
+# Evidence push credential (optional). The public half is registered on the
+# repository as a write-enabled deploy key, so this credential can push to this
+# one repository and do nothing else: no API access, no other repository, no
+# account scope. It exists so a long run can deliver its evidence without a
+# live SSH session at the end. Absent, the SSH collection path is unchanged.
+if [[ -n "$EVIDENCE_DEPLOY_KEY" ]]; then
+  install -d -m 0700 -o ${ssh_user} -g ${ssh_user} /home/${ssh_user}/.ssh
+  printf '%s\n' "$EVIDENCE_DEPLOY_KEY" > /home/${ssh_user}/.ssh/evidence_deploy_key
+  chmod 0600 /home/${ssh_user}/.ssh/evidence_deploy_key
+  chown ${ssh_user}:${ssh_user} /home/${ssh_user}/.ssh/evidence_deploy_key
+
+  # Pin GitHub's SSH host keys. StrictHostKeyChecking=no here would make the
+  # push trust-on-first-use, which is exactly the property the VM's own host
+  # key handling exists to avoid.
+  cat > /home/${ssh_user}/.ssh/github_known_hosts <<'GITHUB_HOST_KEYS'
+github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+GITHUB_HOST_KEYS
+  chmod 0644 /home/${ssh_user}/.ssh/github_known_hosts
+  chown ${ssh_user}:${ssh_user} /home/${ssh_user}/.ssh/github_known_hosts
+
+  # Derive the SSH push remote from the clone URL rather than taking a second
+  # variable: two sources for "which repository" is one too many, and a
+  # mismatch would push evidence somewhere nobody looks.
+  EVIDENCE_PUSH_REMOTE="$(printf '%s' "$REPOSITORY_URL" \
+    | sed -E 's#^https://github\.com/#git@github.com:#')"
+  if [[ "$EVIDENCE_PUSH_REMOTE" != git@github.com:* ]]; then
+    echo "repository_url is not a github.com HTTPS URL; cannot derive a push remote" >&2
+    exit 1
+  fi
+
+  {
+    printf 'EVIDENCE_PUSH_ENABLED=1\n'
+    printf 'export EVIDENCE_PUSH_REMOTE=%q\n' "$EVIDENCE_PUSH_REMOTE"
+    printf 'export GIT_SSH_COMMAND=%q\n' \
+      "ssh -i /home/${ssh_user}/.ssh/evidence_deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/${ssh_user}/.ssh/github_known_hosts"
+  } >> /etc/sembla-evidence-push.env
+  chmod 0644 /etc/sembla-evidence-push.env
+else
+  printf 'EVIDENCE_PUSH_ENABLED=0\n' > /etc/sembla-evidence-push.env
+  chmod 0644 /etc/sembla-evidence-push.env
+fi
 
 printf '%s' '${remote_run_spike_b64}' | base64 -d > /home/${ssh_user}/run-spike.sh
 chown ${ssh_user}:${ssh_user} /home/${ssh_user}/run-spike.sh

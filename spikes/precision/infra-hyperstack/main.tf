@@ -83,6 +83,7 @@ locals {
     repository_url_b64        = base64encode(var.repository_url)
     ssh_cidr_b64              = base64encode(var.ssh_cidr)
     ssh_host_private_key_b64  = base64encode(var.ssh_host_private_key)
+    evidence_deploy_key_b64   = base64encode(var.evidence_deploy_key)
     tailscale_auth_key_b64    = base64encode(var.tailscale_auth_key)
     ssh_user                  = var.ssh_user
   })

@@ -637,6 +637,70 @@ cd "$OUT_ROOT"
 find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 sha256sum -c SHA256SUMS >/dev/null
 tar -czf "$HOME/demographic-bench.tar.gz" -C "$HOME" demographic-bench
+
+# --- evidence push (optional) -------------------------------------------------
+# Pushing happens *after* SHA256SUMS is written and verified, so the pushed tree
+# is self-verifying: whoever pulls it can re-check every file against a manifest
+# that was produced before the push existed.
+#
+# This is what makes a long run genuinely unattended. Without it, artifacts only
+# reach the workstation if an SSH session is alive at the end of a multi-hour
+# job, which on 2026-07-25 was the binding constraint rather than compute.
+# It does NOT stop billing: the VM must still be destroyed.
+# shellcheck disable=SC1091
+[[ -f /etc/sembla-evidence-push.env ]] && . /etc/sembla-evidence-push.env
+if [[ "${EVIDENCE_PUSH_ENABLED:-0}" == "1" ]]; then
+  echo '=== pushing evidence to GitHub ==='
+  PUSH_BRANCH="evidence/hyperstack-$(date -u +%Y%m%dT%H%M%SZ)"
+  case "$PUSH_BRANCH" in
+    evidence/*) ;;
+    *) echo "refusing to push to a non-evidence branch: $PUSH_BRANCH" >&2; exit 6 ;;
+  esac
+
+  # A rented VM must not be able to disturb the trunk even by accident.
+  if [[ "$PUSH_BRANCH" == "main" || "$PUSH_BRANCH" == "master" ]]; then
+    echo 'refusing to push to a trunk branch' >&2
+    exit 6
+  fi
+
+  # Refuse to publish anything that looks like a credential. The evidence tree
+  # is timings, hashes, and provenance text; a key or token in it means
+  # something upstream is wrong, and pushing is irreversible.
+  if grep -rIl -E 'BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|api[_-]?key' \
+      "$OUT_ROOT" >/dev/null 2>&1; then
+    echo 'refusing to push: evidence tree contains something that looks like a credential' >&2
+    grep -rIl -E 'BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|api[_-]?key' "$OUT_ROOT" >&2 || true
+    exit 6
+  fi
+
+  PUSH_TREE="$HOME/evidence-push"
+  rm -rf "$PUSH_TREE"
+  git clone --quiet --no-checkout "$SPIKE_DIR" "$PUSH_TREE"
+  cd "$PUSH_TREE"
+  git config user.email 'evidence@sembla.invalid'
+  git config user.name 'Sembla evidence collector'
+  git remote remove origin
+  git remote add origin "$EVIDENCE_PUSH_REMOTE"
+  # An orphan branch: evidence is an artifact, not a change to the source tree,
+  # and a detached history cannot conflict with or accidentally revert trunk.
+  git checkout --quiet --orphan "$PUSH_BRANCH"
+  git rm -rq --cached . 2>/dev/null || true
+  rm -rf ./*
+  mkdir -p "docs/evidence/demographic-bench/$(basename "$OUT_ROOT")"
+  cp -R "$OUT_ROOT/." "docs/evidence/demographic-bench/$(basename "$OUT_ROOT")/"
+  git add -A
+  git commit --quiet -m "Evidence: $(basename "$OUT_ROOT") from $(cat "$OUT_ROOT/host-identity.sha256")"
+  if git push --quiet origin "HEAD:refs/heads/$PUSH_BRANCH"; then
+    echo "SEMBLA_EVIDENCE_PUSHED $PUSH_BRANCH"
+    printf '%s\n' "$PUSH_BRANCH" > "$HOME/evidence-branch"
+  else
+    # A failed push must not fail the run: the tarball is still on disk and the
+    # SSH path still works. Say so loudly rather than exiting non-zero.
+    echo 'SEMBLA_EVIDENCE_PUSH_FAILED (tarball intact; collect over SSH)' >&2
+  fi
+  cd "$OUT_ROOT"
+fi
+
 echo SEMBLA_BENCH_COMPLETE
 REMOTE_EOF
 
@@ -706,10 +770,21 @@ while (( SECONDS < poll_deadline )); do
   sleep 120
 done
 ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/bench.log' > "$ARTIFACT_DIR/remote-run.log" 2>/dev/null || true
+EVIDENCE_BRANCH="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/evidence-branch 2>/dev/null || true' 2>/dev/null || true)"
+if [[ -n "$EVIDENCE_BRANCH" ]]; then
+  echo "Evidence was pushed to branch: $EVIDENCE_BRANCH"
+  echo "It is retrievable with 'git fetch origin $EVIDENCE_BRANCH' from anywhere,"
+  echo "independently of this session surviving."
+  printf '%s\n' "$EVIDENCE_BRANCH" > "$ARTIFACT_DIR/evidence-branch.txt"
+fi
+
 if [[ "$bench_status" != "SEMBLA_BENCH_COMPLETE" ]]; then
   echo "Remote benchmark did not complete: ${bench_status:-still running at timeout}" >&2
   echo "Log: $ARTIFACT_DIR/remote-run.log" >&2
   echo "The VM is still up. Re-run this script to rejoin, or destroy it now." >&2
+  if [[ -n "$EVIDENCE_BRANCH" ]]; then
+    echo "Note: evidence for a completed earlier phase is already on $EVIDENCE_BRANCH." >&2
+  fi
   exit 1
 fi
 

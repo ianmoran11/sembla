@@ -56,10 +56,27 @@ case "${1:-}" in
 import datetime
 print((datetime.datetime.now() + datetime.timedelta(seconds=$seconds)).strftime('%Y-%m-%d %H:%M:%S'))")"
 
+    deadline_epoch="$(python3 -c "import time; print(int(time.time()) + $seconds)")"
+
+    if ! command -v caffeinate >/dev/null; then
+      echo "warning: caffeinate not found; system sleep will delay this watchdog" >&2
+    fi
+
     # nohup + & detaches from the terminal; on macOS there is no setsid. The
     # child is reparented when this shell exits and keeps running.
     nohup bash -c '
-      sleep "$1"
+      # Hold a system-sleep assertion for as long as this watchdog lives.
+      # Without it macOS suspends us when the machine sleeps, so a watchdog
+      # armed at bedtime fires hours late and bills the whole night. `-w $$`
+      # ties the assertion to this process, so `disarm` releases it too.
+      if command -v caffeinate >/dev/null; then
+        caffeinate -s -w $$ &
+      fi
+      # Poll an absolute deadline rather than sleeping for a duration: a relative
+      # sleep does not advance while the host is suspended, so it would fire late
+      # by however long the machine slept. This fires within the poll interval of
+      # the wall-clock deadline even if the host suspends and resumes.
+      while (( $(date +%s) < $1 )); do sleep 30; done
       cd "$2"
       {
         printf "[%s] deadline reached\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -80,7 +97,7 @@ print((datetime.datetime.now() + datetime.timedelta(seconds=$seconds)).strftime(
         fi
         printf "[%s] destroy complete; state is clean\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       } 2>&1
-    ' _ "$seconds" "$MODULE_DIR" "$TFVARS_FILE" >> "$LOG_FILE" 2>&1 &
+    ' _ "$deadline_epoch" "$MODULE_DIR" "$TFVARS_FILE" >> "$LOG_FILE" 2>&1 &
 
     echo $! > "$PID_FILE"
     printf '%s\n' "$deadline" > "$DEADLINE_FILE"
@@ -88,6 +105,9 @@ print((datetime.datetime.now() + datetime.timedelta(seconds=$seconds)).strftime(
     echo "Armed: PID $(cat "$PID_FILE") will destroy the VM at $deadline (local time)."
     echo "Log:   $LOG_FILE"
     echo "This survives the collector, the shell, and tmux. It does not survive a reboot."
+    if command -v caffeinate >/dev/null; then
+      echo "System sleep is held off while this watchdog is armed (caffeinate -s)."
+    fi
     ;;
 
   status)

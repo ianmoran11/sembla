@@ -24,11 +24,12 @@ Each item below has failed at least once in practice.
       a useful error.
 - [ ] **Secrets available**: `HYPERSTACK_API_KEY`,
       `TF_VAR_console_password_hash`, and — if using the pre-seeded host key —
-      `TF_VAR_ssh_host_private_key`. All three must be in the *same* shell as
-      the plan, the apply, and the collector.
+      `TF_VAR_ssh_host_private_key`. If pushing evidence to GitHub, also
+      `TF_VAR_evidence_deploy_key` (see "Evidence push"). All must be in the
+      *same* shell as the plan, the apply, and the collector.
 - [ ] **`umask 077` before `terraform plan`.** The plan file embeds the console
-      password hash inside user-data; `review-paid-plan.py` refuses a `0644`
-      plan, and it is right to.
+      password hash — and the evidence deploy key, if set — inside user-data;
+      `review-paid-plan.py` refuses a `0644` plan, and it is right to.
 - [ ] **`emergency_poweroff_hours` exceeds the expected run time.** It defaults
       low. A guest poweroff mid-run loses the work *and* keeps billing.
 - [ ] **Arm the billing watchdog** (`destroy-deadline.sh arm <hours>`) before
@@ -208,26 +209,61 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
-## Planned improvement: collect through GitHub, not SSH
+## Evidence push: collect through GitHub, not SSH
 
-The current design needs a live SSH session at the *end* of a multi-hour run to
-retrieve artifacts. That couples a 5-hour job to 5 hours of stable connectivity,
-which is the wrong dependency — and on 2026-07-25 it was the binding constraint,
-not compute.
+**Implemented 2026-07-26.** Previously the design needed a live SSH session at
+the *end* of a multi-hour run to retrieve artifacts, coupling a 5-hour job to
+5 hours of stable connectivity. On 2026-07-25 that, not compute, was the
+binding constraint.
 
-The better design: the remote payload commits its evidence directory to the
-repository and pushes, so collection is `git pull` from anywhere and the local
-driver becomes optional. Sketch:
+The remote payload now commits its evidence directory to an `evidence/<UTC>`
+branch and pushes, so collection is a `git fetch` from anywhere and the local
+driver becomes insurance rather than a dependency.
 
-- Provision a **fine-grained, contents-write, single-repo** deploy token or
-  deploy key, passed through `TF_VAR_*` into user-data the way the host key is;
-  never into tfvars or state beyond what user-data already carries.
-- The payload commits to a dedicated branch (`evidence/hyperstack-<UTC>`), never
-  to `main`, so a failed or partial run cannot disturb the trunk.
-- Push after `SHA256SUMS` is written, so the pushed tree is self-verifying.
-- Keep the local driver for teardown, but let it exit cleanly once the push is
-  confirmed; the watchdog remains the billing backstop either way.
-- The VM must still be destroyed — a push does not stop billing.
+### One-time setup
 
-This also removes the mobile-data cost of pulling artifacts over a hotspot, and
-makes an unattended overnight run genuinely unattended.
+1. `eval "$(bash prepare-deploy-key.sh)"` — generates a fresh ED25519 deploy
+   key, prints the public half, and exports `TF_VAR_evidence_deploy_key`.
+2. Register the printed public key at
+   `https://github.com/<owner>/<repo>/settings/keys/new` with **Allow write
+   access** ticked.
+3. **Enable branch protection on `main`.** GitHub deploy keys cannot be scoped
+   to a branch, so protection on the trunk is the only thing preventing a
+   compromised VM from touching it. The payload refuses to push to `main` or
+   `master` and only ever pushes `evidence/*`, but that is the payload policing
+   itself; branch protection is the control that does not depend on the VM.
+4. Delete the deploy key from GitHub once the session's evidence is merged.
+   Keys are per-session by design — re-running the script makes a new one.
+
+Leave `TF_VAR_evidence_deploy_key` unset to disable the push entirely; the SSH
+collection path is unchanged and remains the primary route.
+
+### Properties worth knowing
+
+- The push happens **after** `SHA256SUMS` is written and verified, so the
+  pushed tree is self-verifying.
+- The branch is an **orphan**: evidence is an artifact, not a change to the
+  source tree, and a detached history cannot conflict with trunk.
+- The payload **scans for credential-shaped strings** before pushing and
+  refuses if it finds any. A push is irreversible.
+- A failed push does **not** fail the run. The tarball stays on disk and SSH
+  collection still works; the failure is reported loudly instead.
+- GitHub's SSH host keys are **pinned** in cloud-init. Trust-on-first-use here
+  would undo the reason the VM's own host key is pre-seeded.
+- **A push does not stop billing.** The VM must still be destroyed.
+
+### What this does and does not make safe
+
+It makes *artifact delivery* independent of your laptop. It does not make
+teardown independent of your laptop — that is still `terraform destroy`, run
+either by the driver or by `destroy-deadline.sh`.
+
+The watchdog was also hardened on 2026-07-26: it now polls an absolute
+deadline instead of sleeping for a duration, and holds a `caffeinate -s`
+assertion while armed. Before that change, a watchdog armed at bedtime would
+not fire, because macOS suspends a sleeping process when the machine sleeps —
+an overnight run would have billed until the machine next woke.
+
+Even so, prefer to run when you are awake. Every session so far has produced
+at least one surprise needing a decision.
+

@@ -13,6 +13,7 @@
 !outputs.tf
 !prepare-console-password.sh
 !destroy-deadline.sh
+!prepare-deploy-key.sh
 !prepare-host-key.sh
 !remote-run-spike.sh
 !run-demographic-benchmark.sh
