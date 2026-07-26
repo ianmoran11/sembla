@@ -79,6 +79,21 @@ pub struct TickReport {
     pub aggregate_builds: usize,
 }
 
+/// Per-phase wall durations for one instrumented CPU tick.
+#[derive(Clone, Copy, Debug)]
+pub struct TickPhaseDurations {
+    pub execute_tick: std::time::Duration,
+    pub observe_views: std::time::Duration,
+    pub report: std::time::Duration,
+}
+
+/// One CPU tick report paired with its per-phase instrumentation.
+#[derive(Clone, Debug)]
+pub struct TimedTickReport {
+    pub report: TickReport,
+    pub phases: TickPhaseDurations,
+}
+
 /// A structured saturation warning produced by [`run`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SaturationWarning {
@@ -277,6 +292,41 @@ pub fn run_tick_with_features(
     Ok(execute_tick(model, state, params, seed, tick)?.report)
 }
 
+/// Executes one CPU tick while measuring only the named per-tick phase
+/// boundaries. The ordinary run path calls [`run_tick_with_features`] and
+/// allocates no timer state.
+pub fn run_tick_with_features_timed(
+    model: &ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    tick: u32,
+    enabled_features: &FeatureSet,
+) -> Result<TimedTickReport, TickError> {
+    require_grouped_observations_feature(model, enabled_features)?;
+
+    let started = std::time::Instant::now();
+    let box_outcomes = execute_tick_state(model, state, params, seed, tick)?;
+    let execute_tick = started.elapsed();
+
+    let started = std::time::Instant::now();
+    let (views, grouped_views) = observe_tick(model, state, params)?;
+    let observe_views = started.elapsed();
+
+    let started = std::time::Instant::now();
+    let outcome = finish_tick(model, tick, box_outcomes, views, grouped_views);
+    let report = started.elapsed();
+
+    Ok(TimedTickReport {
+        report: outcome.report,
+        phases: TickPhaseDurations {
+            execute_tick,
+            observe_views,
+            report,
+        },
+    })
+}
+
 /// Executes ticks `0..n_ticks` and records strict saturation warnings.
 pub fn run(
     model: &ValidatedModel,
@@ -360,6 +410,18 @@ fn execute_tick(
     seed: u64,
     tick: u32,
 ) -> Result<TickOutcome, TickError> {
+    let box_outcomes = execute_tick_state(model, state, params, seed, tick)?;
+    let (views, grouped_views) = observe_tick(model, state, params)?;
+    Ok(finish_tick(model, tick, box_outcomes, views, grouped_views))
+}
+
+fn execute_tick_state(
+    model: &ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    tick: u32,
+) -> Result<Vec<BoxOutcome>, TickError> {
     let snapshot = state.snapshot();
     let mut box_outcomes = Vec::with_capacity(model.model().boxes.len());
     for box_index in 0..model.model().boxes.len() {
@@ -417,12 +479,30 @@ fn execute_tick(
         return Err(error.into());
     }
     state.replace_inputs(next_inputs);
+    Ok(box_outcomes)
+}
+
+fn observe_tick(
+    model: &ValidatedModel,
+    state: &StateStore,
+    params: &ParamEnv,
+) -> Result<(Vec<ViewValue>, Vec<GroupedViewValue>), TickError> {
     // Observation is deliberately evaluated only after commit and receives an
     // immutable store. It cannot consume RNG coordinates, stage writes, or
     // influence conflict resolution or scheduling.
-    let views = observe_views(model, state, params)?;
-    let grouped_views = observe_grouped_views(model, state, params)?;
+    Ok((
+        observe_views(model, state, params)?,
+        observe_grouped_views(model, state, params)?,
+    ))
+}
 
+fn finish_tick(
+    model: &ValidatedModel,
+    tick: u32,
+    box_outcomes: Vec<BoxOutcome>,
+    views: Vec<ViewValue>,
+    grouped_views: Vec<GroupedViewValue>,
+) -> TickOutcome {
     let mut fired = model
         .transitions()
         .iter()
@@ -449,7 +529,7 @@ fn execute_tick(
         }
     }
 
-    Ok(TickOutcome {
+    TickOutcome {
         report: TickReport {
             tick,
             views,
@@ -460,7 +540,7 @@ fn execute_tick(
             aggregate_builds,
         },
         fired_per_resource_table,
-    })
+    }
 }
 
 /// Evaluates declaration-ordered views from an already committed state.

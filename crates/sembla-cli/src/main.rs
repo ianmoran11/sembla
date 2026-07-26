@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use sembla_cuda::{CudaBackend, HashMode};
 use sembla_ir::{AttrType, FeatureSet, ParamType, ParamValue, GROUPED_OBSERVATIONS_FEATURE};
@@ -12,12 +13,13 @@ use sembla_runtime::state_artifact::{
     committed_table_inits, read as read_state_artifact, sniff_magic, state_artifact_hash,
     to_table_inits, write_new as write_new_state_artifact, StateKind, STATE_ARTIFACT_SCHEMA,
 };
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 const GROUPED_SCOPE_FOLLOW_UP: &str =
     "--enable grouped-observations is not yet supported for diff-backends; see the grouped-observations backend follow-up PRD";
@@ -126,6 +128,7 @@ struct RunOptions {
     export_state: Option<String>,
     dt: Option<f64>,
     params: Option<String>,
+    timing_json: Option<String>,
     backend: BackendSelection,
     enabled_features: FeatureSet,
 }
@@ -147,6 +150,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
     let mut export_state = None;
     let mut dt = None;
     let mut params = None;
+    let mut timing_json = None;
     let mut backend = None;
     let mut enabled_features = FeatureSet::new();
     let mut index = 0;
@@ -176,6 +180,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
                 set_once(&mut dt, value, flag)?;
             }
             "--params" => set_once(&mut params, value.clone(), flag)?,
+            "--timing-json" => set_once(&mut timing_json, value.clone(), flag)?,
             "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
             "--enable" => {
                 enabled_features.insert(parse_feature(value)?);
@@ -192,6 +197,7 @@ fn parse_run_options(flags: &[String]) -> Result<RunOptions, String> {
         export_state,
         dt,
         params,
+        timing_json,
         backend: backend.unwrap_or_default(),
         enabled_features,
     })
@@ -1366,6 +1372,29 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
             }
         }
     }
+    if let Some(timing_path) = options.timing_json.as_deref() {
+        let timing_path = Path::new(timing_path);
+        let mut output_paths = Vec::new();
+        if let Some(out) = options.out.as_deref() {
+            output_paths.extend([
+                PathBuf::from(out),
+                summaries_path(out),
+                manifest::sidecar_path(out),
+            ]);
+        }
+        if let Some(export_path) = options.export_state.as_deref() {
+            output_paths.push(PathBuf::from(export_path));
+        }
+        for output_path in output_paths {
+            if paths_resolve_to_same_file(timing_path, &output_path) {
+                return Err(format!(
+                    "--timing-json path '{}' conflicts with run output path '{}'",
+                    timing_path.display(),
+                    output_path.display()
+                ));
+            }
+        }
+    }
     if let Some(export_path) = options.export_state.as_deref() {
         let export_path = Path::new(export_path);
         if export_path
@@ -1380,6 +1409,25 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     }
 
     let RunInput { model, plan } = read_run_input(path, &options)?;
+    if let (Some(timing_path), Some(out)) = (options.timing_json.as_deref(), options.out.as_deref())
+    {
+        let timing_path = Path::new(timing_path);
+        for view in model
+            .model()
+            .boxes
+            .iter()
+            .flat_map(|model_box| model_box.grouped_views.iter())
+        {
+            let grouped_path = grouped_output_path(Path::new(out), &view.name);
+            if paths_resolve_to_same_file(timing_path, &grouped_path) {
+                return Err(format!(
+                    "--timing-json path '{}' conflicts with run output path '{}'",
+                    timing_path.display(),
+                    grouped_path.display()
+                ));
+            }
+        }
+    }
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
     let initialized = initialized_tables(&model, &options.population)?;
@@ -1388,6 +1436,7 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
     let params = resolve_params(&model, options.params.as_deref())?;
     if options.out.is_none()
         && options.export_state.is_none()
+        && options.timing_json.is_none()
         && options.backend == BackendSelection::Cpu
     {
         let mut state =
@@ -1413,15 +1462,37 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         }
         return Ok(());
     }
-    let execution = execute_backend_output_with_features(
-        &model,
-        initial,
-        &params,
-        options.seed,
-        options.ticks,
-        BackendRunMode::final_only(options.backend),
-        &options.enabled_features,
-    )?;
+    let (execution, timing) = if options.timing_json.is_some() {
+        let scale = initial
+            .iter()
+            .map(|table| table.row_count)
+            .max()
+            .unwrap_or(0);
+        let (execution, timing) = execute_backend_output_timed_with_features(
+            &model,
+            initial,
+            &params,
+            options.seed,
+            options.ticks,
+            BackendRunMode::final_only(options.backend),
+            &options.enabled_features,
+            scale,
+        )?;
+        (execution, Some(timing))
+    } else {
+        (
+            execute_backend_output_with_features(
+                &model,
+                initial,
+                &params,
+                options.seed,
+                options.ticks,
+                BackendRunMode::final_only(options.backend),
+                &options.enabled_features,
+            )?,
+            None,
+        )
+    };
     let exported_state = options
         .export_state
         .as_deref()
@@ -1475,7 +1546,7 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
             run_manifest.plan = Some(plan_identity);
             run_manifest.linked_source = linked_source;
         }
-        manifest::write(&manifest::sidecar_path(out), &run_manifest)
+        manifest::write(&manifest::sidecar_path(out), &run_manifest)?;
     } else {
         for (tick, row) in execution.output.series.rows.iter().enumerate() {
             for transition in model.transitions() {
@@ -1501,8 +1572,11 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
                 );
             }
         }
-        Ok(())
     }
+    if let (Some(timing_path), Some(timing)) = (options.timing_json.as_deref(), timing.as_ref()) {
+        write_timing_document(timing_path, timing)?;
+    }
+    Ok(())
 }
 
 fn sweep_file(path: &str, options: SweepOptions) -> i32 {
@@ -2160,21 +2234,71 @@ fn grouped_output_records(outputs: &[GroupedCsvOutput]) -> Vec<manifest::Grouped
 }
 
 fn paths_resolve_to_same_file(left: &Path, right: &Path) -> bool {
-    if left == right {
+    if left == right || same_file_identity(left, right) {
         return true;
     }
-    let resolve = |path: &Path| {
-        let file_name = path.file_name()?;
-        let parent = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or_else(|| Path::new("."));
-        parent
-            .canonicalize()
-            .ok()
-            .map(|parent| parent.join(file_name))
-    };
-    matches!((resolve(left), resolve(right)), (Some(left), Some(right)) if left == right)
+    matches!(
+        (
+            resolve_collision_path(left),
+            resolve_collision_path(right)
+        ),
+        (Some(left), Some(right)) if left == right
+    )
+}
+
+fn resolve_collision_path(path: &Path) -> Option<PathBuf> {
+    if let Ok(path) = path.canonicalize() {
+        return Some(path);
+    }
+    let mut candidate = canonical_parent_with_final_component(path)?;
+    // Follow a final-component symlink even when its target does not yet
+    // exist. That prevents a dangling timing alias from becoming destructive
+    // after the ordinary output is created.
+    for _ in 0..16 {
+        match std::fs::symlink_metadata(&candidate) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                let target = std::fs::read_link(&candidate).ok()?;
+                candidate = if target.is_absolute() {
+                    target
+                } else {
+                    candidate.parent()?.join(target)
+                };
+                candidate = canonical_parent_with_final_component(&candidate)?;
+                if let Ok(path) = candidate.canonicalize() {
+                    return Some(path);
+                }
+            }
+            _ => return Some(candidate),
+        }
+    }
+    None
+}
+
+fn canonical_parent_with_final_component(path: &Path) -> Option<PathBuf> {
+    let file_name = path.file_name()?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    parent
+        .canonicalize()
+        .ok()
+        .map(|parent| parent.join(file_name))
+}
+
+#[cfg(unix)]
+fn same_file_identity(left: &Path, right: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+
+    matches!(
+        (std::fs::metadata(left), std::fs::metadata(right)),
+        (Ok(left), Ok(right)) if left.dev() == right.dev() && left.ino() == right.ino()
+    )
+}
+
+#[cfg(not(unix))]
+fn same_file_identity(_left: &Path, _right: &Path) -> bool {
+    false
 }
 
 struct BackendRunOutput {
@@ -2183,6 +2307,297 @@ struct BackendRunOutput {
     identity: manifest::BackendIdentity,
     per_tick_hashes: PerTickHashes,
     elapsed: std::time::Duration,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PhaseDurations {
+    execute_tick: Option<Duration>,
+    kernels: Option<Duration>,
+    readback_control: Option<Duration>,
+    state_transfer: Option<Duration>,
+    state_reconstruct: Option<Duration>,
+    state_hash: Option<Duration>,
+    observe_views: Option<Duration>,
+    report: Option<Duration>,
+    other: Option<Duration>,
+}
+
+impl PhaseDurations {
+    fn zero_for_backend(backend: BackendSelection) -> Self {
+        match backend {
+            BackendSelection::Cpu => Self {
+                execute_tick: Some(Duration::ZERO),
+                state_hash: Some(Duration::ZERO),
+                observe_views: Some(Duration::ZERO),
+                report: Some(Duration::ZERO),
+                other: Some(Duration::ZERO),
+                ..Self::default()
+            },
+            BackendSelection::Cuda => Self {
+                kernels: Some(Duration::ZERO),
+                readback_control: Some(Duration::ZERO),
+                state_transfer: Some(Duration::ZERO),
+                state_reconstruct: Some(Duration::ZERO),
+                state_hash: Some(Duration::ZERO),
+                observe_views: Some(Duration::ZERO),
+                report: Some(Duration::ZERO),
+                other: Some(Duration::ZERO),
+                ..Self::default()
+            },
+        }
+    }
+
+    fn attributed(&self) -> Duration {
+        [
+            self.execute_tick,
+            self.kernels,
+            self.readback_control,
+            self.state_transfer,
+            self.state_reconstruct,
+            self.state_hash,
+            self.observe_views,
+            self.report,
+        ]
+        .into_iter()
+        .flatten()
+        .sum()
+    }
+
+    fn total(&self) -> Duration {
+        self.attributed() + self.other.unwrap_or_default()
+    }
+
+    fn add_assign(&mut self, other: Self) {
+        fn add(slot: &mut Option<Duration>, value: Option<Duration>) {
+            if let Some(value) = value {
+                *slot = Some(slot.unwrap_or_default() + value);
+            }
+        }
+        add(&mut self.execute_tick, other.execute_tick);
+        add(&mut self.kernels, other.kernels);
+        add(&mut self.readback_control, other.readback_control);
+        add(&mut self.state_transfer, other.state_transfer);
+        add(&mut self.state_reconstruct, other.state_reconstruct);
+        add(&mut self.state_hash, other.state_hash);
+        add(&mut self.observe_views, other.observe_views);
+        add(&mut self.report, other.report);
+        add(&mut self.other, other.other);
+    }
+
+    fn milliseconds(self) -> TimingPhases {
+        TimingPhases {
+            execute_tick: self.execute_tick.map(duration_ms),
+            kernels: self.kernels.map(duration_ms),
+            readback_control: self.readback_control.map(duration_ms),
+            state_transfer: self.state_transfer.map(duration_ms),
+            state_reconstruct: self.state_reconstruct.map(duration_ms),
+            state_hash: self.state_hash.map(duration_ms),
+            observe_views: self.observe_views.map(duration_ms),
+            report: self.report.map(duration_ms),
+            other: self.other.map(duration_ms),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TickTiming {
+    tick: u32,
+    wall_time: Duration,
+    phases: PhaseDurations,
+}
+
+fn finish_tick_timing(
+    tick: u32,
+    wall_time: Duration,
+    mut phases: PhaseDurations,
+) -> Result<TickTiming, String> {
+    phases.other = Some(wall_time.checked_sub(phases.attributed()).ok_or_else(|| {
+        format!("tick {tick}: attributed timing exceeds measured tick wall time")
+    })?);
+    Ok(TickTiming {
+        tick,
+        wall_time,
+        phases,
+    })
+}
+
+#[derive(Serialize)]
+struct TimingSession {
+    backend: &'static str,
+    scale: usize,
+    ticks: u32,
+    seed: u64,
+    repository_commit: String,
+    binary_sha256: String,
+}
+
+#[derive(Serialize)]
+struct TimerMetadata {
+    clock: &'static str,
+    resolution: &'static str,
+    reported_unit: &'static str,
+}
+
+#[derive(Clone, Copy, Serialize)]
+struct TimingPhases {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    execute_tick: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kernels: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    readback_control: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_transfer: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_reconstruct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_hash: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    observe_views: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    report: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    other: Option<f64>,
+}
+
+#[derive(Serialize)]
+struct TimingTick {
+    tick: u32,
+    wall_time_ms: f64,
+    phases_ms: TimingPhases,
+    phase_sum_ms: f64,
+    within_tolerance: bool,
+}
+
+#[derive(Serialize)]
+struct TimingTotals {
+    wall_time_ms: f64,
+    phases_ms: TimingPhases,
+    phase_sum_ms: f64,
+}
+
+#[derive(Serialize)]
+struct TimingSelfCheck {
+    tolerance_ms: f64,
+    all_ticks_reconciled: bool,
+    other_non_negative: bool,
+}
+
+#[derive(Serialize)]
+struct TimingDocument {
+    schema: &'static str,
+    session: TimingSession,
+    kernel_sync_inserted: bool,
+    timer: TimerMetadata,
+    ticks: Vec<TimingTick>,
+    totals: TimingTotals,
+    self_check: TimingSelfCheck,
+}
+
+impl TimingDocument {
+    fn new(
+        backend: BackendSelection,
+        scale: usize,
+        ticks: u32,
+        seed: u64,
+        kernel_sync_inserted: bool,
+        tick_timings: Vec<TickTiming>,
+    ) -> Result<Self, String> {
+        const TOLERANCE_MS: f64 = 0.001;
+        let mut total_wall = Duration::ZERO;
+        let mut total_phases = PhaseDurations::zero_for_backend(backend);
+        let mut rows = Vec::with_capacity(tick_timings.len());
+        for timing in tick_timings {
+            let phase_sum = timing.phases.total();
+            let within_tolerance =
+                (duration_ms(phase_sum) - duration_ms(timing.wall_time)).abs() <= TOLERANCE_MS;
+            total_wall += timing.wall_time;
+            total_phases.add_assign(timing.phases);
+            rows.push(TimingTick {
+                tick: timing.tick,
+                wall_time_ms: duration_ms(timing.wall_time),
+                phases_ms: timing.phases.milliseconds(),
+                phase_sum_ms: duration_ms(phase_sum),
+                within_tolerance,
+            });
+        }
+        let total_phase_time = total_phases.total();
+        let all_ticks_reconciled = rows.iter().all(|row| row.within_tolerance)
+            && (duration_ms(total_phase_time) - duration_ms(total_wall)).abs() <= TOLERANCE_MS;
+        if !all_ticks_reconciled {
+            return Err("timing phases did not reconcile with measured tick wall time".to_owned());
+        }
+        Ok(Self {
+            schema: "sembla-execution-timing-v1",
+            session: TimingSession {
+                backend: match backend {
+                    BackendSelection::Cpu => "cpu",
+                    BackendSelection::Cuda => "cuda",
+                },
+                scale,
+                ticks,
+                seed,
+                repository_commit: repository_commit()?,
+                binary_sha256: current_binary_sha256()?,
+            },
+            kernel_sync_inserted,
+            timer: TimerMetadata {
+                clock: "std::time::Instant",
+                resolution: "nanoseconds",
+                reported_unit: "milliseconds",
+            },
+            ticks: rows,
+            totals: TimingTotals {
+                wall_time_ms: duration_ms(total_wall),
+                phases_ms: total_phases.milliseconds(),
+                phase_sum_ms: duration_ms(total_phase_time),
+            },
+            self_check: TimingSelfCheck {
+                tolerance_ms: TOLERANCE_MS,
+                all_ticks_reconciled,
+                other_non_negative: true,
+            },
+        })
+    }
+}
+
+fn duration_ms(duration: Duration) -> f64 {
+    duration.as_secs_f64() * 1_000.0
+}
+
+fn repository_commit() -> Result<String, String> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map_err(|error| format!("could not resolve repository commit for timing JSON: {error}"))?;
+    if !output.status.success() {
+        return Err("could not resolve repository commit for timing JSON".to_owned());
+    }
+    let commit = String::from_utf8(output.stdout)
+        .map_err(|_| "repository commit is not UTF-8".to_owned())?
+        .trim()
+        .to_owned();
+    if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("repository commit is not a full SHA-1".to_owned());
+    }
+    Ok(commit)
+}
+
+fn current_binary_sha256() -> Result<String, String> {
+    let binary = std::env::current_exe()
+        .map_err(|error| format!("could not locate current binary for timing JSON: {error}"))?;
+    let bytes = std::fs::read(&binary).map_err(|error| format!("{}: {error}", binary.display()))?;
+    Ok(hex(&Sha256::digest(bytes)))
+}
+
+fn write_timing_document(path: &str, timing: &TimingDocument) -> Result<(), String> {
+    let mut json = serde_json::to_string_pretty(timing)
+        .map_err(|error| format!("could not serialize timing JSON: {error}"))?;
+    json.push('\n');
+    std::fs::write(path, json).map_err(|error| format!("{path}: {error}"))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2269,6 +2684,90 @@ fn execute_backend_output_with_features(
         }
         BackendSelection::Cuda => {
             run_results_output_cuda(model, initial, params, seed, ticks, run_mode.hash_mode)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_backend_output_timed_with_features(
+    model: &sembla_ir::ValidatedModel,
+    initial: Vec<TableInit>,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+    run_mode: BackendRunMode,
+    enabled_features: &FeatureSet,
+    scale: usize,
+) -> Result<(BackendRunOutput, TimingDocument), String> {
+    if run_mode.backend == BackendSelection::Cuda
+        && model
+            .model()
+            .boxes
+            .iter()
+            .any(|model_box| !model_box.grouped_views.is_empty())
+    {
+        return Err("grouped observations run on the cpu backend only for now".to_owned());
+    }
+    match run_mode.backend {
+        BackendSelection::Cpu => {
+            let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
+            let started = Instant::now();
+            let (output, tick_timings) = run_results_output_timed_with_features(
+                model,
+                &mut state,
+                params,
+                seed,
+                ticks,
+                run_mode.hash_mode,
+                enabled_features,
+            )?;
+            let elapsed = started.elapsed();
+            let per_tick_hashes = output.per_tick_hashes.clone();
+            let timing =
+                TimingDocument::new(run_mode.backend, scale, ticks, seed, false, tick_timings)?;
+            Ok((
+                BackendRunOutput {
+                    output,
+                    state,
+                    identity: manifest::BackendIdentity::cpu_oracle(),
+                    per_tick_hashes,
+                    elapsed,
+                },
+                timing,
+            ))
+        }
+        BackendSelection::Cuda => {
+            #[cfg(feature = "cuda")]
+            {
+                let (output, tick_timings) = run_results_output_cuda_timed(
+                    model,
+                    initial,
+                    params,
+                    seed,
+                    ticks,
+                    run_mode.hash_mode,
+                )?;
+                let timing =
+                    TimingDocument::new(run_mode.backend, scale, ticks, seed, false, tick_timings)?;
+                Ok((output, timing))
+            }
+            #[cfg(not(feature = "cuda"))]
+            {
+                let _ = scale;
+                match run_results_output_cuda(
+                    model,
+                    initial,
+                    params,
+                    seed,
+                    ticks,
+                    run_mode.hash_mode,
+                ) {
+                    Ok(_) => Err(
+                        "CUDA timing unexpectedly succeeded without the cuda feature".to_owned(),
+                    ),
+                    Err(error) => Err(error),
+                }
+            }
         }
     }
 }
@@ -2409,6 +2908,184 @@ fn generic_firing_descriptors(model: &sembla_ir::ValidatedModel) -> Vec<FiringDe
         .collect()
 }
 
+struct RunOutputAccumulator {
+    has_views: bool,
+    enums: Option<Vec<EnumCountDescriptor>>,
+    firings: Vec<FiringDescriptor>,
+    headers: Vec<String>,
+    csv: String,
+    rows: Vec<Vec<ReportedValue>>,
+    tick_reports: Vec<executor::TickReport>,
+}
+
+impl RunOutputAccumulator {
+    fn new(
+        model: &sembla_ir::ValidatedModel,
+        params: &ParamEnv,
+        ticks: u32,
+    ) -> Result<Self, String> {
+        let has_views = model
+            .model()
+            .boxes
+            .iter()
+            .any(|model_box| !model_box.views.is_empty());
+        let enums = (!has_views).then(|| generic_enum_descriptors(model));
+        let firings = generic_firing_descriptors(model);
+        let mut csv = String::new();
+        csv.push_str("# params=");
+        csv.push_str(&canonical_params(params)?);
+        csv.push('\n');
+        csv.push_str(&format!("# dt={}\n", model.model().dt));
+
+        let mut headers = vec!["tick".to_owned()];
+        if has_views {
+            headers.extend(
+                model
+                    .model()
+                    .boxes
+                    .iter()
+                    .flat_map(|model_box| model_box.views.iter().map(|view| view.name.clone())),
+            );
+        } else {
+            for descriptor in enums.as_deref().unwrap_or_default() {
+                for variant in &descriptor.variants {
+                    headers.push(format!(
+                        "count:{}.{}.{}={variant}",
+                        descriptor.box_name, descriptor.table_name, descriptor.attr_name
+                    ));
+                }
+            }
+        }
+        for descriptor in &firings {
+            if has_views {
+                headers.push(format!("fired_{}", descriptor.transition_name));
+            } else {
+                headers.push(format!(
+                    "fired:{}.{}",
+                    descriptor.box_name, descriptor.transition_name
+                ));
+            }
+        }
+        headers.push("deferred_total".to_owned());
+        csv.push_str(
+            &headers
+                .iter()
+                .map(|header| csv_field(header))
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+        csv.push('\n');
+
+        Ok(Self {
+            has_views,
+            enums,
+            firings,
+            headers,
+            csv,
+            rows: Vec::with_capacity(ticks as usize),
+            tick_reports: Vec::with_capacity(ticks as usize),
+        })
+    }
+
+    fn push_tick(
+        &mut self,
+        state: &StateStore,
+        tick: u32,
+        report: executor::TickReport,
+    ) -> Result<(), String> {
+        let mut row = Vec::with_capacity(self.headers.len() - 1);
+        if self.has_views {
+            row.extend(
+                report
+                    .views
+                    .iter()
+                    .map(|view| ReportedValue::from(view.value)),
+            );
+        } else {
+            let snapshot = state.snapshot();
+            for descriptor in self.enums.as_deref().unwrap_or_default() {
+                let values = snapshot
+                    .enum_values(
+                        &descriptor.box_name,
+                        &descriptor.table_name,
+                        &descriptor.attr_name,
+                    )
+                    .map_err(|error| error.to_string())?;
+                let mut counts = vec![0_usize; descriptor.variants.len()];
+                for value in values {
+                    let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
+                        format!(
+                            "invalid enum index {value} for {}.{}.{} with {} variants",
+                            descriptor.box_name,
+                            descriptor.table_name,
+                            descriptor.attr_name,
+                            descriptor.variants.len()
+                        )
+                    })?;
+                    *slot += 1;
+                }
+                row.extend(counts.into_iter().map(ReportedValue::Unsigned));
+            }
+        }
+        for descriptor in &self.firings {
+            let (reported_rule_id, fired) = report
+                .fired
+                .get(descriptor.rule_id as usize)
+                .ok_or_else(|| {
+                    format!(
+                        "tick {tick}: internal firing report has no rule {}",
+                        descriptor.rule_id
+                    )
+                })?;
+            if *reported_rule_id != descriptor.rule_id {
+                return Err(format!(
+                    "tick {tick}: internal firing report rule mismatch: expected {}, found {}",
+                    descriptor.rule_id, reported_rule_id
+                ));
+            }
+            row.push(ReportedValue::Unsigned(*fired));
+        }
+        row.push(ReportedValue::Unsigned(
+            report
+                .deferred_per_resource_table
+                .iter()
+                .map(|(_, count)| count)
+                .sum(),
+        ));
+        self.csv.push_str(&tick.to_string());
+        for value in &row {
+            self.csv.push(',');
+            self.csv.push_str(&value.csv());
+        }
+        self.csv.push('\n');
+        self.rows.push(row);
+        self.tick_reports.push(report);
+        Ok(())
+    }
+
+    fn finish(
+        self,
+        model: &sembla_ir::ValidatedModel,
+        per_tick_hashes: PerTickHashes,
+    ) -> Result<RunOutput, String> {
+        let grouped = grouped_csv_outputs(model, &self.tick_reports)?;
+        let summaries =
+            executor::summarize(model, &self.tick_reports).map_err(|error| error.to_string())?;
+        let summaries_csv = summaries_csv(&summaries);
+        Ok(RunOutput {
+            csv: self.csv,
+            grouped,
+            series: ReportedSeries {
+                columns: self.headers.into_iter().skip(1).collect(),
+                rows: self.rows,
+            },
+            summaries,
+            summaries_csv,
+            per_tick_hashes,
+        })
+    }
+}
+
 #[cfg(test)]
 fn run_results_output(
     model: &sembla_ir::ValidatedModel,
@@ -2437,151 +3114,102 @@ fn run_results_output_with_features(
     hash_mode: HashMode,
     enabled_features: &FeatureSet,
 ) -> Result<RunOutput, String> {
-    let has_views = model
-        .model()
-        .boxes
-        .iter()
-        .any(|model_box| !model_box.views.is_empty());
-    let enums = (!has_views).then(|| generic_enum_descriptors(model));
-    let firings = generic_firing_descriptors(model);
-    let mut csv = String::new();
-    let mut rows = Vec::with_capacity(ticks as usize);
-    let mut tick_reports = Vec::with_capacity(ticks as usize);
+    let mut output = RunOutputAccumulator::new(model, params, ticks)?;
     let mut per_tick_hashes =
         (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
-    csv.push_str("# params=");
-    csv.push_str(&canonical_params(params)?);
-    csv.push('\n');
-    csv.push_str(&format!("# dt={}\n", model.model().dt));
-
-    let mut headers = vec!["tick".to_owned()];
-    if has_views {
-        headers.extend(
-            model
-                .model()
-                .boxes
-                .iter()
-                .flat_map(|model_box| model_box.views.iter().map(|view| view.name.clone())),
-        );
-    } else {
-        for descriptor in enums.as_deref().unwrap_or_default() {
-            for variant in &descriptor.variants {
-                headers.push(format!(
-                    "count:{}.{}.{}={variant}",
-                    descriptor.box_name, descriptor.table_name, descriptor.attr_name
-                ));
-            }
-        }
-    }
-    for descriptor in &firings {
-        if has_views {
-            headers.push(format!("fired_{}", descriptor.transition_name));
-        } else {
-            headers.push(format!(
-                "fired:{}.{}",
-                descriptor.box_name, descriptor.transition_name
-            ));
-        }
-    }
-    headers.push("deferred_total".to_owned());
-    csv.push_str(
-        &headers
-            .iter()
-            .map(|header| csv_field(header))
-            .collect::<Vec<_>>()
-            .join(","),
-    );
-    csv.push('\n');
-
     for tick in 0..ticks {
         let report =
             executor::run_tick_with_features(model, state, params, seed, tick, enabled_features)
                 .map_err(|error| format!("tick {tick}: {error}"))?;
-        let mut row = Vec::with_capacity(headers.len() - 1);
-        if has_views {
-            row.extend(
-                report
-                    .views
-                    .iter()
-                    .map(|view| ReportedValue::from(view.value)),
-            );
-        } else {
-            let snapshot = state.snapshot();
-            for descriptor in enums.as_deref().unwrap_or_default() {
-                let values = snapshot
-                    .enum_values(
-                        &descriptor.box_name,
-                        &descriptor.table_name,
-                        &descriptor.attr_name,
-                    )
-                    .map_err(|error| error.to_string())?;
-                let mut counts = vec![0_usize; descriptor.variants.len()];
-                for value in values {
-                    let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
-                        format!(
-                            "invalid enum index {value} for {}.{}.{} with {} variants",
-                            descriptor.box_name,
-                            descriptor.table_name,
-                            descriptor.attr_name,
-                            descriptor.variants.len()
-                        )
-                    })?;
-                    *slot += 1;
-                }
-                row.extend(counts.into_iter().map(ReportedValue::Unsigned));
-            }
-        }
-        for descriptor in &firings {
-            let (reported_rule_id, fired) = report
-                .fired
-                .get(descriptor.rule_id as usize)
-                .ok_or_else(|| {
-                    format!(
-                        "tick {tick}: internal firing report has no rule {}",
-                        descriptor.rule_id
-                    )
-                })?;
-            if *reported_rule_id != descriptor.rule_id {
-                return Err(format!(
-                    "tick {tick}: internal firing report rule mismatch: expected {}, found {}",
-                    descriptor.rule_id, reported_rule_id
-                ));
-            }
-            row.push(ReportedValue::Unsigned(*fired));
-        }
-        row.push(ReportedValue::Unsigned(
-            report
-                .deferred_per_resource_table
-                .iter()
-                .map(|(_, count)| count)
-                .sum(),
-        ));
-        csv.push_str(&tick.to_string());
-        for value in &row {
-            csv.push(',');
-            csv.push_str(&value.csv());
-        }
-        csv.push('\n');
-        rows.push(row);
-        tick_reports.push(report);
+        output.push_tick(state, tick, report)?;
         if let Some(per_tick_hashes) = per_tick_hashes.as_mut() {
             per_tick_hashes.push(state.state_hash());
         }
     }
-    let grouped = grouped_csv_outputs(model, &tick_reports)?;
-    let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
-    let summaries_csv = summaries_csv(&summaries);
-    Ok(RunOutput {
-        csv,
-        grouped,
-        series: ReportedSeries {
-            columns: headers.into_iter().skip(1).collect(),
-            rows,
-        },
-        summaries,
-        summaries_csv,
-        per_tick_hashes,
-    })
+    output.finish(model, per_tick_hashes)
+}
+
+fn run_results_output_timed_with_features(
+    model: &sembla_ir::ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+    hash_mode: HashMode,
+    enabled_features: &FeatureSet,
+) -> Result<(RunOutput, Vec<TickTiming>), String> {
+    let mut output = RunOutputAccumulator::new(model, params, ticks)?;
+    let mut per_tick_hashes =
+        (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
+    let mut tick_timings = Vec::with_capacity(ticks as usize);
+    for tick in 0..ticks {
+        let tick_started = Instant::now();
+        let timed = executor::run_tick_with_features_timed(
+            model,
+            state,
+            params,
+            seed,
+            tick,
+            enabled_features,
+        )
+        .map_err(|error| format!("tick {tick}: {error}"))?;
+
+        let report_started = Instant::now();
+        output.push_tick(state, tick, timed.report)?;
+        let report = timed.phases.report + report_started.elapsed();
+
+        let state_hash = if let Some(per_tick_hashes) = per_tick_hashes.as_mut() {
+            let phase_started = Instant::now();
+            per_tick_hashes.push(state.state_hash());
+            phase_started.elapsed()
+        } else {
+            Duration::ZERO
+        };
+
+        let wall_time = tick_started.elapsed();
+        tick_timings.push(finish_tick_timing(
+            tick,
+            wall_time,
+            PhaseDurations {
+                execute_tick: Some(timed.phases.execute_tick),
+                state_hash: Some(state_hash),
+                observe_views: Some(timed.phases.observe_views),
+                report: Some(report),
+                ..PhaseDurations::default()
+            },
+        )?);
+    }
+    Ok((output.finish(model, per_tick_hashes)?, tick_timings))
+}
+
+fn cuda_tick_report(
+    model: &sembla_ir::ValidatedModel,
+    tick: u32,
+    fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
+    deferred_per_resource_table: Vec<(String, usize)>,
+    views: Vec<sembla_runtime::executor::ViewValue>,
+) -> executor::TickReport {
+    let fired = model
+        .transitions()
+        .iter()
+        .map(|transition| {
+            let count = fired_per_box
+                .iter()
+                .flat_map(|(_, rules)| rules)
+                .find(|(rule_id, _)| *rule_id == transition.rule_id)
+                .map_or(0, |(_, count)| *count);
+            (transition.rule_id, count)
+        })
+        .collect();
+    executor::TickReport {
+        tick,
+        views,
+        grouped_views: Vec::new(),
+        fired,
+        fired_per_box,
+        deferred_per_resource_table,
+        aggregate_builds: 0,
+    }
 }
 
 fn run_results_output_cuda(
@@ -2599,181 +3227,120 @@ fn run_results_output_cuda(
     let identity =
         manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
     let mut hashes = (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
-    let has_views = model
-        .model()
-        .boxes
-        .iter()
-        .any(|model_box| !model_box.views.is_empty());
-    let enums = (!has_views).then(|| generic_enum_descriptors(model));
-    let firings = generic_firing_descriptors(model);
-    let mut csv = String::new();
-    let mut rows = Vec::with_capacity(ticks as usize);
-    let mut tick_reports = Vec::with_capacity(ticks as usize);
-    csv.push_str("# params=");
-    csv.push_str(&canonical_params(params)?);
-    csv.push('\n');
-    csv.push_str(&format!("# dt={}\n", model.model().dt));
+    let mut output = RunOutputAccumulator::new(model, params, ticks)?;
 
-    let mut headers = vec!["tick".to_owned()];
-    if has_views {
-        headers.extend(
-            model
-                .model()
-                .boxes
-                .iter()
-                .flat_map(|model_box| model_box.views.iter().map(|view| view.name.clone())),
-        );
-    } else {
-        for descriptor in enums.as_deref().unwrap_or_default() {
-            for variant in &descriptor.variants {
-                headers.push(format!(
-                    "count:{}.{}.{}={variant}",
-                    descriptor.box_name, descriptor.table_name, descriptor.attr_name
-                ));
-            }
-        }
-    }
-    for descriptor in &firings {
-        if has_views {
-            headers.push(format!("fired_{}", descriptor.transition_name));
-        } else {
-            headers.push(format!(
-                "fired:{}.{}",
-                descriptor.box_name, descriptor.transition_name
-            ));
-        }
-    }
-    headers.push("deferred_total".to_owned());
-    csv.push_str(
-        &headers
-            .iter()
-            .map(|header| csv_field(header))
-            .collect::<Vec<_>>()
-            .join(","),
-    );
-    csv.push('\n');
-
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     for tick in 0..ticks {
         let observation = backend
             .run_tick_observed()
             .map_err(|error| format!("tick {tick}: {error}"))?;
+        debug_assert_eq!(observation.tick, tick);
         state = observation.state;
         if let Some(hashes) = hashes.as_mut() {
             hashes.push(state.state_hash());
         }
         let views = executor::observe_views(model, &state, params)
             .map_err(|error| format!("tick {tick}: {error}"))?;
-        let fired = model
-            .transitions()
-            .iter()
-            .map(|transition| {
-                let count = observation
-                    .fired_per_box
-                    .iter()
-                    .flat_map(|(_, rules)| rules)
-                    .find(|(rule_id, _)| *rule_id == transition.rule_id)
-                    .map_or(0, |(_, count)| *count);
-                (transition.rule_id, count)
-            })
-            .collect();
-        let report = executor::TickReport {
+        let report = cuda_tick_report(
+            model,
             tick,
+            observation.fired_per_box,
+            observation.deferred_per_resource_table,
             views,
-            grouped_views: Vec::new(),
-            fired,
-            fired_per_box: observation.fired_per_box,
-            deferred_per_resource_table: observation.deferred_per_resource_table,
-            aggregate_builds: 0,
-        };
-        let mut row = Vec::with_capacity(headers.len() - 1);
-        if has_views {
-            row.extend(
-                report
-                    .views
-                    .iter()
-                    .map(|view| ReportedValue::from(view.value)),
-            );
-        } else {
-            let snapshot = state.snapshot();
-            for descriptor in enums.as_deref().unwrap_or_default() {
-                let values = snapshot
-                    .enum_values(
-                        &descriptor.box_name,
-                        &descriptor.table_name,
-                        &descriptor.attr_name,
-                    )
-                    .map_err(|error| error.to_string())?;
-                let mut counts = vec![0_usize; descriptor.variants.len()];
-                for value in values {
-                    let slot = counts.get_mut(usize::from(*value)).ok_or_else(|| {
-                        format!(
-                            "invalid enum index {value} for {}.{}.{} with {} variants",
-                            descriptor.box_name,
-                            descriptor.table_name,
-                            descriptor.attr_name,
-                            descriptor.variants.len()
-                        )
-                    })?;
-                    *slot += 1;
-                }
-                row.extend(counts.into_iter().map(ReportedValue::Unsigned));
-            }
-        }
-        for descriptor in &firings {
-            let (reported_rule_id, fired) = report
-                .fired
-                .get(descriptor.rule_id as usize)
-                .ok_or_else(|| {
-                    format!(
-                        "tick {tick}: internal firing report has no rule {}",
-                        descriptor.rule_id
-                    )
-                })?;
-            if *reported_rule_id != descriptor.rule_id {
-                return Err(format!(
-                    "tick {tick}: internal firing report rule mismatch: expected {}, found {}",
-                    descriptor.rule_id, reported_rule_id
-                ));
-            }
-            row.push(ReportedValue::Unsigned(*fired));
-        }
-        row.push(ReportedValue::Unsigned(
-            report
-                .deferred_per_resource_table
-                .iter()
-                .map(|(_, count)| count)
-                .sum(),
-        ));
-        csv.push_str(&tick.to_string());
-        for value in &row {
-            csv.push(',');
-            csv.push_str(&value.csv());
-        }
-        csv.push('\n');
-        rows.push(row);
-        tick_reports.push(report);
+        );
+        output.push_tick(&state, tick, report)?;
     }
     let elapsed = started.elapsed();
-    let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
-    let summaries_csv = summaries_csv(&summaries);
+    let output = output.finish(model, hashes.clone())?;
     Ok(BackendRunOutput {
-        output: RunOutput {
-            csv,
-            grouped: Vec::new(),
-            series: ReportedSeries {
-                columns: headers.into_iter().skip(1).collect(),
-                rows,
-            },
-            summaries,
-            summaries_csv,
-            per_tick_hashes: hashes.clone(),
-        },
+        output,
         state,
         identity,
         per_tick_hashes: hashes,
         elapsed,
     })
+}
+
+#[cfg(feature = "cuda")]
+fn run_results_output_cuda_timed(
+    model: &sembla_ir::ValidatedModel,
+    initial: Vec<TableInit>,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+    hash_mode: HashMode,
+) -> Result<(BackendRunOutput, Vec<TickTiming>), String> {
+    let mut state = StateStore::new(model, initial.clone()).map_err(|error| error.to_string())?;
+    let mut backend = CudaBackend::new(model, initial, params, seed, hash_mode)
+        .map_err(|error| error.to_string())?;
+    let device = backend.device_identity().clone();
+    let identity =
+        manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
+    let mut hashes = (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
+    let mut output = RunOutputAccumulator::new(model, params, ticks)?;
+    let mut tick_timings = Vec::with_capacity(ticks as usize);
+
+    let started = Instant::now();
+    for tick in 0..ticks {
+        let tick_started = Instant::now();
+        let (observation, backend_phases) = backend
+            .run_tick_observed_timed()
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        debug_assert_eq!(observation.tick, tick);
+        state = observation.state;
+
+        let state_hash = if let Some(hashes) = hashes.as_mut() {
+            let phase_started = Instant::now();
+            hashes.push(state.state_hash());
+            phase_started.elapsed()
+        } else {
+            Duration::ZERO
+        };
+
+        let phase_started = Instant::now();
+        let views = executor::observe_views(model, &state, params)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let observe_views = phase_started.elapsed();
+
+        let phase_started = Instant::now();
+        let report = cuda_tick_report(
+            model,
+            tick,
+            observation.fired_per_box,
+            observation.deferred_per_resource_table,
+            views,
+        );
+        output.push_tick(&state, tick, report)?;
+        let report = backend_phases[4] + phase_started.elapsed();
+
+        let wall_time = tick_started.elapsed();
+        tick_timings.push(finish_tick_timing(
+            tick,
+            wall_time,
+            PhaseDurations {
+                kernels: Some(backend_phases[0]),
+                readback_control: Some(backend_phases[1]),
+                state_transfer: Some(backend_phases[2]),
+                state_reconstruct: Some(backend_phases[3]),
+                state_hash: Some(state_hash),
+                observe_views: Some(observe_views),
+                report: Some(report),
+                ..PhaseDurations::default()
+            },
+        )?);
+    }
+    let elapsed = started.elapsed();
+    let output = output.finish(model, hashes.clone())?;
+    Ok((
+        BackendRunOutput {
+            output,
+            state,
+            identity,
+            per_tick_hashes: hashes,
+            elapsed,
+        },
+        tick_timings,
+    ))
 }
 
 fn summaries_csv(summaries: &[SummaryValue]) -> String {
@@ -3820,6 +4387,7 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
             export_state: None,
             dt: options.dt,
             params: options.params.clone(),
+            timing_json: None,
             backend: BackendSelection::Cpu,
             enabled_features: FeatureSet::new(),
         };
@@ -4147,6 +4715,7 @@ mod tests {
                     export_state: None,
                     dt: None,
                     params: None,
+                    timing_json: None,
                     backend: BackendSelection::Cpu,
                     enabled_features: sembla_ir::FeatureSet::new(),
                 },

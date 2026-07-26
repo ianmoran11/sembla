@@ -518,11 +518,77 @@ impl CudaBackend {
     pub fn run_tick_observed(&mut self) -> Result<CudaTickObservation, CudaError> {
         let tick = self.next_tick;
         self.execute_tick()?;
+        let (wins, deferred) = self.readback_control()?;
+        let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
+        Ok(CudaTickObservation {
+            tick,
+            state: self.download_state_store()?,
+            fired_per_box,
+            deferred_per_resource_table,
+        })
+    }
+
+    /// Executes one observed CUDA tick and returns durations in this order:
+    /// kernels, control readback, state transfer, state reconstruction, and
+    /// host control-report assembly. `execute_tick` already synchronizes
+    /// through its terminal status D2H copy, so this instrumentation
+    /// deliberately inserts no second sync.
+    pub fn run_tick_observed_timed(
+        &mut self,
+    ) -> Result<(CudaTickObservation, [std::time::Duration; 5]), CudaError> {
+        let tick = self.next_tick;
+
+        let started = std::time::Instant::now();
+        self.execute_tick()?;
+        let kernels = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let (wins, deferred) = self.readback_control()?;
+        let readback_control = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
+        let report = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let (state, inputs, input_counts) = self.download_state_parts()?;
+        let state_transfer = started.elapsed();
+
+        let started = std::time::Instant::now();
+        let state = self.reconstruct_state_store(&state, &inputs, &input_counts)?;
+        let state_reconstruct = started.elapsed();
+
+        Ok((
+            CudaTickObservation {
+                tick,
+                state,
+                fired_per_box,
+                deferred_per_resource_table,
+            },
+            [
+                kernels,
+                readback_control,
+                state_transfer,
+                state_reconstruct,
+                report,
+            ],
+        ))
+    }
+
+    fn readback_control(&self) -> Result<(Vec<u8>, Vec<u8>), CudaError> {
         let wins = self.stream.memcpy_dtov(&self.wins).map_err(driver_error)?;
         let deferred = self
             .stream
             .memcpy_dtov(&self.deferred)
             .map_err(driver_error)?;
+        Ok((wins, deferred))
+    }
+
+    fn control_reports(
+        &self,
+        wins: &[u8],
+        deferred: &[u8],
+    ) -> (Vec<(String, Vec<(u32, usize)>)>, Vec<(String, usize)>) {
         let mut fired_per_box = Vec::with_capacity(self.model.model().boxes.len());
         for (box_index, model_box) in self.model.model().boxes.iter().enumerate() {
             let mut fired = Vec::with_capacity(model_box.transitions.len());
@@ -568,12 +634,7 @@ impl CudaBackend {
                 global_table += 1;
             }
         }
-        Ok(CudaTickObservation {
-            tick,
-            state: self.download_state_store()?,
-            fired_per_box,
-            deferred_per_resource_table,
-        })
+        (fired_per_box, deferred_per_resource_table)
     }
 
     /// Evaluates checked coordinate Philox vectors on the device. This is a
@@ -1352,6 +1413,11 @@ impl CudaBackend {
     }
 
     fn download_state_store(&self) -> Result<StateStore, CudaError> {
+        let (state, inputs, input_counts) = self.download_state_parts()?;
+        self.reconstruct_state_store(&state, &inputs, &input_counts)
+    }
+
+    fn download_state_parts(&self) -> Result<(Vec<u8>, Vec<u8>, Vec<u64>), CudaError> {
         let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
         let inputs = self
             .stream
@@ -1361,15 +1427,24 @@ impl CudaBackend {
             .stream
             .memcpy_dtov(&self.input_counts)
             .map_err(driver_error)?;
-        let initial = unpack_state(&self.model, &self.layout, &state);
+        Ok((state, inputs, input_counts))
+    }
+
+    fn reconstruct_state_store(
+        &self,
+        state: &[u8],
+        inputs: &[u8],
+        input_counts: &[u64],
+    ) -> Result<StateStore, CudaError> {
+        let initial = unpack_state(&self.model, &self.layout, state);
         let mut store = StateStore::new(&self.model, initial)
             .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
         store
             .replace_backend_inputs(unpack_inputs(
                 &self.model,
                 &self.layout,
-                &inputs,
-                &input_counts,
+                inputs,
+                input_counts,
             ))
             .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
         Ok(store)

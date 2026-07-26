@@ -86,8 +86,48 @@ and `scripts/check-rust.sh` does not compile it. Following `DECISIONS.md`
 
 ## PRDs
 
-- `0001-per-phase-timing-instrumentation` — a default-off `--timing-json` flag
-  that attributes each tick's wall time to named phases in both backends.
+- `0001-per-phase-timing-instrumentation` — **implemented locally 2026-07-26**:
+  the default-off `--timing-json` flag attributes each tick's wall time to
+  named phases in both backends. CPU schema and inertness checks pass; CUDA
+  hardware validation remains pending under §J14.2.
+
+### 0001 implementation notes
+
+The option is deliberately separate from `FeatureSet` and `--enable`.
+`FeatureSet` records semantic switches under `DECISIONS.md` §E8; timing is
+observational, changes no result, and therefore must not imply semantic meaning
+or add a manifest field. The integration test makes that distinction
+checkable by comparing stdout, results, summaries, manifest (including
+`final_state_sha256`), and exported state byte-for-byte with timing off and on.
+The disabled branch calls the ordinary untimed runner and owns no timing
+collector.
+
+The JSON `session.scale` is the maximum initialized table row count, so the
+five-million-slot demographic case records `5000000` rather than summing its
+small auxiliary tables. Durations use `std::time::Instant`, retain nanosecond
+resolution internally, and are reported in milliseconds. `other` is computed
+with checked duration subtraction and every tick plus the totals must reconcile
+within 0.001 ms before the document is written.
+
+The CUDA executor already synchronizes at the end of `execute_tick` through the
+same-stream status device-to-host copy. No second synchronization was added,
+and timing JSON records `"kernel_sync_inserted": false`; the `kernels` phase
+therefore includes the existing wait without adding another perturbation.
+
+CPU overhead was measured in-run with the release binary on the fixed
+one-million-slot, 24-tick, seed-9009 case in three interleaved off/on pairs.
+Median user time was 6.06 s off and 6.09 s on (+0.03 s, 0.50%); fastest user
+time was 6.00 s off and 6.04 s on (+0.04 s, 0.67%). Median wall time was 7.70 s
+off and 7.91 s on, with wall time noisier than user time. Every paired CSV,
+summary, manifest, and stdout was byte-identical. This bounds the observed CPU
+cost of per-tick timers plus session identity and JSON emission as negligible
+for the target run shape.
+
+Hardware criteria remain **pending under §J14.2**: build the release CUDA
+feature on the GPU host; verify all CUDA phases with transfer and reconstruction
+separate; verify reconciliation and non-negative `other`; and collect the
+5M-row, 2-tick `cuda-l4-20260726` case. No local CUDA build or runtime result is
+claimed.
 
 Later PRDs are **deliberately not written.** What the instrumentation measures
 decides what, if anything, comes next.
