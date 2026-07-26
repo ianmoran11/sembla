@@ -7,6 +7,11 @@
 # dies — dropped phone connection, closed laptop, timeout, crash — nothing else
 # runs it. This does.
 #
+# At the deadline it destroys what state knows about, then reconciles the
+# account through the API. The second step matters: an apply that times out
+# leaves a VM billing but absent from state, where `terraform destroy` cannot
+# see it. See RUNBOOK, "The apply-timeout orphan".
+#
 #   bash destroy-deadline.sh arm [hours]     # default 6
 #   bash destroy-deadline.sh status
 #   bash destroy-deadline.sh disarm
@@ -28,6 +33,18 @@ vm_in_state() {
   terraform state list 2>/dev/null | grep -q 'hyperstack_core_virtual_machine'
 }
 
+# An apply that times out leaves a VM that is billing but absent from state.
+# Guarding only what state knows about would miss exactly that case, which is
+# the one most likely to leave a machine running. See RUNBOOK.
+orphan_exists() {
+  [[ -n "${HYPERSTACK_API_KEY:-}" ]] || return 1
+  local rc=0
+  bash "$MODULE_DIR/reconcile-orphans.sh" >/dev/null 2>&1 || rc=$?
+  # Exits 1 when orphans are present, 0 when clean. Any other failure (an API
+  # error, say) also lands here; arming on uncertainty is the safe direction.
+  [[ $rc -ne 0 ]]
+}
+
 watchdog_alive() {
   [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
@@ -46,8 +63,14 @@ case "${1:-}" in
       exit 2
     fi
     if ! vm_in_state; then
-      echo "no VM in Terraform state; nothing to guard" >&2
-      exit 2
+      if orphan_exists; then
+        echo "No VM in Terraform state, but an untracked VM from this module is billing." >&2
+        echo "Arming anyway: the watchdog reconciles through the API, which is the only" >&2
+        echo "thing that can see an apply-timeout orphan." >&2
+      else
+        echo "no VM in Terraform state and no untracked VM in the account; nothing to guard" >&2
+        exit 2
+      fi
     fi
     mkdir -p "$STATE_DIR"
     chmod 0700 "$STATE_DIR"
@@ -80,22 +103,27 @@ print((datetime.datetime.now() + datetime.timedelta(seconds=$seconds)).strftime(
       cd "$2"
       {
         printf "[%s] deadline reached\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        if ! terraform state list 2>/dev/null | grep -q hyperstack_core_virtual_machine; then
-          printf "[%s] no VM in state; the collector already destroyed it. Nothing to do.\n" \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          exit 0
+        if terraform state list 2>/dev/null | grep -q hyperstack_core_virtual_machine; then
+          printf "[%s] VM present in state -- destroying to stop billing\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          terraform destroy -var-file="$3" \
+            -var=create_instance=true \
+            -var=accept_paid_creation=true \
+            -auto-approve
+          if terraform state list 2>/dev/null | grep -q -E "hyperstack_core_virtual_machine|security_rule"; then
+            printf "[%s] DESTROY INCOMPLETE -- delete the VM in the Hyperstack console NOW\n" \
+              "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            exit 1
+          fi
+          printf "[%s] destroy complete; state is clean\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        else
+          printf "[%s] no VM in state\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         fi
-        printf "[%s] VM still present -- destroying to stop billing\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        terraform destroy -var-file="$3" \
-          -var=create_instance=true \
-          -var=accept_paid_creation=true \
-          -auto-approve
-        if terraform state list 2>/dev/null | grep -q -E "hyperstack_core_virtual_machine|security_rule"; then
-          printf "[%s] DESTROY INCOMPLETE -- delete the VM in the Hyperstack console NOW\n" \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          exit 1
-        fi
-        printf "[%s] destroy complete; state is clean\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+        # Always reconcile, even after a clean destroy: state going empty is not
+        # proof the account is empty, and an apply-timeout orphan is invisible to
+        # everything above this line.
+        printf "[%s] reconciling untracked VMs through the API\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        bash "$2/reconcile-orphans.sh" --delete --yes
       } 2>&1
     ' _ "$deadline_epoch" "$MODULE_DIR" "$TFVARS_FILE" >> "$LOG_FILE" 2>&1 &
 
@@ -113,7 +141,8 @@ print((datetime.datetime.now() + datetime.timedelta(seconds=$seconds)).strftime(
   status)
     if watchdog_alive; then
       echo "armed: PID $(cat "$PID_FILE"), fires at $(cat "$DEADLINE_FILE")"
-      vm_in_state && echo "VM currently in state: yes" || echo "VM currently in state: no (watchdog will no-op)"
+      vm_in_state && echo "VM currently in state: yes" \
+        || echo "VM currently in state: no (the watchdog still reconciles untracked VMs)"
     else
       echo "not armed"
       [[ -f "$LOG_FILE" ]] && { echo "--- last log ---"; tail -5 "$LOG_FILE"; }

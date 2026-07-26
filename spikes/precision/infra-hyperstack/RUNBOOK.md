@@ -215,17 +215,46 @@ curl -sS -X DELETE https://infrahub-api.nexgencloud.com/v1/core/virtual-machines
 Then delete the consumed `hyperstack-paid.tfplan`: a stale plan file that has
 already been applied is one keystroke away from a duplicate VM.
 
-### Not yet fixed
+### What now defends against it
 
-Two changes would turn this from an orphan into a delay, and neither is done:
+**A `create` timeout is not available.** The alpha provider exposes only a
+`profile` block on `hyperstack_core_virtual_machine` — there is no `timeouts`
+block, so the 5-minute wait cannot be lengthened. Terraform config alone cannot
+prevent this failure, which is why the compensating control below is the whole
+defence rather than a backstop.
 
-1. A `timeouts { create = "15m" }` block on
-   `hyperstack_core_virtual_machine.gpu` so a slow spot provision does not
-   error at all.
-2. A post-apply reconciliation step: if state holds no VM, query the API for
-   one matching `name_prefix` and either import it or delete it. Right now the
-   operator is the only thing standing between a timeout and an untracked
-   billing machine.
+**`reconcile-orphans.sh`** compares the account against Terraform state:
+
+```sh
+bash reconcile-orphans.sh            # report only; exits 1 if orphans exist
+bash reconcile-orphans.sh --delete   # delete them, with confirmation
+```
+
+Only VMs whose name starts with `name_prefix` are ever considered; everything
+else in the account is reported as untouched and can never be a deletion
+candidate. After deleting it re-queries the account and fails loudly if
+anything remains, because a delete response is not proof.
+
+Run it after **any** failed or interrupted apply, and before assuming a session
+is finished.
+
+**`destroy-deadline.sh` now covers the orphan case.** Previously it refused to
+arm when state held no VM — precisely wrong after an apply timeout, since that
+is exactly when state is empty and a machine is billing. It now:
+
+- arms when state has a VM **or** the account has an untracked one;
+- at the deadline, destroys what state knows about, then **always** reconciles
+  through the API, because state going empty is not proof the account is empty.
+
+Adopting the orphan instead of deleting it is possible when the run is still
+wanted:
+
+```sh
+terraform import 'hyperstack_core_virtual_machine.gpu[0]' <ID>
+```
+
+but note the SSH security-group rule will still be missing, so the VM is
+usually unreachable on its public IP even once adopted.
 
 ## Failure playbook
 

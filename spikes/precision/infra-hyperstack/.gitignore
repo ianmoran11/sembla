@@ -11,6 +11,7 @@
 !example.tfvars
 !main.tf
 !outputs.tf
+!reconcile-orphans.sh
 !prepare-console-password.sh
 !destroy-deadline.sh
 !prepare-deploy-key.sh
