@@ -260,6 +260,62 @@ fn row_wise_guarded(age: &[i64], tenure: &[i64], status: &[i64], threads: usize)
     out
 }
 
+/// Attribute the residual: same threaded row-wise shape, progressively less work.
+fn partial(age: &[i64], tenure: &[i64], threads: usize, stage: u8) -> u64 {
+    let rows = age.len();
+    let chunk = rows.div_ceil(threads);
+    let lo = (-LAMBDA * DT).exp() * (1.0 - 1e-12);
+    let partials: Vec<u64> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..threads)
+            .map(|t| {
+                let base = t * chunk;
+                let end = (base + chunk).min(rows);
+                scope.spawn(move || {
+                    let mut bands = vec![0_u64; BANDS];
+                    let mut acc = 0_u64;
+                    for row in base..end {
+                        let a = age[row];
+                        // stage 0: read only
+                        if stage == 0 {
+                            acc += a as u64 & 1;
+                            continue;
+                        }
+                        // stage 1: + band histogram
+                        let b = a / WIDTH;
+                        if a >= 0 && (b as usize) < BANDS {
+                            bands[b as usize] += 1;
+                        }
+                        if stage == 1 {
+                            continue;
+                        }
+                        // stage 2: + five guards
+                        let tn = tenure[row] > 0;
+                        let g1 = a >= 20 && a < 65 && tn;
+                        acc += (a >= 0 && a < 20 && tn) as u64;
+                        acc += g1 as u64;
+                        acc += (a >= 65 && a < 200 && tn) as u64;
+                        acc += (a >= 0 && a < 200 && tn) as u64;
+                        acc += (a >= 18 && a < 90 && tn) as u64;
+                        if stage == 2 {
+                            continue;
+                        }
+                        // stage 3: + Philox draw, guarded ln
+                        if g1 {
+                            let u = uniform_f64(0xC0FFEE, 7, 3, row as u32, 0);
+                            if u >= lo && (-u.ln() / LAMBDA) < DT {
+                                acc += 1;
+                            }
+                        }
+                    }
+                    acc + bands.iter().sum::<u64>()
+                })
+            })
+            .collect();
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    partials.iter().sum()
+}
+
 fn median(mut xs: Vec<f64>) -> f64 {
     xs.sort_by(f64::total_cmp);
     xs[xs.len() / 2]
@@ -332,6 +388,27 @@ fn main() {
     }
     println!(
         "\nfloor = {floor_ms:.2} ms: reading and writing the touched state once at\n\
-         200 GB/s. All three arms asserted to produce identical counts."
+         200 GB/s. All arms asserted to produce identical counts."
     );
+
+    println!("\n--- what the residual is made of (threaded row-wise) ---");
+    println!("{:<34} {:>9} {:>11}", "cumulative work", "ms", "delta_ms");
+    let labels = [
+        "read age only",
+        "+ 18-band histogram",
+        "+ 5 guards",
+        "+ Philox draw & guarded ln",
+    ];
+    let mut prev = 0.0;
+    for (stage, label) in labels.iter().enumerate() {
+        let mut times = Vec::new();
+        for _ in 0..reps {
+            let t = Instant::now();
+            std::hint::black_box(partial(&age, &tenure, cores, stage as u8));
+            times.push(t.elapsed().as_secs_f64() * 1000.0);
+        }
+        let ms = median(times);
+        println!("{label:<34} {ms:>9.2} {:>11.2}", ms - prev);
+        prev = ms;
+    }
 }
