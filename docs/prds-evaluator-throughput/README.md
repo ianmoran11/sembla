@@ -11,6 +11,10 @@ floor to within a small factor of it. Run from the Sembla repository with:
 first; the constraints below are binding. When a PRD conflicts with this README,
 this README wins.
 
+`docs/performance-model.md` is the durable synthesis of everything below,
+plus the CUDA-side picture and the open questions. This folder is the plan;
+that document is the reference, and it outlives this folder.
+
 ## Why this folder exists
 
 `prds-host-evaluator-performance` took the fixed 1M case from 49.5 s to ~7.6 s

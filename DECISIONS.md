@@ -1477,3 +1477,47 @@ served its purpose and should not be used to steer work from here.
 **Recorded, not decided.** The ageing cost share measured **0.328** median
 (0.321 / 0.328 / 0.330), materially above earlier measurements and well above
 §K2's 10% threshold. §K2 is not revisited here.
+
+## M. Performance methodology
+
+### M1. Optimisation is scoped from direct measurement, not from profile shares (2026-07-27)
+
+**Decision.** No performance work in this project is scoped from a profiler's
+percentages alone. A candidate change must first be measured directly — a
+hand-written arm computing the same result by the proposed method, asserted
+equal to the current one — and it is that measurement, not a profile share, that
+justifies a PRD. Profiles remain the right tool for *finding* candidates and the
+wrong one for *sizing* them.
+
+**Alternatives.** Continuing to scope from profile shares, which is cheaper and
+needs no throwaway code, is rejected. Requiring a full implementation before
+committing to one is also rejected: the point is a falsifiable measurement, not
+a finished change.
+
+**Reason.** Three failures, each expensive, and each with the same shape.
+
+The CUDA folder scoped two PRDs from source structure and both picked the wrong
+target (§L6, §L7). Then `prds-host-evaluator-performance` PRD 0004 removed a
+provable 8 MB-per-operand copy: the allocator symbols in the profile duly
+dropped ~20%, and the measured runtime did not move at all. Two later spikes
+explained why and generalised it — first-touch page-fault time is attributed to
+the code writing the memory rather than to `malloc`, so profiles *systematically
+understate* allocation cost, and `alloc_spike` found 4.04× available where the
+symbols suggested ~14%.
+
+The corollary is that a negative result is worth paying for. `bitset_spike` and
+`narrow_spike` each cost minutes and each closed off a plausible PRD, and
+`rng_batch_spike` established that a bottleneck was irreducible rather than
+badly arranged. A measurement that says "do not do this" is as valuable as one
+that says "do this", and much cheaper than discovering it in review.
+
+A screen that can only pass is not a screen: where a spike judges quality rather
+than speed, it must include a control expected to fail. `rng_variants_spike`'s
+deliberately weakened variant failed by ~40×, which is the only reason to
+believe the screen could reject anything.
+
+**Consequence.** Spikes are committed, runnable, and cited by the PRDs they
+justify — see `crates/sembla-runtime/examples/` and `docs/performance-model.md`.
+They are not implementations and carry no acceptance obligations, but they are
+evidence and are kept.
+

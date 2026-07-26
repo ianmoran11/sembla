@@ -12,6 +12,12 @@ repository with:
 first; the constraints below are binding. When a PRD conflicts with this README,
 this README wins.
 
+**Closed 2026-07-27.** All four PRDs landed; the fixed case went from 49.5 s to
+~7.6 s and the §L4 gate passed at 4.207× (`DECISIONS.md` §L8). Follow-on work is
+in `docs/prds-evaluator-throughput/`, and the durable findings — including this
+folder's measurement protocol and the lessons behind it — are consolidated in
+[`docs/performance-model.md`](../performance-model.md).
+
 ## Why this folder exists
 
 `prds-cuda-validation-parallelism` fixed a quadratic in the CUDA conflict

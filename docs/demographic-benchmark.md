@@ -1,5 +1,10 @@
 # Demographic slot benchmark
 
+For what limits the system, where the time goes, and what has already been
+measured or ruled out, see [`docs/performance-model.md`](performance-model.md).
+Read that before scoping optimisation work; this document is the measurement
+tooling it draws on.
+
 This benchmark is manual benchmark/test tooling. It is not scientific
 population generation and does not change the `demographic_slots` model's
 interpretation. The synthetic rows exist only to measure the architecture.
