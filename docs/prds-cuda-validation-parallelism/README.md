@@ -146,11 +146,13 @@ order.
   regression pass every differential test.
 - `0005-measure-and-publish` — re-run the frozen case, commit evidence, correct
   `docs/demographic-benchmark.md` and the forward roadmap's scale note.
-- `0006-remaining-serial-kernels` — **rewritten 2026-07-26 against an `nsys`
-  profile.** Targets the three measured consumers: `check_candidate_errors`
-  (37.7%), `prepare_effects` (33.7%), and `resolve_conflicts` (28.5%, already
-  parallel — diagnosed, not parallelised). Adds a guard test covering
-  candidate-indexed loops as well as row-indexed ones.
+- `0006-segmented-argmin-conflict-resolution` — **the decisive one.** Profiling
+  at 500k/2M/5M showed `resolve_conflicts` is quadratic (exponent 1.96) and
+  77.9% of GPU time at 5M. Replaces the nested scan with the segmented argmin
+  the CPU oracle already uses. First PRD here that can change *results*, so
+  byte-identical goldens are the guard.
+- `0007-linear-serial-kernels` — the two remaining single-threaded kernels,
+  which scale linearly and are secondary. Runs after 0006.
 
 ## Acceptance notes
 
