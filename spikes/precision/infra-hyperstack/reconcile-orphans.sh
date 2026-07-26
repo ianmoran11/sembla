@@ -64,16 +64,21 @@ for resource in state.get("resources", []):
 PY
 )"
 
-API_JSON="$(curl -sS --max-time 30 \
+# The API response goes to a file rather than a pipe: `python3 - <<PY` already
+# uses stdin for the program, so a piped payload would be silently discarded and
+# every VM would look like it had vanished.
+API_JSON_FILE="$(mktemp)"
+trap 'rm -f "$API_JSON_FILE"' EXIT
+curl -sS --max-time 30 \
   https://infrahub-api.nexgencloud.com/v1/core/virtual-machines \
-  -H "api_key: $HYPERSTACK_API_KEY" -H 'Accept: application/json')"
+  -H "api_key: $HYPERSTACK_API_KEY" -H 'Accept: application/json' > "$API_JSON_FILE"
 
-REPORT="$(printf '%s' "$API_JSON" | python3 - "$NAME_PREFIX" "$STATE_IDS" <<'PY'
-import json, sys
+REPORT="$(python3 - "$NAME_PREFIX" "$STATE_IDS" "$API_JSON_FILE" <<'PY'
+import json, pathlib, sys
 prefix = sys.argv[1]
 tracked = {line.strip() for line in sys.argv[2].splitlines() if line.strip()}
 try:
-    instances = json.loads(sys.stdin.read()).get("instances", [])
+    instances = json.loads(pathlib.Path(sys.argv[3]).read_text()).get("instances", [])
 except Exception:
     raise SystemExit("could not parse the Hyperstack response; check the API key")
 
@@ -144,13 +149,13 @@ done <<< "$ORPHANS"
 
 # Never trust the delete response; the account listing is the only proof.
 sleep 5
-REMAINING="$(curl -sS --max-time 30 \
+curl -sS --max-time 30 \
   https://infrahub-api.nexgencloud.com/v1/core/virtual-machines \
-  -H "api_key: $HYPERSTACK_API_KEY" -H 'Accept: application/json' \
-  | python3 - "$NAME_PREFIX" <<'PY'
-import json, sys
+  -H "api_key: $HYPERSTACK_API_KEY" -H 'Accept: application/json' > "$API_JSON_FILE"
+REMAINING="$(python3 - "$NAME_PREFIX" "$API_JSON_FILE" <<'PY'
+import json, pathlib, sys
 prefix = sys.argv[1]
-instances = json.loads(sys.stdin.read()).get("instances", [])
+instances = json.loads(pathlib.Path(sys.argv[2]).read_text()).get("instances", [])
 names = [v.get("name") or "" for v in instances]
 print(sum(1 for n in names if n.startswith(prefix)))
 PY
