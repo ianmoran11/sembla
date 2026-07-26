@@ -167,6 +167,66 @@ state is 48 bytes/slot (about 458 MiB), and the H100 flavor's 177 GiB host RAM i
 ample. Keep the eight-hour emergency timer and the independent destroy watchdog;
 neither a guest poweroff nor a benchmark failure stops billing.
 
+## The apply-timeout orphan (2026-07-26)
+
+**The most expensive failure this module has.** It happened, and the recovery
+is worth knowing before it happens again.
+
+`terraform apply` waits 5 minutes for the VM to reach a stable state. A slow
+spot provision exceeds that, so Terraform errors *after* the VM was created:
+
+```text
+Error: Waiting for state change error
+Timeout 5m0s reached waiting for resource state change
+```
+
+The VM is then **ACTIVE and billing but absent from Terraform state**, which
+means:
+
+- `terraform destroy` finds nothing to destroy;
+- `destroy-deadline.sh` refuses to arm — it checks `terraform state list`, so
+  the billing watchdog does **not** cover this VM;
+- the SSH security-group rule was never created either, so the machine is
+  usually unreachable on its public IP even though it is running and charging.
+
+**Never re-run `terraform apply` here.** It creates a *second* VM rather than
+adopting the first.
+
+### Recovery
+
+```sh
+# 1. Find it. The name matches name_prefix + the bootstrap fingerprint.
+curl -sS https://infrahub-api.nexgencloud.com/v1/core/virtual-machines \
+  -H "api_key: $HYPERSTACK_API_KEY" -H 'Accept: application/json' \
+| python3 -c "
+import json,sys
+for v in json.load(sys.stdin).get('instances',[]):
+    print(v.get('id'), v.get('name'), v.get('status'), v.get('floating_ip'))
+"
+
+# 2. Delete by id.
+curl -sS -X DELETE https://infrahub-api.nexgencloud.com/v1/core/virtual-machines/<ID> \
+  -H "api_key: $HYPERSTACK_API_KEY" -H 'Accept: application/json'
+
+# 3. Verify. Do not trust the delete response.
+#    Re-run step 1 and require an empty instance list.
+```
+
+Then delete the consumed `hyperstack-paid.tfplan`: a stale plan file that has
+already been applied is one keystroke away from a duplicate VM.
+
+### Not yet fixed
+
+Two changes would turn this from an orphan into a delay, and neither is done:
+
+1. A `timeouts { create = "15m" }` block on
+   `hyperstack_core_virtual_machine.gpu` so a slow spot provision does not
+   error at all.
+2. A post-apply reconciliation step: if state holds no VM, query the API for
+   one matching `name_prefix` and either import it or delete it. Right now the
+   operator is the only thing standing between a timeout and an untracked
+   billing machine.
+
 ## Failure playbook
 
 | Symptom | Cause | Action |
