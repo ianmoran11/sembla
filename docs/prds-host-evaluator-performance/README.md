@@ -78,16 +78,26 @@ costs minutes, not rented GPU hours.
   evidence reports 1.62× wall, but one baseline run was contended (23.92 s wall
   against 14.20 s user) and inflated the median; user time, 13.05 s → 9.21 s,
   is the load-bearing figure. Cumulative with 0001: 49.7 s → 10.9 s.
-- `0003-compute-per-tick-hashes-only-when-consumed` — per-tick `state_hash` is
+- `0003-compute-per-tick-hashes-only-when-consumed` — per-tick `state_hash` was
   31.4% of the full-duration profile and, outside the CPU-vs-CUDA differential,
-  nothing reads the result. Scoped from 0002's full-duration capture.
+  nothing read the result. **Landed 2026-07-26: 1.35× user time, outputs and
+  manifests byte-identical**
+  (`docs/evidence/host-evaluator-hash-on-demand-20260726/`). Wall-clock median
+  went backwards under machine contention; the uncontended run measured
+  8.17 s wall / 6.19 s user. This session prompted the revised reporting rules
+  below.
+- `0004-stop-copying-owned-real-columns` — `numeric_as_real` clones a
+  million-element buffer to read an owned `Real` column, at three call sites
+  that each convert both operands. Scoped from 0003's full-duration capture.
 
-Later PRDs remain **deliberately unwritten.** 0002's capture is the first that
-covers a whole process, so its shares are the first that can be trusted. Under
-the hashing, the remainder is real compute (`log`, `draw_u32x4`) plus
-allocation traffic spread thin across `from_iter`, `nanov2_free`, and
-`madvise`, with the write path (`locate_writable_cell`) small but present. None
-of those is an obvious next target until 0003 lands and the profile is retaken.
+Later PRDs remain **deliberately unwritten.** After 0003 the profile has no
+dominant entry: allocation-related symbols aggregate to roughly a third,
+real compute (`execute_tick`, `log`, `draw_u32x4`) to another third and sets a
+floor, and the rest is spread thin. 0004 removes the one provably redundant
+copy inside the allocation traffic. The two larger candidates — buffer pooling
+and a scalar broadcast representation for literals — are named in 0004's
+non-goals and get scoped from the profile 0004 produces, because removing the
+copy changes what pooling would be sized for.
 
 ## Measurement protocol
 
@@ -100,9 +110,39 @@ areas:  4    present fraction: 0.8    streams: birth:600,overseas:250,internal:1
 backend: cpu
 ```
 
-Three runs, median reported, with the `sample` profile committed alongside.
-Baseline on Apple M2 Pro: **49.5 s wall, 46.8 s user** (single run,
-`docs/evidence/host-profile-20260726/`).
+### Reporting rules (binding, revised 2026-07-26 after PRDs 0001–0003)
+
+Three sessions in a row were contended, twice badly enough to distort the
+headline: 0002's median wall was inflated by a run at 23.92 s wall against
+14.20 s user, overstating a real ~1.4× as 1.62×; 0003's median wall went
+*backwards* while user time improved 1.35×. The noise floor is now comparable
+to the effect sizes being measured, so the protocol is tightened:
+
+- **Five runs each side, not three.** Record every run individually.
+- **Report the minimum, not the median.** For a deterministic single-threaded
+  workload on a quiet machine, the fastest run is the one least polluted by
+  scheduling; the median rewards nothing and absorbs outliers badly at n=3.
+  Report the median too, but the minimum is the headline.
+- **User time is primary; wall time is secondary.** Quote both. Where they
+  disagree, user time decides and the discrepancy is explained.
+- **Flag contention per run.** Compute `wall − (user + sys)`; any run exceeding
+  **0.5 s** is marked `contended: true` in `measurements.json`, as 0003's
+  evidence already does. A comparison whose minimum-side run is contended is
+  not reportable — re-run it.
+- **Quiesce the machine.** These benchmarks have been running on the same
+  Apple M2 Pro that concurrently runs the PRD runner and its agents, which is
+  the most likely source of every contended run so far. Do not measure while
+  another PRD stage, build, or agent session is active on the same host.
+- Continue recording binary and input SHA-256 digests, and commit a
+  full-duration `sample` profile of the post-change build.
+
+### Reference points
+
+- Original baseline, Apple M2 Pro: **49.5 s wall, 46.8 s user** (single run,
+  `docs/evidence/host-profile-20260726/`).
+- After 0001–0003, best uncontended run: **8.17 s wall, 6.19 s user**
+  (`docs/evidence/host-evaluator-hash-on-demand-20260726/`). Cumulative ≈ 6×
+  wall, 7.5× user, with every CSV and manifest digest unchanged throughout.
 
 ## Status notes
 
