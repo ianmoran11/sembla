@@ -69,12 +69,19 @@ costs minutes, not rented GPU hours.
 
 - `0001-resolve-column-references-once` — hoist column resolution out of the row
   loop. Small, bit-identical by construction, and targets a pattern the profile
-  shows is hot throughout.
+  shows is hot throughout. **Landed 2026-07-26: 3.18× wall on the fixed case,
+  output byte-identical** (`docs/evidence/host-evaluator-resolve-once-20260726/`).
+- `0002-resolve-reference-columns-once` — the same transformation for the `Ref`
+  attribute type, which 0001 left out. Scoped from 0001's post-change profile,
+  where the `Ref` read path is the largest remaining evaluator branch.
 
-Later PRDs are **deliberately not written yet.** The candidates are buffer reuse
-or evaluator fusion for the per-node allocation, and whatever remains in
-`observe_views`. Both are re-scoped from a fresh profile after 0001 lands,
-because some of their apparent cost may be 0001's.
+Later PRDs remain **deliberately unwritten.** 0001's profile re-ranked the
+original candidates: per-node allocation is still visible but no longer
+obviously next, `observe_views` fell sharply, and per-tick SHA-256 state hashing
+rose to the largest single top-of-stack entry. None of those shares are
+trustworthy yet — both profiles to date are 10-second windows of runs of very
+different length, so they are not directly comparable. 0002 requires a
+full-duration capture, and the PRD after it is scoped from that.
 
 ## Measurement protocol
 
