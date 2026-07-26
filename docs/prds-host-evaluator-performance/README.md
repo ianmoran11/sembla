@@ -86,9 +86,12 @@ costs minutes, not rented GPU hours.
   went backwards under machine contention; the uncontended run measured
   8.17 s wall / 6.19 s user. This session prompted the revised reporting rules
   below.
-- `0004-stop-copying-owned-real-columns` — `numeric_as_real` clones a
-  million-element buffer to read an owned `Real` column, at three call sites
-  that each convert both operands. Scoped from 0003's full-duration capture.
+- `0004-stop-copying-owned-real-columns` — `numeric_as_real` previously cloned
+  a million-element buffer to read an owned `Real` column, at three call sites
+  that each convert both operands. **Implemented 2026-07-26: outputs and
+  manifests remained byte-identical; the user-time headline was a permitted
+  negligible 0.51% regression**
+  (`docs/evidence/host-evaluator-owned-real-move-20260726/`).
 
 Later PRDs remain **deliberately unwritten.** After 0003 the profile has no
 dominant entry: allocation-related symbols aggregate to roughly a third,

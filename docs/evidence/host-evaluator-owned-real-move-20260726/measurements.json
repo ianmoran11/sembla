@@ -1,0 +1,181 @@
+{
+  "schema": "sembla-host-evaluator-owned-real-move-before-after-v1",
+  "session": {
+    "date": "2026-07-26",
+    "baseline_commit": "3866d0a7ef5ede54b58cd5e79502efaad26b7aea",
+    "implementation_commit": "cdb91e9aea9aa5924b54911f849748a20d02b917",
+    "machine": "Apple M2 Pro",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "os": "macOS 15.5 (24F74)",
+    "measurement_mode": "in_run",
+    "quiescence": "advisory"
+  },
+  "case": {
+    "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+    "scale": 1000000,
+    "ticks": 24,
+    "seed": 9009,
+    "areas": 4,
+    "present_fraction": 0.8,
+    "streams": "birth:600,overseas:250,internal:150",
+    "backend": "cpu"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "before": {
+    "binary_sha256": "194f6874e3b9f4a16acc737be751f1211b384755dd2f0cd29aa15a046de27bc2",
+    "runs": [
+      {
+        "run": 1,
+        "wall_seconds": 7.89,
+        "user_seconds": 5.93,
+        "sys_seconds": 1.59,
+        "wall_minus_user_and_sys_seconds": 0.37,
+        "contended": false
+      },
+      {
+        "run": 2,
+        "wall_seconds": 7.58,
+        "user_seconds": 5.91,
+        "sys_seconds": 1.47,
+        "wall_minus_user_and_sys_seconds": 0.20,
+        "contended": false
+      },
+      {
+        "run": 3,
+        "wall_seconds": 7.89,
+        "user_seconds": 5.95,
+        "sys_seconds": 1.67,
+        "wall_minus_user_and_sys_seconds": 0.27,
+        "contended": false
+      },
+      {
+        "run": 4,
+        "wall_seconds": 7.64,
+        "user_seconds": 5.90,
+        "sys_seconds": 1.51,
+        "wall_minus_user_and_sys_seconds": 0.23,
+        "contended": false
+      },
+      {
+        "run": 5,
+        "wall_seconds": 7.63,
+        "user_seconds": 5.95,
+        "sys_seconds": 1.53,
+        "wall_minus_user_and_sys_seconds": 0.15,
+        "contended": false
+      }
+    ],
+    "fastest_uncontended": {
+      "selection_metric": "user_seconds",
+      "run": 4,
+      "wall_seconds": 7.64,
+      "user_seconds": 5.90,
+      "sys_seconds": 1.51
+    },
+    "median": {
+      "wall_seconds": 7.64,
+      "user_seconds": 5.93,
+      "sys_seconds": 1.53
+    }
+  },
+  "after": {
+    "binary_sha256": "54191a25ba0b6e5d6e897bddb3defae0c613aa527564e8f7a0a2ba506a7da21a",
+    "runs": [
+      {
+        "run": 1,
+        "wall_seconds": 8.54,
+        "user_seconds": 6.05,
+        "sys_seconds": 1.74,
+        "wall_minus_user_and_sys_seconds": 0.75,
+        "contended": true
+      },
+      {
+        "run": 2,
+        "wall_seconds": 7.69,
+        "user_seconds": 5.93,
+        "sys_seconds": 1.55,
+        "wall_minus_user_and_sys_seconds": 0.21,
+        "contended": false
+      },
+      {
+        "run": 3,
+        "wall_seconds": 7.93,
+        "user_seconds": 6.03,
+        "sys_seconds": 1.63,
+        "wall_minus_user_and_sys_seconds": 0.27,
+        "contended": false
+      },
+      {
+        "run": 4,
+        "wall_seconds": 7.51,
+        "user_seconds": 5.94,
+        "sys_seconds": 1.47,
+        "wall_minus_user_and_sys_seconds": 0.10,
+        "contended": false
+      },
+      {
+        "run": 5,
+        "wall_seconds": 8.08,
+        "user_seconds": 6.09,
+        "sys_seconds": 1.63,
+        "wall_minus_user_and_sys_seconds": 0.36,
+        "contended": false
+      }
+    ],
+    "fastest_uncontended": {
+      "selection_metric": "user_seconds",
+      "run": 2,
+      "wall_seconds": 7.69,
+      "user_seconds": 5.93,
+      "sys_seconds": 1.55
+    },
+    "median": {
+      "wall_seconds": 7.93,
+      "user_seconds": 6.03,
+      "sys_seconds": 1.63
+    }
+  },
+  "comparison": {
+    "load_bearing_metric": "user_seconds",
+    "headline_user_speedup": 0.9949,
+    "headline_user_reduction_percent": -0.5085,
+    "headline_wall_speedup": 0.9935,
+    "headline_wall_reduction_percent": -0.6545,
+    "median_user_speedup": 0.9834,
+    "median_user_reduction_percent": -1.6863,
+    "median_wall_speedup": 0.9634,
+    "median_wall_reduction_percent": -3.7958,
+    "contention_note": "After run 1 is contended with a 0.75 s wall-minus-user-and-sys gap. All other runs are uncontended. User time is load-bearing; the measured result is negligible and slightly negative."
+  },
+  "outputs": {
+    "all_primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_manifests_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f",
+    "final_state_sha256": "2d509ead9aa506e71be155faaa5608542f7ca32cee203ee42b0d3179d670020c",
+    "before_runs_checked": 5,
+    "after_runs_checked": 5,
+    "all_before_and_after_outputs_match": true,
+    "all_before_and_after_summaries_match": true,
+    "all_before_and_after_manifests_match": true,
+    "profiled_output_matches": true,
+    "profiled_summary_matches": true,
+    "profiled_manifest_matches": true
+  },
+  "profile": {
+    "scope": "full_process_lifetime",
+    "interval_milliseconds": 1,
+    "startup_main_thread_samples": 10,
+    "main_execution_samples": 6088,
+    "contains_execute_tick": true,
+    "contains_eval_expr": true,
+    "contains_eval_arithmetic": true,
+    "contains_eval_equality": true,
+    "contains_eval_ordering": true,
+    "file": "post-change-full-duration.sample.txt",
+    "sha256": "951da9190eacdbdb07981a3c64093b66a4ab54cee774f22b5c0867993e896350"
+  }
+}
