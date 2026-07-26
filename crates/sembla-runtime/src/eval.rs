@@ -1253,8 +1253,8 @@ fn eval_arithmetic(
         || matches!(lhs, InternalColumn::Real(_))
         || matches!(rhs, InternalColumn::Real(_))
     {
-        let lhs = numeric_as_real(&lhs)?;
-        let rhs = numeric_as_real(&rhs)?;
+        let lhs = numeric_as_real(lhs)?;
+        let rhs = numeric_as_real(rhs)?;
         return Ok(InternalColumn::Real(
             lhs.into_iter()
                 .zip(rhs)
@@ -1325,7 +1325,7 @@ fn eval_equality(
         )?;
         (lhs, rhs)
     };
-    let equal = equal_columns(&lhs, &rhs)?;
+    let equal = equal_columns(lhs, rhs)?;
     Ok(InternalColumn::Bool(
         equal
             .into_iter()
@@ -1334,8 +1334,8 @@ fn eval_equality(
     ))
 }
 
-fn equal_columns(lhs: &InternalColumn, rhs: &InternalColumn) -> Result<Vec<bool>, EvalError> {
-    if let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (lhs, rhs) {
+fn equal_columns(lhs: InternalColumn, rhs: InternalColumn) -> Result<Vec<bool>, EvalError> {
+    if let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (&lhs, &rhs) {
         return Ok(lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect());
     }
     if matches!(lhs, InternalColumn::Real(_) | InternalColumn::Int(_))
@@ -1349,13 +1349,13 @@ fn equal_columns(lhs: &InternalColumn, rhs: &InternalColumn) -> Result<Vec<bool>
     }
     let values = match (lhs, rhs) {
         (InternalColumn::Bool(lhs), InternalColumn::Bool(rhs)) => {
-            lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
         }
         (InternalColumn::Enum(lhs), InternalColumn::Enum(rhs)) => {
-            lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
         }
         (InternalColumn::Ref(lhs), InternalColumn::Ref(rhs)) => {
-            lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
         }
         _ => return Err(EvalError::new("equality operands have incompatible types")),
     };
@@ -1396,8 +1396,8 @@ fn eval_ordering(
                 .collect(),
         ));
     }
-    let lhs = numeric_as_real(&lhs)?;
-    let rhs = numeric_as_real(&rhs)?;
+    let lhs = numeric_as_real(lhs)?;
+    let rhs = numeric_as_real(rhs)?;
     Ok(InternalColumn::Bool(
         lhs.into_iter()
             .zip(rhs)
@@ -1411,10 +1411,10 @@ fn eval_ordering(
     ))
 }
 
-fn numeric_as_real(column: &InternalColumn) -> Result<Vec<f64>, EvalError> {
+fn numeric_as_real(column: InternalColumn) -> Result<Vec<f64>, EvalError> {
     match column {
-        InternalColumn::Real(values) => Ok(values.clone()),
-        InternalColumn::Int(values) => Ok(values.iter().map(|value| *value as f64).collect()),
+        InternalColumn::Real(values) => Ok(values),
+        InternalColumn::Int(values) => Ok(values.into_iter().map(|value| value as f64).collect()),
         _ => Err(EvalError::new(
             "numeric expression did not evaluate to Real or Int",
         )),
