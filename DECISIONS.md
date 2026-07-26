@@ -1427,3 +1427,53 @@ GPU". That is a more useful finding than a pass would have been.
 **Consequent direction.** The next work is host-side profiling, which is free and
 local — no GPU required. PRD 0007's kernel parallelisation, while correct and
 merged, is not expected to move any measurable number.
+
+### L8. §L4 verdict after the host-evaluator track: met at 4.21x, with no GPU change (2026-07-27)
+
+**Decision.** The §L4 gate is **met**. Three replicates per backend on one host
+(commit `917d930`, one shared 10M artifact, one binary, the unchanged frozen
+protocol): CUDA median `31.82s`, CPU median `133.86s`, ratio **4.207x** against
+a required 3x. Spreads were 6.1% and 0.2%. All seven collector assertions pass,
+including byte-identical results, summaries, and execution hashes across both
+backends and every replicate. Evidence:
+`docs/evidence/demographic-bench/hyperstack-l4-20260726T140326Z/`.
+
+**No GPU code changed between §L7 and this measurement.** CUDA went `171.2s →
+31.8s` (5.4x) and CPU `438.7s → 133.9s` (3.3x) entirely from
+`docs/prds-host-evaluator-performance` PRDs 0001–0004: resolving column
+references once per column rather than once per row, the same for `Ref`
+columns, and computing per-tick state hashes only when a consumer reads them.
+
+**Why the ratio moved when both backends improved.** §L7 established that ~96%
+of CUDA wall time was host-side work. The CUDA path pays that cost *in addition
+to* its device work, so removing it helps CUDA proportionally more than CPU.
+This is the mechanism §L7 predicted, now confirmed at the frozen scale.
+
+**Where CUDA time now goes.** Per-phase instrumentation at 5M rows over 2 ticks
+(`docs/prds-execution-timing` PRD 0001) attributes what §L7 could only record as
+unaccounted: `state_reconstruct` **45.8%**, `observe_views` 20.2%,
+`state_transfer` 13.9%, `readback_control` 7.8%, `report` 7.4%, `other` 4.3%,
+`kernels` **0.56%**. Kernel time is `9.4ms` of `1674ms`, essentially unchanged
+from §L7's `9.1ms` — the share rose only because the denominator shrank.
+
+`state_reconstruct` is `unpack_state` + `StateStore::new` rebuilding the full
+host state every tick so host-side observation has something to read. It is
+host allocation, not PCIe: transfer is a third of its cost.
+
+**Alternatives rejected.** Raising the gate now that it passes — the same
+argument §L7 used against lowering it applies symmetrically, and a bar moved
+after seeing the result is not a bar. Treating 4.21x as the ceiling — three
+named costs above it remain addressable.
+
+**Reason.** The gate asked whether the GPU is worth using for this model class.
+The answer is now yes, by the criterion set before any result was known.
+
+**Consequent direction.** Gate-clearing no longer justifies further work; the
+remaining items must be argued on their own merits. `state_reconstruct` is the
+largest and is a local, bit-identical change. Note also that further CPU-side
+optimisation now *lowers* this ratio while improving the product, so §L4 has
+served its purpose and should not be used to steer work from here.
+
+**Recorded, not decided.** The ageing cost share measured **0.328** median
+(0.321 / 0.328 / 0.330), materially above earlier measurements and well above
+§K2's 10% threshold. §K2 is not revisited here.

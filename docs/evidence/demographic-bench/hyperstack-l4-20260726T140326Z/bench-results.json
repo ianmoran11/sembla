@@ -1,0 +1,102 @@
+{
+  "assertions": {
+    "binary_identical_for_all_arms": true,
+    "gate_results_summaries_and_state_hashes_identical_for_all_arms": true,
+    "initial_state_identical_for_all_arms": true,
+    "one_host": true,
+    "one_session": true,
+    "repository_commit_identical_for_all_arms": true,
+    "three_replicates_per_backend": true
+  },
+  "measurements": {
+    "ageing_cost_share": {
+      "max": 0.3296756011273011,
+      "median": 0.328029302269725,
+      "min": 0.32084661174914314,
+      "replicates": [
+        0.32084661174914314,
+        0.328029302269725,
+        0.3296756011273011
+      ],
+      "spread": 0.008828989378157959
+    },
+    "cpu_full": {
+      "max_seconds": 166.77,
+      "median_seconds": 166.54,
+      "min_seconds": 166.31,
+      "replicates": [
+        166.31,
+        166.54,
+        166.77
+      ],
+      "spread_seconds": 0.46000000000000796
+    },
+    "cpu_no_ageing": {
+      "max_seconds": 112.95,
+      "median_seconds": 111.91,
+      "min_seconds": 111.79,
+      "replicates": [
+        112.95,
+        111.91,
+        111.79
+      ],
+      "spread_seconds": 1.1599999999999966
+    },
+    "cpu_no_grouped": {
+      "max_seconds": 134.09,
+      "median_seconds": 133.86,
+      "min_seconds": 133.85,
+      "replicates": [
+        134.09,
+        133.86,
+        133.85
+      ],
+      "spread_seconds": 0.2400000000000091
+    },
+    "cuda_no_grouped": {
+      "max_seconds": 33.61,
+      "median_seconds": 31.82,
+      "min_seconds": 31.67,
+      "replicates": [
+        31.67,
+        33.61,
+        31.82
+      ],
+      "spread_seconds": 1.9399999999999977
+    }
+  },
+  "protocol": {
+    "areas": 4,
+    "gate_cuda_speedup_at_least": 3.0,
+    "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+    "present_fraction": 0.8,
+    "replicates_per_backend": 3,
+    "reported_statistic": "median",
+    "seed": 9009,
+    "slots": 10000000,
+    "streams": "birth:600,overseas:250,internal:150",
+    "ticks": 24
+  },
+  "provenance": {
+    "binary_sha256": "9d2a222f2d302738001a06070caa9df7ff579cfbfafc1ec84551e8adcf9598b5",
+    "finished_utc": "2026-07-26T14:26:42Z",
+    "gate_execution_hashes_sha256": "2b946800312ada8dfb1bfb04f0339cbfcefe67b74a80522d1c4b989beeb3b223",
+    "gate_results_sha256": "9d770ee3f38a213e73fe5ece629819a2af634725a1a1564238198b65ad0a7870",
+    "gate_summaries_sha256": "e978d7a13b7d54c37d6cce5743a7b70cae1230d32b2767de10277bd3b88b662e",
+    "gpu_name": "NVIDIA H100 PCIe",
+    "host_identity_sha256": "ddec7a88e0f41a9bd27aa38b2c88138cbb60493f91a1e869bcfb38e32d093a97",
+    "host_ram_gib": 177,
+    "initial_state_sha256": "02934c1f4161ced37395e82dacf64039cdb99f1d12434e83c5a87f0b07c9b57c",
+    "repository_commit": "917d9309a1a77d465fed3a3133b5f5552244f6db",
+    "session_id": "b997af3c-431a-48fb-ac08-292b0d57ac0d",
+    "started_utc": "2026-07-26T14:03:51Z"
+  },
+  "schema_version": "sembla.cuda-validation-l4-benchmark/v1",
+  "verdict": {
+    "ageing_evidence_direction": "strengthens",
+    "ageing_k2_threshold": 0.1,
+    "cpu_median_over_cuda_median": 4.20678818353237,
+    "k2_decided_here": false,
+    "l4_gate_met": true
+  }
+}

@@ -1,0 +1,59 @@
+=== building one sembla-cli binary with CUDA ===
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded crypto-common v0.1.7
+  Downloaded sha2 v0.10.9
+  Downloaded zmij v1.0.21
+  Downloaded version_check v0.9.5
+  Downloaded typenum v1.20.1
+  Downloaded libm v0.2.16
+  Downloaded cpufeatures v0.2.17
+  Downloaded syn v2.0.118
+  Downloaded digest v0.10.7
+  Downloaded cudarc v0.17.6
+  Downloaded generic-array v0.14.7
+  Downloaded block-buffer v0.10.4
+   Compiling version_check v0.9.5
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.46
+   Compiling typenum v1.20.1
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.228
+   Compiling zmij v1.0.21
+   Compiling cfg-if v1.0.4
+   Compiling serde_json v1.0.150
+   Compiling serde v1.0.228
+   Compiling libm v0.2.16
+   Compiling cpufeatures v0.2.17
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling cudarc v0.17.6
+   Compiling libloading v0.8.9
+   Compiling generic-array v0.14.7
+   Compiling syn v2.0.118
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.228
+   Compiling sembla-ir v0.3.0 (/home/ubuntu/sembla/crates/sembla-ir)
+   Compiling sembla-runtime v0.3.0 (/home/ubuntu/sembla/crates/sembla-runtime)
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+   Compiling sembla-cli v0.3.0 (/home/ubuntu/sembla/crates/sembla-cli)
+    Finished `release` profile [optimized] target(s) in 12.37s
+=== phase-attribution profile (5M rows, 2 ticks) ===
+=== phase-attribution profile complete ===
+=== synthesizing one shared 10M state artifact ===
+=== measurement cuda-1 ===
+=== measurement cpu-1 ===
+=== measurement ageing-full-1 ===
+=== measurement ageing-no-ageing-1 ===
+=== measurement cuda-2 ===
+=== measurement cpu-2 ===
+=== measurement ageing-full-2 ===
+=== measurement ageing-no-ageing-2 ===
+=== measurement cuda-3 ===
+=== measurement cpu-3 ===
+=== measurement ageing-full-3 ===
+=== measurement ageing-no-ageing-3 ===
+SEMBLA_BENCH_COMPLETE
