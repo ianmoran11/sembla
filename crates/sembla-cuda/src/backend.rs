@@ -39,6 +39,8 @@ pub struct CudaTickObservation {
 #[derive(Debug)]
 struct Layout {
     row_counts: Vec<u64>,
+    resource_offsets: Vec<u64>,
+    resource_count: usize,
     column_offsets: Vec<u64>,
     state_len: usize,
     ports: Vec<(usize, usize)>,
@@ -46,6 +48,8 @@ struct Layout {
     input_len: usize,
     candidate_offsets: Vec<u64>,
     candidate_count: usize,
+    claim_instance_offsets: Vec<u64>,
+    claim_instance_count: usize,
     aggregate_offsets: Vec<u64>,
     aggregate_len: usize,
     aggregate_max_groups: usize,
@@ -71,6 +75,24 @@ impl ValidationLaunchGeometry {
     }
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ConflictLaunchGeometry {
+    grid: u32,
+    block: u32,
+}
+
+#[cfg(test)]
+impl ConflictLaunchGeometry {
+    fn config(self) -> LaunchConfig {
+        LaunchConfig {
+            grid_dim: (self.grid, 1, 1),
+            block_dim: (self.block, 1, 1),
+            shared_mem_bytes: 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CudaBackend {
     model: ValidatedModel,
@@ -86,6 +108,12 @@ pub struct CudaBackend {
     check_errors: CudaFunction,
     validate_claims: CudaFunction,
     validate_claim_compatibility: CudaFunction,
+    init_conflict_winners: CudaFunction,
+    build_claim_instances: CudaFunction,
+    reduce_claim_keys: CudaFunction,
+    reduce_claim_rules: CudaFunction,
+    reduce_claim_entities: CudaFunction,
+    reduce_claim_instances: CudaFunction,
     resolve_conflicts: CudaFunction,
     validate_effects: CudaFunction,
     prepare_effects: CudaFunction,
@@ -103,6 +131,7 @@ pub struct CudaBackend {
     next_state: CudaSlice<u8>,
     column_offsets: CudaSlice<u64>,
     row_counts: CudaSlice<u64>,
+    resource_offsets: CudaSlice<u64>,
     inputs: CudaSlice<u8>,
     next_inputs: CudaSlice<u8>,
     input_offsets: CudaSlice<u64>,
@@ -116,11 +145,20 @@ pub struct CudaBackend {
     aggregate_active: CudaSlice<u8>,
     aggregate_offsets: CudaSlice<u64>,
     candidate_offsets: CudaSlice<u64>,
+    claim_instance_offsets: CudaSlice<u64>,
     enabled: CudaSlice<u8>,
     times: CudaSlice<f64>,
     candidate_errors: CudaSlice<u8>,
     wins: CudaSlice<u8>,
     deferred: CudaSlice<u8>,
+    instance_resources: CudaSlice<u64>,
+    instance_keys: CudaSlice<u64>,
+    instance_rules: CudaSlice<u32>,
+    instance_entities: CudaSlice<u32>,
+    winner_keys: CudaSlice<u64>,
+    winner_rules: CudaSlice<u32>,
+    winner_entities: CudaSlice<u32>,
+    winner_instances: CudaSlice<u64>,
     write_offsets: CudaSlice<u64>,
     owners: CudaSlice<i32>,
     owner_values: CudaSlice<u64>,
@@ -136,6 +174,10 @@ pub struct CudaBackend {
     // to confirm the four validation launches under explicit geometries.
     #[cfg(test)]
     validation_launch_override: Option<ValidationLaunchGeometry>,
+    // The hardware test varies all segmented-argmin launches, including
+    // deliberately undersubscribed grids, to prove geometry independence.
+    #[cfg(test)]
+    conflict_launch_override: Option<ConflictLaunchGeometry>,
 }
 
 impl CudaBackend {
@@ -233,6 +275,12 @@ impl CudaBackend {
         let check_errors = load("sembla_check_candidate_errors")?;
         let validate_claims = load("sembla_validate_claims")?;
         let validate_claim_compatibility = load("sembla_validate_claim_compatibility")?;
+        let init_conflict_winners = load("sembla_init_conflict_winners")?;
+        let build_claim_instances = load("sembla_build_claim_instances")?;
+        let reduce_claim_keys = load("sembla_reduce_claim_keys")?;
+        let reduce_claim_rules = load("sembla_reduce_claim_rules")?;
+        let reduce_claim_entities = load("sembla_reduce_claim_entities")?;
+        let reduce_claim_instances = load("sembla_reduce_claim_instances")?;
         let resolve_conflicts = load("sembla_resolve_conflicts")?;
         let validate_effects = load("sembla_validate_effects")?;
         let prepare_effects = load("sembla_prepare_effects")?;
@@ -257,6 +305,9 @@ impl CudaBackend {
             .map_err(driver_error)?;
         let row_counts = stream
             .memcpy_stod(&nonempty(&layout.row_counts))
+            .map_err(driver_error)?;
+        let resource_offsets = stream
+            .memcpy_stod(&nonempty(&layout.resource_offsets))
             .map_err(driver_error)?;
         let input_zeroes = vec![0_u8; layout.input_len.max(1)];
         let inputs = stream.memcpy_stod(&input_zeroes).map_err(driver_error)?;
@@ -293,6 +344,9 @@ impl CudaBackend {
         let candidate_offsets = stream
             .memcpy_stod(&nonempty(&layout.candidate_offsets))
             .map_err(driver_error)?;
+        let claim_instance_offsets = stream
+            .memcpy_stod(&nonempty(&layout.claim_instance_offsets))
+            .map_err(driver_error)?;
         let candidate_len = layout.candidate_count.max(1);
         let enabled = stream
             .alloc_zeros::<u8>(candidate_len)
@@ -314,6 +368,32 @@ impl CudaBackend {
             .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?;
         let deferred = stream
             .alloc_zeros::<u8>(deferred_len)
+            .map_err(driver_error)?;
+        let claim_instance_len = layout.claim_instance_count.max(1);
+        let instance_resources = stream
+            .alloc_zeros::<u64>(claim_instance_len)
+            .map_err(driver_error)?;
+        let instance_keys = stream
+            .alloc_zeros::<u64>(claim_instance_len)
+            .map_err(driver_error)?;
+        let instance_rules = stream
+            .alloc_zeros::<u32>(claim_instance_len)
+            .map_err(driver_error)?;
+        let instance_entities = stream
+            .alloc_zeros::<u32>(claim_instance_len)
+            .map_err(driver_error)?;
+        let resource_len = layout.resource_count.max(1);
+        let winner_keys = stream
+            .alloc_zeros::<u64>(resource_len)
+            .map_err(driver_error)?;
+        let winner_rules = stream
+            .alloc_zeros::<u32>(resource_len)
+            .map_err(driver_error)?;
+        let winner_entities = stream
+            .alloc_zeros::<u32>(resource_len)
+            .map_err(driver_error)?;
+        let winner_instances = stream
+            .alloc_zeros::<u64>(resource_len)
             .map_err(driver_error)?;
         let write_offsets = stream
             .memcpy_stod(&nonempty(&layout.write_offsets))
@@ -353,6 +433,12 @@ impl CudaBackend {
             check_errors,
             validate_claims,
             validate_claim_compatibility,
+            init_conflict_winners,
+            build_claim_instances,
+            reduce_claim_keys,
+            reduce_claim_rules,
+            reduce_claim_entities,
+            reduce_claim_instances,
             resolve_conflicts,
             validate_effects,
             prepare_effects,
@@ -370,6 +456,7 @@ impl CudaBackend {
             next_state,
             column_offsets,
             row_counts,
+            resource_offsets,
             inputs,
             next_inputs,
             input_offsets,
@@ -383,11 +470,20 @@ impl CudaBackend {
             aggregate_active,
             aggregate_offsets,
             candidate_offsets,
+            claim_instance_offsets,
             enabled,
             times,
             candidate_errors,
             wins,
             deferred,
+            instance_resources,
+            instance_keys,
+            instance_rules,
+            instance_entities,
+            winner_keys,
+            winner_rules,
+            winner_entities,
+            winner_instances,
             write_offsets,
             owners,
             owner_values,
@@ -401,6 +497,8 @@ impl CudaBackend {
             device_identity,
             #[cfg(test)]
             validation_launch_override: None,
+            #[cfg(test)]
+            conflict_launch_override: None,
         })
     }
 
@@ -568,6 +666,17 @@ impl CudaBackend {
             return geometry.config();
         }
         LaunchConfig::for_num_elems(rows)
+    }
+
+    fn conflict_launch_config(&self, elements: u32, one: LaunchConfig) -> LaunchConfig {
+        if elements == 0 {
+            return one;
+        }
+        #[cfg(test)]
+        if let Some(geometry) = self.conflict_launch_override {
+            return geometry.config();
+        }
+        LaunchConfig::for_num_elems(elements)
     }
 
     fn execute_tick(&mut self) -> Result<(), CudaError> {
@@ -782,11 +891,14 @@ impl CudaBackend {
 
             let mut candidate_begin = 0_u64;
             let mut candidate_count = 0_u64;
+            let mut claim_instance_begin = 0_u64;
+            let mut claim_instance_count = 0_u64;
             if let Some((_, first)) = transition_positions.first() {
                 let rule_index = usize::try_from(first.rule_id).map_err(|_| {
                     CudaError::InvalidInput("rule id exceeds host index width".to_owned())
                 })?;
                 candidate_begin = self.layout.candidate_offsets[rule_index];
+                claim_instance_begin = self.layout.claim_instance_offsets[rule_index];
                 for (_, transition) in &transition_positions {
                     let model_transition = &self.model.model().boxes[transition.box_index]
                         .transitions[transition.transition_index];
@@ -796,41 +908,141 @@ impl CudaBackend {
                         .position(|table| table.name == model_transition.table)
                         .expect("validated transition table");
                     let global_table = global_table(&self.model, transition.box_index, table_index);
-                    candidate_count = candidate_count
-                        .checked_add(self.layout.row_counts[global_table])
+                    let rows = self.layout.row_counts[global_table];
+                    candidate_count = candidate_count.checked_add(rows).ok_or_else(|| {
+                        CudaError::InvalidInput("box candidate count overflow".to_owned())
+                    })?;
+                    let claims = u64::try_from(model_transition.contests.len()).map_err(|_| {
+                        CudaError::InvalidInput("claim count exceeds u64".to_owned())
+                    })?;
+                    claim_instance_count = claim_instance_count
+                        .checked_add(rows.checked_mul(claims).ok_or_else(|| {
+                            CudaError::InvalidInput("box claim-instance count overflow".to_owned())
+                        })?)
                         .ok_or_else(|| {
-                            CudaError::InvalidInput("box candidate count overflow".to_owned())
+                            CudaError::InvalidInput("box claim-instance count overflow".to_owned())
                         })?;
                 }
             }
             if candidate_count != 0 {
-                let launch_count = u32::try_from(candidate_count).map_err(|_| {
+                let candidate_launch_count = u32::try_from(candidate_count).map_err(|_| {
                     CudaError::InvalidInput(
                         "box candidate count exceeds CUDA launch capacity".to_owned(),
                     )
                 })?;
+                let candidate_config = self.conflict_launch_config(candidate_launch_count, one);
                 let resource_table_count = self.layout.row_counts.len() as u64;
+
+                if claim_instance_count != 0 {
+                    let instance_launch_count =
+                        u32::try_from(claim_instance_count).map_err(|_| {
+                            CudaError::InvalidInput(
+                                "box claim-instance count exceeds CUDA launch capacity".to_owned(),
+                            )
+                        })?;
+                    let resource_count =
+                        u64::try_from(self.layout.resource_count).map_err(|_| {
+                            CudaError::InvalidInput("resource count exceeds u64".to_owned())
+                        })?;
+                    let resource_launch_count = u32::try_from(resource_count).map_err(|_| {
+                        CudaError::InvalidInput(
+                            "resource count exceeds CUDA launch capacity".to_owned(),
+                        )
+                    })?;
+                    let resource_config = self.conflict_launch_config(resource_launch_count, one);
+                    let instance_config = self.conflict_launch_config(instance_launch_count, one);
+
+                    let mut args = self.stream.launch_builder(&self.init_conflict_winners);
+                    args.arg(&resource_count)
+                        .arg(&mut self.winner_keys)
+                        .arg(&mut self.winner_rules)
+                        .arg(&mut self.winner_entities)
+                        .arg(&mut self.winner_instances);
+                    unsafe { args.launch(resource_config) }.map_err(driver_error)?;
+
+                    let mut args = self.stream.launch_builder(&self.build_claim_instances);
+                    args.arg(&self.state)
+                        .arg(&self.column_offsets)
+                        .arg(&self.row_counts)
+                        .arg(&self.inputs)
+                        .arg(&self.input_offsets)
+                        .arg(&self.input_counts)
+                        .arg(&self.params)
+                        .arg(&self.aggregates)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&self.candidate_offsets)
+                        .arg(&self.claim_instance_offsets)
+                        .arg(&self.resource_offsets)
+                        .arg(&candidate_begin)
+                        .arg(&candidate_count)
+                        .arg(&self.enabled)
+                        .arg(&self.times)
+                        .arg(&mut self.instance_resources)
+                        .arg(&mut self.instance_keys)
+                        .arg(&mut self.instance_rules)
+                        .arg(&mut self.instance_entities)
+                        .arg(&self.status);
+                    unsafe { args.launch(candidate_config) }.map_err(driver_error)?;
+
+                    let mut args = self.stream.launch_builder(&self.reduce_claim_keys);
+                    args.arg(&claim_instance_begin)
+                        .arg(&claim_instance_count)
+                        .arg(&self.instance_resources)
+                        .arg(&self.instance_keys)
+                        .arg(&mut self.winner_keys);
+                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+
+                    let mut args = self.stream.launch_builder(&self.reduce_claim_rules);
+                    args.arg(&claim_instance_begin)
+                        .arg(&claim_instance_count)
+                        .arg(&self.instance_resources)
+                        .arg(&self.instance_keys)
+                        .arg(&self.instance_rules)
+                        .arg(&self.winner_keys)
+                        .arg(&mut self.winner_rules);
+                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+
+                    let mut args = self.stream.launch_builder(&self.reduce_claim_entities);
+                    args.arg(&claim_instance_begin)
+                        .arg(&claim_instance_count)
+                        .arg(&self.instance_resources)
+                        .arg(&self.instance_keys)
+                        .arg(&self.instance_rules)
+                        .arg(&self.instance_entities)
+                        .arg(&self.winner_keys)
+                        .arg(&self.winner_rules)
+                        .arg(&mut self.winner_entities);
+                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+
+                    let mut args = self.stream.launch_builder(&self.reduce_claim_instances);
+                    args.arg(&claim_instance_begin)
+                        .arg(&claim_instance_count)
+                        .arg(&self.instance_resources)
+                        .arg(&self.instance_keys)
+                        .arg(&self.instance_rules)
+                        .arg(&self.instance_entities)
+                        .arg(&self.winner_keys)
+                        .arg(&self.winner_rules)
+                        .arg(&self.winner_entities)
+                        .arg(&mut self.winner_instances);
+                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+                }
+
                 let mut args = self.stream.launch_builder(&self.resolve_conflicts);
-                args.arg(&self.state)
-                    .arg(&self.column_offsets)
-                    .arg(&self.row_counts)
-                    .arg(&self.inputs)
-                    .arg(&self.input_offsets)
-                    .arg(&self.input_counts)
-                    .arg(&self.params)
-                    .arg(&self.aggregates)
-                    .arg(&self.aggregate_offsets)
+                args.arg(&self.row_counts)
                     .arg(&self.candidate_offsets)
+                    .arg(&self.claim_instance_offsets)
                     .arg(&candidate_begin)
                     .arg(&candidate_count)
                     .arg(&resource_table_count)
                     .arg(&self.enabled)
-                    .arg(&self.times)
+                    .arg(&self.instance_resources)
+                    .arg(&self.winner_rules)
+                    .arg(&self.winner_entities)
                     .arg(&mut self.wins)
                     .arg(&mut self.deferred)
                     .arg(&self.status);
-                unsafe { args.launch(LaunchConfig::for_num_elems(launch_count)) }
-                    .map_err(driver_error)?;
+                unsafe { args.launch(candidate_config) }.map_err(driver_error)?;
             }
 
             // Reduce each effect-bearing rule's winners into a stable
@@ -1364,10 +1576,27 @@ fn build_layout(
     state_len = state_len.max(1);
     input_len = input_len.max(1);
 
+    // A resource segment is addressed directly by (global table, row). This
+    // prefix layout is deterministic and gives the flat claim-instance list a
+    // stable grouping without a scheduling-dependent sort.
+    let mut resource_offsets = Vec::with_capacity(row_counts.len());
+    let mut resource_count = 0_usize;
+    for rows in &row_counts {
+        resource_offsets.push(resource_count as u64);
+        let rows = usize::try_from(*rows)
+            .map_err(|_| CudaError::InvalidInput("resource row count exceeds usize".to_owned()))?;
+        resource_count = resource_count
+            .checked_add(rows)
+            .ok_or_else(|| CudaError::InvalidInput("resource size overflow".to_owned()))?;
+    }
+
     let mut candidate_offsets = Vec::new();
     let mut candidate_count = 0_usize;
+    let mut claim_instance_offsets = Vec::new();
+    let mut claim_instance_count = 0_usize;
     for transition in model.transitions() {
         candidate_offsets.push(candidate_count as u64);
+        claim_instance_offsets.push(claim_instance_count as u64);
         let declaration =
             &model.model().boxes[transition.box_index].transitions[transition.transition_index];
         let table_index = model.model().boxes[transition.box_index]
@@ -1376,9 +1605,19 @@ fn build_layout(
             .position(|table| table.name == declaration.table)
             .expect("validated transition table");
         let global = global_table(model, transition.box_index, table_index);
+        let rows = usize::try_from(row_counts[global])
+            .map_err(|_| CudaError::InvalidInput("candidate row count exceeds usize".to_owned()))?;
         candidate_count = candidate_count
-            .checked_add(row_counts[global] as usize)
+            .checked_add(rows)
             .ok_or_else(|| CudaError::InvalidInput("candidate size overflow".to_owned()))?;
+        claim_instance_count = claim_instance_count
+            .checked_add(
+                rows.checked_mul(declaration.contests.len())
+                    .ok_or_else(|| {
+                        CudaError::InvalidInput("claim-instance size overflow".to_owned())
+                    })?,
+            )
+            .ok_or_else(|| CudaError::InvalidInput("claim-instance size overflow".to_owned()))?;
     }
 
     let mut aggregate_offsets = Vec::new();
@@ -1399,6 +1638,8 @@ fn build_layout(
 
     Ok(Layout {
         row_counts,
+        resource_offsets,
+        resource_count,
         column_offsets,
         state_len,
         ports,
@@ -1406,6 +1647,8 @@ fn build_layout(
         input_len,
         candidate_offsets,
         candidate_count,
+        claim_instance_offsets,
+        claim_instance_count,
         aggregate_offsets,
         aggregate_len: aggregate_len.max(1),
         aggregate_max_groups,
@@ -1702,6 +1945,62 @@ mod diagnostic_equality_hardware {
                     case.name, grid, block, committed
                 );
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod conflict_geometry_hardware {
+    use super::{ConflictLaunchGeometry, CudaBackend, HashMode};
+    use sembla_runtime::eval::ParamEnv;
+    use sembla_runtime::executor::run_tick;
+    use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
+
+    fn contested_model() -> sembla_ir::ValidatedModel {
+        // Rules are deliberately ordered B, C, A. Their only enabled rows have
+        // keys 1, 2, 0 and entity IDs 0, 1, 2 respectively, so key, rule, and
+        // entity component minima come from different instances. The CPU
+        // compare_instances lexicographic minimum is A (key 0), not a
+        // component-wise synthetic tuple.
+        let source = r#"{"name":"segmented_argmin_geometry","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Worker","size_hint":1,"attrs":[]},{"name":"Applicant","size_hint":3,"attrs":[{"name":"worker","ty":{"kind":"ref","table":"Worker"}},{"name":"priority","ty":{"kind":"int"}},{"name":"role","ty":{"kind":"enum","variants":["B","C","A"]}},{"name":"outcome","ty":{"kind":"enum","variants":["Waiting","Won"]}}]}],"transitions":[{"name":"rule_b","table":"Applicant","guard":{"kind":"enum_is","attr":"role","variant":"B"},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"outcome","value":{"kind":"enum","variant":"Won"}}],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"key","expr":{"kind":"self_attr","name":"priority"}}}]},{"name":"rule_c","table":"Applicant","guard":{"kind":"enum_is","attr":"role","variant":"C"},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"outcome","value":{"kind":"enum","variant":"Won"}}],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"key","expr":{"kind":"self_attr","name":"priority"}}}]},{"name":"rule_a","table":"Applicant","guard":{"kind":"enum_is","attr":"role","variant":"A"},"hazard":{"kind":"real","value":1e300},"effects":[{"kind":"set_attr","attr":"outcome","value":{"kind":"enum","variant":"Won"}}],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"key","expr":{"kind":"self_attr","name":"priority"}}}]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+        sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+    }
+
+    fn contested_state() -> Vec<TableInit> {
+        vec![
+            TableInit::new("world", "Worker", 1, Vec::new()),
+            TableInit::new(
+                "world",
+                "Applicant",
+                3,
+                vec![
+                    ColumnInit::new("worker", ColumnData::Ref(vec![0, 0, 0])),
+                    ColumnInit::new("priority", ColumnData::Int(vec![1, 2, 0])),
+                    ColumnInit::new("role", ColumnData::Enum(vec![0, 1, 2])),
+                    ColumnInit::new("outcome", ColumnData::Enum(vec![0, 0, 0])),
+                ],
+            ),
+        ]
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA GPU; exercises explicit conflict launch geometries"]
+    fn segmented_argmin_winner_matches_cpu_under_three_geometries() {
+        let model = contested_model();
+        let initial = contested_state();
+        let params = ParamEnv::defaults(&model);
+        let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+        run_tick(&model, &mut cpu, &params, 9009, 0).unwrap();
+        let expected = cpu.state_hash();
+
+        for (grid, block) in [(1, 1), (1, 32), (3, 4)] {
+            let mut backend =
+                CudaBackend::new(&model, initial.clone(), &params, 9009, HashMode::EveryTick)
+                    .expect("CUDA device, driver, and NVRTC are required");
+            backend.conflict_launch_override = Some(ConflictLaunchGeometry { grid, block });
+            let result = backend.run(1).unwrap();
+            assert_eq!(result.final_state_hash, expected, "geometry {grid}x{block}");
+            assert_eq!(result.per_tick_state_hashes, [expected]);
         }
     }
 }

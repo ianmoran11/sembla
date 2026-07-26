@@ -265,3 +265,24 @@ The §L4 gate itself is re-run by PRD 0006 under the unchanged protocol, at whic
 point three replicates are affordable because the run should no longer take 90
 minutes each. That is the intended point to satisfy 0005's numeric criteria, not
 a re-run of 0005.
+
+### 2026-07-26 — PRD 0006 local implementation
+
+Replaced the per-candidate all-row scan with a materialized flat
+`(candidate, claim)` list and direct-address resource segments. Four ordered
+atomic-min passes select the lexicographic `(ordering key, rule word, entity ID,
+stable instance)` minimum; every pass restricts to the prefix fixed by earlier
+passes. Candidate finalization reads only its statically bounded own claims.
+The floating-point key encoding is tested pairwise against Rust
+`f64::total_cmp`, including signed zero, subnormals, infinities, and positive and
+negative NaNs.
+
+The frozen demographic model has five contested transitions over the slot
+table, so 10M slots materialize 50M claim instances. Their four SoA fields use
+1.2 GB before the separate per-resource winner arrays, within the 80 GB target
+H100 but substantially above a one-claim estimate. Local source guards prohibit
+cross-table row scans, a fixture distinguishes lexicographic from component-wise
+minima, and an ignored CUDA test compares the CPU winner under `1x1`, `1x32`,
+and `3x4` conflict launch geometries. Existing CSV/hash/example goldens remain
+byte-identical; only the canonical generated CUDA source fixture changes.
+Hardware criteria 5–7 remain **pending** per §J14.2.

@@ -1513,7 +1513,14 @@ impl<'a> Generator<'a> {
             }
         }
         out.push_str("}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const double* times, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {\n  unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (local_candidate >= candidate_count || status[0] != 0ULL) return;\n  unsigned long long self_candidate = candidate_begin + local_candidate;\n  for (unsigned long long table = 0; table < resource_table_count; ++table) deferred[self_candidate * resource_table_count + table] = 0U;\n  wins[self_candidate] = enabled[self_candidate];\n  if (!enabled[self_candidate]) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        // The CPU oracle flattens (candidate, claim) instances, groups them by
+        // resource identity, and takes a lexicographic argmin under
+        // compare_instances: ordering key, rule_word, entity_id. Materialize
+        // that same list at stable (rule, row, claim) indices. A final instance
+        // index component orders otherwise identical duplicate claims without
+        // changing the winning candidate.
+        out.push_str("\nextern \"C\" __global__ void sembla_init_conflict_winners(unsigned long long resource_count, unsigned long long* winner_keys, unsigned int* winner_rules, unsigned int* winner_entities, unsigned long long* winner_instances) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long resource = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; resource < resource_count; resource += stride) {\n    winner_keys[resource] = 0xffffffffffffffffULL;\n    winner_rules[resource] = 0xffffffffU;\n    winner_entities[resource] = 0xffffffffU;\n    winner_instances[resource] = 0xffffffffffffffffULL;\n  }\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_build_claim_instances(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned long long* claim_instance_offsets, const unsigned long long* resource_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned long long* instance_resources, unsigned long long* instance_keys, unsigned int* instance_rules, unsigned int* instance_entities, const unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local_candidate < candidate_count; local_candidate += stride) {\n    unsigned long long self_candidate = candidate_begin + local_candidate;\n    unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -1526,78 +1533,73 @@ impl<'a> Generator<'a> {
                 box_index: validated.box_index,
                 table_index,
             };
-            writeln!(out, "  if (self_candidate >= candidate_offsets[{}] && self_candidate < candidate_offsets[{}] + row_counts[{table_global}]) {{ unsigned long long row = self_candidate - candidate_offsets[{}];", validated.rule_id, validated.rule_id, validated.rule_id).unwrap();
+            writeln!(out, "    if (self_candidate >= candidate_offsets[{}] && self_candidate < candidate_offsets[{}] + row_counts[{table_global}]) {{ unsigned long long row = self_candidate - candidate_offsets[{}];", validated.rule_id, validated.rule_id, validated.rule_id).unwrap();
             for (claim_index, claim) in transition.contests.iter().enumerate() {
                 let resource_ty = self.infer(&claim.resource, rows, None)?;
                 let Ty::Ref(target_name) = resource_ty else {
                     return Err(codegen("claim resource is not Ref"));
                 };
+                let target_table = self.table_index(validated.box_index, &target_name)?;
+                let target_global = self.global_table(validated.box_index, target_table);
                 let resource = self
                     .render(
                         &claim.resource,
                         rows,
-                        Some(&Ty::Ref(target_name.clone())),
+                        Some(&Ty::Ref(target_name)),
                         "state",
                         "row",
                     )?
                     .0;
-                writeln!(out, "    unsigned int resource_{claim_index} = {resource};").unwrap();
-                let (self_key, self_key_ty) =
-                    self.claim_key(claim, rows, "row", "self_candidate")?;
-                writeln!(out, "    {} best_key_{claim_index} = {self_key}; unsigned int best_rule_{claim_index} = {}U; unsigned int best_entity_{claim_index} = (unsigned int)row;", self_key_ty.cuda(), validated.rule_word).unwrap();
-                for other in self.model.transitions() {
-                    let other_transition = &self.model.model().boxes[other.box_index].transitions
-                        [other.transition_index];
-                    let other_table_index =
-                        self.table_index(other.box_index, &other_transition.table)?;
-                    let other_rows = Rows::State {
-                        box_index: other.box_index,
-                        table_index: other_table_index,
-                    };
-                    let other_global = self.global_table(other.box_index, other_table_index);
-                    for other_claim in &other_transition.contests {
-                        let other_ty = self.infer(&other_claim.resource, other_rows, None)?;
-                        if other_ty != Ty::Ref(target_name.clone())
-                            || other.box_index != validated.box_index
-                        {
-                            continue;
-                        }
-                        let compatible = claim_ordering_type(self, claim, rows)?
-                            == claim_ordering_type(self, other_claim, other_rows)?;
-                        if !compatible {
-                            continue;
-                        }
-                        let other_resource = self
-                            .render(
-                                &other_claim.resource,
-                                other_rows,
-                                Some(&other_ty),
-                                "state",
-                                "other_row",
-                            )?
-                            .0;
-                        writeln!(out, "    for (unsigned long long other_row = 0; other_row < row_counts[{other_global}]; ++other_row) {{ unsigned long long other_candidate = candidate_offsets[{}] + other_row; if (!enabled[other_candidate] || (unsigned int)({other_resource}) != resource_{claim_index}) continue;", other.rule_id).unwrap();
-                        let (other_key, _) = self.claim_key(
-                            other_claim,
-                            other_rows,
-                            "other_row",
-                            "other_candidate",
-                        )?;
-                        let better = if self_key_ty == Ty::Real {
-                            format!("sembla_total_less({other_key}, best_key_{claim_index}) || (sembla_total_equal({other_key}, best_key_{claim_index}) && ({}U < best_rule_{claim_index} || ({}U == best_rule_{claim_index} && (unsigned int)other_row < best_entity_{claim_index})))", other.rule_word, other.rule_word)
-                        } else {
-                            format!("({other_key}) < best_key_{claim_index} || (({other_key}) == best_key_{claim_index} && ({}U < best_rule_{claim_index} || ({}U == best_rule_{claim_index} && (unsigned int)other_row < best_entity_{claim_index})))", other.rule_word, other.rule_word)
-                        };
-                        writeln!(out, "      if ({better}) {{ best_key_{claim_index} = {other_key}; best_rule_{claim_index} = {}U; best_entity_{claim_index} = (unsigned int)other_row; }}\n    }}", other.rule_word).unwrap();
-                    }
-                }
+                let (key, key_ty) = self.claim_key(claim, rows, "row", "self_candidate")?;
+                let order_key = match key_ty {
+                    Ty::Real => format!("sembla_f64_order_key({key})"),
+                    Ty::Int => format!("sembla_i64_order_key({key})"),
+                    Ty::Enum(_) => format!("(unsigned long long)({key})"),
+                    _ => return Err(codegen("contest key must be Real, Int, or Enum")),
+                };
+                writeln!(out, "      {{ unsigned long long instance = claim_instance_offsets[{}] + row * {}ULL + {claim_index}ULL; if (enabled[self_candidate]) {{ instance_resources[instance] = resource_offsets[{target_global}] + (unsigned long long)({resource}); instance_keys[instance] = {order_key}; instance_rules[instance] = {}U; instance_entities[instance] = (unsigned int)row; }} else {{ instance_resources[instance] = 0xffffffffffffffffULL; }} }}", validated.rule_id, transition.contests.len(), validated.rule_word).unwrap();
+            }
+            out.push_str("    }\n");
+        }
+        out.push_str("  }\n}\n");
+
+        // Each pass restricts itself to the exact prefix fixed by prior passes.
+        // Therefore these atomic minima compute one lexicographic argmin rather
+        // than unrelated component-wise minima, independent of arrival order.
+        out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_keys(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, unsigned long long* winner_keys) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL) atomicMin(winner_keys + resource, instance_keys[instance]); }\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_rules(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned long long* winner_keys, unsigned int* winner_rules) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource]) atomicMin(winner_rules + resource, instance_rules[instance]); }\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_entities(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned int* instance_entities, const unsigned long long* winner_keys, const unsigned int* winner_rules, unsigned int* winner_entities) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource]) atomicMin(winner_entities + resource, instance_entities[instance]); }\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_instances(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned int* instance_entities, const unsigned long long* winner_keys, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned long long* winner_instances) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource] && instance_entities[instance] == winner_entities[resource]) atomicMin(winner_instances + resource, instance); }\n}\n");
+
+        out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned long long* row_counts, const unsigned long long* candidate_offsets, const unsigned long long* claim_instance_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const unsigned long long* instance_resources, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local_candidate < candidate_count; local_candidate += stride) {\n    unsigned long long self_candidate = candidate_begin + local_candidate;\n    for (unsigned long long table = 0; table < resource_table_count; ++table) deferred[self_candidate * resource_table_count + table] = 0U;\n    wins[self_candidate] = enabled[self_candidate];\n    if (!enabled[self_candidate]) continue;\n");
+        for validated in self.model.transitions() {
+            let transition = &self.model.model().boxes[validated.box_index].transitions
+                [validated.transition_index];
+            if transition.contests.is_empty() {
+                continue;
+            }
+            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_global = self.global_table(validated.box_index, table_index);
+            writeln!(out, "    if (self_candidate >= candidate_offsets[{}] && self_candidate < candidate_offsets[{}] + row_counts[{table_global}]) {{ unsigned long long row = self_candidate - candidate_offsets[{}];", validated.rule_id, validated.rule_id, validated.rule_id).unwrap();
+            for (claim_index, claim) in transition.contests.iter().enumerate() {
+                let resource_ty = self.infer(
+                    &claim.resource,
+                    Rows::State {
+                        box_index: validated.box_index,
+                        table_index,
+                    },
+                    None,
+                )?;
+                let Ty::Ref(target_name) = resource_ty else {
+                    return Err(codegen("claim resource is not Ref"));
+                };
                 let target_table = self.table_index(validated.box_index, &target_name)?;
                 let target_global = self.global_table(validated.box_index, target_table);
-                writeln!(out, "    if (best_rule_{claim_index} != {}U || best_entity_{claim_index} != (unsigned int)row) {{ wins[self_candidate] = 0; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }}", validated.rule_word).unwrap();
+                writeln!(out, "      {{ unsigned long long instance = claim_instance_offsets[{}] + row * {}ULL + {claim_index}ULL; unsigned long long resource = instance_resources[instance]; if (winner_rules[resource] != {}U || winner_entities[resource] != (unsigned int)row) {{ wins[self_candidate] = 0U; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }} }}", validated.rule_id, transition.contests.len(), validated.rule_word).unwrap();
             }
-            out.push_str("  }\n");
+            out.push_str("    }\n");
         }
-        out.push_str("}\n");
+        out.push_str("  }\n}\n");
         Ok(())
     }
 
@@ -2000,6 +2002,13 @@ fn f64_literal(value: f64) -> String {
     format!("sembla_f64(0x{:016x}ULL)", value.to_bits())
 }
 
+#[cfg(test)]
+fn cuda_f64_order_key(value: f64) -> u64 {
+    let signed_bits = value.to_bits() as i64;
+    let total_key = signed_bits ^ ((((signed_bits >> 63) as u64) >> 1) as i64);
+    (total_key as u64) ^ 0x8000_0000_0000_0000
+}
+
 fn codegen(message: impl Into<String>) -> CudaError {
     CudaError::Codegen(message.into())
 }
@@ -2020,11 +2029,13 @@ pub fn generate(model: &ValidatedModel) -> Result<GeneratedCuda, CudaError> {
 }
 
 const PRELUDE: &str = r#"
-// Simulation results never pass through atomics. Effects are staged in
-// generated rule/effect/row order, then scattered by ascending destination
-// cell. Validation *diagnostics* are reduced with atomics under a short lock
-// so the reported failure is independent of launch geometry; the committed
-// status is written only by the single-thread commit kernel.
+// Conflict winners use ordered atomicMin passes over an explicit total key;
+// every pass is order-independent and only sees the prefix selected earlier.
+// Other simulation results are staged in generated rule/effect/row order, then
+// scattered by ascending destination cell. Validation *diagnostics* are reduced
+// with atomics under a short lock so the reported failure is independent of
+// launch geometry; the committed status is written only by the single-thread
+// commit kernel.
 __device__ __forceinline__ double sembla_f64(unsigned long long bits) {
   return __longlong_as_double((long long)bits);
 }
@@ -2037,6 +2048,16 @@ __device__ __forceinline__ int sembla_total_less(double left, double right) {
 }
 __device__ __forceinline__ int sembla_total_equal(double left, double right) {
   return sembla_total_key(left) == sembla_total_key(right);
+}
+// Unsigned encodings whose ordinary integer order exactly matches the CPU
+// oracle's signed i64 order and Rust f64::total_cmp order. The sign-bit flip
+// converts the signed total-order key above into the unsigned domain required
+// by atomicMin without changing its ordering, including signed zero and NaNs.
+__device__ __forceinline__ unsigned long long sembla_i64_order_key(long long value) {
+  return ((unsigned long long)value) ^ 0x8000000000000000ULL;
+}
+__device__ __forceinline__ unsigned long long sembla_f64_order_key(double value) {
+  return ((unsigned long long)sembla_total_key(value)) ^ 0x8000000000000000ULL;
 }
 // Records one validation failure into scratch slots status[4..=8] without
 // touching the committed diagnostic status[0..=3]. The scratch holds the
@@ -2151,7 +2172,7 @@ extern "C" __global__ void sembla_philox_vectors(const unsigned long long* seeds
 mod tests {
     use std::path::Path;
 
-    use super::{generate, DUMP_ENV};
+    use super::{cuda_f64_order_key, generate, DUMP_ENV};
 
     fn example_model(name: &str) -> sembla_ir::ValidatedModel {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/{name}"));
@@ -2397,12 +2418,12 @@ mod tests {
         assert!(first.source.contains("sembla_build_output_partials"));
         assert!(first.source.contains("sembla_finish_outputs"));
         assert!(!first.source.contains("atomicAdd"));
-        // Simulation results never pass through atomics; the atomicMin used
-        // by the validation diagnostic reduction is confined out of the
-        // resolver and the other result-bearing kernels.
+        // The argmin uses only order-independent atomic minima in staged
+        // prefix passes. Finalization itself is a bounded own-claim lookup.
         let resolver = kernel_body(&first.source, "sembla_resolve_conflicts");
         assert!(!resolver.contains("atomicMin"));
         assert!(!resolver.contains("atomicAdd"));
+        assert!(!resolver.contains("other_row"));
     }
 
     #[test]
@@ -2453,9 +2474,10 @@ mod tests {
                 "sembla_exp(seed, tick, {}U,",
                 transition.rule_word
             )));
-            assert!(generated
-                .source
-                .contains(&format!("best_rule_0 = {}U", transition.rule_word)));
+            assert!(generated.source.contains(&format!(
+                "instance_rules[instance] = {}U",
+                transition.rule_word
+            )));
             assert!(generated
                 .source
                 .contains(&format!("candidate_offsets[{}]", transition.rule_id)));
@@ -2488,9 +2510,176 @@ mod tests {
         assert!(!resolver.contains("status[1] ="));
         assert!(!resolver.contains("status[2] ="));
         assert!(!generated.source.contains("atomicAdd"));
-        // The validation diagnostic reduction may use atomicMin; the
-        // resolver's staged argmin must not.
+        // The validation diagnostic reduction and prefix argmin passes may
+        // use atomicMin; candidate finalization itself must not.
         assert!(!resolver.contains("atomicMin"));
+    }
+
+    #[test]
+    fn segmented_argmin_has_no_cross_table_row_scan_and_prefixes_every_pass() {
+        let generated = generate(&stable_contested_model()).unwrap();
+        for kernel in [
+            "sembla_build_claim_instances",
+            "sembla_reduce_claim_keys",
+            "sembla_reduce_claim_rules",
+            "sembla_reduce_claim_entities",
+            "sembla_reduce_claim_instances",
+            "sembla_resolve_conflicts",
+        ] {
+            let body = kernel_body(&generated.source, kernel);
+            assert!(
+                !body.contains("other_row") && !body.contains("row_counts[other"),
+                "{kernel} contains a cross-table all-row scan"
+            );
+        }
+
+        let rules = kernel_body(&generated.source, "sembla_reduce_claim_rules");
+        assert!(rules.contains("instance_keys[instance] == winner_keys[resource]"));
+        let entities = kernel_body(&generated.source, "sembla_reduce_claim_entities");
+        assert!(entities.contains("instance_keys[instance] == winner_keys[resource]"));
+        assert!(entities.contains("instance_rules[instance] == winner_rules[resource]"));
+        let instances = kernel_body(&generated.source, "sembla_reduce_claim_instances");
+        assert!(instances.contains("instance_keys[instance] == winner_keys[resource]"));
+        assert!(instances.contains("instance_rules[instance] == winner_rules[resource]"));
+        assert!(instances.contains("instance_entities[instance] == winner_entities[resource]"));
+    }
+
+    #[test]
+    fn prefix_reduction_is_lexicographic_not_component_wise() {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        struct Instance {
+            key: u64,
+            rule: u32,
+            entity: u32,
+            stable: u64,
+        }
+
+        // Every component minimum comes from a different instance. An
+        // incorrect component-wise reduction would synthesize (0, 0, 0, 0),
+        // while compare_instances' lexicographic key selects the first row.
+        let instances = [
+            Instance {
+                key: 0,
+                rule: 90,
+                entity: 90,
+                stable: 90,
+            },
+            Instance {
+                key: 1,
+                rule: 0,
+                entity: 80,
+                stable: 80,
+            },
+            Instance {
+                key: 2,
+                rule: 70,
+                entity: 0,
+                stable: 70,
+            },
+            Instance {
+                key: 3,
+                rule: 60,
+                entity: 60,
+                stable: 0,
+            },
+        ];
+        let cpu = *instances
+            .iter()
+            .min_by_key(|instance| {
+                (
+                    instance.key,
+                    instance.rule,
+                    instance.entity,
+                    instance.stable,
+                )
+            })
+            .unwrap();
+
+        for order in [[0, 1, 2, 3], [3, 2, 1, 0], [1, 3, 0, 2]] {
+            let key = order.iter().map(|&i| instances[i].key).min().unwrap();
+            let rule = order
+                .iter()
+                .filter(|&&i| instances[i].key == key)
+                .map(|&i| instances[i].rule)
+                .min()
+                .unwrap();
+            let entity = order
+                .iter()
+                .filter(|&&i| instances[i].key == key && instances[i].rule == rule)
+                .map(|&i| instances[i].entity)
+                .min()
+                .unwrap();
+            let stable = order
+                .iter()
+                .filter(|&&i| {
+                    instances[i].key == key
+                        && instances[i].rule == rule
+                        && instances[i].entity == entity
+                })
+                .map(|&i| instances[i].stable)
+                .min()
+                .unwrap();
+            assert_eq!(
+                Instance {
+                    key,
+                    rule,
+                    entity,
+                    stable
+                },
+                cpu
+            );
+        }
+        assert_eq!(cpu, instances[0]);
+    }
+
+    #[test]
+    fn cuda_f64_order_key_exactly_matches_rust_total_cmp() {
+        let values = [
+            f64::from_bits(0xfff8_0000_0000_0001), // negative quiet NaN
+            f64::from_bits(0xfff0_0000_0000_0001), // negative signaling NaN
+            f64::NEG_INFINITY,
+            -1.0,
+            f64::from_bits(0x8000_0000_0000_0001), // negative subnormal
+            -0.0,
+            0.0,
+            f64::from_bits(0x0000_0000_0000_0001), // positive subnormal
+            1.0,
+            f64::INFINITY,
+            f64::from_bits(0x7ff0_0000_0000_0001), // positive signaling NaN
+            f64::from_bits(0x7ff8_0000_0000_0001), // positive quiet NaN
+        ];
+        for left in values {
+            for right in values {
+                assert_eq!(
+                    left.total_cmp(&right),
+                    cuda_f64_order_key(left).cmp(&cuda_f64_order_key(right)),
+                    "left={:#018x} right={:#018x}",
+                    left.to_bits(),
+                    right.to_bits()
+                );
+            }
+        }
+        assert!(cuda_f64_order_key(-0.0) < cuda_f64_order_key(0.0));
+    }
+
+    #[test]
+    fn frozen_demographic_model_has_fifty_million_claim_instances() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/demographic/benchmark/demographic_slots.no-grouped.json");
+        let source = std::fs::read_to_string(path).unwrap();
+        let model = sembla_ir::validate(sembla_ir::parse_json(&source).unwrap()).unwrap();
+        let claims_per_slot: usize = model
+            .model()
+            .boxes
+            .iter()
+            .flat_map(|model_box| &model_box.transitions)
+            .map(|transition| transition.contests.len())
+            .sum();
+        assert_eq!(claims_per_slot, 5);
+        let instance_count = 10_000_000_usize.checked_mul(claims_per_slot).unwrap();
+        assert_eq!(instance_count, 50_000_000);
+        // Four SoA fields: resource/key u64 and rule/entity u32.
+        assert_eq!(instance_count * (8 + 8 + 4 + 4), 1_200_000_000);
     }
 
     #[test]
