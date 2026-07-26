@@ -266,6 +266,18 @@ point three replicates are affordable because the run should no longer take 90
 minutes each. That is the intended point to satisfy 0005's numeric criteria, not
 a re-run of 0005.
 
+**Closed 2026-07-27.** Three replicates per backend were collected under the
+unchanged protocol and the §L4 gate is **met at 4.207×** — CUDA median
+`31.82s`, CPU median `133.86s`, all seven collector assertions passing
+(`docs/evidence/demographic-bench/hyperstack-l4-20260726T140326Z/`,
+`DECISIONS.md` §L8). 0005's numeric criteria are satisfied by that run.
+
+Note what did *not* cause it: no GPU code changed after PRD 0007. The gate
+passed because `docs/prds-host-evaluator-performance` removed host-side work
+that the CUDA path was paying on top of its device work. This folder's own
+conclusion — that further CUDA kernel optimisation cannot pay, at 0.56% of wall
+time — still stands.
+
 ### 2026-07-26 — PRD 0006 local implementation
 
 Replaced the per-candidate all-row scan with a materialized flat
