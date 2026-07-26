@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-26T09:47:55.149Z",
+  "runId": "2026-07-26T09-11-07-260Z",
+  "prdPath": "docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "attempt": 4,
+  "text": "## Review\n\nThe user explicitly requested that PRD 0004 be paused before this review was launched. Nevertheless, the repository state was inspected:\n\n- The evaluator implementation remains correct.\n- No borrowed numeric coercion calls remain.\n- Protected artifacts remain unchanged.\n- The external evidence gate still has zero required files.\n- No PRD 0004 evidence exists under `docs/evidence/`.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: despite the explicit pause decision, review launched before any five-run quiesced corpus, output/manifest/final_state_sha256 comparison, or full-duration sample profile was collected.\"],\"summary\":\"The source implementation is correct, but the managed workflow ignored the requested pause and launched review with the mandatory external evidence gate still entirely unmet.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: despite the explicit pause decision, review launched before any five-run quiesced corpus, output/manifest/final_state_sha256 comparison, or full-duration sample profile was collected."
+    ],
+    "summary": "The source implementation is correct, but the managed workflow ignored the requested pause and launched review with the mandatory external evidence gate still entirely unmet.",
+    "raw": "## Review\n\nThe user explicitly requested that PRD 0004 be paused before this review was launched. Nevertheless, the repository state was inspected:\n\n- The evaluator implementation remains correct.\n- No borrowed numeric coercion calls remain.\n- Protected artifacts remain unchanged.\n- The external evidence gate still has zero required files.\n- No PRD 0004 evidence exists under `docs/evidence/`.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: despite the explicit pause decision, review launched before any five-run quiesced corpus, output/manifest/final_state_sha256 comparison, or full-duration sample profile was collected.\"],\"summary\":\"The source implementation is correct, but the managed workflow ignored the requested pause and launched review with the mandatory external evidence gate still entirely unmet.\"}\n```",
+    "source": "json"
+  }
+}

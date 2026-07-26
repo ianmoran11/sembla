@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-26T09:37:30.974Z",
+  "runId": "2026-07-26T09-11-07-260Z",
+  "prdPath": "docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "attempt": 3,
+  "text": "## Review\n\nAttempt 3 made no repository revision. The source implementation remains correct:\n\n- `numeric_as_real` consumes its column and moves `Real` values.\n- No borrowed coercion calls remain.\n- Regression coverage is present.\n- Protected artifacts remain unchanged.\n\nThe required evidence entry condition still fails:\n\n```text\nbefore/run-1.time: missing\nafter/run-1.time: missing\nprofile/post-change-full-duration.sample.txt: missing\nrepo evidence: none\n```\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: attempt 3 produced no quiesced five-run timing corpus, no recorded-output/manifest/final_state_sha256 comparison, and no full-duration post-change sample profile.\"],\"summary\":\"The source implementation is correct and protected artifacts remain unchanged, but the required external evidence entry condition was not satisfied before attempt 3, so the PRD remains incomplete.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: attempt 3 produced no quiesced five-run timing corpus, no recorded-output/manifest/final_state_sha256 comparison, and no full-duration post-change sample profile."
+    ],
+    "summary": "The source implementation is correct and protected artifacts remain unchanged, but the required external evidence entry condition was not satisfied before attempt 3, so the PRD remains incomplete.",
+    "raw": "## Review\n\nAttempt 3 made no repository revision. The source implementation remains correct:\n\n- `numeric_as_real` consumes its column and moves `Real` values.\n- No borrowed coercion calls remain.\n- Regression coverage is present.\n- Protected artifacts remain unchanged.\n\nThe required evidence entry condition still fails:\n\n```text\nbefore/run-1.time: missing\nafter/run-1.time: missing\nprofile/post-change-full-duration.sample.txt: missing\nrepo evidence: none\n```\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: attempt 3 produced no quiesced five-run timing corpus, no recorded-output/manifest/final_state_sha256 comparison, and no full-duration post-change sample profile.\"],\"summary\":\"The source implementation is correct and protected artifacts remain unchanged, but the required external evidence entry condition was not satisfied before attempt 3, so the PRD remains incomplete.\"}\n```",
+    "source": "json"
+  }
+}

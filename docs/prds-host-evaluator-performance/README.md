@@ -125,16 +125,40 @@ to the effect sizes being measured, so the protocol is tightened:
   Report the median too, but the minimum is the headline.
 - **User time is primary; wall time is secondary.** Quote both. Where they
   disagree, user time decides and the discrepancy is explained.
-- **Flag contention per run.** Compute `wall − (user + sys)`; any run exceeding
-  **0.5 s** is marked `contended: true` in `measurements.json`, as 0003's
-  evidence already does. A comparison whose minimum-side run is contended is
-  not reportable — re-run it.
-- **Quiesce the machine.** These benchmarks have been running on the same
-  Apple M2 Pro that concurrently runs the PRD runner and its agents, which is
-  the most likely source of every contended run so far. Do not measure while
-  another PRD stage, build, or agent session is active on the same host.
+- **Flag contention per run (binding).** Compute `wall − (user + sys)`; any run
+  exceeding **0.5 s** is marked `contended: true` in `measurements.json`, as
+  0003's evidence already does.
+- **Report the fastest uncontended run on each side (binding).** A comparison
+  is reportable once **at least one uncontended run exists on each side**. If
+  five runs on a side are all contended, run more; if they stay contended,
+  record that fact and report user time only, saying so explicitly.
+- **Prefer a quiet machine (advisory, not a gate).** Measure when little else
+  is running. This is guidance the operator can act on, **not an acceptance
+  criterion** — see the note below.
 - Continue recording binary and input SHA-256 digests, and commit a
   full-duration `sample` profile of the post-change build.
+
+### Why quiescence is advisory (added 2026-07-26 after PRD 0004 stalled)
+
+The first version of these rules made quiescence binding: *"do not measure
+while the PRD runner or another agent session is active on the same host."*
+That is **unsatisfiable by construction** — the runner cannot stand itself down
+to satisfy an acceptance criterion in a PRD it is executing. PRD 0004's
+implementation was complete and correct on attempt 1 and still exhausted all
+five attempts, because each review found an evidence gate that no in-run action
+could ever close.
+
+**No PRD in this folder may make its acceptance depend on the absence of the
+process evaluating it.** Noise is handled statistically — five runs, per-run
+contention flags, fastest uncontended run — not by demanding conditions the
+runner cannot create.
+
+The contention also turned out not to be the runner. With the runner stopped,
+load average was 9.84, dominated by `mds_stores` at 166% CPU: Spotlight was
+indexing a 3.1 GB `target/` directory that had no `.metadata_never_index`
+marker, so every build fed it gigabytes of fresh object files. The marker has
+since been added. That is the likeliest cause of the contended runs in 0002,
+0003, and 0004.
 
 ### Reference points
 

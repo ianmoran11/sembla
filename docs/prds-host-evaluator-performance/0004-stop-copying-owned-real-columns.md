@@ -3,8 +3,9 @@
 ## Context
 
 Read `docs/prds-host-evaluator-performance/README.md` first; its constraints
-bind, including the **revised reporting rules** — five runs, minimum reported,
-user time primary, quiesced machine.
+bind, including the **revised reporting rules** — five runs, fastest
+uncontended run reported, user time primary. Quiescence is advisory, not a
+gate; measurement happens in-run.
 
 PRDs 0001–0003 took the fixed case from 49.5 s / 46.8 s to a best uncontended
 8.17 s / 6.19 s, roughly 6× wall and 7.5× user, with every CSV and manifest
@@ -88,12 +89,19 @@ which buffer holds them.
 
 ### 4. Measure under the revised protocol
 
-Five runs each side, minimum reported as the headline with median alongside,
-user time primary, every run's `wall − (user + sys)` recorded and any run over
-0.5 s marked contended. **Do not measure while the PRD runner or another agent
-session is active on the same host** — that is the identified cause of the
-contention in 0002 and 0003. Commit a full-duration `sample` profile of the
-post-change build.
+Five runs each side, user time primary, every run's `wall − (user + sys)`
+recorded and any run over 0.5 s marked contended. Report the **fastest
+uncontended run on each side** as the headline, with the median alongside.
+
+Measurement is performed **in-run, by the implementation stage** — it is not an
+out-of-band operator step. Do not pause, wait for the host to go quiet, or
+require that the runner or any agent session be absent: an earlier version of
+this PRD did require that, and it stalled the run at five attempts because the
+condition can never be true from inside the run. If every run on a side is
+contended, take more runs and record the fact; noise is handled by the
+statistics, not by standing the runner down.
+
+Commit a full-duration `sample` profile of the post-change build.
 
 ## Allowed files
 
@@ -131,8 +139,10 @@ or CLI changes. No new dependencies.
 3. `cargo test --locked` and `scripts/check-rust.sh` green, with unchanged
    negative-suite expectations — including the integer-overflow diagnostics and
    their row indices.
-4. Five runs each side under the revised protocol, minimum and median both
-   reported, user time named as load-bearing, contention flagged per run.
+4. Five runs each side under the revised protocol, collected in-run: fastest
+   uncontended run and median both reported, user time named as load-bearing,
+   contention flagged per run. At least one uncontended run per side, or an
+   explicit record that none was achieved.
 5. A full-duration post-change `sample` profile is committed.
 6. `python3 scripts/check-markdown-links.py` passes.
 
