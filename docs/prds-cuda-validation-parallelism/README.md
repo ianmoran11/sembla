@@ -68,6 +68,22 @@ which is why the cost appears exactly for the model class the forward roadmap is
 built on: slot claiming, generation-safe references, household links, and
 identity-preserving migration all dereference `Ref` or contest a resource.
 
+## Profile before scoping (binding)
+
+**No PRD in this folder may scope a performance change without a kernel profile
+first.** Two PRDs were scoped from emitted-source structure — 0002 and the first
+draft of 0006 — and both selected the wrong kernels. An `nsys` profile settled it
+in fifteen minutes for about one dollar.
+
+Structural reasoning about which kernel dominates is a hypothesis. `nsys stats
+--report cuda_gpu_kern_sum` is a finding. `ncu` is available on the CUDA image
+under `/usr/local/cuda*/bin` for occupancy and stall analysis when a kernel is
+already parallel but slow.
+
+Profile at the scale you intend to fix: cost here is superlinear in rows (2.7
+s/tick at 500k against 235.3 s/tick at 10M), so a small-scale ranking may not
+hold at the target scale.
+
 ## Authority and scope
 
 - `DESIGN.md` (§4.2 kernel fragment, §5.2 precision, §8 two execution paths),
@@ -130,10 +146,11 @@ order.
   regression pass every differential test.
 - `0005-measure-and-publish` — re-run the frozen case, commit evidence, correct
   `docs/demographic-benchmark.md` and the forward roadmap's scale note.
-- `0006-remaining-serial-kernels` — added 2026-07-26 after 0005's measurement:
-  three further kernels carry the same defect, excluded from 0002 on an
-  unverified assertion. Adds a corpus-wide test so kernel exclusions must be
-  named in code with a reason rather than claimed in prose.
+- `0006-remaining-serial-kernels` — **rewritten 2026-07-26 against an `nsys`
+  profile.** Targets the three measured consumers: `check_candidate_errors`
+  (37.7%), `prepare_effects` (33.7%), and `resolve_conflicts` (28.5%, already
+  parallel — diagnosed, not parallelised). Adds a guard test covering
+  candidate-indexed loops as well as row-indexed ones.
 
 ## Acceptance notes
 

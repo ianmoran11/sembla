@@ -1,123 +1,128 @@
-# PRD 0006: Eliminate the remaining single-threaded per-row work
+# PRD 0006: Address the three kernels the profile actually identifies
 
 ## Context
 
 Read `docs/prds-cuda-validation-parallelism/README.md` first; its constraints
-bind. `DECISIONS.md` §L1–L6 are normative.
+bind. `DECISIONS.md` §L1–L6 are normative, and **§L6 supersedes §L1**.
 
-PRD 0002 parallelised four validation kernels and delivered better than an 11×
-improvement (90m08s → under 10m for 24 ticks at 10M slots). The §L4 gate — CUDA
-at least 3× faster than the same host's CPU — was still missed, because CUDA
-remains roughly at CPU parity rather than ahead of it.
+**This PRD was rewritten on 2026-07-26 after profiling.** Its first draft
+targeted three kernels chosen by reading emitted source — the same method that
+produced PRD 0002's incorrect scope. An `nsys` profile then showed that method
+had again picked the wrong set. The measured distribution (500k rows, 2 ticks,
+99.9% of GPU time):
 
-The cause is **not** architectural. PRD 0002's specification listed
-`sembla_mark_effect_aggregates`, `sembla_prepare_effects`, and
-`sembla_validate_claim_compatibility` as kernels to leave untouched, asserting
-they "do O(1) or O(rules) work". That assertion was made from kernel names
-without reading their bodies, and it was wrong:
+| Kernel | Share | Instances | Character |
+|---|---:|---:|---|
+| `sembla_check_candidate_errors` | 37.7% | 20 | single-threaded; walks candidates (rules × rows) |
+| `sembla_prepare_effects` | 33.7% | 2 | single-threaded; two per-row loops |
+| `sembla_resolve_conflicts` | 28.5% | 2 | **already parallel** — slow for a different reason |
 
-| Kernel | Serial per-row loops | Writes status |
-|---|---:|---|
-| `sembla_mark_effect_aggregates` | 1 | no |
-| `sembla_prepare_effects` | 2 | yes |
-| `sembla_validate_claim_compatibility` | nested (`left_row` × `right_row`) | yes |
-
-The same defect, in kernels excluded by an unverified claim.
+PRD 0002's four kernels now cost **0.0%**. They were serial, they are fixed, and
+they never mattered.
 
 ## Goal
 
-No single-threaded per-row work remains in the emitted CUDA for any corpus
-model, and the codebase can no longer regress into it silently.
+The three measured consumers are addressed on their own terms, and the §L4 gate
+is re-measured. Two are serialisation; one is not, and must not be treated as if
+it were.
 
 ## Specification
 
-### 1. Parallelise `sembla_mark_effect_aggregates`
+### 1. Profile before scoping, at the scale being fixed
 
-Grid-stride its row loop. It writes no status, so no reduction is needed — this
-is the simple case.
+Cost is superlinear in rows: 2.7 s/tick at 500k versus 235.3 s/tick at 10M — 87×
+for 20× the rows. **The 500k distribution above may not hold at 10M.** Before
+changing any kernel, capture an `nsys` kernel summary at a scale where the
+superlinearity is visible (≥2M rows), and record it as evidence. If the ranking
+differs from the table above, this specification is revised to match the profile,
+not the other way round.
 
-### 2. Parallelise `sembla_prepare_effects`
+### 2. `sembla_check_candidate_errors` — the largest consumer
 
-Grid-stride both row loops. It writes status, so it must reuse the reduction
-protocol PRD 0002 established (`sembla_record_validation_failure` /
-`sembla_commit_validation_status`, minimum failing candidate, no intra-launch
-early exit that could suppress a lower index). Do not invent a second mechanism.
+Single-threaded, and it walks the **candidate** array (rules × rows), which is
+why detectors looking for `row < row_counts[...]` missed it — including mine.
 
-### 3. Decide `sembla_validate_claim_compatibility` — do not parallelise blindly
+Parallelise it with a grid-stride loop over candidates. It writes status, so it
+must reuse PRD 0002's established reduction (`sembla_record_validation_failure` /
+`sembla_commit_validation_status`, minimum failing index, no intra-launch early
+exit that could suppress a lower index). Do not introduce a second mechanism.
 
-Its loops are **nested over rows**, i.e. O(rows²). At 10M rows that is ~10¹⁴
-iterations, so it cannot currently be executing for the frozen model; the Rust
-emits pair checks only for *statically incompatible* claim pairs, and the
-demographic model evidently has none.
+Twenty launches in two ticks suggests it runs per rule per tick; confirm from the
+profile whether reducing launch count is also available, but do not restructure
+the tick loop in this PRD.
 
-Parallelising a quadratic does not fix a quadratic. This PRD must therefore:
+### 3. `sembla_prepare_effects`
 
-- **Establish empirically** whether the frozen model emits any pair loop, by
-  asserting on the emitted CUDA source rather than by reasoning.
-- If it emits none: record that, leave the kernel serial, and add a **named
-  trigger** — the first corpus or benchmark model that emits a pair loop
-  re-opens this question before its results are used for any gate.
-- If it emits some: stop and record the finding. An O(rows²) check is a
-  scalability defect in its own right and needs an algorithmic decision
-  (indexing, sorting, or a different formulation), not a wider launch config.
-  That decision belongs in its own PRD, not here.
+Single-threaded with two per-row loops. Grid-stride both; same reduction protocol
+as above.
 
-Also record whether the CPU oracle performs the same quadratic check. If CPU
-completes 10M in ~7 minutes while CUDA does not, either CPU avoids this work or
-formulates it differently — and that asymmetry is worth knowing.
+### 4. `sembla_resolve_conflicts` — analyse, do not parallelise
 
-### 4. A mechanical guard against this class of mistake
+It is **already parallel** and still costs 28.5%, ~483ms per instance at 500k.
+Widening the launch configuration is not the fix and may not be a fix at all.
 
-Add a test asserting that, for every model in the differential corpus, the
-emitted CUDA contains **no kernel that both carries the single-thread guard and
-loops over rows**. Allowed exceptions must be named explicitly in the test with
-a reason, so excluding a kernel becomes a visible decision rather than an
-unverified assertion in prose.
+This PRD must determine *why* before proposing a change: atomic contention on the
+contested resource, uncoalesced access across the claim arrays, an O(rows × rules)
+argmin, or work that is simply irreducible. Use `ncu` (present on the CUDA image,
+under `/usr/local/cuda*/bin`) for occupancy, memory throughput, and stall reasons.
 
-This is the criterion that would have caught PRD 0002's scoping error
-automatically, and it is the most durable part of this PRD.
+**Record the finding and stop.** If it needs an algorithmic change, that is its
+own PRD with its own decision record. Determinism here is load-bearing: §E3's
+argmin with lexicographic tie-break is the conflict semantics, and CPU is ground
+truth.
+
+### 5. Guard against the mistake that produced two wrong scopes
+
+Add a test asserting that no emitted kernel both carries the single-thread guard
+and loops over a bulk array — **candidates as well as rows**, since the candidate
+case is exactly what slipped through twice. Every allowed exception is named in
+the test with a reason, so an exclusion becomes a visible decision rather than an
+assertion in prose.
+
+### 6. Re-measure
+
+Re-run the frozen §L protocol unchanged and record the verdict, pass or fail.
 
 ## Allowed files
 
 - `crates/sembla-cuda/src/codegen.rs`
 - `crates/sembla-cuda/src/backend.rs`
 - `crates/sembla-cuda/tests/**`
-- `DECISIONS.md` (§L addition only, for the §3 outcome and any trigger)
+- `DECISIONS.md` (§L additions only)
+- `docs/evidence/**` (new profile evidence only)
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
 
 ## Non-goals
 
-No semantic change. No fusion into execution kernels (§L2). No hoisting out of
-the per-tick path. No grouped-observation support (§L5). No algorithmic rewrite
-of the quadratic check — that is a separate PRD if §3 shows it is reached.
+No semantic change. No fusion (§L2). No hoisting out of the per-tick path. No
+grouped-observation support (§L5). No restructuring of the tick loop or launch
+counts. No algorithmic rewrite of `resolve_conflicts` — §4 diagnoses, a later PRD
+decides.
 
 ## Acceptance criteria
 
 **Local:**
 
-1. `sembla_mark_effect_aggregates` and `sembla_prepare_effects` carry no
-   single-thread guard and use grid-stride loops.
-2. `sembla_prepare_effects` reports failures through the PRD 0002 reduction; no
-   second reporting mechanism is introduced.
-3. The corpus-wide guard test from §4 exists, passes, and enumerates every
-   allowed exception with a stated reason.
-4. A test records whether the frozen model emits a claim-compatibility pair
-   loop, and asserts the §3 outcome either way.
-5. `examples/**`, all goldens, and tracked CUDA differential evidence are
-   byte-unchanged; `cargo test --locked` and `scripts/check-rust.sh` green.
-6. Diagnostics unchanged: `device_status()` codes and messages identical, and
-   PRD 0003's diagnostic-equality fixtures still pass.
+1. A profile at ≥2M rows is captured and committed as evidence **before** any
+   kernel change, and the specification is reconciled against it.
+2. `check_candidate_errors` and `prepare_effects` carry no single-thread guard
+   and use grid-stride loops over their bulk arrays.
+3. Both report failures through the PRD 0002 reduction; no second mechanism.
+4. The §5 guard test exists, covers candidate-indexed loops as well as
+   row-indexed ones, and enumerates every exception with a reason.
+5. §4 produces a written finding for `resolve_conflicts` with `ncu` evidence.
+6. Diagnostics unchanged: `device_status()` codes and messages identical; PRD
+   0003's diagnostic-equality fixtures still pass.
+7. `examples/**`, goldens, and tracked CUDA differential evidence byte-unchanged;
+   `cargo test --locked` and `scripts/check-rust.sh` green.
 
 **Hardware (pending per §J14.2):**
 
-7. The frozen §L benchmark case re-runs under the unchanged §L4 protocol —
-   three replicates per backend, one host, one commit, median reported.
-8. The §L4 verdict is recorded as measured, pass or fail.
+8. Frozen §L protocol re-run; §L4 verdict recorded as measured.
 
-## Note on scope discipline
+## Note on method
 
-PRD 0002 failed its gate because a kernel exclusion was asserted rather than
-checked. This PRD must not repeat that: every kernel left serial is named in a
-test with a reason, not in prose. If §3 concludes the quadratic check is
-unreached, that conclusion is an assertion in code with a trigger attached —
-not a sentence in a document.
+Two PRDs in this folder have now been scoped from emitted-source structure and
+both picked the wrong kernels. The profile took fifteen minutes and about one
+dollar. Criterion 1 is not bureaucracy — it is the correction for the specific
+failure that produced this document twice.

@@ -1352,3 +1352,47 @@ command:  scripts/bench-demographic.sh --scales 10000000 --ticks 24 --seed 9009
 Both arms run on one host in one session. Replicates: **three per backend**, and
 the reported figure is the median; a single run is not evidence for a gate (the
 ageing-share readings this year show why).
+
+### L6. §L4 verdict at PRD 0002: not met, and the diagnosis was wrong (2026-07-26)
+
+**Decision.** The §L4 gate is **not met**. Measured on one Hyperstack host
+(H100 PCIe, AMD EPYC 9554, commit `dbc665f`, one shared 10M state artifact, one
+release binary): CUDA `5647.9s`, CPU `434.6s` for 24 ticks of the no-grouped
+model — CUDA is **13.0x slower** than the same host's CPU, against a gate
+requiring 3x faster. Single replicate per arm: the protocol was stopped after
+replicate 1 once the magnitude made further replicates uninformative, so this is
+recorded as a **measured verdict, not §L4 gate evidence**.
+
+**PRD 0002 was correct and irrelevant.** An `nsys` kernel profile at 500k rows
+shows its four parallelised kernels (`validate_claims`, `validate_transition`,
+`validate_effects`, `validate_outputs`) now consume **0.0%** of GPU time. They
+were genuinely serial and are genuinely fixed. They were never the bottleneck.
+
+**The measured distribution** (500k rows, 2 ticks, 99.9% of GPU time):
+
+| Kernel | Share | Character |
+|---|---:|---|
+| `sembla_check_candidate_errors` | 37.7% | single-threaded; walks the candidate array (rules x rows) |
+| `sembla_prepare_effects` | 33.7% | single-threaded; two per-row loops |
+| `sembla_resolve_conflicts` | 28.5% | **already parallel** — slow for another reason |
+
+**Alternatives rejected.** Closing the track (the cause is now identified and
+addressable); proceeding with PRD 0006 as drafted (it targets only
+`prepare_effects`, one of three); and treating this as §L4 gate evidence (one
+replicate).
+
+**Reason.** §L1 attributed the cost to the four validation kernels on the
+strength of emitted-source structure plus a sustained 100% `utilization.gpu`
+reading. Both observations were real; the inference from them was not tested
+before a PRD was scoped, implemented, and measured on rented hardware. §L1 is
+**superseded** by this measured distribution.
+
+**Consequent rule.** No CUDA performance PRD is scoped without a kernel profile
+first. Profiling this case cost about fifteen minutes and one dollar and would
+have prevented the entire 0002 cycle. Structural reasoning about which kernel
+dominates is a hypothesis, not a finding.
+
+Note also that cost is **superlinear** in rows: 2.7 s/tick at 500k against
+235.3 s/tick at 10M, i.e. 87x cost for 20x rows. The 10M kernel distribution may
+therefore differ from the 500k profile above, and the rewritten PRD must profile
+at the scale it intends to fix.
