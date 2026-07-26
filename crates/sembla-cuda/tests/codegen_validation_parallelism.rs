@@ -162,7 +162,10 @@ fn every_single_worker_bulk_loop_is_an_explicit_named_exception() {
         ),
         (
             "sembla_mark_effect_aggregates",
-            "updates aggregate activity metadata outside PRD 0007's two kernels",
+            "negligible in the 2026-07-26 profile: absent from the top consumers \
+at 500k/2M/5M while resolve_conflicts, check_candidate_errors and \
+prepare_effects accounted for 99.9% of GPU time. Re-open if a profile ever \
+ranks it, per docs/evidence/cuda-profile-20260726/",
         ),
         (
             "sembla_build_aggregate_partials",
