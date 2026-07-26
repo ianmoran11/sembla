@@ -57,6 +57,7 @@ via the `--timing-json` instrumentation:
 host state every tick so host-side observation has something to read. It is host
 allocation, **not PCIe** — transfer is a third of its cost. Roughly 80% of CUDA
 wall time is "bring state to the host and observe it there".
+`docs/prds-cuda-host-path/` addresses the reconstruction.
 
 ### CPU evaluator, 5M rows, representative tick shape
 
@@ -132,6 +133,38 @@ cross-rule correlation are untested, and those are where counter mixers fail.
 Note for whoever takes it: **1.56× and 9.08× cost the same** in the only
 expensive respect, since both regenerate everything. Taking the small win first
 means paying that cost twice.
+
+## Work queue
+
+Which PRD to run, in order. Two folders are active and their items interleave,
+so run them from here rather than folder by folder.
+
+| # | PRD | GPU? | why here |
+|---|---|---|---|
+| 1 | `prds-evaluator-throughput/0001` threading | no | largest single factor; structurally independent, so nothing later can invalidate it, and it multiplies everything that follows |
+| 2 | `prds-evaluator-throughput/0002` guarded `ln` | no | independent of the evaluator's shape; self-contained correctness argument |
+| 3 | `prds-cuda-host-path/0001` reuse the state buffer | local only | largest single CUDA-path item at 45.8%; its *local* criteria need no GPU |
+| 4 | **one GPU session** | yes | verify 3's hardware criteria and re-measure the CUDA phase split, in a single trip |
+| 5 | re-scope | no | write `prds-evaluator-throughput/0003+` and `prds-cuda-host-path/0002+` from the measurements 1–4 produce |
+
+**Why batch the GPU work into step 4.** A Hyperstack session costs money, needs
+you at the keyboard, and every session so far has produced at least one
+surprise. Steps 1–3 are free and local. Doing them first also makes step 4 more
+informative, because threading changes the CUDA phase shares — `observe_views`
+runs on the host in both backends — so the split measured after is the one worth
+scoping from.
+
+**Why not run the folders separately.** `prds-cuda-host-path/0001` touches
+`state.rs`, and so will the buffer-reuse PRD in `prds-evaluator-throughput`.
+Interleaving them in this order keeps that overlap to one PRD at a time.
+
+**Deliberately unwritten**, and to be scoped at step 5 rather than now: scalar
+broadcast, whole-tick tiling, buffer reuse, and whatever the CUDA phase split
+ranks next. Each is re-scoped from a fresh measurement because removing one cost
+re-ranks everything behind it.
+
+**Not queued**: the RNG change (deferred, see above) and device-side observation
+(a §K6/§L5 semantic decision, needing its own folder).
 
 ## Methodology, learned the hard way
 

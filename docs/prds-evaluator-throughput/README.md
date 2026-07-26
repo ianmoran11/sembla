@@ -15,6 +15,12 @@ this README wins.
 plus the CUDA-side picture and the open questions. This folder is the plan;
 that document is the reference, and it outlives this folder.
 
+**Where this sits in the overall order:** this folder's 0001 and 0002 are steps
+1 and 2 of the work queue in
+[`docs/performance-model.md`](../performance-model.md#work-queue), which
+interleaves them with `docs/prds-cuda-host-path/`. Run from the queue, not
+folder by folder — both folders eventually touch `state.rs`.
+
 ## Why this folder exists
 
 `prds-host-evaluator-performance` took the fixed 1M case from 49.5 s to ~7.6 s
