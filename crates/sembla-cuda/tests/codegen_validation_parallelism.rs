@@ -1,5 +1,4 @@
-#![cfg(feature = "cuda")]
-//! GPU-less acceptance tests for PRD 0002 (parallel validation kernels).
+//! GPU-less acceptance tests for PRD 0002 and PRD 0007 parallel kernels.
 //!
 //! The four per-row validation kernels must execute across the device and
 //! report the minimum failing candidate index for every launch geometry.
@@ -18,6 +17,19 @@ mod diagnostic_cases;
 /// checked value (outputs plus the ordered fold).
 fn parallel_validation_model() -> sembla_ir::ValidatedModel {
     let source = r#"{"name":"parallel_validation","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Person","size_hint":2,"attrs":[{"name":"state","ty":{"kind":"enum","variants":["Off","On"]}},{"name":"x","ty":{"kind":"int"}},{"name":"priority","ty":{"kind":"int"}},{"name":"mate","ty":{"kind":"ref","table":"Person"}}]}],"transitions":[{"name":"act","table":"Person","guard":{"kind":"gt","lhs":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}},"rhs":{"kind":"int","value":0}},"hazard":{"kind":"real","value":1.0},"effects":[{"kind":"set_attr","attr":"x","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}}},{"kind":"set_attr","attr":"state","value":{"kind":"enum","variant":"On"}},{"kind":"set_attr","attr":"mate","value":{"kind":"self_attr","name":"mate"}}],"contests":[{"resource":{"kind":"self_attr","name":"mate"},"ordering":{"kind":"key","expr":{"kind":"mul","lhs":{"kind":"self_attr","name":"priority"},"rhs":{"kind":"int","value":2}}}}]}],"inputs":[],"outputs":[{"name":"totals","schema":[{"name":"total","ty":{"kind":"int"}}],"builder":{"kind":"per_table","table":"Person","fields":[{"name":"total","op":{"kind":"sum","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":3}}},"filter":{"kind":"gt","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":0}}}]}}],"views":[]},{"name":"sink","tables":[],"transitions":[],"inputs":[{"name":"totals","schema":[{"name":"total","ty":{"kind":"int"}}]}],"outputs":[],"views":[]}],"wires":[{"from":{"box":"world","port":"totals"},"to":{"box":"sink","port":"totals"}}],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn sir_model() -> sembla_ir::ValidatedModel {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/sir.json");
+    let source = std::fs::read_to_string(path).unwrap();
+    sembla_ir::validate(sembla_ir::parse_json(&source).unwrap()).unwrap()
+}
+
+/// Activates the rejection-only compatibility kernel's model-dependent nested
+/// row scans: two claims target the same resource with incompatible orderings.
+fn incompatible_claim_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"incompatible_claims","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Worker","size_hint":1,"attrs":[]},{"name":"Applicant","size_hint":1,"attrs":[{"name":"worker","ty":{"kind":"ref","table":"Worker"}},{"name":"priority","ty":{"kind":"int"}}]}],"transitions":[{"name":"race","table":"Applicant","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"race_time"}}]},{"name":"priority","table":"Applicant","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":1e300},"effects":[],"contests":[{"resource":{"kind":"self_attr","name":"worker"},"ordering":{"kind":"key","expr":{"kind":"self_attr","name":"priority"}}}]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
     sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
 }
 
@@ -44,15 +56,13 @@ const PARALLEL_KERNELS: [&str; 4] = [
     "sembla_validate_outputs",
 ];
 
-/// The genuinely single-threaded kernels named by the PRD, plus the two new
-/// O(1) status-protocol helpers, all launched with the `one` config.
-const SERIAL_KERNELS: [&str; 10] = [
+/// The remaining deliberately single-threaded kernels. PRD 0007 removes
+/// `sembla_check_candidate_errors` and `sembla_prepare_effects` from this list.
+const SERIAL_KERNELS: [&str; 8] = [
     "sembla_reset_status",
-    "sembla_check_candidate_errors",
     "sembla_record_aggregate_errors",
     "sembla_check_output_errors",
     "sembla_mark_effect_aggregates",
-    "sembla_prepare_effects",
     "sembla_prepare_outputs",
     "sembla_validate_claim_compatibility",
     "sembla_init_validation_scratch",
@@ -102,9 +112,133 @@ fn parallel_validation_kernels_report_only_through_the_reduction() {
         .find("extern \"C\" __global__ void")
         .unwrap()];
     assert!(
-        prelude.contains("atomicMin(status + 6, candidate)"),
-        "the reduction accumulates the minimum candidate with atomicMin"
+        prelude.contains("atomicMin(status + 6, order_identity)"),
+        "the reduction accumulates the minimum ordering identity with atomicMin"
     );
+}
+
+#[test]
+fn candidate_errors_and_effect_preparation_are_grid_strided_reductions() {
+    let generated = generate(&parallel_validation_model()).unwrap();
+    let candidates = kernel_body(&generated.source, "sembla_check_candidate_errors");
+    assert!(!candidates.contains("blockIdx.x != 0"));
+    assert_eq!(
+        candidates
+            .matches("row < candidate_count; row += stride")
+            .count(),
+        2,
+        "guard and hazard candidate arrays must both be grid-strided"
+    );
+    assert!(candidates.contains("sembla_record_validation_failure(status, 3ULL"));
+    assert!(!candidates.contains("status[0] ="));
+    assert!(!candidates.contains("status[1] ="));
+
+    let owners = kernel_body(&generated.source, "sembla_init_effect_owners");
+    assert!(!owners.contains("blockIdx.x != 0"));
+    assert!(owners.contains("owner < owner_count; owner += stride"));
+
+    let effects = kernel_body(&generated.source, "sembla_prepare_effects");
+    assert!(!effects.contains("blockIdx.x != 0"));
+    assert!(effects.contains("row < row_counts["));
+    assert!(effects.contains("row += stride"));
+    assert!(effects.contains("sembla_record_validation_failure(status,"));
+    assert!(!effects.contains("status[0] ="));
+    assert!(!effects.contains("status[1] ="));
+}
+
+#[test]
+fn every_single_worker_bulk_loop_is_an_explicit_named_exception() {
+    // Representative conformance corpus for unconditional and model-dependent
+    // emitted loop shapes.
+    let generated = [
+        generate(&parallel_validation_model()).unwrap(),
+        generate(&sir_model()).unwrap(),
+        generate(&incompatible_claim_model()).unwrap(),
+    ];
+    let exceptions = [
+        (
+            "sembla_reset_status",
+            "clears bounded aggregate diagnostic scratch once per tick",
+        ),
+        (
+            "sembla_mark_effect_aggregates",
+            "updates aggregate activity metadata outside PRD 0007's two kernels",
+        ),
+        (
+            "sembla_build_aggregate_partials",
+            "preserves order-sensitive checked aggregate folds",
+        ),
+        (
+            "sembla_record_aggregate_errors",
+            "folds bounded aggregate diagnostic metadata in semantic order",
+        ),
+        (
+            "sembla_init_validation_scratch",
+            "clears rule-indexed validation metadata once per tick",
+        ),
+        (
+            "sembla_validate_claim_compatibility",
+            "retains declaration-ordered rejection diagnostics for statically incompatible claim pairs; parallelization is outside PRD 0007",
+        ),
+        (
+            "sembla_validate_outputs",
+            "keeps the documented order-sensitive checked Int fold on worker zero",
+        ),
+        (
+            "sembla_prepare_outputs",
+            "clears bounded port and output-field metadata",
+        ),
+        (
+            "sembla_check_output_errors",
+            "preserves ordered output-field diagnostic precedence",
+        ),
+    ];
+    assert!(exceptions.iter().all(|(_, reason)| !reason.is_empty()));
+
+    let bulk_bounds = [
+        "candidate_count",
+        "row_counts[",
+        "owner_count",
+        "input_counts[",
+        "error_count",
+        "rule_count",
+        "aggregate_count",
+        "group_count",
+        "field_count",
+        "port_count",
+        "< count",
+    ];
+    // Prove the detector covers the two shapes called out by PRD 0007.
+    assert!(bulk_bounds.contains(&"candidate_count"));
+    assert!(bulk_bounds.contains(&"row_counts["));
+
+    let marker = "extern \"C\" __global__ void ";
+    let mut observed = std::collections::BTreeSet::new();
+    for generated in &generated {
+        for suffix in generated.source.split(marker).skip(1) {
+            let name = suffix.split('(').next().unwrap();
+            let body = kernel_body(&generated.source, name);
+            let single_worker = body.contains("blockIdx.x != 0")
+                || body.contains("worker != 0U")
+                || body.contains("validation_worker == 0ULL");
+            let bulk_loop = body.lines().any(|line| {
+                line.contains("for (") && bulk_bounds.iter().any(|bound| line.contains(bound))
+            });
+            if single_worker && bulk_loop {
+                assert!(
+                    exceptions.iter().any(|(exception, _)| *exception == name),
+                    "{name} has a single-worker bulk loop but no named exception"
+                );
+                observed.insert(name);
+            }
+        }
+    }
+    for (exception, reason) in exceptions {
+        assert!(
+            observed.contains(exception),
+            "named exception {exception} ({reason}) was not exercised by the guard"
+        );
+    }
 }
 
 #[test]
@@ -123,11 +257,12 @@ fn serial_status_kernels_keep_the_single_thread_guard() {
 fn commit_publishes_candidate_before_code_and_scratch_is_initialised() {
     let generated = generate(&parallel_validation_model()).unwrap();
     let commit = kernel_body(&generated.source, "sembla_commit_validation_status");
-    let candidate = commit.find("status[1] = status[6];").unwrap();
+    let identity = commit.find("status[1] = status[9];").unwrap();
+    let details = commit.find("status[3] = status[11];").unwrap();
     let code = commit.find("status[0] = status[7];").unwrap();
     assert!(
-        candidate < code,
-        "the candidate must be published before the code"
+        identity < details && details < code,
+        "the complete diagnostic payload must be published before the code"
     );
     assert!(
         commit.contains("if (status[0] != 0ULL || status[5] == 0xffffffffffffffffULL) return;"),
@@ -136,6 +271,8 @@ fn commit_publishes_candidate_before_code_and_scratch_is_initialised() {
     let init = kernel_body(&generated.source, "sembla_init_validation_scratch");
     assert!(init.contains("status[5] = 0xffffffffffffffffULL;"));
     assert!(init.contains("status[6] = 0xffffffffffffffffULL;"));
+    assert!(init.contains("status[9] = 0ULL;"));
+    assert!(init.contains("status[11] = 0ULL;"));
     assert!(init.contains("effect_active[i] = 0U;"));
 }
 
@@ -174,9 +311,9 @@ fn ordered_output_fold_stays_on_one_worker() {
 
 const EMPTY: u64 = u64::MAX;
 
-/// Mirrors the scratch slots status[4..=8]: (scan, candidate, code, branch).
-/// The lock is elided because the host drives records sequentially, exactly
-/// as serialised critical sections would interleave on device.
+/// Mirrors the ordering portion of scratch slots status[4..=11]:
+/// (scan, order identity, code, branch). The lock and diagnostic payload are
+/// elided because this mirror tests ordering rather than payload publication.
 #[derive(Default)]
 struct Scratch {
     scan: u64,
@@ -197,18 +334,24 @@ impl Scratch {
 
     /// Faithful port of `sembla_record_validation_failure`.
     fn record(&mut self, code: u64, candidate: u64, scan: u64, branch: u64) {
-        if scan < self.scan {
-            self.scan = scan;
-            self.code = code;
-            self.branch = branch;
-            self.candidate = candidate; // atomicExch reset for the new scan
-        } else if scan == self.scan {
-            let previous = self.candidate.min(candidate); // atomicMin
-            if candidate < self.candidate || (candidate == self.candidate && branch < self.branch) {
+        match scan.cmp(&self.scan) {
+            std::cmp::Ordering::Less => {
+                self.scan = scan;
                 self.code = code;
                 self.branch = branch;
+                self.candidate = candidate; // atomicExch reset for the new scan
             }
-            self.candidate = previous;
+            std::cmp::Ordering::Equal => {
+                let previous = self.candidate.min(candidate); // atomicMin
+                if candidate < self.candidate
+                    || (candidate == self.candidate && branch < self.branch)
+                {
+                    self.code = code;
+                    self.branch = branch;
+                }
+                self.candidate = previous;
+            }
+            std::cmp::Ordering::Greater => {}
         }
     }
 

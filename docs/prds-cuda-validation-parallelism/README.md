@@ -286,3 +286,21 @@ minima, and an ignored CUDA test compares the CPU winner under `1x1`, `1x32`,
 and `3x4` conflict launch geometries. Existing CSV/hash/example goldens remain
 byte-identical; only the canonical generated CUDA source fixture changes.
 Hardware criteria 5–7 remain **pending** per §J14.2.
+
+### 2026-07-26 — PRD 0007 local implementation
+
+`sembla_check_candidate_errors` now grid-strides both candidate-error columns
+and records guard/hazard failures through the existing ordered validation
+reduction before the host commits status. Effect-owner initialization is a
+separate grid-stride kernel, and `sembla_prepare_effects` is launched once per
+rule with a grid-stride winner-row loop. Stream-ordered rule launches preserve
+transition/effect write order without racing owner cells.
+
+The PRD 0002 reduction now carries the complete selected diagnostic payload so
+double-write status fields remain paired with the minimum semantic failure key;
+status codes and `device_status()` messages are unchanged. A generated-source
+guard detects candidate-, row-, owner-, and metadata-indexed bulk loops under a
+single-worker guard and names every retained exception with its reason. The
+canonical generated CUDA source fixture changes, while examples, CSV/hash
+goldens, and tracked differential evidence remain byte-identical. Hardware
+criterion 6 remains **pending** per §J14.2.

@@ -1385,15 +1385,15 @@ impl<'a> Generator<'a> {
         // Runs once per tick after sembla_reset_status: prepares the
         // reduction scratch slots and clears the per-rule effect activity
         // flags that sembla_mark_effect_active repopulates each tick.
-        out.push_str("\nextern \"C\" __global__ void sembla_init_validation_scratch(unsigned long long* status, unsigned int* effect_active, unsigned long long rule_count) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  status[4] = 0ULL;\n  status[5] = 0xffffffffffffffffULL;\n  status[6] = 0xffffffffffffffffULL;\n  status[7] = 0ULL;\n  status[8] = 0xffffffffffffffffULL;\n  for (unsigned long long i = 0; i < rule_count; ++i) effect_active[i] = 0U;\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_init_validation_scratch(unsigned long long* status, unsigned int* effect_active, unsigned long long rule_count) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  status[4] = 0ULL;\n  status[5] = 0xffffffffffffffffULL;\n  status[6] = 0xffffffffffffffffULL;\n  status[7] = 0ULL;\n  status[8] = 0xffffffffffffffffULL;\n  status[9] = 0ULL;\n  status[10] = 0ULL;\n  status[11] = 0ULL;\n  for (unsigned long long i = 0; i < rule_count; ++i) effect_active[i] = 0U;\n}\n");
         // Runs on the stream immediately after every parallel validation
         // launch. Publishes the scratch minimum as the committed diagnostic,
         // or does nothing when the launch recorded no failure or a prior
-        // launch already failed. The candidate is written before the code so
-        // a reader never observes a code without its index; the kernel
-        // boundary then makes both visible before the next launch reads
-        // status[0] at its entrance.
-        out.push_str("\nextern \"C\" __global__ void sembla_commit_validation_status(unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  if (status[0] != 0ULL || status[5] == 0xffffffffffffffffULL) return;\n  status[1] = status[6];\n  __threadfence();\n  status[0] = status[7];\n}\n");
+        // launch already failed. The complete payload is written before the
+        // code so a reader never observes a code without its matching fields;
+        // the kernel boundary then makes them visible before the next launch
+        // reads status[0] at its entrance.
+        out.push_str("\nextern \"C\" __global__ void sembla_commit_validation_status(unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  if (status[0] != 0ULL || status[5] == 0xffffffffffffffffULL) return;\n  status[1] = status[9];\n  status[2] = status[10];\n  status[3] = status[11];\n  __threadfence();\n  status[0] = status[7];\n}\n");
         // Parallel OR-reduction of wins over one rule's candidate range into
         // a stable per-rule activity flag. sembla_validate_effects validates
         // a transition's whole column exactly when this flag is set, which
@@ -1402,7 +1402,11 @@ impl<'a> Generator<'a> {
     }
 
     fn emit_error_check_kernel(&self, out: &mut String) {
-        out.push_str("\nextern \"C\" __global__ void sembla_check_candidate_errors(const unsigned char* errors, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  for (unsigned long long row = 0; row < candidate_count; ++row) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL]) { status[0] = 3ULL; status[1] = candidate; return; } }\n  for (unsigned long long row = 0; row < candidate_count; ++row) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL + 1ULL]) { status[0] = 3ULL; status[1] = candidate; return; } }\n}\n");
+        let guard_scan = self.validation_scan();
+        let hazard_scan = self.validation_scan();
+        out.push_str("\nextern \"C\" __global__ void sembla_check_candidate_errors(const unsigned char* errors, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n");
+        writeln!(out, "  for (unsigned long long row = worker; row < candidate_count; row += stride) {{ unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL]) sembla_record_validation_failure(status, 3ULL, candidate, {guard_scan}ULL, 0ULL); }}").unwrap();
+        writeln!(out, "  for (unsigned long long row = worker; row < candidate_count; row += stride) {{ unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL + 1ULL]) sembla_record_validation_failure(status, 3ULL, candidate, {hazard_scan}ULL, 0ULL); }}\n}}").unwrap();
     }
 
     fn emit_resolve_kernel(&self, out: &mut String) -> Result<(), CudaError> {
@@ -1674,7 +1678,8 @@ impl<'a> Generator<'a> {
         }
         out.push_str("}\n");
 
-        out.push_str("\nextern \"C\" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned long long owner_count, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  for (unsigned long long i = 0; i < owner_count; ++i) owners[i] = -1;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_init_effect_owners(int* owners, unsigned long long owner_count) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long owner = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; owner < owner_count; owner += stride) owners[owner] = -1;\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned int rule_id, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -1685,33 +1690,45 @@ impl<'a> Generator<'a> {
                 box_index: validated.box_index,
                 table_index,
             };
-            writeln!(out, "  {{ int any_winner = 0; for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) any_winner |= wins[candidate_offsets[{}] + row] != 0; if (any_winner) {{", validated.rule_id).unwrap();
-            writeln!(out, "    for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ unsigned long long candidate = candidate_offsets[{}] + row; if (!wins[candidate]) continue;", validated.rule_id).unwrap();
-            for effect in &transition.effects {
+            let scan = self.validation_scan();
+            writeln!(out, "  if (rule_id == {}U) {{", validated.rule_id).unwrap();
+            writeln!(out, "    for (unsigned long long row = worker; row < row_counts[{global_table}]; row += stride) {{ unsigned long long candidate = candidate_offsets[{}] + row; if (!wins[candidate]) continue;", validated.rule_id).unwrap();
+            for (effect_index, effect) in transition.effects.iter().enumerate() {
                 let Effect::SetAttr { attr, value } = effect;
                 let attr_index = attr_index(table, attr)?;
                 let ty = Ty::from(&table.attrs[attr_index].ty);
                 let column = self.column(validated.box_index, table_index, attr_index);
                 let rendered = self.render(value, rows, Some(&ty), "state", "row")?.0;
+                let branch = u64::try_from(effect_index)
+                    .map_err(|_| codegen("effect index exceeds u64"))?
+                    .checked_mul(3)
+                    .ok_or_else(|| codegen("effect diagnostic branch overflow"))?;
                 out.push_str("      {\n");
-                writeln!(out, "      local_error = 0U; {} value = ({})({rendered}); if (local_error) {{ status[0] = 5ULL; status[1] = candidate; return; }}", ty.cuda(), ty.cuda()).unwrap();
+                writeln!(
+                    out,
+                    "      local_error = 0U; {} value = ({})({rendered});",
+                    ty.cuda(),
+                    ty.cuda()
+                )
+                .unwrap();
+                writeln!(out, "      if (local_error) {{ sembla_record_validation_failure(status, 5ULL, candidate, {scan}ULL, {branch}ULL, candidate, 0ULL, 0ULL); }} else {{").unwrap();
                 match &ty {
-                    Ty::Enum(variants) => writeln!(out, "      if ((unsigned long long)value >= {}ULL) {{ status[0] = 6ULL; status[1] = candidate; return; }}", variants.len()).unwrap(),
+                    Ty::Enum(variants) => writeln!(out, "        if ((unsigned long long)value >= {}ULL) {{ sembla_record_validation_failure(status, 6ULL, candidate, {scan}ULL, {}ULL, candidate, 0ULL, 0ULL); }} else", variants.len(), branch + 1).unwrap(),
                     Ty::Ref(target) => {
                         let target_index = self.table_index(validated.box_index, target)?;
                         let target_global = self.global_table(validated.box_index, target_index);
-                        writeln!(out, "      if ((unsigned long long)value >= row_counts[{target_global}]) {{ status[0] = 7ULL; status[1] = candidate; return; }}").unwrap();
+                        writeln!(out, "        if ((unsigned long long)value >= row_counts[{target_global}]) {{ sembla_record_validation_failure(status, 7ULL, candidate, {scan}ULL, {}ULL, candidate, 0ULL, 0ULL); }} else", branch + 1).unwrap();
                     }
-                    _ => {}
+                    _ => out.push_str("       "),
                 }
-                writeln!(out, "      {{ unsigned long long owner = write_offsets[{column}] + row; if (owners[owner] != -1) {{ status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = {}ULL; return; }} owners[owner] = (int){}U;", validated.rule_id, validated.rule_id).unwrap();
+                writeln!(out, "        {{ unsigned long long owner = write_offsets[{column}] + row; if (owners[owner] != -1) {{ sembla_record_validation_failure(status, 8ULL, candidate, {scan}ULL, {}ULL, owner, (unsigned long long)owners[owner], {}ULL); }} else {{ owners[owner] = (int){}U;", branch + 2, validated.rule_id, validated.rule_id).unwrap();
                 match ty {
-                    Ty::Real => out.push_str("        owner_values[owner] = (unsigned long long)__double_as_longlong(value);\n"),
-                    _ => out.push_str("        owner_values[owner] = (unsigned long long)value;\n"),
+                    Ty::Real => out.push_str("          owner_values[owner] = (unsigned long long)__double_as_longlong(value);\n"),
+                    _ => out.push_str("          owner_values[owner] = (unsigned long long)value;\n"),
                 }
-                out.push_str("      }\n      }\n");
+                out.push_str("        } }\n      }\n      }\n");
             }
-            out.push_str("    }\n  }\n  }\n");
+            out.push_str("    }\n    return;\n  }\n");
         }
         out.push_str("}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_apply_effects(unsigned char* next_state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned long long* write_offsets, const int* owners, const unsigned long long* owner_values, unsigned long long owner_count, const unsigned long long* status) {\n  unsigned long long owner = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (owner >= owner_count || status[0] != 0ULL || owners[owner] == -1) return;\n");
@@ -2059,37 +2076,51 @@ __device__ __forceinline__ unsigned long long sembla_i64_order_key(long long val
 __device__ __forceinline__ unsigned long long sembla_f64_order_key(double value) {
   return ((unsigned long long)sembla_total_key(value)) ^ 0x8000000000000000ULL;
 }
-// Records one validation failure into scratch slots status[4..=8] without
+// Records one validation failure into scratch slots status[4..=11] without
 // touching the committed diagnostic status[0..=3]. The scratch holds the
-// lexicographically smallest (scan, candidate, branch) triple seen so far,
-// which reproduces the serial CPU validator's first failure: scans follow
-// the emitted CPU validation order, candidates ascend within a scan, and
-// branches follow the per-row check order inside one scan. Failures are
-// rare, so a short spin lock keeps the selected code paired with its
-// candidate and branch; the candidate itself is reduced with atomicMin.
-// status[4]: lock, status[5]: scan, status[6]: candidate, status[7]: code,
-// status[8]: branch. Requires independent thread scheduling (sm_70+), which
-// every supported device has.
+// lexicographically smallest (scan, order_identity, branch) triple seen so
+// far. Most diagnostics report order_identity itself; the extended overload
+// also keeps a distinct reported identity and two details paired with the
+// selected failure for diagnostics such as deterministic double writes.
+// Failures are rare, so a short spin lock keeps every selected field paired;
+// order_identity itself is reduced with atomicMin.
+// status[4]: lock, status[5]: scan, status[6]: order identity, status[7]: code,
+// status[8]: branch, status[9]: reported identity, status[10..=11]: details.
+// Requires independent thread scheduling (sm_70+), which every supported
+// device has.
+__device__ __forceinline__ void sembla_record_validation_failure(
+    unsigned long long* status, unsigned long long code,
+    unsigned long long order_identity, unsigned long long scan,
+    unsigned long long branch, unsigned long long reported_identity,
+    unsigned long long detail_2, unsigned long long detail_3) {
+  while (atomicCAS(status + 4, 0ULL, 1ULL) != 0ULL) { }
+  __threadfence();
+  int selected = 0;
+  if (scan < status[5]) {
+    status[5] = scan;
+    atomicExch(status + 6, order_identity);
+    selected = 1;
+  } else if (scan == status[5]) {
+    unsigned long long previous = atomicMin(status + 6, order_identity);
+    selected = order_identity < previous ||
+               (order_identity == previous && branch < status[8]);
+  }
+  if (selected) {
+    status[7] = code;
+    status[8] = branch;
+    status[9] = reported_identity;
+    status[10] = detail_2;
+    status[11] = detail_3;
+  }
+  __threadfence();
+  atomicExch(status + 4, 0ULL);
+}
 __device__ __forceinline__ void sembla_record_validation_failure(
     unsigned long long* status, unsigned long long code,
     unsigned long long candidate, unsigned long long scan,
     unsigned long long branch) {
-  while (atomicCAS(status + 4, 0ULL, 1ULL) != 0ULL) { }
-  __threadfence();
-  if (scan < status[5]) {
-    status[5] = scan;
-    status[7] = code;
-    status[8] = branch;
-    atomicExch(status + 6, candidate);
-  } else if (scan == status[5]) {
-    unsigned long long previous = atomicMin(status + 6, candidate);
-    if (candidate < previous || (candidate == previous && branch < status[8])) {
-      status[7] = code;
-      status[8] = branch;
-    }
-  }
-  __threadfence();
-  atomicExch(status + 4, 0ULL);
+  sembla_record_validation_failure(
+      status, code, candidate, scan, branch, candidate, 0ULL, 0ULL);
 }
 __device__ __forceinline__ long long sembla_add_i64(long long a, long long b, unsigned char* error) {
   if ((b > 0 && a > 0x7fffffffffffffffLL - b) ||

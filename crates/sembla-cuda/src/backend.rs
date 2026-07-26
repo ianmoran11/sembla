@@ -116,6 +116,7 @@ pub struct CudaBackend {
     reduce_claim_instances: CudaFunction,
     resolve_conflicts: CudaFunction,
     validate_effects: CudaFunction,
+    init_effect_owners: CudaFunction,
     prepare_effects: CudaFunction,
     apply_effects: CudaFunction,
     validate_outputs: CudaFunction,
@@ -283,6 +284,7 @@ impl CudaBackend {
         let reduce_claim_instances = load("sembla_reduce_claim_instances")?;
         let resolve_conflicts = load("sembla_resolve_conflicts")?;
         let validate_effects = load("sembla_validate_effects")?;
+        let init_effect_owners = load("sembla_init_effect_owners")?;
         let prepare_effects = load("sembla_prepare_effects")?;
         let apply_effects = load("sembla_apply_effects")?;
         let validate_outputs = load("sembla_validate_outputs")?;
@@ -411,10 +413,10 @@ impl CudaBackend {
         let output_errors = stream
             .alloc_zeros::<u8>(output_field_count * 3)
             .map_err(driver_error)?;
-        // status[0..=3] is the committed diagnostic; status[4..=8] is the
-        // per-tick validation-reduction scratch (lock, scan, candidate, code,
-        // branch) prepared by sembla_init_validation_scratch.
-        let status = stream.alloc_zeros::<u64>(9).map_err(driver_error)?;
+        // status[0..=3] is the committed diagnostic; status[4..=11] is the
+        // per-tick validation-reduction scratch (lock, scan, ordering identity,
+        // code, branch, and selected payload) prepared by the scratch kernel.
+        let status = stream.alloc_zeros::<u64>(12).map_err(driver_error)?;
         let effect_active = stream
             .alloc_zeros::<u32>(layout.candidate_offsets.len().max(1))
             .map_err(driver_error)?;
@@ -441,6 +443,7 @@ impl CudaBackend {
             reduce_claim_instances,
             resolve_conflicts,
             validate_effects,
+            init_effect_owners,
             prepare_effects,
             apply_effects,
             validate_outputs,
@@ -844,6 +847,9 @@ impl CudaBackend {
                     .arg(&candidate_begin)
                     .arg(&candidate_count)
                     .arg(&mut self.status);
+                unsafe { args.launch(validation_config) }.map_err(driver_error)?;
+                let mut args = self.stream.launch_builder(&self.commit_validation_status);
+                args.arg(&mut self.status);
                 unsafe { args.launch(one) }.map_err(driver_error)?;
 
                 let claims_config = self.validation_launch_config(rows, one);
@@ -1108,8 +1114,38 @@ impl CudaBackend {
         self.stream
             .memcpy_dtod(&self.state, &mut self.next_state)
             .map_err(driver_error)?;
-        {
-            let owner_count = self.layout.owner_count as u64;
+        let owner_count = self.layout.owner_count as u64;
+        let owner_launch_count = u32::try_from(self.layout.owner_count).map_err(|_| {
+            CudaError::InvalidInput("write-owner count exceeds CUDA launch capacity".to_owned())
+        })?;
+        if owner_launch_count != 0 {
+            let mut args = self.stream.launch_builder(&self.init_effect_owners);
+            args.arg(&mut self.owners).arg(&owner_count);
+            unsafe { args.launch(LaunchConfig::for_num_elems(owner_launch_count)) }
+                .map_err(driver_error)?;
+        }
+        for transition in self.model.transitions() {
+            let model_transition = &self.model.model().boxes[transition.box_index].transitions
+                [transition.transition_index];
+            if model_transition.effects.is_empty() {
+                continue;
+            }
+            let table_index = self.model.model().boxes[transition.box_index]
+                .tables
+                .iter()
+                .position(|table| table.name == model_transition.table)
+                .expect("validated transition table");
+            let global_table = global_table(&self.model, transition.box_index, table_index);
+            let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
+                CudaError::InvalidInput(format!(
+                    "rule {} row count exceeds u32 entity IDs",
+                    transition.rule_id
+                ))
+            })?;
+            if rows == 0 {
+                continue;
+            }
+            let rule_id = transition.rule_id;
             let mut args = self.stream.launch_builder(&self.prepare_effects);
             args.arg(&self.state)
                 .arg(&self.column_offsets)
@@ -1125,15 +1161,15 @@ impl CudaBackend {
                 .arg(&self.write_offsets)
                 .arg(&mut self.owners)
                 .arg(&mut self.owner_values)
-                .arg(&owner_count)
+                .arg(&rule_id)
                 .arg(&mut self.status);
+            unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+            let mut args = self.stream.launch_builder(&self.commit_validation_status);
+            args.arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
         if self.layout.owner_count != 0 {
-            let owner_count = self.layout.owner_count as u64;
-            let launch_count = u32::try_from(self.layout.owner_count).map_err(|_| {
-                CudaError::InvalidInput("write-owner count exceeds CUDA launch capacity".to_owned())
-            })?;
+            let launch_count = owner_launch_count;
             let mut args = self.stream.launch_builder(&self.apply_effects);
             args.arg(&mut self.next_state)
                 .arg(&self.column_offsets)

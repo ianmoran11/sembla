@@ -31,37 +31,51 @@ __device__ __forceinline__ unsigned long long sembla_i64_order_key(long long val
 __device__ __forceinline__ unsigned long long sembla_f64_order_key(double value) {
   return ((unsigned long long)sembla_total_key(value)) ^ 0x8000000000000000ULL;
 }
-// Records one validation failure into scratch slots status[4..=8] without
+// Records one validation failure into scratch slots status[4..=11] without
 // touching the committed diagnostic status[0..=3]. The scratch holds the
-// lexicographically smallest (scan, candidate, branch) triple seen so far,
-// which reproduces the serial CPU validator's first failure: scans follow
-// the emitted CPU validation order, candidates ascend within a scan, and
-// branches follow the per-row check order inside one scan. Failures are
-// rare, so a short spin lock keeps the selected code paired with its
-// candidate and branch; the candidate itself is reduced with atomicMin.
-// status[4]: lock, status[5]: scan, status[6]: candidate, status[7]: code,
-// status[8]: branch. Requires independent thread scheduling (sm_70+), which
-// every supported device has.
+// lexicographically smallest (scan, order_identity, branch) triple seen so
+// far. Most diagnostics report order_identity itself; the extended overload
+// also keeps a distinct reported identity and two details paired with the
+// selected failure for diagnostics such as deterministic double writes.
+// Failures are rare, so a short spin lock keeps every selected field paired;
+// order_identity itself is reduced with atomicMin.
+// status[4]: lock, status[5]: scan, status[6]: order identity, status[7]: code,
+// status[8]: branch, status[9]: reported identity, status[10..=11]: details.
+// Requires independent thread scheduling (sm_70+), which every supported
+// device has.
+__device__ __forceinline__ void sembla_record_validation_failure(
+    unsigned long long* status, unsigned long long code,
+    unsigned long long order_identity, unsigned long long scan,
+    unsigned long long branch, unsigned long long reported_identity,
+    unsigned long long detail_2, unsigned long long detail_3) {
+  while (atomicCAS(status + 4, 0ULL, 1ULL) != 0ULL) { }
+  __threadfence();
+  int selected = 0;
+  if (scan < status[5]) {
+    status[5] = scan;
+    atomicExch(status + 6, order_identity);
+    selected = 1;
+  } else if (scan == status[5]) {
+    unsigned long long previous = atomicMin(status + 6, order_identity);
+    selected = order_identity < previous ||
+               (order_identity == previous && branch < status[8]);
+  }
+  if (selected) {
+    status[7] = code;
+    status[8] = branch;
+    status[9] = reported_identity;
+    status[10] = detail_2;
+    status[11] = detail_3;
+  }
+  __threadfence();
+  atomicExch(status + 4, 0ULL);
+}
 __device__ __forceinline__ void sembla_record_validation_failure(
     unsigned long long* status, unsigned long long code,
     unsigned long long candidate, unsigned long long scan,
     unsigned long long branch) {
-  while (atomicCAS(status + 4, 0ULL, 1ULL) != 0ULL) { }
-  __threadfence();
-  if (scan < status[5]) {
-    status[5] = scan;
-    status[7] = code;
-    status[8] = branch;
-    atomicExch(status + 6, candidate);
-  } else if (scan == status[5]) {
-    unsigned long long previous = atomicMin(status + 6, candidate);
-    if (candidate < previous || (candidate == previous && branch < status[8])) {
-      status[7] = code;
-      status[8] = branch;
-    }
-  }
-  __threadfence();
-  atomicExch(status + 4, 0ULL);
+  sembla_record_validation_failure(
+      status, code, candidate, scan, branch, candidate, 0ULL, 0ULL);
 }
 __device__ __forceinline__ long long sembla_add_i64(long long a, long long b, unsigned char* error) {
   if ((b > 0 && a > 0x7fffffffffffffffLL - b) ||
@@ -214,9 +228,11 @@ extern "C" __global__ void sembla_transition_00000001(const unsigned char* state
 }
 
 extern "C" __global__ void sembla_check_candidate_errors(const unsigned char* errors, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long* status) {
-  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
-  for (unsigned long long row = 0; row < candidate_count; ++row) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL]) { status[0] = 3ULL; status[1] = candidate; return; } }
-  for (unsigned long long row = 0; row < candidate_count; ++row) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL + 1ULL]) { status[0] = 3ULL; status[1] = candidate; return; } }
+  if (status[0] != 0ULL) return;
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
+  for (unsigned long long row = worker; row < candidate_count; row += stride) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL]) sembla_record_validation_failure(status, 3ULL, candidate, 2ULL, 0ULL); }
+  for (unsigned long long row = worker; row < candidate_count; row += stride) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL + 1ULL]) sembla_record_validation_failure(status, 3ULL, candidate, 3ULL, 0ULL); }
 }
 
 extern "C" __global__ void sembla_init_validation_scratch(unsigned long long* status, unsigned int* effect_active, unsigned long long rule_count) {
@@ -226,13 +242,18 @@ extern "C" __global__ void sembla_init_validation_scratch(unsigned long long* st
   status[6] = 0xffffffffffffffffULL;
   status[7] = 0ULL;
   status[8] = 0xffffffffffffffffULL;
+  status[9] = 0ULL;
+  status[10] = 0ULL;
+  status[11] = 0ULL;
   for (unsigned long long i = 0; i < rule_count; ++i) effect_active[i] = 0U;
 }
 
 extern "C" __global__ void sembla_commit_validation_status(unsigned long long* status) {
   if (blockIdx.x != 0 || threadIdx.x != 0) return;
   if (status[0] != 0ULL || status[5] == 0xffffffffffffffffULL) return;
-  status[1] = status[6];
+  status[1] = status[9];
+  status[2] = status[10];
+  status[3] = status[11];
   __threadfence();
   status[0] = status[7];
 }
@@ -309,40 +330,50 @@ extern "C" __global__ void sembla_validate_effects(const unsigned char* state, c
   unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   unsigned char local_error = 0U; unsigned char* error = &local_error;
   if (box_index == 0U) { if (effect_active[0] != 0U) {
-    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(1U); if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate_offsets[0] + row, 2ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate_offsets[0] + row, 2ULL, 1ULL); } }
+    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(1U); if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate_offsets[0] + row, 4ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate_offsets[0] + row, 4ULL, 1ULL); } }
   } }
   if (box_index == 0U) { if (effect_active[1] != 0U) {
-    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(2U); if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate_offsets[1] + row, 3ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate_offsets[1] + row, 3ULL, 1ULL); } }
+    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(2U); if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate_offsets[1] + row, 5ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate_offsets[1] + row, 5ULL, 1ULL); } }
   } }
 }
 
-extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned long long owner_count, unsigned long long* status) {
-  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
-  for (unsigned long long i = 0; i < owner_count; ++i) owners[i] = -1;
+extern "C" __global__ void sembla_init_effect_owners(int* owners, unsigned long long owner_count) {
+  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
+  for (unsigned long long owner = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; owner < owner_count; owner += stride) owners[owner] = -1;
+}
+
+extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned int rule_id, unsigned long long* status) {
+  if (status[0] != 0ULL) return;
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
   unsigned char local_error = 0; unsigned char* error = &local_error;
-  { int any_winner = 0; for (unsigned long long row = 0; row < row_counts[0]; ++row) any_winner |= wins[candidate_offsets[0] + row] != 0; if (any_winner) {
-    for (unsigned long long row = 0; row < row_counts[0]; ++row) { unsigned long long candidate = candidate_offsets[0] + row; if (!wins[candidate]) continue;
+  if (rule_id == 0U) {
+    for (unsigned long long row = worker; row < row_counts[0]; row += stride) { unsigned long long candidate = candidate_offsets[0] + row; if (!wins[candidate]) continue;
       {
-      local_error = 0U; unsigned short value = (unsigned short)(1U); if (local_error) { status[0] = 5ULL; status[1] = candidate; return; }
-      if ((unsigned long long)value >= 3ULL) { status[0] = 6ULL; status[1] = candidate; return; }
-      { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = 0ULL; return; } owners[owner] = (int)0U;
-        owner_values[owner] = (unsigned long long)value;
+      local_error = 0U; unsigned short value = (unsigned short)(1U);
+      if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate, 6ULL, 0ULL, candidate, 0ULL, 0ULL); } else {
+        if ((unsigned long long)value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate, 6ULL, 1ULL, candidate, 0ULL, 0ULL); } else
+        { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { sembla_record_validation_failure(status, 8ULL, candidate, 6ULL, 2ULL, owner, (unsigned long long)owners[owner], 0ULL); } else { owners[owner] = (int)0U;
+          owner_values[owner] = (unsigned long long)value;
+        } }
       }
       }
     }
+    return;
   }
-  }
-  { int any_winner = 0; for (unsigned long long row = 0; row < row_counts[0]; ++row) any_winner |= wins[candidate_offsets[1] + row] != 0; if (any_winner) {
-    for (unsigned long long row = 0; row < row_counts[0]; ++row) { unsigned long long candidate = candidate_offsets[1] + row; if (!wins[candidate]) continue;
+  if (rule_id == 1U) {
+    for (unsigned long long row = worker; row < row_counts[0]; row += stride) { unsigned long long candidate = candidate_offsets[1] + row; if (!wins[candidate]) continue;
       {
-      local_error = 0U; unsigned short value = (unsigned short)(2U); if (local_error) { status[0] = 5ULL; status[1] = candidate; return; }
-      if ((unsigned long long)value >= 3ULL) { status[0] = 6ULL; status[1] = candidate; return; }
-      { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { status[0] = 8ULL; status[1] = owner; status[2] = (unsigned long long)owners[owner]; status[3] = 1ULL; return; } owners[owner] = (int)1U;
-        owner_values[owner] = (unsigned long long)value;
+      local_error = 0U; unsigned short value = (unsigned short)(2U);
+      if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate, 7ULL, 0ULL, candidate, 0ULL, 0ULL); } else {
+        if ((unsigned long long)value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate, 7ULL, 1ULL, candidate, 0ULL, 0ULL); } else
+        { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { sembla_record_validation_failure(status, 8ULL, candidate, 7ULL, 2ULL, owner, (unsigned long long)owners[owner], 1ULL); } else { owners[owner] = (int)1U;
+          owner_values[owner] = (unsigned long long)value;
+        } }
       }
       }
     }
-  }
+    return;
   }
 }
 
