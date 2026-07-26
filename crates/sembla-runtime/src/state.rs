@@ -451,6 +451,13 @@ impl<'a> ResolvedColumn<'a> {
             _ => Err(wrong_column_type(self.table, self.column, "Enum")),
         }
     }
+
+    pub(crate) fn ref_values(self) -> Result<&'a [u32], StateError> {
+        match self.column {
+            ColumnState::Ref { values, .. } => Ok(values),
+            _ => Err(wrong_column_type(self.table, self.column, "Ref")),
+        }
+    }
 }
 
 impl Snapshot<'_> {

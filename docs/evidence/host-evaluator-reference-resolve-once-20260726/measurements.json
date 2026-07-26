@@ -1,0 +1,64 @@
+{
+  "schema": "sembla-host-evaluator-reference-before-after-v1",
+  "session": {
+    "date": "2026-07-26",
+    "baseline_commit": "2a9dac41de05371197cfd855ca4638c64f788c1e",
+    "machine": "Apple M2 Pro",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "os": "macOS 15.5 (24F74)"
+  },
+  "case": {
+    "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+    "scale": 1000000,
+    "ticks": 24,
+    "seed": 9009,
+    "areas": 4,
+    "present_fraction": 0.8,
+    "streams": "birth:600,overseas:250,internal:150",
+    "backend": "cpu"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "before": {
+    "binary_sha256": "00f5ec56098d14b543279d3cc882e1f9c45ea20b65df268826a9ce4a88cbc79c",
+    "runs": [
+      {"run": 1, "wall_seconds": 14.93, "user_seconds": 12.43, "sys_seconds": 1.98},
+      {"run": 2, "wall_seconds": 23.92, "user_seconds": 14.20, "sys_seconds": 3.28},
+      {"run": 3, "wall_seconds": 17.64, "user_seconds": 13.05, "sys_seconds": 2.33}
+    ],
+    "median": {"wall_seconds": 17.64, "user_seconds": 13.05, "sys_seconds": 2.33}
+  },
+  "after": {
+    "binary_sha256": "33347efedbd914ef1a97e54664bb0987a46ccb41b9575d5ad41836fa75288d2d",
+    "runs": [
+      {"run": 1, "wall_seconds": 10.83, "user_seconds": 9.15, "sys_seconds": 1.33},
+      {"run": 2, "wall_seconds": 10.93, "user_seconds": 9.22, "sys_seconds": 1.61},
+      {"run": 3, "wall_seconds": 10.90, "user_seconds": 9.21, "sys_seconds": 1.56}
+    ],
+    "median": {"wall_seconds": 10.90, "user_seconds": 9.21, "sys_seconds": 1.56}
+  },
+  "comparison": {
+    "wall_speedup": 1.6183,
+    "wall_reduction_percent": 38.2086,
+    "user_speedup": 1.4169,
+    "user_reduction_percent": 29.4253
+  },
+  "outputs": {
+    "all_primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_before_and_after_outputs_match": true,
+    "profiled_output_matches": true
+  },
+  "profile": {
+    "tool": "/usr/bin/sample",
+    "capture_scope": "full process lifetime",
+    "requested_max_duration_seconds": 600,
+    "interval_milliseconds": 1,
+    "main_execution_samples": 8508,
+    "file": "post-change-full-duration.sample.txt",
+    "sha256": "522df27f0ae8a4f8ed88934e040aa411b8dc0d32abe6edd62a03c4e715bb211d"
+  }
+}

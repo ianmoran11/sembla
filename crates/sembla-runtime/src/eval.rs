@@ -1217,11 +1217,14 @@ fn eval_self_attr(
                 (0..row_count).map(|row| values[row]).collect(),
             ))
         }
-        AttrType::Ref { .. } => (0..row_count)
-            .map(|row| snapshot.reference(table.box_name(), table.table_name(), name, row))
-            .collect::<Result<Vec<_>, _>>()
-            .map(InternalColumn::Ref)
-            .map_err(Into::into),
+        AttrType::Ref { .. } if row_count == 0 => Ok(InternalColumn::Ref(Vec::new())),
+        AttrType::Ref { .. } => {
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
+            let values = column.ref_values()?;
+            Ok(InternalColumn::Ref(
+                (0..row_count).map(|row| values[row]).collect(),
+            ))
+        }
     }
 }
 
@@ -1451,14 +1454,19 @@ fn eval_aggregate(
     let query_rows = snapshot.row_count(query.box_name(), query.table_name())?;
     match accumulator {
         Accumulator::Int(groups) => {
-            let mut values = Vec::with_capacity(query_rows);
-            for row in 0..query_rows {
-                let group = snapshot.reference(
+            let references: &[u32] = if query_rows == 0 {
+                &[]
+            } else {
+                let column = snapshot.resolve_column(
                     query.box_name(),
                     query.table_name(),
                     &on.self_fk_attr,
-                    row,
-                )? as usize;
+                )?;
+                column.ref_values()?
+            };
+            let mut values = Vec::with_capacity(query_rows);
+            for reference in references {
+                let group = *reference as usize;
                 values.push(*groups.get(group).ok_or_else(|| {
                     EvalError::new(format!(
                         "aggregate broadcast group {group} is out of bounds"
@@ -1468,14 +1476,19 @@ fn eval_aggregate(
             Ok(InternalColumn::Int(values))
         }
         Accumulator::Real(groups) => {
-            let mut values = Vec::with_capacity(query_rows);
-            for row in 0..query_rows {
-                let group = snapshot.reference(
+            let references: &[u32] = if query_rows == 0 {
+                &[]
+            } else {
+                let column = snapshot.resolve_column(
                     query.box_name(),
                     query.table_name(),
                     &on.self_fk_attr,
-                    row,
-                )? as usize;
+                )?;
+                column.ref_values()?
+            };
+            let mut values = Vec::with_capacity(query_rows);
+            for reference in references {
+                let group = *reference as usize;
                 values.push(*groups.get(group).ok_or_else(|| {
                     EvalError::new(format!(
                         "aggregate broadcast group {group} is out of bounds"
@@ -1520,14 +1533,22 @@ fn build_aggregate(
     match op {
         AggOp::Count => {
             let mut groups = vec![0_i64; group_count];
+            let mut references = None;
             for (row, include) in filter.iter().copied().enumerate() {
                 if include {
-                    let group = snapshot.reference(
-                        target.box_name(),
-                        target.table_name(),
-                        &on.fk_attr,
-                        row,
-                    )? as usize;
+                    let reference_values = if let Some(values) = references {
+                        values
+                    } else {
+                        let column = snapshot.resolve_column(
+                            target.box_name(),
+                            target.table_name(),
+                            &on.fk_attr,
+                        )?;
+                        let values = column.ref_values()?;
+                        references = Some(values);
+                        values
+                    };
+                    let group = reference_values[row] as usize;
                     groups[group] = groups[group].checked_add(1).ok_or_else(|| {
                         EvalError::new(format!("aggregate Count overflow in group {group}"))
                     })?;
@@ -1548,14 +1569,22 @@ fn build_aggregate(
             match values {
                 InternalColumn::Int(values) => {
                     let mut groups = vec![0_i64; group_count];
+                    let mut references = None;
                     for (row, (include, value)) in filter.iter().copied().zip(values).enumerate() {
                         if include {
-                            let group = snapshot.reference(
-                                target.box_name(),
-                                target.table_name(),
-                                &on.fk_attr,
-                                row,
-                            )? as usize;
+                            let reference_values = if let Some(values) = references {
+                                values
+                            } else {
+                                let column = snapshot.resolve_column(
+                                    target.box_name(),
+                                    target.table_name(),
+                                    &on.fk_attr,
+                                )?;
+                                let values = column.ref_values()?;
+                                references = Some(values);
+                                values
+                            };
+                            let group = reference_values[row] as usize;
                             groups[group] = groups[group].checked_add(value).ok_or_else(|| {
                                 EvalError::new(format!("integer Sum overflow in group {group}"))
                             })?;
@@ -1565,15 +1594,23 @@ fn build_aggregate(
                 }
                 InternalColumn::Real(values) => {
                     let mut groups = vec![0.0_f64; group_count];
+                    let mut references = None;
                     // This ascending target-row pass is the canonical CPU reduction order.
                     for (row, (include, value)) in filter.iter().copied().zip(values).enumerate() {
                         if include {
-                            let group = snapshot.reference(
-                                target.box_name(),
-                                target.table_name(),
-                                &on.fk_attr,
-                                row,
-                            )? as usize;
+                            let reference_values = if let Some(values) = references {
+                                values
+                            } else {
+                                let column = snapshot.resolve_column(
+                                    target.box_name(),
+                                    target.table_name(),
+                                    &on.fk_attr,
+                                )?;
+                                let values = column.ref_values()?;
+                                references = Some(values);
+                                values
+                            };
+                            let group = reference_values[row] as usize;
                             groups[group] += value;
                         }
                     }

@@ -119,3 +119,28 @@ after over three runs each on the same Apple M2 Pro in one session. All outputs
 were byte-identical. Raw measurements, binary and input hashes, and the
 post-change `sample` profile are under
 `docs/evidence/host-evaluator-resolve-once-20260726/`.
+
+### 2026-07-26 — PRD 0002 local implementation
+
+`ResolvedColumn::ref_values` now exposes the contiguous `Ref` values with the
+same wrong-type diagnostic as `Snapshot::reference`. The `SelfAttr` Ref path
+and all five aggregate reads resolve the column at most once before indexing
+it by row; `Snapshot::reference` remains available to callers outside the host
+evaluator.
+
+The implementation selected §3's default **preserve** route. `SelfAttr` and
+aggregate broadcast return or skip resolution when their row range is empty.
+The three filtered aggregate paths resolve on the first selected row, so the
+**filtered zero-selection case** remains lazy even when the target table has
+rows but every filter result is `false`. A behavioural regression test covers
+Count, integer Sum, and real Sum with an intentionally wrong-typed target FK;
+all three still succeed when the filter selects no rows. Missing-column and
+wrong-type errors therefore retain their prior timing, types, and messages, and
+no `DECISIONS.md` change is needed.
+
+The fixed one-million-slot case measured 17.64 s median wall before and 10.90 s
+after over three runs each on the same Apple M2 Pro in one session, a 1.62×
+improvement. All measured and profiled outputs were byte-identical. Raw
+measurements, binary and input hashes, and the full-process-lifetime
+post-change `sample` profile are under
+`docs/evidence/host-evaluator-reference-resolve-once-20260726/`.
