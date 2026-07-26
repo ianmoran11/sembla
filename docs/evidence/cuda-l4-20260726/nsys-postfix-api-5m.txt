@@ -1,0 +1,23 @@
+Generating SQLite file p5000000.sqlite from p5000000.nsys-rep
+Processing [p5000000.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+
+ ** CUDA API Summary (cuda_api_sum):
+
+ Time (%)  Total Time (ns)  Num Calls   Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)          Name        
+ --------  ---------------  ---------  ----------  ---------  --------  ---------  -----------  --------------------
+     93.8        377449258         12  31454104.8  4449731.0      8763  117308006   45495337.3  cuMemcpyDtoHAsync_v2
+      2.6         10628922         39    272536.5     2143.0       491    7102532    1131961.0  cuMemAllocAsync     
+      2.6         10459005         16    653687.8     1778.0      1593   10423431    2605265.2  cuMemcpyHtoDAsync_v2
+      0.4          1687446          1   1687446.0  1687446.0   1687446    1687446          0.0  cuModuleLoadData    
+      0.2           929274        234      3971.3     2148.5      1893     102584       7402.9  cuLaunchKernel      
+      0.2           645409          1    645409.0   645409.0    645409     645409          0.0  cuModuleUnload      
+      0.1           276951         56      4945.6     2073.0      1162      57987       8691.0  cuEventRecord       
+      0.0           129585          3     43195.0    50496.0     20271      58818      20284.1  cuMemcpyDtoDAsync_v2
+      0.0           113159         22      5143.6     3961.0      1371      29415       5750.9  cuMemsetD8Async     
+      0.0            96114         39      2464.5      991.0       421      20671       3991.6  cuMemFreeAsync      
+      0.0            64123         78       822.1      390.0       140      15493       1821.0  cuStreamWaitEvent   
+      0.0            35784         78       458.8      250.5       110       3466        653.0  cuEventCreate       
+      0.0            16029         78       205.5      155.5        90       1552        240.9  cuEventDestroy_v2   
+      0.0             5519          1      5519.0     5519.0      5519       5519          0.0  cuInit              
+      0.0              992          1       992.0      992.0       992        992          0.0  cuCtxSetCurrent     
+

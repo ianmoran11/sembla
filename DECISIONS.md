@@ -1396,3 +1396,34 @@ Note also that cost is **superlinear** in rows: 2.7 s/tick at 500k against
 235.3 s/tick at 10M, i.e. 87x cost for 20x rows. The 10M kernel distribution may
 therefore differ from the 500k profile above, and the rewritten PRD must profile
 at the scale it intends to fix.
+
+### L7. §L4 verdict after PRD 0006: not met at 2.56x, and the bottleneck has moved off the GPU (2026-07-26)
+
+**Decision.** The §L4 gate is **not met**. Three replicates per backend on one
+host (commit `206900c`, one shared 10M artifact, one binary): CUDA median
+`171.2s`, CPU median `438.7s`, ratio **2.56x** against a required 3x. Spreads
+were 5.3% and 2.8%, so this is a measured miss rather than a noisy one.
+
+**PRD 0006 succeeded regardless.** 33.0x faster than the pre-fix `5647.9s`, with
+**byte-identical output hashes** — the segmented argmin selects the same winners
+as the quadratic scan, satisfying §E3. `resolve_conflicts` now scales linearly.
+
+**The bottleneck is no longer the GPU.** At 5M rows over 2 ticks, all GPU
+kernels together account for **9.1 ms of 10,620 ms** of wall time — 0.09%. Of
+the CUDA API time, 93.8% is `cuMemcpyDtoHAsync` device-to-host readback; the
+remaining ~96% of wall time is host-side work outside CUDA. The post-fix kernel
+ranking is flat, with no kernel above 11.5%.
+
+**Alternatives rejected.** Lowering the gate to fit 2.56x — it was set at "worth
+using" deliberately, before any result was known, and moving it now would make
+it meaningless. Continuing CUDA kernel optimisation — at 0.09% of wall time
+there is nothing left to win there. Closing the CUDA track as unviable — 2.56x
+faster is the right side of parity and the remaining cost is addressable.
+
+**Reason.** The gate asked whether the GPU is worth using for this model class.
+The measured answer is "yes, moderately, and the reason it isn't more is not the
+GPU". That is a more useful finding than a pass would have been.
+
+**Consequent direction.** The next work is host-side profiling, which is free and
+local — no GPU required. PRD 0007's kernel parallelisation, while correct and
+merged, is not expected to move any measurable number.

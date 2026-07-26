@@ -1,0 +1,6 @@
+PASS one host and one session
+PASS repository commit identical for both backends and every replicate
+PASS binary SHA-256 identical for both backends and every replicate
+PASS initial-state SHA-256 identical for both backends and every replicate
+PASS gate results, summaries, and execution hashes identical for both backends and every replicate
+PASS exactly three no-grouped replicates per backend
