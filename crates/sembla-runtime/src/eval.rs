@@ -894,13 +894,14 @@ fn eval_expr(
                 .ok_or_else(|| EvalError::new(format!("unknown enum variant for '{attr}'")))?;
             let variant = u16::try_from(variant)
                 .map_err(|_| EvalError::new(format!("enum attribute '{attr}' exceeds u16")))?;
-            let mut values = Vec::with_capacity(row_count);
-            for row in 0..row_count {
-                values.push(
-                    snapshot.enum_index(table.box_name(), table.table_name(), attr, row)?
-                        == variant,
-                );
+            if row_count == 0 {
+                return Ok(InternalColumn::Bool(Vec::new()));
             }
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), attr)?;
+            let enum_values = column.enum_values()?;
+            let values = (0..row_count)
+                .map(|row| enum_values[row] == variant)
+                .collect();
             Ok(InternalColumn::Bool(values))
         }
         Expr::Input { port, agg } => {
@@ -1192,21 +1193,30 @@ fn eval_self_attr(
 ) -> Result<InternalColumn, EvalError> {
     let attr = find_attr(row_attrs, name)?;
     match &attr.ty {
-        AttrType::Real => (0..row_count)
-            .map(|row| snapshot.real(table.box_name(), table.table_name(), name, row))
-            .collect::<Result<Vec<_>, _>>()
-            .map(InternalColumn::Real)
-            .map_err(Into::into),
-        AttrType::Int => (0..row_count)
-            .map(|row| snapshot.int(table.box_name(), table.table_name(), name, row))
-            .collect::<Result<Vec<_>, _>>()
-            .map(InternalColumn::Int)
-            .map_err(Into::into),
-        AttrType::Enum { .. } => (0..row_count)
-            .map(|row| snapshot.enum_index(table.box_name(), table.table_name(), name, row))
-            .collect::<Result<Vec<_>, _>>()
-            .map(InternalColumn::Enum)
-            .map_err(Into::into),
+        AttrType::Real if row_count == 0 => Ok(InternalColumn::Real(Vec::new())),
+        AttrType::Real => {
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
+            let values = column.real_values()?;
+            Ok(InternalColumn::Real(
+                (0..row_count).map(|row| values[row]).collect(),
+            ))
+        }
+        AttrType::Int if row_count == 0 => Ok(InternalColumn::Int(Vec::new())),
+        AttrType::Int => {
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
+            let values = column.int_values()?;
+            Ok(InternalColumn::Int(
+                (0..row_count).map(|row| values[row]).collect(),
+            ))
+        }
+        AttrType::Enum { .. } if row_count == 0 => Ok(InternalColumn::Enum(Vec::new())),
+        AttrType::Enum { .. } => {
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
+            let values = column.enum_values()?;
+            Ok(InternalColumn::Enum(
+                (0..row_count).map(|row| values[row]).collect(),
+            ))
+        }
         AttrType::Ref { .. } => (0..row_count)
             .map(|row| snapshot.reference(table.box_name(), table.table_name(), name, row))
             .collect::<Result<Vec<_>, _>>()

@@ -423,7 +423,48 @@ pub struct Snapshot<'a> {
     inputs: &'a [InputTable],
 }
 
+/// A state column resolved once together with its table for stable diagnostics.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ResolvedColumn<'a> {
+    table: &'a TableState,
+    column: &'a ColumnState,
+}
+
+impl<'a> ResolvedColumn<'a> {
+    pub(crate) fn real_values(self) -> Result<&'a [f64], StateError> {
+        match self.column {
+            ColumnState::Real { values, .. } => Ok(values),
+            _ => Err(wrong_column_type(self.table, self.column, "Real")),
+        }
+    }
+
+    pub(crate) fn int_values(self) -> Result<&'a [i64], StateError> {
+        match self.column {
+            ColumnState::Int { values, .. } => Ok(values),
+            _ => Err(wrong_column_type(self.table, self.column, "Int")),
+        }
+    }
+
+    pub(crate) fn enum_values(self) -> Result<&'a [u16], StateError> {
+        match self.column {
+            ColumnState::Enum { values, .. } => Ok(values),
+            _ => Err(wrong_column_type(self.table, self.column, "Enum")),
+        }
+    }
+}
+
 impl Snapshot<'_> {
+    /// Resolves one state column without performing a row lookup.
+    pub(crate) fn resolve_column(
+        &self,
+        box_name: &str,
+        table_name: &str,
+        column_name: &str,
+    ) -> Result<ResolvedColumn<'_>, StateError> {
+        let (table, column) = find_column(self.state, box_name, table_name, column_name)?;
+        Ok(ResolvedColumn { table, column })
+    }
+
     /// Returns the table delivered to `box_name.port_name` for this tick.
     /// Every declared input exists; all have zero rows at tick 0.
     pub fn input_table(&self, box_name: &str, port_name: &str) -> Result<&InputTable, StateError> {
@@ -897,12 +938,11 @@ fn find_table<'a>(
         })
 }
 
-fn find_cell<'a>(
+fn find_column<'a>(
     state: &'a StateData,
     box_name: &str,
     table_name: &str,
     column_name: &str,
-    row: usize,
 ) -> Result<(&'a TableState, &'a ColumnState), StateError> {
     let table = find_table(state, box_name, table_name)?;
     let column = table
@@ -914,6 +954,17 @@ fn find_cell<'a>(
                 "box '{box_name}', table '{table_name}', column '{column_name}': no such state column"
             ))
         })?;
+    Ok((table, column))
+}
+
+fn find_cell<'a>(
+    state: &'a StateData,
+    box_name: &str,
+    table_name: &str,
+    column_name: &str,
+    row: usize,
+) -> Result<(&'a TableState, &'a ColumnState), StateError> {
+    let (table, column) = find_column(state, box_name, table_name, column_name)?;
     if row >= table.row_count {
         return Err(cell_error(
             table,

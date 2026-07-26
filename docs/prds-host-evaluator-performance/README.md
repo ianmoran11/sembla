@@ -90,3 +90,25 @@ backend: cpu
 Three runs, median reported, with the `sample` profile committed alongside.
 Baseline on Apple M2 Pro: **49.5 s wall, 46.8 s user** (single run,
 `docs/evidence/host-profile-20260726/`).
+
+## Status notes
+
+### 2026-07-26 — PRD 0001 local implementation
+
+`Snapshot::resolve_column` now resolves table and column names once, and the
+host evaluator matches Real, Int, and Enum column types before indexing their
+contiguous values by row. The existing per-row accessors remain available for
+other callers.
+
+The implementation selected §3's default **preserve** route. Every affected
+path returns its existing empty result before resolving a column when
+`row_count == 0`; missing-column and wrong-type errors therefore remain lazy on
+empty tables, while non-empty tables retain the existing error types and exact
+messages. No `DECISIONS.md` change is needed because evaluator semantics did not
+change.
+
+The fixed one-million-slot case measured 49.66 s median wall before and 15.62 s
+after over three runs each on the same Apple M2 Pro in one session. All outputs
+were byte-identical. Raw measurements, binary and input hashes, and the
+post-change `sample` profile are under
+`docs/evidence/host-evaluator-resolve-once-20260726/`.
