@@ -361,6 +361,83 @@ BIN="$SPIKE_DIR/target/release/sembla"
 BIN_SHA="$(sha256sum "$BIN" | awk '{print $1}')"
 printf '%s  target/release/sembla\n' "$BIN_SHA" > "$OUT_ROOT/binary.sha256"
 
+# --- optional phase-attribution profile ---------------------------------------
+# Runs BEFORE the frozen gate, deliberately: it finishes in minutes where the
+# gate takes hours, so its result is readable in ~bench.log early and the
+# operator can let the gate continue or tear down without waiting.
+#
+# Additive only: the frozen §L4 protocol below is untouched, which is why the
+# scale/tick overrides remain refused. This stage answers a different question —
+# where the CUDA path's wall time actually goes — using the case from
+# docs/evidence/cuda-l4-20260726 so the numbers are directly comparable to the
+# ~10,200 ms that run recorded as "unaccounted (host CPU)".
+if [[ "${BENCH_PROFILE:-0}" == "1" ]]; then
+  echo '=== phase-attribution profile (5M rows, 2 ticks) ==='
+  PROFILE_DIR="$OUT_ROOT/profile"
+  mkdir -p "$PROFILE_DIR"
+  PROFILE_SCALE=5000000
+  PROFILE_TICKS=2
+  PROFILE_STATE="$WORK/profile-5m.state"
+
+  "$BIN" synth-state \
+    --model fixtures/demographic/benchmark/demographic_slots.full.json \
+    --slots "$PROFILE_SCALE" --areas "$AREAS" --present-fraction "$PRESENT_FRACTION" \
+    --streams "$STREAMS" --seed "$SEED" --out "$PROFILE_STATE" \
+    > "$PROFILE_DIR/synth-state.stdout" 2> "$PROFILE_DIR/synth-state.stderr"
+  sha256sum "$PROFILE_STATE" | awk '{print $1"  profile-5m.state"}' \
+    > "$PROFILE_DIR/profile-state.sha256"
+
+  python3 - "$PROFILE_SCALE" "$PROFILE_STATE.model.json" "$WORK" <<'PY'
+import json, pathlib, sys
+scale = int(sys.argv[1])
+model = json.loads(pathlib.Path(sys.argv[2]).read_text())
+for box in model["boxes"]:
+    for table in box["tables"]:
+        if table["name"] in {"person_slot", "slot_resource"}:
+            table["size_hint"] = scale
+src = pathlib.Path.cwd() / "fixtures/demographic/benchmark/demographic_slots.no-grouped.json"
+tmpl = json.loads(src.read_text())
+for box in tmpl["boxes"]:
+    for table in box["tables"]:
+        if table["name"] in {"person_slot", "slot_resource"}:
+            table["size_hint"] = scale
+(pathlib.Path(sys.argv[3]) / "profile-no-grouped.json").write_text(
+    json.dumps(tmpl, separators=(",", ":")) + "\n"
+)
+PY
+
+  # Both backends, so the shared host phases can be read side by side.
+  for backend in cuda cpu; do
+    "$BIN" run "$WORK/profile-no-grouped.json" \
+      --seed "$SEED" --population "$PROFILE_STATE" --backend "$backend" \
+      --ticks "$PROFILE_TICKS" \
+      --timing-json "$PROFILE_DIR/timing-$backend.json" \
+      --out "$PROFILE_DIR/profile-$backend.csv" \
+      > "$PROFILE_DIR/profile-$backend.stdout" 2> "$PROFILE_DIR/profile-$backend.stderr"
+  done
+
+  # nsys still gives per-kernel detail the timers cannot. Failure here must not
+  # lose the timing JSON, which is the primary artifact.
+  if command -v nsys >/dev/null; then
+    (
+      cd "$PROFILE_DIR"
+      nsys profile --trace=cuda --force-overwrite=true -o profile-cuda \
+        "$BIN" run "$WORK/profile-no-grouped.json" \
+        --seed "$SEED" --population "$PROFILE_STATE" --backend cuda \
+        --ticks "$PROFILE_TICKS" --out nsys-run.csv \
+        > nsys-run.stdout 2> nsys-run.stderr
+      nsys stats --report cuda_gpu_kern_sum profile-cuda.nsys-rep > nsys-kern-sum.txt 2>&1
+      nsys stats --report cuda_api_sum      profile-cuda.nsys-rep > nsys-api-sum.txt 2>&1
+      rm -f profile-cuda.nsys-rep nsys-run.csv
+    ) || echo 'nsys profiling failed; timing JSON is unaffected' >&2
+  else
+    echo 'nsys not found; skipping kernel-level detail' > "$PROFILE_DIR/nsys-missing.txt"
+  fi
+
+  rm -f "$PROFILE_STATE" "$PROFILE_STATE.model.json"
+  echo '=== phase-attribution profile complete ==='
+fi
+
 STATE="$WORK/initial.state"
 echo '=== synthesizing one shared 10M state artifact ==='
 "$BIN" synth-state \
@@ -639,79 +716,6 @@ assert all(doc["assertions"].values())
     "PASS exactly three no-grouped replicates per backend\n"
 )
 PY
-
-# --- optional phase-attribution profile ---------------------------------------
-# Additive only: the frozen §L4 protocol above is untouched, which is why the
-# scale/tick overrides remain refused. This stage answers a different question —
-# where the CUDA path's wall time actually goes — using the case from
-# docs/evidence/cuda-l4-20260726 so the numbers are directly comparable to the
-# ~10,200 ms that run recorded as "unaccounted (host CPU)".
-if [[ "${BENCH_PROFILE:-0}" == "1" ]]; then
-  echo '=== phase-attribution profile (5M rows, 2 ticks) ==='
-  PROFILE_DIR="$OUT_ROOT/profile"
-  mkdir -p "$PROFILE_DIR"
-  PROFILE_SCALE=5000000
-  PROFILE_TICKS=2
-  PROFILE_STATE="$WORK/profile-5m.state"
-
-  "$BIN" synth-state \
-    --model fixtures/demographic/benchmark/demographic_slots.full.json \
-    --slots "$PROFILE_SCALE" --areas "$AREAS" --present-fraction "$PRESENT_FRACTION" \
-    --streams "$STREAMS" --seed "$SEED" --out "$PROFILE_STATE" \
-    > "$PROFILE_DIR/synth-state.stdout" 2> "$PROFILE_DIR/synth-state.stderr"
-  sha256sum "$PROFILE_STATE" | awk '{print $1"  profile-5m.state"}' \
-    > "$PROFILE_DIR/profile-state.sha256"
-
-  python3 - "$PROFILE_SCALE" "$PROFILE_STATE.model.json" "$WORK" <<'PY'
-import json, pathlib, sys
-scale = int(sys.argv[1])
-model = json.loads(pathlib.Path(sys.argv[2]).read_text())
-for box in model["boxes"]:
-    for table in box["tables"]:
-        if table["name"] in {"person_slot", "slot_resource"}:
-            table["size_hint"] = scale
-src = pathlib.Path.cwd() / "fixtures/demographic/benchmark/demographic_slots.no-grouped.json"
-tmpl = json.loads(src.read_text())
-for box in tmpl["boxes"]:
-    for table in box["tables"]:
-        if table["name"] in {"person_slot", "slot_resource"}:
-            table["size_hint"] = scale
-(pathlib.Path(sys.argv[3]) / "profile-no-grouped.json").write_text(
-    json.dumps(tmpl, separators=(",", ":")) + "\n"
-)
-PY
-
-  # Both backends, so the shared host phases can be read side by side.
-  for backend in cuda cpu; do
-    "$BIN" run "$WORK/profile-no-grouped.json" \
-      --seed "$SEED" --population "$PROFILE_STATE" --backend "$backend" \
-      --ticks "$PROFILE_TICKS" \
-      --timing-json "$PROFILE_DIR/timing-$backend.json" \
-      --out "$PROFILE_DIR/profile-$backend.csv" \
-      > "$PROFILE_DIR/profile-$backend.stdout" 2> "$PROFILE_DIR/profile-$backend.stderr"
-  done
-
-  # nsys still gives per-kernel detail the timers cannot. Failure here must not
-  # lose the timing JSON, which is the primary artifact.
-  if command -v nsys >/dev/null; then
-    (
-      cd "$PROFILE_DIR"
-      nsys profile --trace=cuda --force-overwrite=true -o profile-cuda \
-        "$BIN" run "$WORK/profile-no-grouped.json" \
-        --seed "$SEED" --population "$PROFILE_STATE" --backend cuda \
-        --ticks "$PROFILE_TICKS" --out nsys-run.csv \
-        > nsys-run.stdout 2> nsys-run.stderr
-      nsys stats --report cuda_gpu_kern_sum profile-cuda.nsys-rep > nsys-kern-sum.txt 2>&1
-      nsys stats --report cuda_api_sum      profile-cuda.nsys-rep > nsys-api-sum.txt 2>&1
-      rm -f profile-cuda.nsys-rep nsys-run.csv
-    ) || echo 'nsys profiling failed; timing JSON is unaffected' >&2
-  else
-    echo 'nsys not found; skipping kernel-level detail' > "$PROFILE_DIR/nsys-missing.txt"
-  fi
-
-  rm -f "$PROFILE_STATE" "$PROFILE_STATE.model.json"
-  echo '=== phase-attribution profile complete ==='
-fi
 
 rm -rf "$WORK"
 cd "$OUT_ROOT"
