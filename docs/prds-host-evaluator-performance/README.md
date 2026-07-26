@@ -72,16 +72,22 @@ costs minutes, not rented GPU hours.
   shows is hot throughout. **Landed 2026-07-26: 3.18× wall on the fixed case,
   output byte-identical** (`docs/evidence/host-evaluator-resolve-once-20260726/`).
 - `0002-resolve-reference-columns-once` — the same transformation for the `Ref`
-  attribute type, which 0001 left out. Scoped from 0001's post-change profile,
-  where the `Ref` read path is the largest remaining evaluator branch.
+  attribute type, which 0001 left out. **Landed 2026-07-26: ~1.4× on the fixed
+  case, output byte-identical**
+  (`docs/evidence/host-evaluator-reference-resolve-once-20260726/`). The
+  evidence reports 1.62× wall, but one baseline run was contended (23.92 s wall
+  against 14.20 s user) and inflated the median; user time, 13.05 s → 9.21 s,
+  is the load-bearing figure. Cumulative with 0001: 49.7 s → 10.9 s.
+- `0003-compute-per-tick-hashes-only-when-consumed` — per-tick `state_hash` is
+  31.4% of the full-duration profile and, outside the CPU-vs-CUDA differential,
+  nothing reads the result. Scoped from 0002's full-duration capture.
 
-Later PRDs remain **deliberately unwritten.** 0001's profile re-ranked the
-original candidates: per-node allocation is still visible but no longer
-obviously next, `observe_views` fell sharply, and per-tick SHA-256 state hashing
-rose to the largest single top-of-stack entry. None of those shares are
-trustworthy yet — both profiles to date are 10-second windows of runs of very
-different length, so they are not directly comparable. 0002 requires a
-full-duration capture, and the PRD after it is scoped from that.
+Later PRDs remain **deliberately unwritten.** 0002's capture is the first that
+covers a whole process, so its shares are the first that can be trusted. Under
+the hashing, the remainder is real compute (`log`, `draw_u32x4`) plus
+allocation traffic spread thin across `from_iter`, `nanov2_free`, and
+`madvise`, with the write path (`locate_writable_cell`) small but present. None
+of those is an obvious next target until 0003 lands and the profile is retaken.
 
 ## Measurement protocol
 
