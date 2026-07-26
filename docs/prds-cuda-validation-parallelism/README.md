@@ -247,3 +247,21 @@ and asserts the exact diagnostic naming `--enable grouped-observations`; a
 separate ignored hardware test runs every CUDA-supported plan fixture.
 Existing examples, plan fixtures, goldens, and tracked CUDA evidence are
 byte-unchanged. Hardware criterion 5 remains **pending** per §J14.2.
+
+### 2026-07-26 — PRD 0005 executed with a recorded deviation
+
+The frozen §L protocol requires three replicates per backend. It was stopped
+after replicate 1 (CUDA `5647.9s`, CPU `434.6s`, 13.0x slower) because the
+magnitude made further replicates uninformative and each CUDA replicate costs
+~90 minutes of rented GPU. **PRD 0005's acceptance criteria are therefore not
+fully met**, and `DECISIONS.md` §L6 records the result as a measured verdict
+rather than §L4 gate evidence.
+
+Its §4 documentation obligations are complete: `docs/demographic-benchmark.md`
+and `docs/forward-roadmap.md` both carry the corrected conclusion, and §5's
+ageing share is reported as unresolved rather than decided.
+
+The §L4 gate itself is re-run by PRD 0006 under the unchanged protocol, at which
+point three replicates are affordable because the run should no longer take 90
+minutes each. That is the intended point to satisfy 0005's numeric criteria, not
+a re-run of 0005.

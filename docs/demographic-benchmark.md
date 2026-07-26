@@ -241,3 +241,23 @@ The recommendation is therefore unchanged, with its evidentiary basis restated:
 cost is not yet known at all. Resolving it needs replicated runs at a fixed
 scale with a reported spread, not another single point — the same replication
 discipline any threshold decision requires.
+
+## CUDA verdict — 2026-07-26
+
+The §L4 gate is **not met**. On one Hyperstack host (H100 PCIe, AMD EPYC 9554,
+commit `dbc665f`, one shared 10M artifact, one binary): CUDA `5647.9s`, CPU
+`434.6s` for 24 ticks of the no-grouped model — **13.0× slower**. Single
+replicate per arm; the protocol was stopped once the magnitude made further
+replicates uninformative, so this is a measured verdict, not gate evidence
+(`evidence/demographic-bench/hyperstack-l4-attempt-20260726/`).
+
+The cause is **not** the validation kernels. Kernel profiling at 500k/2M/5M
+(`evidence/cuda-profile-20260726/`) shows `sembla_resolve_conflicts` is quadratic
+in rows — fitted exponent 1.96, 77.9% of GPU time at 5M — because it scans every
+row of the resource table inside a per-row kernel. `DESIGN.md` §4.2's segmented
+argmin, which the CPU oracle already implements in `resolve_claims`, is the
+intended primitive.
+
+**The ageing share is unresolved and not decided here.** Readings of 11.6%
+(M2 Pro) and 12.2% (EPYC) at 10M both exceed the §K2 10% threshold, but all are
+unreplicated single runs. The §K2 trigger has its own process.
