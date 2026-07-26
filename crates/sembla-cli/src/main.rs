@@ -1419,7 +1419,7 @@ fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
         &params,
         options.seed,
         options.ticks,
-        options.backend,
+        BackendRunMode::final_only(options.backend),
         &options.enabled_features,
     )?;
     let exported_state = options
@@ -1776,7 +1776,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             &params,
             execution_seed,
             options.ticks,
-            options.backend,
+            BackendRunMode::final_only(options.backend),
             &options.enabled_features,
         )?;
         if draw == 0 {
@@ -2121,6 +2121,10 @@ struct GroupedCsvOutput {
     csv: String,
 }
 
+type StateHash = [u8; 32];
+type PerTickHashes = Option<Vec<StateHash>>;
+type ComparedPerTickHashes<'a> = (&'a [StateHash], &'a [StateHash]);
+
 #[derive(Clone, Debug)]
 struct RunOutput {
     csv: String,
@@ -2128,7 +2132,7 @@ struct RunOutput {
     series: ReportedSeries,
     summaries: Vec<SummaryValue>,
     summaries_csv: String,
-    per_tick_hashes: Vec<[u8; 32]>,
+    per_tick_hashes: PerTickHashes,
 }
 
 fn summaries_path(output: &str) -> std::path::PathBuf {
@@ -2177,8 +2181,30 @@ struct BackendRunOutput {
     output: RunOutput,
     state: StateStore,
     identity: manifest::BackendIdentity,
-    per_tick_hashes: Vec<[u8; 32]>,
+    per_tick_hashes: PerTickHashes,
     elapsed: std::time::Duration,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BackendRunMode {
+    backend: BackendSelection,
+    hash_mode: HashMode,
+}
+
+impl BackendRunMode {
+    fn final_only(backend: BackendSelection) -> Self {
+        Self {
+            backend,
+            hash_mode: HashMode::FinalOnly,
+        }
+    }
+
+    fn every_tick(backend: BackendSelection) -> Self {
+        Self {
+            backend,
+            hash_mode: HashMode::EveryTick,
+        }
+    }
 }
 
 fn execute_backend_output(
@@ -2187,7 +2213,7 @@ fn execute_backend_output(
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
-    backend: BackendSelection,
+    run_mode: BackendRunMode,
 ) -> Result<BackendRunOutput, String> {
     execute_backend_output_with_features(
         model,
@@ -2195,7 +2221,7 @@ fn execute_backend_output(
         params,
         seed,
         ticks,
-        backend,
+        run_mode,
         &FeatureSet::new(),
     )
 }
@@ -2206,10 +2232,10 @@ fn execute_backend_output_with_features(
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
-    backend: BackendSelection,
+    run_mode: BackendRunMode,
     enabled_features: &FeatureSet,
 ) -> Result<BackendRunOutput, String> {
-    if backend == BackendSelection::Cuda
+    if run_mode.backend == BackendSelection::Cuda
         && model
             .model()
             .boxes
@@ -2218,7 +2244,7 @@ fn execute_backend_output_with_features(
     {
         return Err("grouped observations run on the cpu backend only for now".to_owned());
     }
-    match backend {
+    match run_mode.backend {
         BackendSelection::Cpu => {
             let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
             let started = std::time::Instant::now();
@@ -2228,6 +2254,7 @@ fn execute_backend_output_with_features(
                 params,
                 seed,
                 ticks,
+                run_mode.hash_mode,
                 enabled_features,
             )?;
             let elapsed = started.elapsed();
@@ -2240,7 +2267,9 @@ fn execute_backend_output_with_features(
                 elapsed,
             })
         }
-        BackendSelection::Cuda => run_results_output_cuda(model, initial, params, seed, ticks),
+        BackendSelection::Cuda => {
+            run_results_output_cuda(model, initial, params, seed, ticks, run_mode.hash_mode)
+        }
     }
 }
 
@@ -2388,7 +2417,15 @@ fn run_results_output(
     seed: u64,
     ticks: u32,
 ) -> Result<RunOutput, String> {
-    run_results_output_with_features(model, state, params, seed, ticks, &FeatureSet::new())
+    run_results_output_with_features(
+        model,
+        state,
+        params,
+        seed,
+        ticks,
+        HashMode::FinalOnly,
+        &FeatureSet::new(),
+    )
 }
 
 fn run_results_output_with_features(
@@ -2397,6 +2434,7 @@ fn run_results_output_with_features(
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
+    hash_mode: HashMode,
     enabled_features: &FeatureSet,
 ) -> Result<RunOutput, String> {
     let has_views = model
@@ -2409,7 +2447,8 @@ fn run_results_output_with_features(
     let mut csv = String::new();
     let mut rows = Vec::with_capacity(ticks as usize);
     let mut tick_reports = Vec::with_capacity(ticks as usize);
-    let mut per_tick_hashes = Vec::with_capacity(ticks as usize);
+    let mut per_tick_hashes =
+        (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
     csv.push_str("# params=");
     csv.push_str(&canonical_params(params)?);
     csv.push('\n');
@@ -2525,7 +2564,9 @@ fn run_results_output_with_features(
         csv.push('\n');
         rows.push(row);
         tick_reports.push(report);
-        per_tick_hashes.push(state.state_hash());
+        if let Some(per_tick_hashes) = per_tick_hashes.as_mut() {
+            per_tick_hashes.push(state.state_hash());
+        }
     }
     let grouped = grouped_csv_outputs(model, &tick_reports)?;
     let summaries = executor::summarize(model, &tick_reports).map_err(|error| error.to_string())?;
@@ -2549,14 +2590,15 @@ fn run_results_output_cuda(
     params: &ParamEnv,
     seed: u64,
     ticks: u32,
+    hash_mode: HashMode,
 ) -> Result<BackendRunOutput, String> {
     let mut state = StateStore::new(model, initial.clone()).map_err(|error| error.to_string())?;
-    let mut backend = CudaBackend::new(model, initial, params, seed, HashMode::EveryTick)
+    let mut backend = CudaBackend::new(model, initial, params, seed, hash_mode)
         .map_err(|error| error.to_string())?;
     let device = backend.device_identity().clone();
     let identity =
         manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
-    let mut hashes = Vec::with_capacity(ticks as usize);
+    let mut hashes = (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
     let has_views = model
         .model()
         .boxes
@@ -2617,7 +2659,9 @@ fn run_results_output_cuda(
             .run_tick_observed()
             .map_err(|error| format!("tick {tick}: {error}"))?;
         state = observation.state;
-        hashes.push(state.state_hash());
+        if let Some(hashes) = hashes.as_mut() {
+            hashes.push(state.state_hash());
+        }
         let views = executor::observe_views(model, &state, params)
             .map_err(|error| format!("tick {tick}: {error}"))?;
         let fired = model
@@ -3068,7 +3112,7 @@ fn verify_run_result(
                 &params,
                 recorded.seed,
                 recorded.ticks,
-                backend,
+                BackendRunMode::final_only(backend),
                 &enabled_features,
             )?;
             compare_field(
@@ -3153,7 +3197,7 @@ fn verify_run_result(
                     &params,
                     execution.seed.unwrap_or(recorded.seed),
                     recorded.ticks,
-                    backend,
+                    BackendRunMode::final_only(backend),
                     &enabled_features,
                 )?;
                 compare_field(
@@ -3578,7 +3622,7 @@ fn compare_arm(
         params,
         seed,
         ticks,
-        backend,
+        BackendRunMode::final_only(backend),
         enabled_features,
     )?;
     let hashes = execution_hashes(&execution.output, &execution.state);
@@ -3729,6 +3773,40 @@ fn collect_diff_corpus_paths(directory: &str, suffix: &str) -> Result<Vec<String
     Ok(paths)
 }
 
+fn compare_per_tick_hashes<'a>(
+    path: &str,
+    cpu: &'a PerTickHashes,
+    cuda: &'a PerTickHashes,
+) -> Result<ComparedPerTickHashes<'a>, String> {
+    let cpu = cpu.as_deref().ok_or_else(|| {
+        format!("{path}: internal invariant violation: cpu per-tick hashes are absent")
+    })?;
+    let cuda = cuda.as_deref().ok_or_else(|| {
+        format!("{path}: internal invariant violation: cuda per-tick hashes are absent")
+    })?;
+    if cpu.len() != cuda.len() {
+        return Err(format!(
+            "{path}: per-tick hash sequence lengths differ: cpu={} cuda={}",
+            cpu.len(),
+            cuda.len()
+        ));
+    }
+    if let Some((tick, (cpu_hash, cuda_hash))) = cpu
+        .iter()
+        .zip(cuda)
+        .enumerate()
+        .find(|(_, (cpu, cuda))| cpu != cuda)
+    {
+        return Err(format!(
+            "{}: first divergence at tick {tick}: cpu={} cuda={}",
+            path,
+            hex(cpu_hash),
+            hex(cuda_hash)
+        ));
+    }
+    Ok((cpu, cuda))
+}
+
 fn diff_backends(options: DiffOptions) -> Result<(), String> {
     for path in &options.models {
         if input_uses_grouped_views(path)? {
@@ -3754,7 +3832,7 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
             &params,
             options.seed,
             options.ticks,
-            BackendSelection::Cpu,
+            BackendRunMode::every_tick(BackendSelection::Cpu),
         )?;
         let cuda = execute_backend_output(
             &model,
@@ -3762,25 +3840,10 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
             &params,
             options.seed,
             options.ticks,
-            BackendSelection::Cuda,
+            BackendRunMode::every_tick(BackendSelection::Cuda),
         )?;
-        if let Some((tick, (cpu_hash, cuda_hash))) = cpu
-            .per_tick_hashes
-            .iter()
-            .zip(&cuda.per_tick_hashes)
-            .enumerate()
-            .find(|(_, (cpu, cuda))| cpu != cuda)
-        {
-            return Err(format!(
-                "{}: first divergence at tick {tick}: cpu={} cuda={}",
-                path,
-                hex(cpu_hash),
-                hex(cuda_hash)
-            ));
-        }
-        if cpu.per_tick_hashes.len() != cuda.per_tick_hashes.len() {
-            return Err(format!("{path}: per-tick hash sequence lengths differ"));
-        }
+        let (cpu_per_tick_hashes, cuda_per_tick_hashes) =
+            compare_per_tick_hashes(path, &cpu.per_tick_hashes, &cuda.per_tick_hashes)?;
         let cpu_final = cpu.state.state_hash();
         let cuda_final = cuda.state.state_hash();
         if cpu_final != cuda_final {
@@ -3808,8 +3871,8 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
                 return Err(format!(
                     "{}: first divergence at tick {tick}: cpu={} cuda={}; results bytes differ",
                     path,
-                    hex(&cpu.per_tick_hashes[tick]),
-                    hex(&cuda.per_tick_hashes[tick])
+                    hex(&cpu_per_tick_hashes[tick]),
+                    hex(&cuda_per_tick_hashes[tick])
                 ));
             }
             return Err(format!(
@@ -3906,9 +3969,9 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_diff_corpus_paths, csv_field, initialize_population, parse_backend,
-        parse_diff_options, run, run_file_result, run_results_output, BackendSelection, RunOptions,
-        VERSION,
+        collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, initialize_population,
+        parse_backend, parse_diff_options, run, run_file_result, run_results_output,
+        run_results_output_with_features, BackendSelection, HashMode, RunOptions, VERSION,
     };
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
@@ -4034,6 +4097,8 @@ mod tests {
         let first = run_results_output(&model, &mut first_state, &params, 55, 20).unwrap();
         let second = run_results_output(&model, &mut second_state, &params, 55, 20).unwrap();
         assert_eq!(first.csv, second.csv);
+        assert!(first.per_tick_hashes.is_none());
+        assert!(second.per_tick_hashes.is_none());
         assert_eq!(
             first.csv.lines().nth(2).unwrap(),
             "tick,count:chain.particle.phase=A,count:chain.particle.phase=B,fired:chain.move_ab,fired:chain.move_ba,deferred_total"
@@ -4096,6 +4161,57 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(temp).unwrap();
+    }
+
+    #[test]
+    fn per_tick_hash_mode_type_enforces_absence() {
+        let model = load(include_str!("../../../examples/reversible_ctmc.json"));
+        let params = ParamEnv::defaults(&model);
+        let mut state = initialized(&model, 10);
+        let output = run_results_output_with_features(
+            &model,
+            &mut state,
+            &params,
+            55,
+            3,
+            HashMode::EveryTick,
+            &sembla_ir::FeatureSet::new(),
+        )
+        .unwrap();
+        assert_eq!(output.per_tick_hashes.as_ref().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn per_tick_hash_comparison_detects_the_first_divergent_tick() {
+        let cpu = Some(vec![[0; 32], [1; 32], [2; 32]]);
+        let cuda = Some(vec![[0; 32], [9; 32], [8; 32]]);
+        let error = compare_per_tick_hashes("model.json", &cpu, &cuda).unwrap_err();
+        assert!(error.contains("first divergence at tick 1"));
+        assert!(error.contains(&format!("cpu={}", super::hex(&[1; 32]))));
+        assert!(error.contains(&format!("cuda={}", super::hex(&[9; 32]))));
+    }
+
+    #[test]
+    fn per_tick_hash_comparison_checks_lengths_before_elements() {
+        let cpu = Some(vec![[1; 32], [2; 32]]);
+        let cuda = Some(vec![[9; 32]]);
+        let error = compare_per_tick_hashes("model.json", &cpu, &cuda).unwrap_err();
+        assert_eq!(
+            error,
+            "model.json: per-tick hash sequence lengths differ: cpu=2 cuda=1"
+        );
+    }
+
+    #[test]
+    fn per_tick_hash_comparison_rejects_absent_sequences() {
+        let hashes = Some(vec![[0; 32]]);
+        let cpu_error = compare_per_tick_hashes("model.json", &None, &hashes).unwrap_err();
+        assert!(cpu_error.contains("internal invariant violation"));
+        assert!(cpu_error.contains("cpu per-tick hashes are absent"));
+
+        let cuda_error = compare_per_tick_hashes("model.json", &hashes, &None).unwrap_err();
+        assert!(cuda_error.contains("internal invariant violation"));
+        assert!(cuda_error.contains("cuda per-tick hashes are absent"));
     }
 
     #[test]

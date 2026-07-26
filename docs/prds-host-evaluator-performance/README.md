@@ -150,3 +150,32 @@ improvement. All measured and profiled outputs were byte-identical. Raw
 measurements, binary and input hashes, and the full-process-lifetime
 post-change `sample` profile are under
 `docs/evidence/host-evaluator-reference-resolve-once-20260726/`.
+
+### 2026-07-26 — PRD 0003 local implementation
+
+The host run path now reuses `sembla_cuda::HashMode`: plain runs, sweeps,
+comparisons, and manifest verification request `FinalOnly`, while the
+CPU-vs-CUDA differential explicitly requests `EveryTick` from both backends.
+Per-tick hashes are represented as `Option<Vec<[u8; 32]>>`, so disabled hashing
+cannot become an empty sequence that passes the differential vacuously. The
+differential rejects absent sequences as an internal invariant violation,
+checks lengths before elements, and retains first-divergent-tick diagnostics;
+unit tests cover each case with deliberately divergent sequences.
+
+The CLI CUDA tick path passes the requested mode into `CudaBackend` and uses the
+same mode to gate hashing of its downloaded host-state mirror. These are not
+currently two separate per-tick hashes: `run_tick_observed` downloads state but
+does not invoke `CudaBackend`'s own hash path, so the host-mirror
+`StateStore::state_hash` is the one per-tick hash performed by this CLI path.
+The frozen §L4 gate was not rerun or amended; only its future protocol cost
+profile has changed.
+
+The fixed case measured 11.09 s median wall / 9.30 s median user before and
+12.15 s wall / 6.88 s user after. After runs 1 and 2 were contended, with wall
+time exceeding user plus system time by 3.62 s and 2.73 s, so user time is the
+load-bearing comparison: **1.35× faster, a 26.02% reduction**. All primary
+CSVs, summary CSVs, run manifests, and emitted final-state hashes were
+byte-identical. The full-duration profile contains no per-tick `state_hash`
+branch; its only `StateStore::state_hash` call is the retained final hash under
+`execution_hashes`. Measurements and profile are under
+`docs/evidence/host-evaluator-hash-on-demand-20260726/`.

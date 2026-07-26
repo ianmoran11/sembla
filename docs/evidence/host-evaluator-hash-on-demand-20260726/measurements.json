@@ -1,0 +1,71 @@
+{
+  "schema": "sembla-host-evaluator-hash-on-demand-before-after-v1",
+  "session": {
+    "date": "2026-07-26",
+    "baseline_commit": "65fd6c2a2ec1c73de0fad3a9548c7ade960e2c9a",
+    "machine": "Apple M2 Pro",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "os": "macOS 15.5 (24F74)"
+  },
+  "case": {
+    "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+    "scale": 1000000,
+    "ticks": 24,
+    "seed": 9009,
+    "areas": 4,
+    "present_fraction": 0.8,
+    "streams": "birth:600,overseas:250,internal:150",
+    "backend": "cpu"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "before": {
+    "binary_sha256": "33347efedbd914ef1a97e54664bb0987a46ccb41b9575d5ad41836fa75288d2d",
+    "runs": [
+      {"run": 1, "wall_seconds": 11.57, "user_seconds": 9.34, "sys_seconds": 1.57},
+      {"run": 2, "wall_seconds": 10.88, "user_seconds": 9.24, "sys_seconds": 1.54},
+      {"run": 3, "wall_seconds": 11.09, "user_seconds": 9.30, "sys_seconds": 1.61}
+    ],
+    "median": {"wall_seconds": 11.09, "user_seconds": 9.30, "sys_seconds": 1.57}
+  },
+  "after": {
+    "binary_sha256": "194f6874e3b9f4a16acc737be751f1211b384755dd2f0cd29aa15a046de27bc2",
+    "runs": [
+      {"run": 1, "wall_seconds": 12.96, "user_seconds": 6.88, "sys_seconds": 2.46, "contended": true, "wall_minus_user_and_sys_seconds": 3.62},
+      {"run": 2, "wall_seconds": 12.15, "user_seconds": 6.89, "sys_seconds": 2.53, "contended": true, "wall_minus_user_and_sys_seconds": 2.73},
+      {"run": 3, "wall_seconds": 8.17, "user_seconds": 6.19, "sys_seconds": 1.70, "contended": false, "wall_minus_user_and_sys_seconds": 0.28}
+    ],
+    "median": {"wall_seconds": 12.15, "user_seconds": 6.88, "sys_seconds": 2.46}
+  },
+  "comparison": {
+    "load_bearing_metric": "user_seconds",
+    "wall_speedup": 0.9128,
+    "wall_reduction_percent": -9.5582,
+    "user_speedup": 1.3517,
+    "user_reduction_percent": 26.0215,
+    "contention_note": "After runs 1 and 2 have wall-minus-user-and-sys gaps of 3.62 s and 2.73 s; user time is load-bearing."
+  },
+  "outputs": {
+    "all_primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_manifests_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f",
+    "final_state_sha256": "2d509ead9aa506e71be155faaa5608542f7ca32cee203ee42b0d3179d670020c",
+    "all_before_and_after_outputs_match": true,
+    "all_before_and_after_manifests_match": true,
+    "profiled_output_matches": true,
+    "profiled_manifest_matches": true
+  },
+  "profile": {
+    "scope": "full_process_lifetime",
+    "interval_milliseconds": 1,
+    "main_thread_samples": 6579,
+    "main_execution_samples": 6471,
+    "per_tick_state_hash_samples": 0,
+    "final_execution_hash_state_hash_samples": 135,
+    "file": "post-change-full-duration.sample.txt",
+    "sha256": "55b130429e8cae62a96a1610b31a705cd1f7c51bbfa50fdac14486b3b1c902fa"
+  }
+}
