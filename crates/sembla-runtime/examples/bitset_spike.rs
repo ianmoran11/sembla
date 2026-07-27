@@ -118,10 +118,16 @@ fn main() {
 
     let (b, s, f) = (median(t_bool), median(t_bits), median(t_fused));
     println!("rows={rows} reps={reps} selected={n_bool}\n");
-    println!("{:<26} {:>10} {:>9} {:>10}", "arm", "ms", "speedup", "mask_MiB");
+    println!(
+        "{:<26} {:>10} {:>9} {:>10}",
+        "arm", "ms", "speedup", "mask_MiB"
+    );
     let bool_mb = rows as f64 / (1024.0 * 1024.0);
     let bits_mb = words_for(rows) as f64 * 8.0 / (1024.0 * 1024.0);
-    println!("{:<26} {b:>10.2} {:>8.1}x {bool_mb:>10.1}", "Vec<bool> chain", 1.0);
+    println!(
+        "{:<26} {b:>10.2} {:>8.1}x {bool_mb:>10.1}",
+        "Vec<bool> chain", 1.0
+    );
     println!(
         "{:<26} {s:>10.2} {:>8.1}x {bits_mb:>10.1}",
         "bitset chain",

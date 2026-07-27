@@ -101,7 +101,10 @@ fn main() {
     }
     let guard_serial_ms = median(times);
 
-    println!("{:<10} {:>9} {:>9} {:>10}", "guard", "threads", "ms", "speedup");
+    println!(
+        "{:<10} {:>9} {:>9} {:>10}",
+        "guard", "threads", "ms", "speedup"
+    );
     println!("{:<10} {:>9} {guard_serial_ms:>9.2} {:>9.1}x", "", 1, 1.0);
     for threads in [2, 4, 8, cores] {
         if threads <= 1 || threads > cores {
@@ -114,7 +117,10 @@ fn main() {
             guard_parallel(&age, &tenure, &mut out, threads);
             times.push(t.elapsed().as_secs_f64() * 1000.0);
         }
-        assert!(out == base_out, "guard: {threads} threads changed the result");
+        assert!(
+            out == base_out,
+            "guard: {threads} threads changed the result"
+        );
         let ms = median(times);
         println!(
             "{:<10} {threads:>9} {ms:>9.2} {:>9.1}x",
@@ -134,7 +140,10 @@ fn main() {
     }
     let clock_serial_ms = median(times);
 
-    println!("\n{:<10} {:>9} {:>9} {:>10}", "clock", "threads", "ms", "speedup");
+    println!(
+        "\n{:<10} {:>9} {:>9} {:>10}",
+        "clock", "threads", "ms", "speedup"
+    );
     println!("{:<10} {:>9} {clock_serial_ms:>9.2} {:>9.1}x", "", 1, 1.0);
     for threads in [2, 4, 8, cores] {
         if threads <= 1 || threads > cores {
@@ -149,7 +158,9 @@ fn main() {
         }
         // Bit-identical, not approximately equal: compare the raw bits.
         assert!(
-            out.iter().zip(&base_clock).all(|(a, b)| a.to_bits() == b.to_bits()),
+            out.iter()
+                .zip(&base_clock)
+                .all(|(a, b)| a.to_bits() == b.to_bits()),
             "clock: {threads} threads changed a draw"
         );
         let ms = median(times);

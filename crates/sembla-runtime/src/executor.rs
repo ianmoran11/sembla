@@ -11,7 +11,8 @@ use sembla_ir::{
 };
 
 use crate::eval::{
-    eval_column, eval_typed_ref_column, AggCache, EvalError, EvalTable, ParamEnv, ValueColumn,
+    element_wise_map_with_initializer, element_wise_parallel_enabled, eval_column,
+    eval_typed_ref_column, AggCache, EvalError, EvalTable, ParamEnv, ValueColumn,
 };
 use crate::rng::exp_f64;
 use crate::state::{ColumnData, InputTable, Snapshot, StateError, StateStore};
@@ -849,6 +850,35 @@ fn report_table_name(model_box: &sembla_ir::Box, table_index: usize, qualify: bo
     }
 }
 
+fn racing_clock_times(
+    guards: &[bool],
+    hazards: &[f64],
+    seed: u64,
+    tick: u32,
+    rule_id: u32,
+    rule_word: u32,
+    dt: f64,
+) -> Result<Vec<Option<(u32, f64)>>, TickError> {
+    let row_count = guards.len().min(hazards.len());
+    element_wise_map_with_initializer(
+        row_count,
+        || Ok(None),
+        |row| {
+            let lambda = hazards[row];
+            if !guards[row] || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
+                return Ok(None);
+            }
+            let entity_id =
+                u32::try_from(row).map_err(|_| TickError::EntityIdOverflow { rule_id, row })?;
+            let race_time = exp_f64(seed, tick, rule_word, entity_id, 0, lambda);
+            Ok((race_time.partial_cmp(&dt) == Some(Ordering::Less))
+                .then_some((entity_id, race_time)))
+        },
+    )
+    .into_iter()
+    .collect()
+}
+
 fn stage_box(
     model: &ValidatedModel,
     box_index: usize,
@@ -898,41 +928,63 @@ fn stage_box(
             };
             claim_columns.push((resource_table_index, resources.values, ordering, claim));
         }
-        for (row, (guard, lambda)) in guards.into_iter().zip(hazards).enumerate() {
-            if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                continue;
-            }
-            let entity_id = u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
-                rule_id: validated.rule_id,
-                row,
-            })?;
-            let race_time = exp_f64(seed, tick, validated.rule_word, entity_id, 0, lambda);
-            if race_time.partial_cmp(&model.model().dt) != Some(Ordering::Less) {
-                continue;
-            }
-            let mut claims = Vec::with_capacity(claim_columns.len());
-            for (resource_table, resources, key_column, claim) in &claim_columns {
-                let ordering = match (&claim.ordering, key_column) {
-                    (ClaimOrdering::RaceTime, None) => OrderingValue::RaceTime(race_time),
-                    (ClaimOrdering::Key { expr }, Some(column)) => {
-                        key_at(column, expr, table_index, model_box, row)?
-                    }
-                    _ => unreachable!("claim ordering column construction is exhaustive"),
-                };
-                claims.push(CandidateClaim {
-                    table_index: *resource_table,
-                    resource_row: resources[row],
-                    ordering,
+        let mut push_candidate =
+            |row: usize, entity_id: u32, race_time: f64| -> Result<(), TickError> {
+                let mut claims = Vec::with_capacity(claim_columns.len());
+                for (resource_table, resources, key_column, claim) in &claim_columns {
+                    let ordering = match (&claim.ordering, key_column) {
+                        (ClaimOrdering::RaceTime, None) => OrderingValue::RaceTime(race_time),
+                        (ClaimOrdering::Key { expr }, Some(column)) => {
+                            key_at(column, expr, table_index, model_box, row)?
+                        }
+                        _ => unreachable!("claim ordering column construction is exhaustive"),
+                    };
+                    claims.push(CandidateClaim {
+                        table_index: *resource_table,
+                        resource_row: resources[row],
+                        ordering,
+                    });
+                }
+                candidates.push(Candidate {
+                    rule_id: validated.rule_id,
+                    rule_word: validated.rule_word,
+                    table_index,
+                    entity_id,
+                    row,
+                    claims,
                 });
+                Ok(())
+            };
+        if element_wise_parallel_enabled(guards.len().min(hazards.len())) {
+            let race_times = racing_clock_times(
+                &guards,
+                &hazards,
+                seed,
+                tick,
+                validated.rule_id,
+                validated.rule_word,
+                model.model().dt,
+            )?;
+            for (row, race_time) in race_times.into_iter().enumerate() {
+                if let Some((entity_id, race_time)) = race_time {
+                    push_candidate(row, entity_id, race_time)?;
+                }
             }
-            candidates.push(Candidate {
-                rule_id: validated.rule_id,
-                rule_word: validated.rule_word,
-                table_index,
-                entity_id,
-                row,
-                claims,
-            });
+        } else {
+            for (row, (guard, lambda)) in guards.into_iter().zip(hazards).enumerate() {
+                if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
+                    continue;
+                }
+                let entity_id = u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
+                    rule_id: validated.rule_id,
+                    row,
+                })?;
+                let race_time = exp_f64(seed, tick, validated.rule_word, entity_id, 0, lambda);
+                if race_time.partial_cmp(&model.model().dt) != Some(Ordering::Less) {
+                    continue;
+                }
+                push_candidate(row, entity_id, race_time)?;
+            }
         }
     }
     let resolution = resolve_claims(&candidates, model_box.tables.len(), model_box)?;
@@ -1382,4 +1434,42 @@ fn detect_double_writes(pending: &[PendingWrite], model: &ValidatedModel) -> Res
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod parallel_tests {
+    use super::*;
+    use crate::eval::with_test_element_wise_workers;
+
+    #[test]
+    fn racing_clock_is_bit_identical_across_worker_counts() {
+        let row_count = 262_144;
+        let guards = (0..row_count).map(|row| row % 5 != 0).collect::<Vec<_>>();
+        let hazards = (0..row_count)
+            .map(|row| {
+                if row % 11 == 0 {
+                    0.0
+                } else {
+                    0.001 + (row % 97) as f64 * 0.000_001
+                }
+            })
+            .collect::<Vec<_>>();
+        let evaluate = |workers| {
+            with_test_element_wise_workers(workers, || {
+                racing_clock_times(&guards, &hazards, 0xC0FFEE, 7, 19, 3, 1_000.0)
+                    .unwrap()
+                    .into_iter()
+                    .map(|value| value.map(|(entity, time)| (entity, time.to_bits())))
+                    .collect::<Vec<_>>()
+            })
+        };
+        let serial = evaluate(1);
+        for workers in [2, 4] {
+            assert_eq!(
+                evaluate(workers),
+                serial,
+                "racing-clock draws changed at {workers} workers"
+            );
+        }
+    }
 }

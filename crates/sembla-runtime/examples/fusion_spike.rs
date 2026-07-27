@@ -261,7 +261,10 @@ fn main() {
         match eval_last.expect("a result") {
             ValueColumn::Bool(values) => {
                 assert_eq!(values.len(), out.len(), "{name}: length differs");
-                assert!(values == out, "{name}: fused result differs from eval_column");
+                assert!(
+                    values == out,
+                    "{name}: fused result differs from eval_column"
+                );
             }
             other => panic!("{name}: expected Bool, got {other:?}"),
         }

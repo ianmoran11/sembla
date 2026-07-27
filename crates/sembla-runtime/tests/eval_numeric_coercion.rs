@@ -23,7 +23,7 @@ fn owned_real_numeric_coercion_moves_its_buffer_without_cloning() {
         "numeric_as_real must not clone an owned numeric column"
     );
     assert!(
-        function.contains("map(|value| value as f64)"),
+        function.contains("values[row] as f64"),
         "Int-to-Real coercion must retain its exact as-f64 conversion"
     );
     assert_eq!(

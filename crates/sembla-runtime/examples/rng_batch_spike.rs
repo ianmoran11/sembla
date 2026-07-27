@@ -26,6 +26,13 @@
 //!
 //!   cargo run --release -p sembla-runtime --example rng_batch_spike -- [rows] [reps]
 
+// Guard predicates are transcribed verbatim from
+// fixtures/demographic/benchmark/demographic_slots.no-grouped.json so a reader
+// can check the spike against the model, and so the timed loops measure the
+// shape the evaluator actually generates. Rewriting them as range containment
+// would break both.
+#![allow(clippy::manual_range_contains)]
+
 use std::time::Instant;
 
 use sembla_runtime::rng::uniform_f64;
@@ -156,8 +163,14 @@ fn main() {
 
     let base = results[0].1;
     let expect = results[0].2;
-    println!("rows={rows} reps={reps} enabled={enabled} ({:.0}%)\n", enabled as f64 / rows as f64 * 100.0);
-    println!("{:<22} {:>9} {:>9} {:>12}", "shape", "ms", "speedup", "ns_per_draw");
+    println!(
+        "rows={rows} reps={reps} enabled={enabled} ({:.0}%)\n",
+        enabled as f64 / rows as f64 * 100.0
+    );
+    println!(
+        "{:<22} {:>9} {:>9} {:>12}",
+        "shape", "ms", "speedup", "ns_per_draw"
+    );
     for (name, ms, fired) in &results {
         assert_eq!(*fired, expect, "{name} changed the fired count");
         println!(
@@ -166,6 +179,8 @@ fn main() {
             ms * 1.0e6 / enabled as f64
         );
     }
-    println!("\nAll arms asserted to fire the same count. Single-threaded here;\n\
-              this composes with the ~5.6x from threading.");
+    println!(
+        "\nAll arms asserted to fire the same count. Single-threaded here;\n\
+              this composes with the ~5.6x from threading."
+    );
 }

@@ -8,6 +8,151 @@
 
 use std::error::Error;
 use std::fmt;
+use std::sync::OnceLock;
+
+/// Fixed row-index tiling keeps result partitioning independent of worker count.
+const ELEMENT_WISE_CHUNK_ROWS: usize = 16_384;
+/// Below this measured crossover, scoped-thread setup costs more than it saves.
+const ELEMENT_WISE_PARALLEL_THRESHOLD: usize = 5_000_000;
+const EVALUATOR_THREADS_ENV: &str = "SEMBLA_EVAL_THREADS";
+
+static ELEMENT_WISE_WORKERS: OnceLock<usize> = OnceLock::new();
+
+#[inline]
+fn element_wise_worker_count() -> usize {
+    #[cfg(test)]
+    if let Some(workers) = TEST_ELEMENT_WISE_WORKERS.with(std::cell::Cell::get) {
+        return workers;
+    }
+
+    *ELEMENT_WISE_WORKERS.get_or_init(|| {
+        std::env::var(EVALUATOR_THREADS_ENV)
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|workers| *workers > 0)
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, usize::from))
+    })
+}
+
+#[inline]
+fn element_wise_parallel_threshold() -> usize {
+    #[cfg(test)]
+    if let Some(threshold) = TEST_ELEMENT_WISE_THRESHOLD.with(std::cell::Cell::get) {
+        return threshold;
+    }
+    ELEMENT_WISE_PARALLEL_THRESHOLD
+}
+
+#[inline]
+pub(crate) fn element_wise_parallel_enabled(row_count: usize) -> bool {
+    row_count >= element_wise_parallel_threshold()
+        && element_wise_worker_count() > 1
+        && row_count.div_ceil(ELEMENT_WISE_CHUNK_ROWS) > 1
+}
+
+/// Maps rows in fixed index chunks and restores those chunks in index order.
+///
+/// Worker count affects only which worker claims each fixed chunk. It cannot
+/// affect chunk boundaries, operation order within a row, or output order.
+#[inline]
+pub(crate) fn element_wise_map<T, F>(row_count: usize, map: F) -> Vec<T>
+where
+    T: Default + Send,
+    F: Fn(usize) -> T + Sync,
+{
+    element_wise_map_with_initializer(row_count, T::default, map)
+}
+
+#[inline]
+pub(crate) fn element_wise_map_with_initializer<T, I, F>(
+    row_count: usize,
+    initialize: I,
+    map: F,
+) -> Vec<T>
+where
+    T: Send,
+    I: Fn() -> T,
+    F: Fn(usize) -> T + Sync,
+{
+    element_wise_map_initialized_with_workers(
+        row_count,
+        element_wise_worker_count(),
+        initialize,
+        map,
+    )
+}
+
+#[cfg(test)]
+fn element_wise_map_with_workers<T, F>(row_count: usize, workers: usize, map: F) -> Vec<T>
+where
+    T: Default + Send,
+    F: Fn(usize) -> T + Sync,
+{
+    element_wise_map_initialized_with_workers(row_count, workers, T::default, map)
+}
+
+#[inline]
+fn element_wise_map_initialized_with_workers<T, I, F>(
+    row_count: usize,
+    workers: usize,
+    initialize: I,
+    map: F,
+) -> Vec<T>
+where
+    T: Send,
+    I: Fn() -> T,
+    F: Fn(usize) -> T + Sync,
+{
+    let chunk_count = row_count.div_ceil(ELEMENT_WISE_CHUNK_ROWS);
+    let workers = workers.max(1).min(chunk_count.max(1));
+    if row_count < element_wise_parallel_threshold() || workers == 1 {
+        return (0..row_count).map(map).collect();
+    }
+
+    let mut output = std::iter::repeat_with(initialize)
+        .take(row_count)
+        .collect::<Vec<_>>();
+    let mut worker_chunks = std::iter::repeat_with(Vec::new)
+        .take(workers)
+        .collect::<Vec<Vec<(usize, &mut [T])>>>();
+    for (chunk, values) in output.chunks_mut(ELEMENT_WISE_CHUNK_ROWS).enumerate() {
+        worker_chunks[chunk % workers].push((chunk, values));
+    }
+    std::thread::scope(|scope| {
+        for chunks in worker_chunks {
+            let map = &map;
+            scope.spawn(move || {
+                for (chunk, values) in chunks {
+                    let start = chunk * ELEMENT_WISE_CHUNK_ROWS;
+                    for (offset, output) in values.iter_mut().enumerate() {
+                        *output = map(start + offset);
+                    }
+                }
+            });
+        }
+    });
+    output
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_ELEMENT_WISE_WORKERS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    static TEST_ELEMENT_WISE_THRESHOLD: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn with_test_element_wise_workers<R>(workers: usize, run: impl FnOnce() -> R) -> R {
+    TEST_ELEMENT_WISE_WORKERS.with(|worker_slot| {
+        TEST_ELEMENT_WISE_THRESHOLD.with(|threshold_slot| {
+            let previous_workers = worker_slot.replace(Some(workers.max(1)));
+            let previous_threshold = threshold_slot.replace(Some(0));
+            let result = run();
+            threshold_slot.set(previous_threshold);
+            worker_slot.set(previous_workers);
+            result
+        })
+    })
+}
 
 use sembla_ir::{
     AggJoin, AggOp, Aggregate, Attr, AttrType, Expr, ParamType, ParamValue, Table, ValidatedModel,
@@ -859,17 +1004,27 @@ fn eval_expr(
             let (InternalColumn::Bool(lhs), InternalColumn::Bool(rhs)) = (lhs, rhs) else {
                 return Err(EvalError::new("boolean operands did not evaluate to Bool"));
             };
-            let values = lhs
-                .into_iter()
-                .zip(rhs)
-                .map(|(lhs, rhs)| {
+            let row_count = lhs.len().min(rhs.len());
+            let values = if element_wise_parallel_enabled(row_count) {
+                element_wise_map(row_count, |row| {
                     if matches!(expr, Expr::And { .. }) {
-                        lhs && rhs
+                        lhs[row] && rhs[row]
                     } else {
-                        lhs || rhs
+                        lhs[row] || rhs[row]
                     }
                 })
-                .collect();
+            } else {
+                lhs.into_iter()
+                    .zip(rhs)
+                    .map(|(lhs, rhs)| {
+                        if matches!(expr, Expr::And { .. }) {
+                            lhs && rhs
+                        } else {
+                            lhs || rhs
+                        }
+                    })
+                    .collect()
+            };
             Ok(InternalColumn::Bool(values))
         }
         Expr::Not { expr } => {
@@ -877,9 +1032,12 @@ fn eval_expr(
             let InternalColumn::Bool(values) = values else {
                 return Err(EvalError::new("Not operand did not evaluate to Bool"));
             };
-            Ok(InternalColumn::Bool(
-                values.into_iter().map(|value| !value).collect(),
-            ))
+            let values = if element_wise_parallel_enabled(values.len()) {
+                element_wise_map(values.len(), |row| !values[row])
+            } else {
+                values.into_iter().map(|value| !value).collect()
+            };
+            Ok(InternalColumn::Bool(values))
         }
         Expr::EnumIs { attr, variant } => {
             let declaration = find_attr(row_attrs, attr)?;
@@ -899,9 +1057,7 @@ fn eval_expr(
             }
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), attr)?;
             let enum_values = column.enum_values()?;
-            let values = (0..row_count)
-                .map(|row| enum_values[row] == variant)
-                .collect();
+            let values = element_wise_map(row_count, |row| enum_values[row] == variant);
             Ok(InternalColumn::Bool(values))
         }
         Expr::Input { port, agg } => {
@@ -1197,33 +1353,33 @@ fn eval_self_attr(
         AttrType::Real => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.real_values()?;
-            Ok(InternalColumn::Real(
-                (0..row_count).map(|row| values[row]).collect(),
-            ))
+            Ok(InternalColumn::Real(element_wise_map(row_count, |row| {
+                values[row]
+            })))
         }
         AttrType::Int if row_count == 0 => Ok(InternalColumn::Int(Vec::new())),
         AttrType::Int => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.int_values()?;
-            Ok(InternalColumn::Int(
-                (0..row_count).map(|row| values[row]).collect(),
-            ))
+            Ok(InternalColumn::Int(element_wise_map(row_count, |row| {
+                values[row]
+            })))
         }
         AttrType::Enum { .. } if row_count == 0 => Ok(InternalColumn::Enum(Vec::new())),
         AttrType::Enum { .. } => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.enum_values()?;
-            Ok(InternalColumn::Enum(
-                (0..row_count).map(|row| values[row]).collect(),
-            ))
+            Ok(InternalColumn::Enum(element_wise_map(row_count, |row| {
+                values[row]
+            })))
         }
         AttrType::Ref { .. } if row_count == 0 => Ok(InternalColumn::Ref(Vec::new())),
         AttrType::Ref { .. } => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.ref_values()?;
-            Ok(InternalColumn::Ref(
-                (0..row_count).map(|row| values[row]).collect(),
-            ))
+            Ok(InternalColumn::Ref(element_wise_map(row_count, |row| {
+                values[row]
+            })))
         }
     }
 }
@@ -1255,7 +1411,15 @@ fn eval_arithmetic(
     {
         let lhs = numeric_as_real(lhs)?;
         let rhs = numeric_as_real(rhs)?;
-        return Ok(InternalColumn::Real(
+        let row_count = lhs.len().min(rhs.len());
+        let values = if element_wise_parallel_enabled(row_count) {
+            element_wise_map(row_count, |row| match operation {
+                Arithmetic::Add => lhs[row] + rhs[row],
+                Arithmetic::Sub => lhs[row] - rhs[row],
+                Arithmetic::Mul => lhs[row] * rhs[row],
+                Arithmetic::Div => lhs[row] / rhs[row],
+            })
+        } else {
             lhs.into_iter()
                 .zip(rhs)
                 .map(|(lhs, rhs)| match operation {
@@ -1264,26 +1428,49 @@ fn eval_arithmetic(
                     Arithmetic::Mul => lhs * rhs,
                     Arithmetic::Div => lhs / rhs,
                 })
-                .collect(),
-        ));
+                .collect()
+        };
+        return Ok(InternalColumn::Real(values));
     }
     let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (lhs, rhs) else {
         return Err(EvalError::new("arithmetic operands are not numeric"));
     };
-    let values = lhs
+    let row_count = lhs.len().min(rhs.len());
+    let values = if element_wise_parallel_enabled(row_count) {
+        element_wise_map_with_initializer(
+            row_count,
+            || Ok(0_i64),
+            |row| {
+                let value = match operation {
+                    Arithmetic::Add => lhs[row].checked_add(rhs[row]),
+                    Arithmetic::Sub => lhs[row].checked_sub(rhs[row]),
+                    Arithmetic::Mul => lhs[row].checked_mul(rhs[row]),
+                    Arithmetic::Div => unreachable!("division promotes to Real"),
+                };
+                value.ok_or_else(|| {
+                    EvalError::new(format!("integer arithmetic overflow at row {row}"))
+                })
+            },
+        )
         .into_iter()
-        .zip(rhs)
-        .enumerate()
-        .map(|(row, (lhs, rhs))| {
-            let value = match operation {
-                Arithmetic::Add => lhs.checked_add(rhs),
-                Arithmetic::Sub => lhs.checked_sub(rhs),
-                Arithmetic::Mul => lhs.checked_mul(rhs),
-                Arithmetic::Div => unreachable!("division promotes to Real"),
-            };
-            value.ok_or_else(|| EvalError::new(format!("integer arithmetic overflow at row {row}")))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?
+    } else {
+        lhs.into_iter()
+            .zip(rhs)
+            .enumerate()
+            .map(|(row, (lhs, rhs))| {
+                let value = match operation {
+                    Arithmetic::Add => lhs.checked_add(rhs),
+                    Arithmetic::Sub => lhs.checked_sub(rhs),
+                    Arithmetic::Mul => lhs.checked_mul(rhs),
+                    Arithmetic::Div => unreachable!("division promotes to Real"),
+                };
+                value.ok_or_else(|| {
+                    EvalError::new(format!("integer arithmetic overflow at row {row}"))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    };
     Ok(InternalColumn::Int(values))
 }
 
@@ -1326,36 +1513,74 @@ fn eval_equality(
         (lhs, rhs)
     };
     let equal = equal_columns(lhs, rhs)?;
-    Ok(InternalColumn::Bool(
+    let values = if element_wise_parallel_enabled(equal.len()) {
+        element_wise_map(
+            equal.len(),
+            |row| {
+                if negate {
+                    !equal[row]
+                } else {
+                    equal[row]
+                }
+            },
+        )
+    } else {
         equal
             .into_iter()
             .map(|value| if negate { !value } else { value })
-            .collect(),
-    ))
+            .collect()
+    };
+    Ok(InternalColumn::Bool(values))
 }
 
 fn equal_columns(lhs: InternalColumn, rhs: InternalColumn) -> Result<Vec<bool>, EvalError> {
     if let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (&lhs, &rhs) {
-        return Ok(lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect());
+        let row_count = lhs.len().min(rhs.len());
+        return Ok(if element_wise_parallel_enabled(row_count) {
+            element_wise_map(row_count, |row| lhs[row] == rhs[row])
+        } else {
+            lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+        });
     }
     if matches!(lhs, InternalColumn::Real(_) | InternalColumn::Int(_))
         && matches!(rhs, InternalColumn::Real(_) | InternalColumn::Int(_))
     {
-        return Ok(numeric_as_real(lhs)?
-            .into_iter()
-            .zip(numeric_as_real(rhs)?)
-            .map(|(lhs, rhs)| lhs == rhs)
-            .collect());
+        let lhs = numeric_as_real(lhs)?;
+        let rhs = numeric_as_real(rhs)?;
+        let row_count = lhs.len().min(rhs.len());
+        return Ok(if element_wise_parallel_enabled(row_count) {
+            element_wise_map(row_count, |row| lhs[row] == rhs[row])
+        } else {
+            lhs.into_iter()
+                .zip(rhs)
+                .map(|(lhs, rhs)| lhs == rhs)
+                .collect()
+        });
     }
     let values = match (lhs, rhs) {
         (InternalColumn::Bool(lhs), InternalColumn::Bool(rhs)) => {
-            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            let row_count = lhs.len().min(rhs.len());
+            if element_wise_parallel_enabled(row_count) {
+                element_wise_map(row_count, |row| lhs[row] == rhs[row])
+            } else {
+                lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            }
         }
         (InternalColumn::Enum(lhs), InternalColumn::Enum(rhs)) => {
-            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            let row_count = lhs.len().min(rhs.len());
+            if element_wise_parallel_enabled(row_count) {
+                element_wise_map(row_count, |row| lhs[row] == rhs[row])
+            } else {
+                lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            }
         }
         (InternalColumn::Ref(lhs), InternalColumn::Ref(rhs)) => {
-            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            let row_count = lhs.len().min(rhs.len());
+            if element_wise_parallel_enabled(row_count) {
+                element_wise_map(row_count, |row| lhs[row] == rhs[row])
+            } else {
+                lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
+            }
         }
         _ => return Err(EvalError::new("equality operands have incompatible types")),
     };
@@ -1384,7 +1609,15 @@ fn eval_ordering(
     let lhs = eval_expr(lhs, table, row_attrs, snapshot, params, cache, None)?;
     let rhs = eval_expr(rhs, table, row_attrs, snapshot, params, cache, None)?;
     if let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (&lhs, &rhs) {
-        return Ok(InternalColumn::Bool(
+        let row_count = lhs.len().min(rhs.len());
+        let values = if element_wise_parallel_enabled(row_count) {
+            element_wise_map(row_count, |row| match operation {
+                Ordering::Lt => lhs[row] < rhs[row],
+                Ordering::Le => lhs[row] <= rhs[row],
+                Ordering::Gt => lhs[row] > rhs[row],
+                Ordering::Ge => lhs[row] >= rhs[row],
+            })
+        } else {
             lhs.iter()
                 .zip(rhs)
                 .map(|(lhs, rhs)| match operation {
@@ -1393,12 +1626,21 @@ fn eval_ordering(
                     Ordering::Gt => lhs > rhs,
                     Ordering::Ge => lhs >= rhs,
                 })
-                .collect(),
-        ));
+                .collect()
+        };
+        return Ok(InternalColumn::Bool(values));
     }
     let lhs = numeric_as_real(lhs)?;
     let rhs = numeric_as_real(rhs)?;
-    Ok(InternalColumn::Bool(
+    let row_count = lhs.len().min(rhs.len());
+    let values = if element_wise_parallel_enabled(row_count) {
+        element_wise_map(row_count, |row| match operation {
+            Ordering::Lt => lhs[row] < rhs[row],
+            Ordering::Le => lhs[row] <= rhs[row],
+            Ordering::Gt => lhs[row] > rhs[row],
+            Ordering::Ge => lhs[row] >= rhs[row],
+        })
+    } else {
         lhs.into_iter()
             .zip(rhs)
             .map(|(lhs, rhs)| match operation {
@@ -1407,13 +1649,17 @@ fn eval_ordering(
                 Ordering::Gt => lhs > rhs,
                 Ordering::Ge => lhs >= rhs,
             })
-            .collect(),
-    ))
+            .collect()
+    };
+    Ok(InternalColumn::Bool(values))
 }
 
 fn numeric_as_real(column: InternalColumn) -> Result<Vec<f64>, EvalError> {
     match column {
         InternalColumn::Real(values) => Ok(values),
+        InternalColumn::Int(values) if element_wise_parallel_enabled(values.len()) => {
+            Ok(element_wise_map(values.len(), |row| values[row] as f64))
+        }
         InternalColumn::Int(values) => Ok(values.into_iter().map(|value| value as f64).collect()),
         _ => Err(EvalError::new(
             "numeric expression did not evaluate to Real or Int",
@@ -1831,7 +2077,10 @@ fn parameter_value_matches(parameter_type: ParamType, value: &ParamValue) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::state::{ColumnInit, StateStore, TableInit};
     use sembla_ir::{validate, Box as ModelBox, Model};
+    use std::collections::HashSet;
+    use std::sync::{Arc, Barrier, Mutex};
 
     #[test]
     fn input_enum_equality_accepts_literal_on_the_left() {
@@ -1878,5 +2127,193 @@ mod tests {
             eval_input_scalar(&expression, &input, 0, &params),
             Ok(InputScalar::Bool(true))
         ));
+    }
+
+    fn parallel_fixture(row_count: usize) -> (ValidatedModel, StateStore) {
+        let model = validate(Model {
+            name: "parallel-eval".to_owned(),
+            dt: 1.0,
+            params: Vec::new(),
+            boxes: vec![ModelBox {
+                name: "world".to_owned(),
+                tables: vec![
+                    Table {
+                        name: "Group".to_owned(),
+                        size_hint: 4,
+                        attrs: Vec::new(),
+                    },
+                    Table {
+                        name: "Person".to_owned(),
+                        size_hint: row_count as u64,
+                        attrs: vec![
+                            Attr {
+                                name: "x".to_owned(),
+                                ty: AttrType::Real,
+                            },
+                            Attr {
+                                name: "group".to_owned(),
+                                ty: AttrType::Ref {
+                                    table: "Group".to_owned(),
+                                },
+                            },
+                        ],
+                    },
+                ],
+                transitions: Vec::new(),
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                views: Vec::new(),
+                grouped_views: Vec::new(),
+            }],
+            wires: Vec::new(),
+            summaries: Vec::new(),
+        })
+        .unwrap();
+        let values = (0..row_count)
+            .map(|row| (row as f64 - 17_000.0) / 7.0)
+            .collect();
+        let groups = (0..row_count).map(|row| (row % 4) as u32).collect();
+        let state = StateStore::new(
+            &model,
+            vec![
+                TableInit::new("world", "Group", 4, Vec::new()),
+                TableInit::new(
+                    "world",
+                    "Person",
+                    row_count,
+                    vec![
+                        ColumnInit::new("x", ColumnData::Real(values)),
+                        ColumnInit::new("group", ColumnData::Ref(groups)),
+                    ],
+                ),
+            ],
+        )
+        .unwrap();
+        (model, state)
+    }
+
+    fn evaluate_real_bits(
+        expr: &Expr,
+        model: &ValidatedModel,
+        state: &StateStore,
+        workers: usize,
+    ) -> Vec<u64> {
+        with_test_element_wise_workers(workers, || {
+            let params = ParamEnv::defaults(model);
+            let snapshot = state.snapshot();
+            let mut cache = AggCache::new(model, &snapshot, &params);
+            let ValueColumn::Real(values) = eval_column(
+                expr,
+                EvalTable::new(model, "world", "Person").unwrap(),
+                &snapshot,
+                &params,
+                &mut cache,
+            )
+            .unwrap() else {
+                panic!("parallel test expression must be Real");
+            };
+            values.into_iter().map(f64::to_bits).collect()
+        })
+    }
+
+    #[test]
+    fn fixed_row_chunks_honour_the_parallel_threshold() {
+        let caller = std::thread::current().id();
+        let below_threads = Mutex::new(HashSet::new());
+        let below = element_wise_map_with_workers(ELEMENT_WISE_PARALLEL_THRESHOLD - 1, 4, |row| {
+            below_threads
+                .lock()
+                .unwrap()
+                .insert(std::thread::current().id());
+            row
+        });
+        assert_eq!(below.len(), ELEMENT_WISE_PARALLEL_THRESHOLD - 1);
+        assert_eq!(below_threads.into_inner().unwrap(), HashSet::from([caller]));
+        drop(below);
+
+        let row_count = ELEMENT_WISE_PARALLEL_THRESHOLD;
+        let barrier = Arc::new(Barrier::new(4));
+        let above_threads = Mutex::new(HashSet::new());
+        let above = element_wise_map_with_workers(row_count, 4, |row| {
+            if row < ELEMENT_WISE_CHUNK_ROWS * 4 && row % ELEMENT_WISE_CHUNK_ROWS == 0 {
+                barrier.wait();
+            }
+            above_threads
+                .lock()
+                .unwrap()
+                .insert(std::thread::current().id());
+            row
+        });
+        assert_eq!(above, (0..row_count).collect::<Vec<_>>());
+        assert_eq!(above_threads.into_inner().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn real_arithmetic_chain_is_bit_identical_across_worker_counts() {
+        let (model, state) = parallel_fixture(262_144);
+        let expr = Expr::Div {
+            lhs: Box::new(Expr::Mul {
+                lhs: Box::new(Expr::Add {
+                    lhs: Box::new(Expr::SelfAttr {
+                        name: "x".to_owned(),
+                    }),
+                    rhs: Box::new(Expr::Real { value: 0.25 }),
+                }),
+                rhs: Box::new(Expr::Sub {
+                    lhs: Box::new(Expr::SelfAttr {
+                        name: "x".to_owned(),
+                    }),
+                    rhs: Box::new(Expr::Real { value: -0.5 }),
+                }),
+            }),
+            rhs: Box::new(Expr::Real { value: 3.0 }),
+        };
+        let serial = evaluate_real_bits(&expr, &model, &state, 1);
+        for workers in [2, 4] {
+            assert_eq!(
+                evaluate_real_bits(&expr, &model, &state, workers),
+                serial,
+                "Real arithmetic changed at {workers} workers"
+            );
+        }
+    }
+
+    #[test]
+    fn real_aggregate_reduction_stays_bit_identical_and_sequential() {
+        let (model, state) = parallel_fixture(262_144);
+        let expr = Expr::Agg {
+            op: AggOp::Sum {
+                value: Box::new(Expr::SelfAttr {
+                    name: "x".to_owned(),
+                }),
+            },
+            table: "Person".to_owned(),
+            on: AggJoin {
+                fk_attr: "group".to_owned(),
+                self_fk_attr: "group".to_owned(),
+            },
+            filter: Box::new(Expr::Bool { value: true }),
+        };
+        let serial = evaluate_real_bits(&expr, &model, &state, 1);
+        for workers in [2, 4] {
+            assert_eq!(
+                evaluate_real_bits(&expr, &model, &state, workers),
+                serial,
+                "Real aggregate changed at {workers} workers"
+            );
+        }
+
+        let reduction = include_str!("eval.rs")
+            .split_once("// This ascending target-row pass is the canonical CPU reduction order.")
+            .unwrap()
+            .1
+            .split_once("Ok(Accumulator::Real(groups))")
+            .unwrap()
+            .0;
+        assert!(reduction.contains("for (row, (include, value))"));
+        assert!(
+            !reduction.contains("element_wise_map"),
+            "the canonical f64 reduction must remain sequential"
+        );
     }
 }

@@ -43,12 +43,7 @@ fn philox_round(counter: [u32; 4], key: [u32; 2]) -> [u32; 4] {
     let p1 = u64::from(M1) * u64::from(counter[2]);
     let (l0, h0) = (p0 as u32, (p0 >> 32) as u32);
     let (l1, h1) = (p1 as u32, (p1 >> 32) as u32);
-    [
-        h1 ^ counter[1] ^ key[0],
-        l1,
-        h0 ^ counter[3] ^ key[1],
-        l0,
-    ]
+    [h1 ^ counter[1] ^ key[0], l1, h0 ^ counter[3] ^ key[1], l0]
 }
 
 fn philox(seed: u64, tick: u32, rule: u32, entity: u32, idx: u32, rounds: usize) -> [u32; 4] {
@@ -89,7 +84,7 @@ fn mantissa_to_open(mantissa: u64) -> f64 {
 
 fn draw(variant: u8, entity: u32) -> (f64, u64) {
     match variant {
-        0 | 1 | 2 => {
+        0..=2 => {
             let rounds = match variant {
                 0 => 10,
                 1 => 7,
@@ -97,7 +92,10 @@ fn draw(variant: u8, entity: u32) -> (f64, u64) {
             };
             let lanes = philox(0xC0FF_EE00_1234_5678, 7, 3, entity, 0, rounds);
             let m = (u64::from(lanes[0]) << 21) | (u64::from(lanes[1]) >> 11);
-            (mantissa_to_open(m), u64::from(lanes[0]) << 32 | u64::from(lanes[1]))
+            (
+                mantissa_to_open(m),
+                u64::from(lanes[0]) << 32 | u64::from(lanes[1]),
+            )
         }
         _ => {
             let bits = mix64(0xC0FF_EE00_1234_5678, 7, 3, entity, 0);
@@ -119,7 +117,12 @@ fn main() {
     );
 
     let mut base_ns = 0.0;
-    for (variant, name) in [(0_u8, "philox-10"), (1, "philox-7"), (2, "philox-4"), (3, "mix64")] {
+    for (variant, name) in [
+        (0_u8, "philox-10"),
+        (1, "philox-7"),
+        (2, "philox-4"),
+        (3, "mix64"),
+    ] {
         // --- speed ---
         let mut times = Vec::new();
         for _ in 0..5 {
@@ -179,8 +182,7 @@ fn main() {
             syy += y * y;
         }
         let nf = n as f64;
-        let corr = (nf * sxy - sx * sy)
-            / (((nf * sxx - sx * sx) * (nf * syy - sy * sy)).sqrt());
+        let corr = (nf * sxy - sx * sy) / (((nf * sxx - sx * sx) * (nf * syy - sy * sy)).sqrt());
 
         println!(
             "{name:<12} {ns:>9.2} {:>7.2}x {:>12} {:>12.1} {:>12.5}",

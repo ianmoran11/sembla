@@ -178,3 +178,28 @@ Reference: after `prds-host-evaluator-performance`, best uncontended run was
 
 Parallel PRDs must additionally report single-thread time, so a regression in
 serial efficiency cannot hide behind core count.
+
+## PRD 0001 implementation status
+
+PRD 0001 uses `std::thread::scope` above a measured 5,000,000-row threshold,
+with fixed 16,384-row chunks. Chunk boundaries and final output positions are
+functions only of row index and row count; the available worker count changes
+only which worker receives a complete fixed chunk. Real reductions and conflict
+resolution remain sequential. `SEMBLA_EVAL_THREADS` provides the semantically
+inert worker-budget override used by the required 1-, 2-, and 4-worker
+bit-identity tests and the single-worker measurements.
+
+Threshold trials found that one scoped region per expression node regressed the
+full 1M and 2M cases even though isolated maps were already faster. The 5M
+threshold therefore preserves the original serial path for those cases and is
+where the binding spike measured 5.3–5.6× isolated speedups. This is the
+expected near-1× finding that motivates the later one-region-per-tick tiling
+PRD; it is recorded rather than hidden behind a premature pool or fusion
+workaround.
+
+The binding five-run corpus reported a fastest uncontended 7.30 s wall / 5.81 s
+user before, 7.25 / 5.79 s after, and 7.26 / 5.80 s with an explicit single
+worker. All CSVs, summaries, manifests, stdout hashes, and final-state hashes
+were byte-identical. Threshold measurements, every run, contention flags,
+thread counts, input and binary hashes, medians, and output hashes are under
+[`docs/evidence/evaluator-parallel-element-wise-20260727/`](../evidence/evaluator-parallel-element-wise-20260727/).

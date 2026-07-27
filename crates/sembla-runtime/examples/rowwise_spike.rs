@@ -31,6 +31,13 @@
 //!
 //!   cargo run --release -p sembla-runtime --example rowwise_spike -- [rows] [reps]
 
+// Guard predicates are transcribed verbatim from
+// fixtures/demographic/benchmark/demographic_slots.no-grouped.json so a reader
+// can check the spike against the model, and so the timed loops measure the
+// shape the evaluator actually generates. Rewriting them as range containment
+// would break both.
+#![allow(clippy::manual_range_contains)]
+
 use std::time::Instant;
 
 use sembla_runtime::rng::{exp_f64, uniform_f64};
@@ -241,7 +248,11 @@ fn row_wise_guarded(age: &[i64], tenure: &[i64], status: &[i64], threads: usize)
                             }
                         }
                     }
-                    TickResult { band_counts, guard_counts, fired }
+                    TickResult {
+                        band_counts,
+                        guard_counts,
+                        fired,
+                    }
                 })
             })
             .collect();
@@ -253,8 +264,12 @@ fn row_wise_guarded(age: &[i64], tenure: &[i64], status: &[i64], threads: usize)
         fired: 0,
     };
     for p in partials {
-        for (o, v) in out.band_counts.iter_mut().zip(&p.band_counts) { *o += v; }
-        for (o, v) in out.guard_counts.iter_mut().zip(&p.guard_counts) { *o += v; }
+        for (o, v) in out.band_counts.iter_mut().zip(&p.band_counts) {
+            *o += v;
+        }
+        for (o, v) in out.guard_counts.iter_mut().zip(&p.guard_counts) {
+            *o += v;
+        }
         out.fired += p.fired;
     }
     out
@@ -271,7 +286,7 @@ fn partial(age: &[i64], tenure: &[i64], threads: usize, stage: u8) -> u64 {
                 let base = t * chunk;
                 let end = (base + chunk).min(rows);
                 scope.spawn(move || {
-                    let mut bands = vec![0_u64; BANDS];
+                    let mut bands = [0_u64; BANDS];
                     let mut acc = 0_u64;
                     for row in base..end {
                         let a = age[row];
@@ -361,7 +376,12 @@ fn main() {
         t_grd.push(t.elapsed().as_secs_f64() * 1000.0);
     }
 
-    let (c, r, p, g) = (r_col.unwrap(), r_row.unwrap(), r_par.unwrap(), r_grd.unwrap());
+    let (c, r, p, g) = (
+        r_col.unwrap(),
+        r_row.unwrap(),
+        r_par.unwrap(),
+        r_grd.unwrap(),
+    );
     assert_eq!(c, r, "row-wise disagreed with column-wise");
     assert_eq!(c, p, "threaded row-wise disagreed with column-wise");
     assert_eq!(c, g, "guarded row-wise disagreed with column-wise");
@@ -373,7 +393,10 @@ fn main() {
          state touched: {:.0} MiB\n",
         bytes as f64 / (1024.0 * 1024.0)
     );
-    println!("{:<26} {:>10} {:>10} {:>14}", "shape", "ms", "speedup", "x_above_floor");
+    println!(
+        "{:<26} {:>10} {:>10} {:>14}",
+        "shape", "ms", "speedup", "x_above_floor"
+    );
     for (name, ms) in [
         ("column-wise (current)", mc),
         ("row-wise, 1 thread", mr),

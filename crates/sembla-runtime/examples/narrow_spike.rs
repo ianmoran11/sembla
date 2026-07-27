@@ -22,6 +22,13 @@
 //!
 //!   cargo run --release -p sembla-runtime --example narrow_spike -- [rows] [reps]
 
+// Guard predicates are transcribed verbatim from
+// fixtures/demographic/benchmark/demographic_slots.no-grouped.json so a reader
+// can check the spike against the model, and so the timed loops measure the
+// shape the evaluator actually generates. Rewriting them as range containment
+// would break both.
+#![allow(clippy::manual_range_contains)]
+
 use std::time::Instant;
 
 fn median(mut xs: Vec<f64>) -> f64 {

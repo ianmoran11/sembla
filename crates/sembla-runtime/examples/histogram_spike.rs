@@ -96,14 +96,32 @@ fn main() {
         t_hist.push(t.elapsed().as_secs_f64() * 1000.0);
     }
 
-    assert_eq!(c_sep, c_sepf, "fused per-band disagreed with the current shape");
+    assert_eq!(
+        c_sep, c_sepf,
+        "fused per-band disagreed with the current shape"
+    );
     assert_eq!(c_sep, c_hist, "histogram disagreed with the current shape");
 
     let (a, b, c) = (median(t_sep), median(t_sepf), median(t_hist));
     println!("rows={rows} reps={reps} bands={BANDS}\n");
-    println!("{:<28} {:>10} {:>9} {:>8}", "arm", "ms", "speedup", "passes");
-    println!("{:<28} {a:>10.2} {:>8.1}x {BANDS:>8}", "separate + intermediates", 1.0);
-    println!("{:<28} {b:>10.2} {:>8.1}x {BANDS:>8}", "separate, fused", a / b);
-    println!("{:<28} {c:>10.2} {:>8.1}x {:>8}", "single histogram", a / c, 1);
+    println!(
+        "{:<28} {:>10} {:>9} {:>8}",
+        "arm", "ms", "speedup", "passes"
+    );
+    println!(
+        "{:<28} {a:>10.2} {:>8.1}x {BANDS:>8}",
+        "separate + intermediates", 1.0
+    );
+    println!(
+        "{:<28} {b:>10.2} {:>8.1}x {BANDS:>8}",
+        "separate, fused",
+        a / b
+    );
+    println!(
+        "{:<28} {c:>10.2} {:>8.1}x {:>8}",
+        "single histogram",
+        a / c,
+        1
+    );
     println!("\nAll arms asserted to produce identical per-band counts.");
 }
