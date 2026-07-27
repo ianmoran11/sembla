@@ -15,8 +15,16 @@ use crate::eval::{
     tick_worker_count, AggCache, EvalError, EvalTable, ParamEnv, PreparedColumn, PreparedExpr,
     PreparedValue, ValueColumn,
 };
-use crate::rng::exp_f64;
+use crate::rng::{exp_f64, exp_f64_from_uniform, uniform_f64};
 use crate::state::{ColumnData, InputTable, Snapshot, StateError, StateStore};
+
+/// Relative slack below the `exp(-lambda * dt)` boundary used only to reject
+/// certain non-firers. Near the benchmark's thresholds, one binary64 ULP is at
+/// most `2^-52` relative; `1e-12` is about 4,500 ULPs. That envelope dominates
+/// the documented one-ULP platform `exp`/`ln` disagreement plus the handful of
+/// rounding steps that form the threshold. Candidates inside the envelope are
+/// still decided by the canonical platform-`ln` racing clock.
+const RACING_CLOCK_FILTER_RELATIVE_MARGIN: f64 = 1e-12;
 
 /// A numeric observation scalar. Real equality is bitwise so report equality
 /// remains an exact determinism check, including signed zero and NaN payloads.
@@ -196,6 +204,76 @@ impl From<StateError> for TickError {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+struct RacingClockFilter {
+    lo: f64,
+}
+
+impl RacingClockFilter {
+    fn for_hazard(lambda: f64, dt: f64) -> Option<Self> {
+        if lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
+            return None;
+        }
+        let threshold = (-(lambda * dt)).exp();
+        let lo = threshold * (1.0 - RACING_CLOCK_FILTER_RELATIVE_MARGIN);
+        (!lo.is_nan()).then_some(Self { lo })
+    }
+
+    fn admits(self, uniform: f64) -> bool {
+        uniform.partial_cmp(&self.lo) != Some(Ordering::Less)
+    }
+}
+
+fn has_constant_hazard(expr: &Expr) -> bool {
+    matches!(expr, Expr::Real { .. } | Expr::Param { .. })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RacingClockCoordinates {
+    seed: u64,
+    tick: u32,
+    rule_id: u32,
+    rule_word: u32,
+    row: usize,
+}
+
+/// Converts the row before consulting the filter so an enabled candidate keeps
+/// the canonical `EntityIdOverflow` path even when its draw would be rejected.
+fn candidate_race_time(
+    coordinates: RacingClockCoordinates,
+    lambda: f64,
+    dt: f64,
+    filter: Option<RacingClockFilter>,
+) -> Result<Option<(u32, f64)>, TickError> {
+    let entity_id = u32::try_from(coordinates.row).map_err(|_| TickError::EntityIdOverflow {
+        rule_id: coordinates.rule_id,
+        row: coordinates.row,
+    })?;
+    let race_time = if let Some(filter) = filter {
+        let uniform = uniform_f64(
+            coordinates.seed,
+            coordinates.tick,
+            coordinates.rule_word,
+            entity_id,
+            0,
+        );
+        if !filter.admits(uniform) {
+            return Ok(None);
+        }
+        exp_f64_from_uniform(uniform, lambda)
+    } else {
+        exp_f64(
+            coordinates.seed,
+            coordinates.tick,
+            coordinates.rule_word,
+            entity_id,
+            0,
+            lambda,
+        )
+    };
+    Ok((race_time.partial_cmp(&dt) == Some(Ordering::Less)).then_some((entity_id, race_time)))
+}
+
 #[derive(Clone, Debug)]
 struct Candidate {
     /// Dense ordinal retained for transition lookup, reports, and diagnostics.
@@ -280,6 +358,7 @@ struct PreparedTransition<'state> {
     row_count: usize,
     guard: PreparedExpr<'state>,
     hazard: PreparedExpr<'state>,
+    race_filter: Option<RacingClockFilter>,
     claims: Vec<PreparedClaim<'state>>,
 }
 
@@ -533,6 +612,19 @@ fn prepare_tiled_transition<'state>(
             ordering,
         });
     }
+    // Direct literals and parameters are the deliberately narrow row-invariant
+    // fragment. Compute their filter only after all eager preparation succeeds,
+    // preserving declaration-ordered expression errors.
+    let race_filter = if row_count != 0 && has_constant_hazard(&transition.hazard) {
+        let PreparedColumn::Real(values) = hazard.tile(0, 1)? else {
+            return Err(TickError::Evaluation(
+                "transition hazard did not prepare as Real".to_owned(),
+            ));
+        };
+        RacingClockFilter::for_hazard(values[0], model.model().dt)
+    } else {
+        None
+    };
     Ok(Some(PreparedTransition {
         box_index,
         transition_index,
@@ -542,6 +634,7 @@ fn prepare_tiled_transition<'state>(
         row_count,
         guard,
         hazard,
+        race_filter,
         claims,
     }))
 }
@@ -625,15 +718,21 @@ fn evaluate_tile_task(
                         continue;
                     }
                     let row = task.start + offset;
-                    let entity_id =
-                        u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
+                    let Some((entity_id, race_time)) = candidate_race_time(
+                        RacingClockCoordinates {
+                            seed,
+                            tick,
                             rule_id: plan.rule_id,
+                            rule_word: plan.rule_word,
                             row,
-                        })?;
-                    let race_time = exp_f64(seed, tick, plan.rule_word, entity_id, 0, lambda);
-                    if race_time.partial_cmp(&dt) != Some(Ordering::Less) {
+                        },
+                        lambda,
+                        dt,
+                        plan.race_filter,
+                    )?
+                    else {
                         continue;
-                    }
+                    };
                     let mut claims = Vec::with_capacity(plan.claims.len());
                     for (claim, (resource, ordering)) in plan.claims.iter().zip(&claim_columns) {
                         let PreparedColumn::Ref(resources) = resource else {
@@ -1495,6 +1594,13 @@ fn stage_box(
             };
             claim_columns.push((resource_table_index, resources.values, ordering, claim));
         }
+        let race_filter = if has_constant_hazard(&transition.hazard) {
+            hazards
+                .first()
+                .and_then(|lambda| RacingClockFilter::for_hazard(*lambda, model.model().dt))
+        } else {
+            None
+        };
         let mut push_candidate =
             |row: usize, entity_id: u32, race_time: f64| -> Result<(), TickError> {
                 let mut claims = Vec::with_capacity(claim_columns.len());
@@ -1526,14 +1632,21 @@ fn stage_box(
             if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
                 continue;
             }
-            let entity_id = u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
-                rule_id: validated.rule_id,
-                row,
-            })?;
-            let race_time = exp_f64(seed, tick, validated.rule_word, entity_id, 0, lambda);
-            if race_time.partial_cmp(&model.model().dt) != Some(Ordering::Less) {
+            let Some((entity_id, race_time)) = candidate_race_time(
+                RacingClockCoordinates {
+                    seed,
+                    tick,
+                    rule_id: validated.rule_id,
+                    rule_word: validated.rule_word,
+                    row,
+                },
+                lambda,
+                model.model().dt,
+                race_filter,
+            )?
+            else {
                 continue;
-            }
+            };
             push_candidate(row, entity_id, race_time)?;
         }
     }
@@ -2328,6 +2441,154 @@ mod parallel_tests {
                     "parameter error changed at {workers} workers and {tile_rows} rows/tile"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn racing_clock_filter_rejects_below_lo_and_admits_boundary_envelope() {
+        let filter = RacingClockFilter::for_hazard(0.025, 1.0).unwrap();
+        let below = f64::from_bits(filter.lo.to_bits() - 1);
+        let above = f64::from_bits(filter.lo.to_bits() + 1);
+
+        assert!(!filter.admits(below));
+        assert!(filter.admits(filter.lo));
+        assert!(filter.admits(above));
+    }
+
+    #[test]
+    fn guarded_racing_clock_preserves_firing_set_bits_and_contested_winner() -> Result<(), TickError>
+    {
+        let seed = 0xC0FFEE;
+        let tick = 7;
+        let rule_id = 19;
+        let rule_word = 29;
+        let dt = 1.0;
+        let mut rejected = 0;
+        let mut admitted = 0;
+
+        for lambda in [
+            0.001, 0.002, 0.0025, 0.003, 0.012, 0.018, 0.020, 0.025, 1e300,
+        ] {
+            let filter = RacingClockFilter::for_hazard(lambda, dt).unwrap();
+            for row in 0..100_000 {
+                let entity_id = row as u32;
+                let uniform = uniform_f64(seed, tick, rule_word, entity_id, 0);
+                if filter.admits(uniform) {
+                    admitted += 1;
+                } else {
+                    rejected += 1;
+                }
+                let oracle = exp_f64(seed, tick, rule_word, entity_id, 0, lambda);
+                let expected = (oracle.partial_cmp(&dt) == Some(Ordering::Less))
+                    .then_some((entity_id, oracle.to_bits()));
+                let actual = candidate_race_time(
+                    RacingClockCoordinates {
+                        seed,
+                        tick,
+                        rule_id,
+                        rule_word,
+                        row,
+                    },
+                    lambda,
+                    dt,
+                    Some(filter),
+                )?
+                .map(|(entity_id, race_time)| (entity_id, race_time.to_bits()));
+                assert_eq!(actual, expected, "firing set changed for hazard {lambda}");
+            }
+        }
+        assert!(rejected > 0, "the sweep must exercise the fast reject path");
+        assert!(
+            admitted > 0,
+            "the sweep must exercise the canonical ln path"
+        );
+
+        // A contested transition consumes exact race-time bits for its argmin.
+        // Group rows onto 128 resources and prove every winner is unchanged.
+        let lambda = 0.025;
+        let filter = RacingClockFilter::for_hazard(lambda, dt).unwrap();
+        let mut oracle_winners: Vec<Option<(f64, u32)>> = vec![None; 128];
+        let mut guarded_winners: Vec<Option<(f64, u32)>> = vec![None; 128];
+        for row in 0..100_000 {
+            let entity_id = row as u32;
+            let resource = row % 128;
+            let oracle = exp_f64(seed, tick, rule_word, entity_id, 0, lambda);
+            if oracle.partial_cmp(&dt) == Some(Ordering::Less) {
+                let candidate = (oracle, entity_id);
+                if oracle_winners[resource].map_or(true, |winner| {
+                    candidate
+                        .0
+                        .total_cmp(&winner.0)
+                        .then(candidate.1.cmp(&winner.1))
+                        == Ordering::Less
+                }) {
+                    oracle_winners[resource] = Some(candidate);
+                }
+            }
+            if let Some((entity_id, race_time)) = candidate_race_time(
+                RacingClockCoordinates {
+                    seed,
+                    tick,
+                    rule_id,
+                    rule_word,
+                    row,
+                },
+                lambda,
+                dt,
+                Some(filter),
+            )? {
+                let candidate = (race_time, entity_id);
+                if guarded_winners[resource].map_or(true, |winner| {
+                    candidate
+                        .0
+                        .total_cmp(&winner.0)
+                        .then(candidate.1.cmp(&winner.1))
+                        == Ordering::Less
+                }) {
+                    guarded_winners[resource] = Some(candidate);
+                }
+            }
+        }
+        assert_eq!(
+            guarded_winners
+                .iter()
+                .map(|winner| winner.map(|(time, entity)| (time.to_bits(), entity)))
+                .collect::<Vec<_>>(),
+            oracle_winners
+                .iter()
+                .map(|winner| winner.map(|(time, entity)| (time.to_bits(), entity)))
+                .collect::<Vec<_>>()
+        );
+
+        Ok::<(), TickError>(())
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn racing_clock_filter_cannot_hide_entity_id_overflow() {
+        let row = u32::MAX as usize + 1;
+        let error = candidate_race_time(
+            RacingClockCoordinates {
+                seed: 1,
+                tick: 0,
+                rule_id: 7,
+                rule_word: 11,
+                row,
+            },
+            0.001,
+            1.0,
+            Some(RacingClockFilter { lo: 1.0 }),
+        )
+        .expect_err("row conversion must precede a filter that rejects every draw");
+        match error {
+            TickError::EntityIdOverflow {
+                rule_id,
+                row: error_row,
+            } => {
+                assert_eq!(rule_id, 7);
+                assert_eq!(error_row, row);
+            }
+            other => panic!("unexpected error: {other}"),
         }
     }
 

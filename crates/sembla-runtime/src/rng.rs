@@ -105,6 +105,16 @@ fn mantissa_to_open_f64(mantissa: u64) -> f64 {
     }
 }
 
+/// Applies the canonical exponential racing-clock transform to an open uniform.
+///
+/// Keeping this transform here lets callers conservatively inspect the same
+/// draw before deciding whether its `ln` is required, without duplicating or
+/// changing the platform-`ln` exemption documented by `DECISIONS.md` §E7.
+#[must_use]
+pub(crate) fn exp_f64_from_uniform(uniform: f64, lambda: f64) -> f64 {
+    -uniform.ln() / lambda
+}
+
 /// Samples an exponential racing-clock delay at rate `lambda`.
 ///
 /// For positive rates this computes `-ln(U) / lambda`, where `U` is the open
@@ -122,13 +132,16 @@ pub fn exp_f64(
     if lambda <= 0.0 {
         f64::INFINITY
     } else {
-        -uniform_f64(seed, tick, rule_word, entity_id, draw_idx).ln() / lambda
+        exp_f64_from_uniform(
+            uniform_f64(seed, tick, rule_word, entity_id, draw_idx),
+            lambda,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::mantissa_to_open_f64;
+    use super::{exp_f64, exp_f64_from_uniform, mantissa_to_open_f64, uniform_f64};
 
     #[test]
     fn mantissa_conversion_excludes_both_endpoints() {
@@ -138,5 +151,22 @@ mod tests {
         assert!(smallest > 0.0);
         assert!(largest < 1.0);
         assert_eq!(largest, f64::from_bits(1.0_f64.to_bits() - 1));
+    }
+
+    #[test]
+    fn split_exponential_transform_is_bit_identical() {
+        for lambda in [0.001, 0.025, 1.0, 1e300] {
+            for (seed, tick, rule_word, entity_id) in [
+                (0, 0, 0, 0),
+                (0xC0FFEE, 7, 19, 65_536),
+                (u64::MAX, u32::MAX, u32::MAX - 2, u32::MAX),
+            ] {
+                let uniform = uniform_f64(seed, tick, rule_word, entity_id, 0);
+                assert_eq!(
+                    exp_f64_from_uniform(uniform, lambda).to_bits(),
+                    exp_f64(seed, tick, rule_word, entity_id, 0, lambda).to_bits()
+                );
+            }
+        }
     }
 }

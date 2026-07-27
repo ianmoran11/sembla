@@ -14,17 +14,25 @@ struct Exemption {
     reason: &'static str,
 }
 
-// PRD 0001 is deliberately sampler-only. The audit found this pre-existing
-// result-bearing simulation call after the PRD's authoring-time grep had said
-// there were none. Pinning it would change racing-clock results and downstream
-// fixtures, so it remains an exact, visible exemption rather than silently
-// expanding this PRD beyond its non-goals.
-const EXEMPTIONS: &[Exemption] = &[Exemption {
-    path: "crates/sembla-runtime/src/rng.rs",
-    method: "ln",
-    source: "-uniform_f64(seed, tick, rule_word, entity_id, draw_idx).ln() / lambda",
-    reason: "existing racing-clock transform; simulation transcendental pinning is out of PRD 0001 scope",
-}];
+// Racing clocks retain DECISIONS.md §E7's platform-ln exemption because pinning
+// it would change oracle results. PRD 0002 extracts that exact transform so a
+// conservative filter can inspect the same draw first. Its platform exp is an
+// exact visible exemption too: it only sets a lower rejection bound and never
+// replaces the canonical ln-and-dt firing decision near the boundary.
+const EXEMPTIONS: &[Exemption] = &[
+    Exemption {
+        path: "crates/sembla-runtime/src/rng.rs",
+        method: "ln",
+        source: "-uniform.ln() / lambda",
+        reason: "unchanged §E7 racing-clock transform extracted for PRD 0002",
+    },
+    Exemption {
+        path: "crates/sembla-runtime/src/executor.rs",
+        method: "exp",
+        source: "let threshold = (-(lambda * dt)).exp();",
+        reason: "PRD 0002 conservative reject-only bound; canonical ln still decides every boundary candidate",
+    },
+];
 
 #[derive(Debug)]
 struct Finding {

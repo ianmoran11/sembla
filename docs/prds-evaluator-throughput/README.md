@@ -210,3 +210,27 @@ time 1.41× at the cost of more aggregate CPU. The separated tile sweep,
 threshold sweep, every official run, contention flags, live-set arithmetic, and
 hashes are under
 [`docs/evidence/evaluator-tiled-tick-20260727/`](../evidence/evaluator-tiled-tick-20260727/).
+
+## PRD 0002 implementation status
+
+PRD 0002 adds a conservative prefilter for direct Real-literal and Real-parameter
+hazards. Each transition/tick computes `lo = exp(-(lambda * dt)) * (1 - 1e-12)`
+once. Enabled candidates below `lo` skip `ln`; all admitted candidates use the
+same open uniform, unchanged `-uniform.ln() / lambda` transform, and unchanged
+`race_time < dt` comparison. Row-to-`entity_id` conversion remains before the
+filter, and row-dependent hazards keep the unfiltered oracle path.
+
+The `1e-12` named margin is about 4,500 binary64 ULPs near the benchmark
+thresholds, conservatively covering the documented one-ULP platform difference
+and threshold-rounding envelope. Degenerate `1e300` hazards are deliberately not
+special-cased: `lo` is zero, so every open uniform is admitted and its exact race
+time remains available to any contested model.
+
+Across the eight ordinary demographic transitions, only 0.10%–2.47% of enabled
+candidates computed `ln`; the two deliberate `1e300` transitions remained at
+100%. Fastest uncontended user/wall time changed from 6.66/5.34 seconds to
+5.95/5.35 seconds, a 1.119× user-time speedup with essentially flat headline
+wall time, while all outputs and final-state hashes remained byte-identical.
+Full five-run measurements, per-transition fractions,
+structural argument, tests, and hashes are under
+[`docs/evidence/evaluator-guarded-racing-clock-20260727/`](../evidence/evaluator-guarded-racing-clock-20260727/).
