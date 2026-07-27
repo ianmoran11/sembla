@@ -1,6 +1,6 @@
 use sembla_ir::{SummaryDecl, SummaryReduce, ViewDecl, ViewReduce};
 use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::{self, ObservationValue};
+use sembla_runtime::executor::{self, device_observation_eligibility, ObservationValue};
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
@@ -10,6 +10,20 @@ struct Trace {
     fired: Vec<Vec<(u32, usize)>>,
     deferred: Vec<Vec<(String, usize)>>,
     view_counts: Vec<usize>,
+}
+
+fn eligibility_model(views: &str, grouped_views: &str) -> sembla_ir::ValidatedModel {
+    let source = format!(
+        r#"{{"name":"device_observation","dt":1.0,"params":[],"boxes":[{{"name":"world","tables":[{{"name":"Group","size_hint":1,"attrs":[]}},{{"name":"Person","size_hint":4,"attrs":[{{"name":"group","ty":{{"kind":"ref","table":"Group"}}}},{{"name":"n","ty":{{"kind":"int"}}}},{{"name":"x","ty":{{"kind":"real"}}}}]}}],"transitions":[],"inputs":[{{"name":"events","schema":[{{"name":"amount","ty":{{"kind":"int"}}}}]}}],"outputs":[],"views":[{views}],"grouped_views":[{grouped_views}]}}],"wires":[],"summaries":[]}}"#,
+    );
+    let raw = sembla_ir::parse_json(&source).unwrap();
+    if grouped_views.is_empty() {
+        sembla_ir::validate(raw).unwrap()
+    } else {
+        let features =
+            sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+        sembla_ir::validate_with_features(raw, &features).unwrap()
+    }
 }
 
 fn run_trace(model: sembla_ir::ValidatedModel) -> Trace {
@@ -32,6 +46,64 @@ fn run_trace(model: sembla_ir::ValidatedModel) -> Trace {
         trace.view_counts.push(report.views.len());
     }
     trace
+}
+
+#[test]
+fn device_observation_eligibility_accepts_only_count_and_int_extrema() {
+    let model = eligibility_model(
+        r#"{"name":"selected","table":"Person","filter":{"kind":"gt","lhs":{"kind":"self_attr","name":"n"},"rhs":{"kind":"int","value":0}},"value":null,"reduce":"count"},{"name":"minimum","table":"Person","filter":null,"value":{"kind":"self_attr","name":"n"},"reduce":"min"},{"name":"maximum","table":"Person","filter":null,"value":{"kind":"self_attr","name":"n"},"reduce":"max"}"#,
+        "",
+    );
+    let decision = device_observation_eligibility(&model);
+    assert!(decision.eligible, "{decision:?}");
+    assert_eq!(decision.views.len(), 3);
+    assert!(decision.views.iter().all(|view| view.eligible));
+}
+
+#[test]
+fn device_observation_eligibility_is_conservative_for_host_ordered_reductions() {
+    let model = eligibility_model(
+        r#"{"name":"sum_int","table":"Person","filter":null,"value":{"kind":"self_attr","name":"n"},"reduce":"sum"},{"name":"sum_real","table":"Person","filter":null,"value":{"kind":"self_attr","name":"x"},"reduce":"sum"},{"name":"min_real","table":"Person","filter":null,"value":{"kind":"self_attr","name":"x"},"reduce":"min"},{"name":"max_real","table":"Person","filter":null,"value":{"kind":"self_attr","name":"x"},"reduce":"max"}"#,
+        "",
+    );
+    let decision = device_observation_eligibility(&model);
+    assert!(!decision.eligible);
+    assert!(decision.views.iter().all(|view| !view.eligible));
+    assert!(decision.views[0].reason.contains("overflow association"));
+    assert!(decision.views[1].reason.contains("host order"));
+    assert!(decision.views[2].reason.contains("Int expression"));
+    assert!(decision.views[3].reason.contains("Int expression"));
+}
+
+#[test]
+fn device_observation_eligibility_rejects_aggregate_and_input_expressions() {
+    let model = eligibility_model(
+        r#"{"name":"aggregate_filter","table":"Person","filter":{"kind":"gt","lhs":{"kind":"agg","op":{"kind":"count"},"table":"Person","on":{"fk_attr":"group","self_fk_attr":"group"},"filter":{"kind":"bool","value":true}},"rhs":{"kind":"int","value":0}},"value":null,"reduce":"count"},{"name":"input_filter","table":"Person","filter":{"kind":"gt","lhs":{"kind":"input","port":"events","agg":{"op":{"kind":"count"},"filter":null}},"rhs":{"kind":"int","value":0}},"value":null,"reduce":"count"}"#,
+        "",
+    );
+    let decision = device_observation_eligibility(&model);
+    assert!(!decision.eligible);
+    assert_eq!(decision.views.len(), 2);
+    assert!(decision
+        .views
+        .iter()
+        .all(|view| { !view.eligible && view.reason.contains("row-local infallible") }));
+}
+
+#[test]
+fn grouped_and_zero_view_models_force_host_observation() {
+    let grouped = eligibility_model(
+        r#"{"name":"count","table":"Person","filter":null,"value":null,"reduce":"count"}"#,
+        r#"{"name":"by_group","table":"Person","filter":null,"keys":[{"attr":"group"}]}"#,
+    );
+    let grouped = device_observation_eligibility(&grouped);
+    assert!(!grouped.eligible);
+    assert_eq!(grouped.views.len(), 2);
+    assert!(grouped.views[1].reason.contains("grouped"));
+
+    let empty = device_observation_eligibility(&eligibility_model("", ""));
+    assert!(!empty.eligible);
+    assert!(empty.reason.contains("legacy state reporting"));
 }
 
 #[test]

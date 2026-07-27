@@ -42,6 +42,29 @@ fn cuda_backend_retains_and_refreshes_one_host_state_store() {
 }
 
 #[test]
+fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
+    let backend = include_str!("../src/backend.rs");
+    let reused = section(
+        backend,
+        "    pub fn run_tick_observed_reused(&mut self)",
+        "\n    /// Executes one observed CUDA tick and returns durations",
+    );
+    assert!(reused.contains("let views = self.observe_device_views()?"));
+    assert!(reused.contains("host_observation_fallback(views.is_none()"));
+    assert!(reused.contains("self.download_state_store()"));
+
+    let timed = section(
+        backend,
+        "    pub fn run_tick_observed_reused_timed(",
+        "\n    /// Returns the backend-owned host snapshot",
+    );
+    assert!(timed.contains("host_observation_fallback("));
+    assert!(timed.contains("views.is_none()"));
+    assert!(timed.contains("self.download_state_parts()?"));
+    assert!(timed.contains("(std::time::Duration::ZERO, std::time::Duration::ZERO)"));
+}
+
+#[test]
 fn cuda_cli_uses_the_reused_state_path_and_moves_the_state_only_at_run_end() {
     let cli = include_str!("../../sembla-cli/src/main.rs");
     let cuda_run = section(
@@ -51,7 +74,7 @@ fn cuda_cli_uses_the_reused_state_path_and_moves_the_state_only_at_run_end() {
     );
     assert!(cuda_run.contains("run_tick_observed_reused()"));
     assert!(cuda_run.contains("backend.observed_state()"));
-    assert_eq!(cuda_run.matches("backend.into_observed_state()").count(), 1);
+    assert_eq!(cuda_run.matches(".into_observed_state()").count(), 1);
     assert!(!cuda_run.contains("observation.state"));
 
     let timed = section(
@@ -61,6 +84,6 @@ fn cuda_cli_uses_the_reused_state_path_and_moves_the_state_only_at_run_end() {
     );
     assert!(timed.contains("run_tick_observed_reused_timed()"));
     assert!(timed.contains("backend.observed_state()"));
-    assert_eq!(timed.matches("backend.into_observed_state()").count(), 1);
+    assert_eq!(timed.matches(".into_observed_state()").count(), 1);
     assert!(!timed.contains("observation.state"));
 }

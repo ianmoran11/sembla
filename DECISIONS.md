@@ -1538,6 +1538,34 @@ under N seconds" — not a ratio between two implementations that are both movin
 0.402, against §K2's 10% threshold. §K2 is not revisited here, but three
 measurements moving one way is now worth its own look.
 
+### L10. Ungrouped CUDA observation is gated conservatively from the IR (2026-07-27)
+
+**Decision.** A CUDA run may observe ungrouped views on the device and omit its
+per-tick state download only when every declared view is positively recognised
+as either a filtered `Count` or filtered `Min`/`Max` over an `Int` row-local,
+infallible expression. The row-local decision reuses the evaluator's existing
+predicate. Any `Expr::Agg` or `Expr::Input`, grouped view, `Sum`, unrecognised or
+row-fallible expression, or model with no scalar views forces complete host
+observation and state download. Eligibility is computed once from validated IR
+and reported per run and per view.
+
+`Sum` over `Real` stays in canonical ascending row order. `Sum` over `Int` stays
+sequential because reassociation can overflow where the canonical pass does not.
+Real extrema are excluded: the CPU uses its specified total ordering, while
+ordinary floating-point min/max have asymmetric NaN behavior. Counts and Int
+extrema are commutative monoids within the existing closed CUDA fragment and
+return only one scalar per view.
+
+**Alternatives.** Benchmark-name checks, partial device observation when one
+view still needs host state, per-row result download, extending the CUDA
+fragment, and implicit backend fallback are rejected. Grouped views remain
+unchanged under §K6 and §K9.
+
+**Reason.** The all-or-nothing IR gate preserves exact observation semantics
+while removing transfers only when no host consumer needs the per-tick state.
+The existing CPU/CUDA differential comparison remains the executable safety
+argument.
+
 ## M. Performance methodology
 
 ### M1. Optimisation is scoped from direct measurement, not from profile shares (2026-07-27)

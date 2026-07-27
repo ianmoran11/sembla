@@ -64,6 +64,52 @@ fn plan_uses_grouped_views(path: &Path) -> bool {
 
 #[test]
 #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
+fn eligible_views_take_device_observation_differential_path() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .current_dir(repository_path("."))
+        .args([
+            "diff-backends",
+            "examples/sir.json",
+            "--population",
+            "100",
+            "--seed",
+            "7",
+            "--ticks",
+            "2",
+        ])
+        .output()
+        .unwrap();
+    assert_success(&output);
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("cuda_device_observation eligible=true")
+    );
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
+fn ineligible_views_take_state_download_differential_fallback() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .current_dir(repository_path("."))
+        .args([
+            "diff-backends",
+            "examples/observations.json",
+            "--population",
+            "100",
+            "--seed",
+            "7",
+            "--ticks",
+            "2",
+        ])
+        .output()
+        .unwrap();
+    assert_success(&output);
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("cuda_device_observation eligible=false")
+    );
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
 fn differential_corpus_passes() {
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .current_dir(repository_path("."))

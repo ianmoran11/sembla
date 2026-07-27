@@ -4,9 +4,11 @@ use cudarc::driver::{CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKer
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::eval::ParamEnv;
+use sembla_runtime::executor::{DeviceObservationEligibility, ObservationValue, ViewValue};
 use sembla_runtime::state::{ColumnData, InputTable, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
+use crate::codegen::host_observation_fallback;
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -38,11 +40,17 @@ pub struct CudaTickObservation {
 
 pub type CudaFiredPerBox = Vec<(String, Vec<(u32, usize)>)>;
 pub type CudaDeferredPerResourceTable = Vec<(String, usize)>;
-pub type ReusedCudaTickObservation = (u32, CudaFiredPerBox, CudaDeferredPerResourceTable);
+pub type ReusedCudaTickObservation = (
+    u32,
+    CudaFiredPerBox,
+    CudaDeferredPerResourceTable,
+    Option<Vec<ViewValue>>,
+);
 pub type TimedReusedCudaTickObservation = (
     u32,
     CudaFiredPerBox,
     CudaDeferredPerResourceTable,
+    Option<Vec<ViewValue>>,
     [std::time::Duration; 5],
 );
 type DownloadedStateParts = (Vec<u8>, Vec<u8>, Vec<u64>);
@@ -137,6 +145,8 @@ pub struct CudaBackend {
     build_output_partials: CudaFunction,
     finish_outputs: CudaFunction,
     check_output_errors: CudaFunction,
+    init_observations: CudaFunction,
+    observe_view: CudaFunction,
     philox_vectors_kernel: CudaFunction,
     init_validation_scratch: CudaFunction,
     commit_validation_status: CudaFunction,
@@ -178,12 +188,14 @@ pub struct CudaBackend {
     owner_values: CudaSlice<u64>,
     output_partials: CudaSlice<u64>,
     output_errors: CudaSlice<u8>,
+    observation_values: CudaSlice<i64>,
     effect_active: CudaSlice<u32>,
     status: CudaSlice<u64>,
     seed: u64,
     next_tick: u32,
     hash_mode: HashMode,
     device_identity: CudaDeviceIdentity,
+    host_state_current: bool,
     // No public setter exists. The hardware unit test uses this private seam
     // to confirm the four validation launches under explicit geometries.
     #[cfg(test)]
@@ -305,6 +317,8 @@ impl CudaBackend {
         let build_output_partials = load("sembla_build_output_partials")?;
         let finish_outputs = load("sembla_finish_outputs")?;
         let check_output_errors = load("sembla_check_output_errors")?;
+        let init_observations = load("sembla_init_observations")?;
+        let observe_view = load("sembla_observe_view")?;
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
         let init_validation_scratch = load("sembla_init_validation_scratch")?;
         let commit_validation_status = load("sembla_commit_validation_status")?;
@@ -426,6 +440,9 @@ impl CudaBackend {
         let output_errors = stream
             .alloc_zeros::<u8>(output_field_count * 3)
             .map_err(driver_error)?;
+        let observation_values = stream
+            .alloc_zeros::<i64>(generated.observation_view_tables.len().max(1))
+            .map_err(driver_error)?;
         // status[0..=3] is the committed diagnostic; status[4..=11] is the
         // per-tick validation-reduction scratch (lock, scan, ordering identity,
         // code, branch, and selected payload) prepared by the scratch kernel.
@@ -466,6 +483,8 @@ impl CudaBackend {
             build_output_partials,
             finish_outputs,
             check_output_errors,
+            init_observations,
+            observe_view,
             philox_vectors_kernel,
             init_validation_scratch,
             commit_validation_status,
@@ -507,12 +526,14 @@ impl CudaBackend {
             owner_values,
             output_partials,
             output_errors,
+            observation_values,
             effect_active,
             status,
             seed,
             next_tick: 0,
             hash_mode,
             device_identity,
+            host_state_current: true,
             #[cfg(test)]
             validation_launch_override: None,
             #[cfg(test)]
@@ -528,10 +549,17 @@ impl CudaBackend {
         &self.device_identity
     }
 
+    /// Returns the once-per-run IR eligibility decision used by this backend.
+    pub fn observation_eligibility(&self) -> &DeviceObservationEligibility {
+        &self.generated.observation_eligibility
+    }
+
     /// Executes one tick on CUDA and downloads a read-only observation snapshot.
     /// State remains resident on the device for subsequent ticks.
     pub fn run_tick_observed(&mut self) -> Result<CudaTickObservation, CudaError> {
-        let (tick, fired_per_box, deferred_per_resource_table) = self.run_tick_observed_reused()?;
+        let (tick, fired_per_box, deferred_per_resource_table, _) =
+            self.run_tick_observed_reused()?;
+        self.ensure_host_state()?;
         Ok(CudaTickObservation {
             tick,
             state: self.host_state.clone(),
@@ -541,18 +569,17 @@ impl CudaBackend {
     }
 
     /// Executes one observed tick while retaining the host state allocation.
-    ///
-    /// The CLI uses this lending-style path and reads [`Self::observed_state`]
-    /// before the next tick. The owned-observation method remains available for
-    /// callers that need to retain snapshots from multiple ticks.
+    /// `Some(views)` is the all-device fast path; `None` means the complete
+    /// state was downloaded and the caller must use host observation.
     #[doc(hidden)]
     pub fn run_tick_observed_reused(&mut self) -> Result<ReusedCudaTickObservation, CudaError> {
         let tick = self.next_tick;
         self.execute_tick()?;
+        let views = self.observe_device_views()?;
         let (wins, deferred) = self.readback_control()?;
         let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
-        self.download_state_store()?;
-        Ok((tick, fired_per_box, deferred_per_resource_table))
+        host_observation_fallback(views.is_none(), || self.download_state_store())?;
+        Ok((tick, fired_per_box, deferred_per_resource_table, views))
     }
 
     /// Executes one observed CUDA tick and returns durations in this order:
@@ -563,9 +590,10 @@ impl CudaBackend {
     pub fn run_tick_observed_timed(
         &mut self,
     ) -> Result<(CudaTickObservation, [std::time::Duration; 5]), CudaError> {
-        let (tick, fired_per_box, deferred_per_resource_table, mut phases) =
+        let (tick, fired_per_box, deferred_per_resource_table, _, mut phases) =
             self.run_tick_observed_reused_timed()?;
         let started = std::time::Instant::now();
+        self.ensure_host_state()?;
         let state = self.host_state.clone();
         phases[3] += started.elapsed();
         Ok((
@@ -588,6 +616,7 @@ impl CudaBackend {
 
         let started = std::time::Instant::now();
         self.execute_tick()?;
+        let views = self.observe_device_views()?;
         let kernels = started.elapsed();
 
         let started = std::time::Instant::now();
@@ -598,18 +627,23 @@ impl CudaBackend {
         let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
         let report = started.elapsed();
 
-        let started = std::time::Instant::now();
-        let (state, inputs, input_counts) = self.download_state_parts()?;
-        let state_transfer = started.elapsed();
+        let (state_transfer, state_reconstruct) =
+            host_observation_fallback(views.is_none(), || {
+                let started = std::time::Instant::now();
+                let (state, inputs, input_counts) = self.download_state_parts()?;
+                let state_transfer = started.elapsed();
 
-        let started = std::time::Instant::now();
-        self.reconstruct_state_store(&state, &inputs, &input_counts)?;
-        let state_reconstruct = started.elapsed();
+                let started = std::time::Instant::now();
+                self.reconstruct_state_store(&state, &inputs, &input_counts)?;
+                Ok((state_transfer, started.elapsed()))
+            })?
+            .unwrap_or((std::time::Duration::ZERO, std::time::Duration::ZERO));
 
         Ok((
             tick,
             fired_per_box,
             deferred_per_resource_table,
+            views,
             [
                 kernels,
                 readback_control,
@@ -620,16 +654,97 @@ impl CudaBackend {
         ))
     }
 
-    /// Returns the backend-owned state refreshed by the latest observed tick.
+    /// Returns the backend-owned host snapshot. It is current after fallback
+    /// ticks; fast-path callers must not inspect it until final extraction.
     #[doc(hidden)]
     pub fn observed_state(&self) -> &StateStore {
         &self.host_state
     }
 
-    /// Moves the final refreshed state out when the CUDA run is complete.
+    /// Hashes the current tick. Fast-path runs deliberately transfer raw device
+    /// bytes here for `HashMode::EveryTick`; fallback runs reuse host state.
     #[doc(hidden)]
-    pub fn into_observed_state(self) -> StateStore {
-        self.host_state
+    pub fn observed_hash(&self) -> Result<[u8; 32], CudaError> {
+        if self.host_state_current {
+            Ok(self.host_state.state_hash())
+        } else {
+            self.download_hash()
+        }
+    }
+
+    /// Moves the final state out, downloading it exactly once when fast-path
+    /// ticks left the retained host snapshot stale.
+    #[doc(hidden)]
+    pub fn into_observed_state(mut self) -> Result<StateStore, CudaError> {
+        self.ensure_host_state()?;
+        Ok(self.host_state)
+    }
+
+    fn observe_device_views(&mut self) -> Result<Option<Vec<ViewValue>>, CudaError> {
+        if !self.generated.observation_eligibility.eligible {
+            return Ok(None);
+        }
+        let view_count =
+            u32::try_from(self.generated.observation_view_tables.len()).map_err(|_| {
+                CudaError::InvalidInput("observation view count exceeds u32".to_owned())
+            })?;
+        let mut init = self.stream.launch_builder(&self.init_observations);
+        init.arg(&mut self.observation_values).arg(&view_count);
+        unsafe { init.launch(LaunchConfig::for_num_elems(view_count)) }.map_err(driver_error)?;
+
+        for (view_index, table) in self
+            .generated
+            .observation_view_tables
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            let rows = u32::try_from(self.layout.row_counts[table]).map_err(|_| {
+                CudaError::InvalidInput("observation row count exceeds u32".to_owned())
+            })?;
+            if rows == 0 {
+                continue;
+            }
+            let view_index = u32::try_from(view_index).map_err(|_| {
+                CudaError::InvalidInput("observation view index exceeds u32".to_owned())
+            })?;
+            let mut config = LaunchConfig::for_num_elems(rows);
+            config.grid_dim.0 = config.grid_dim.0.min(1024);
+            config.shared_mem_bytes = config.block_dim.0 * 8;
+            let mut observe = self.stream.launch_builder(&self.observe_view);
+            observe
+                .arg(&self.state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.params)
+                .arg(&mut self.observation_values)
+                .arg(&view_index);
+            unsafe { observe.launch(config) }.map_err(driver_error)?;
+        }
+        let values = self
+            .stream
+            .memcpy_dtov(&self.observation_values)
+            .map_err(driver_error)?;
+        let views = self
+            .generated
+            .observation_eligibility
+            .views
+            .iter()
+            .zip(values)
+            .map(|(view, value)| ViewValue {
+                box_name: view.box_name.clone(),
+                name: view.name.clone(),
+                value: ObservationValue::Int(value),
+            })
+            .collect();
+        Ok(Some(views))
+    }
+
+    fn ensure_host_state(&mut self) -> Result<(), CudaError> {
+        if !self.host_state_current {
+            self.download_state_store()?;
+        }
+        Ok(())
     }
 
     fn readback_control(&self) -> Result<(Vec<u8>, Vec<u8>), CudaError> {
@@ -1466,6 +1581,7 @@ impl CudaBackend {
             .next_tick
             .checked_add(1)
             .ok_or_else(|| CudaError::DeviceExecution("tick coordinate overflow".to_owned()))?;
+        self.host_state_current = false;
         Ok(())
     }
 
@@ -1497,7 +1613,9 @@ impl CudaBackend {
         let inputs = unpack_inputs(&self.model, &self.layout, inputs, input_counts);
         self.host_state
             .refresh_backend_snapshot(&self.model, &self.host_tables, inputs)
-            .map_err(|error| CudaError::DeviceExecution(error.to_string()))
+            .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
+        self.host_state_current = true;
+        Ok(())
     }
 
     fn download_hash(&self) -> Result<[u8; 32], CudaError> {

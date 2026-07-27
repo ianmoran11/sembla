@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use sembla_ir::AttrType;
+use sembla_runtime::executor::device_observation_eligibility;
 
 const DEMOGRAPHIC_MODEL: &str = "fixtures/demographic/benchmark/demographic_slots.no-grouped.json";
 const DEMOGRAPHIC_LISTING: &str = "corpus_model=fixtures/demographic/benchmark/demographic_slots.no-grouped.json configuration=no-grouped population=1000 seed=7 ticks=20";
@@ -36,6 +37,12 @@ fn demographic_corpus_member_is_no_grouped_and_exercises_the_coverage_gap() {
                 .any(|attr| matches!(&attr.ty, AttrType::Ref { .. }))
         })
     }));
+
+    let validated = sembla_ir::validate(model).unwrap();
+    let eligibility = device_observation_eligibility(&validated);
+    assert!(eligibility.eligible, "{eligibility:#?}");
+    assert_eq!(eligibility.views.len(), 19);
+    assert!(eligibility.views.iter().all(|view| view.eligible));
 }
 
 #[test]

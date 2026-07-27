@@ -3182,6 +3182,22 @@ fn run_results_output_timed_with_features(
     Ok((output.finish(model, per_tick_hashes)?, tick_timings))
 }
 
+#[cfg(feature = "cuda")]
+fn report_cuda_observation_eligibility(
+    eligibility: &sembla_runtime::executor::DeviceObservationEligibility,
+) {
+    eprintln!(
+        "cuda_device_observation eligible={} reason={}",
+        eligibility.eligible, eligibility.reason
+    );
+    for view in &eligibility.views {
+        eprintln!(
+            "cuda_device_observation_view box={:?} view={:?} eligible={} reason={}",
+            view.box_name, view.name, view.eligible, view.reason
+        );
+    }
+}
+
 fn cuda_tick_report(
     model: &sembla_ir::ValidatedModel,
     tick: u32,
@@ -3274,6 +3290,7 @@ fn run_results_output_cuda(
     let mut backend = CudaBackend::new(model, initial, params, seed, hash_mode)
         .map_err(|error| error.to_string())?;
     let device = backend.device_identity().clone();
+    report_cuda_observation_eligibility(backend.observation_eligibility());
     let identity =
         manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
     let mut hashes = (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
@@ -3281,16 +3298,22 @@ fn run_results_output_cuda(
 
     let started = Instant::now();
     for tick in 0..ticks {
-        let (observed_tick, fired_per_box, deferred_per_resource_table) = backend
+        let (observed_tick, fired_per_box, deferred_per_resource_table, device_views) = backend
             .run_tick_observed_reused()
             .map_err(|error| format!("tick {tick}: {error}"))?;
         debug_assert_eq!(observed_tick, tick);
-        let state = backend.observed_state();
         if let Some(hashes) = hashes.as_mut() {
-            hashes.push(state.state_hash());
+            hashes.push(
+                backend
+                    .observed_hash()
+                    .map_err(|error| format!("tick {tick}: {error}"))?,
+            );
         }
-        let views = executor::observe_views(model, state, params)
-            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let views = match device_views {
+            Some(views) => views,
+            None => executor::observe_views(model, backend.observed_state(), params)
+                .map_err(|error| format!("tick {tick}: {error}"))?,
+        };
         let report = cuda_tick_report(
             model,
             tick,
@@ -3298,11 +3321,13 @@ fn run_results_output_cuda(
             deferred_per_resource_table,
             views,
         );
-        output.push_tick(state, tick, report)?;
+        output.push_tick(backend.observed_state(), tick, report)?;
     }
-    let elapsed = started.elapsed();
     let output = output.finish(model, hashes.clone())?;
-    let state = backend.into_observed_state();
+    let state = backend
+        .into_observed_state()
+        .map_err(|error| error.to_string())?;
+    let elapsed = started.elapsed();
     Ok(BackendRunOutput {
         output,
         state,
@@ -3324,6 +3349,7 @@ fn run_results_output_cuda_timed(
     let mut backend = CudaBackend::new(model, initial, params, seed, hash_mode)
         .map_err(|error| error.to_string())?;
     let device = backend.device_identity().clone();
+    report_cuda_observation_eligibility(backend.observation_eligibility());
     let identity =
         manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
     let mut hashes = (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
@@ -3333,23 +3359,35 @@ fn run_results_output_cuda_timed(
     let started = Instant::now();
     for tick in 0..ticks {
         let tick_started = Instant::now();
-        let (observed_tick, fired_per_box, deferred_per_resource_table, backend_phases) = backend
+        let (
+            observed_tick,
+            fired_per_box,
+            deferred_per_resource_table,
+            device_views,
+            backend_phases,
+        ) = backend
             .run_tick_observed_reused_timed()
             .map_err(|error| format!("tick {tick}: {error}"))?;
         debug_assert_eq!(observed_tick, tick);
-        let state = backend.observed_state();
 
         let state_hash = if let Some(hashes) = hashes.as_mut() {
             let phase_started = Instant::now();
-            hashes.push(state.state_hash());
+            hashes.push(
+                backend
+                    .observed_hash()
+                    .map_err(|error| format!("tick {tick}: {error}"))?,
+            );
             phase_started.elapsed()
         } else {
             Duration::ZERO
         };
 
         let phase_started = Instant::now();
-        let views = executor::observe_views(model, state, params)
-            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let views = match device_views {
+            Some(views) => views,
+            None => executor::observe_views(model, backend.observed_state(), params)
+                .map_err(|error| format!("tick {tick}: {error}"))?,
+        };
         let observe_views = phase_started.elapsed();
 
         let phase_started = Instant::now();
@@ -3360,7 +3398,7 @@ fn run_results_output_cuda_timed(
             deferred_per_resource_table,
             views,
         );
-        output.push_tick(state, tick, report)?;
+        output.push_tick(backend.observed_state(), tick, report)?;
         let report = backend_phases[4] + phase_started.elapsed();
 
         let wall_time = tick_started.elapsed();
@@ -3379,9 +3417,11 @@ fn run_results_output_cuda_timed(
             },
         )?);
     }
-    let elapsed = started.elapsed();
     let output = output.finish(model, hashes.clone())?;
-    let state = backend.into_observed_state();
+    let state = backend
+        .into_observed_state()
+        .map_err(|error| error.to_string())?;
+    let elapsed = started.elapsed();
     Ok((
         BackendRunOutput {
             output,

@@ -139,3 +139,24 @@ against the one above. `state_transfer`, `state_reconstruct` and
 `repository_ref` first, and see `spikes/precision/infra-hyperstack/RUNBOOK.md`
 for the session hazards — including that a mid-run change of the operator's
 egress IP silently breaks SSH.
+
+## PRD 0001 implementation status (local)
+
+Ungrouped device observation now has an all-or-nothing IR gate. The benchmark's
+19 scalar views are reported eligible (18 filtered counts and one Int maximum).
+Eligible runs return one scalar per view and do not download or reconstruct
+state per tick. Host-ineligible and zero-view runs retain the complete download
+fallback. `readback_control` is intentionally unchanged: `wins` and `deferred`
+still transfer for fired/deferred reporting and remain a separate opportunity.
+
+`HashMode::EveryTick`, used by the differential path, still transfers raw device
+state/input bytes through `download_hash`; that transfer is timed separately as
+`state_hash`, not hidden in `state_transfer`. Final-only runs download the final
+state once after the tick loop when the retained host snapshot is stale.
+
+Per §J14.2, CUDA compilation, CPU/CUDA corpus equality (including the eligible
+demographic no-grouped case and an explicit ineligible fallback case), and the
+`cuda-l4-20260726` timing rerun remain **hardware-pending**. That rerun must
+record the complete before/after phase table, including `kernels`, and preserve
+the declaration-ordered eligibility breakdown in its log. No local result is
+presented as GPU evidence.

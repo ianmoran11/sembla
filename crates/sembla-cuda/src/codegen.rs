@@ -3,12 +3,31 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use sembla_ir::{AggOp, AttrType, ClaimOrdering, Effect, Expr, ParamType, Table, ValidatedModel};
+use sembla_ir::{
+    AggOp, AttrType, ClaimOrdering, Effect, Expr, ParamType, Table, ValidatedModel, ViewReduce,
+};
+use sembla_runtime::executor::{device_observation_eligibility, DeviceObservationEligibility};
 use sha2::{Digest, Sha256};
 
 use crate::CudaError;
 
 pub const DUMP_ENV: &str = "SEMBLA_CUDA_DUMP_DIR";
+
+/// Executes the host-state fallback only when the run-wide observation gate
+/// requires it. Keeping this tiny router toolkit-free makes the transfer gate
+/// executable in local tests while the supplied closure remains the real CUDA
+/// download/reconstruction path on hardware.
+#[cfg_attr(not(feature = "cuda"), allow(dead_code))]
+pub(crate) fn host_observation_fallback<T, E>(
+    required: bool,
+    fallback: impl FnOnce() -> Result<T, E>,
+) -> Result<Option<T>, E> {
+    if required {
+        fallback().map(Some)
+    } else {
+        Ok(None)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GeneratedCuda {
@@ -29,6 +48,10 @@ pub struct GeneratedCuda {
     pub effect_aggregate_indices: Vec<usize>,
     /// Aggregate indices evaluated against prospective state for wired outputs.
     pub output_aggregate_indices: Vec<usize>,
+    /// Run-wide IR decision used by the backend to gate host state download.
+    pub observation_eligibility: DeviceObservationEligibility,
+    /// Global table supplying rows for each declaration-ordered device view.
+    pub observation_view_tables: Vec<usize>,
 }
 
 impl GeneratedCuda {
@@ -168,6 +191,15 @@ struct InputSpec {
     ty: Ty,
 }
 
+#[derive(Clone)]
+struct ObservationSpec {
+    box_index: usize,
+    table_index: usize,
+    reduce: ViewReduce,
+    filter: Option<Expr>,
+    value: Option<Expr>,
+}
+
 struct Generator<'a> {
     model: &'a ValidatedModel,
     global_tables: Vec<(usize, usize)>,
@@ -177,6 +209,8 @@ struct Generator<'a> {
     params: BTreeMap<String, usize>,
     aggs: Vec<AggSpec>,
     inputs: Vec<InputSpec>,
+    observation_eligibility: DeviceObservationEligibility,
+    observation_views: Vec<ObservationSpec>,
     next_validation_scan: Cell<u64>,
 }
 
@@ -217,6 +251,26 @@ impl<'a> Generator<'a> {
             .enumerate()
             .map(|(index, parameter)| (parameter.name.clone(), index))
             .collect();
+        let observation_eligibility = device_observation_eligibility(model);
+        let mut observation_views = Vec::new();
+        if observation_eligibility.eligible {
+            for (box_index, model_box) in model.model().boxes.iter().enumerate() {
+                for view in &model_box.views {
+                    let table_index = model_box
+                        .tables
+                        .iter()
+                        .position(|table| table.name == view.table)
+                        .expect("validated observation table is indexed");
+                    observation_views.push(ObservationSpec {
+                        box_index,
+                        table_index,
+                        reduce: view.reduce,
+                        filter: view.filter.clone(),
+                        value: view.value.clone(),
+                    });
+                }
+            }
+        }
         let mut this = Self {
             model,
             global_tables,
@@ -226,6 +280,8 @@ impl<'a> Generator<'a> {
             params,
             aggs: Vec::new(),
             inputs: Vec::new(),
+            observation_eligibility,
+            observation_views,
             next_validation_scan: Cell::new(0),
         };
         this.collect_all()?;
@@ -1074,6 +1130,7 @@ impl<'a> Generator<'a> {
         self.emit_resolve_kernel(&mut out)?;
         self.emit_apply_kernel(&mut out)?;
         self.emit_output_kernel(&mut out)?;
+        self.emit_observation_kernel(&mut out)?;
         out.push_str(PHILOX_TEST_KERNEL);
         let source_sha256 = hex(Sha256::digest(out.as_bytes()).as_slice());
         let aggregate_group_tables = self
@@ -1118,6 +1175,11 @@ impl<'a> Generator<'a> {
             .enumerate()
             .filter_map(|(index, spec)| spec.output_use.then_some(index))
             .collect();
+        let observation_view_tables = self
+            .observation_views
+            .iter()
+            .map(|view| self.global_table(view.box_index, view.table_index))
+            .collect();
         Ok(GeneratedCuda {
             source: out,
             source_sha256,
@@ -1128,6 +1190,8 @@ impl<'a> Generator<'a> {
             schedule_aggregate_indices_by_rule,
             effect_aggregate_indices,
             output_aggregate_indices,
+            observation_eligibility: self.observation_eligibility,
+            observation_view_tables,
         })
     }
 
@@ -1279,6 +1343,90 @@ impl<'a> Generator<'a> {
         }
         out.push_str("}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_record_aggregate_errors(unsigned char* errors, unsigned long long count, unsigned long long aggregate_index, unsigned char* aggregate_facts) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  unsigned char code = 0U;\n  for (unsigned long long i = 0; i < count; ++i) { if (code == 0U && errors[i]) code = errors[i]; errors[i] = 0U; }\n  aggregate_facts[aggregate_index] = code;\n}\n");
+        Ok(())
+    }
+
+    /// Emits only the commutative-monoid observation fragment: filtered
+    /// counts and filtered Int min/max. Threads first reduce into one shared
+    /// scalar per block, so each view performs only one global atomic per block.
+    fn emit_observation_kernel(&self, out: &mut String) -> Result<(), CudaError> {
+        out.push_str("\nextern \"C\" __global__ void sembla_init_observations(long long* values, unsigned int count) {\n  unsigned int view = blockIdx.x * blockDim.x + threadIdx.x;\n  if (view >= count) return;\n");
+        for (index, spec) in self.observation_views.iter().enumerate() {
+            let identity = match spec.reduce {
+                ViewReduce::Count => "0LL",
+                ViewReduce::Min => "0x7fffffffffffffffLL",
+                ViewReduce::Max => "(-0x7fffffffffffffffLL - 1LL)",
+                ViewReduce::Sum => unreachable!("Sum is not device-observation eligible"),
+            };
+            writeln!(out, "  if (view == {index}U) values[{index}] = {identity};").unwrap();
+        }
+        out.push_str("}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_observe_view(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* params, long long* values, unsigned int view_index) {\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  extern __shared__ long long partials[];\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        for (index, spec) in self.observation_views.iter().enumerate() {
+            let rows = Rows::State {
+                box_index: spec.box_index,
+                table_index: spec.table_index,
+            };
+            let table = self.global_table(spec.box_index, spec.table_index);
+            let selected = match &spec.filter {
+                Some(filter) => {
+                    self.render(filter, rows, Some(&Ty::Bool), "state", "row")?
+                        .0
+                }
+                None => "1".to_owned(),
+            };
+            let identity = match spec.reduce {
+                ViewReduce::Count => "0LL",
+                ViewReduce::Min => "0x7fffffffffffffffLL",
+                ViewReduce::Max => "(-0x7fffffffffffffffLL - 1LL)",
+                ViewReduce::Sum => unreachable!("Sum is not device-observation eligible"),
+            };
+            writeln!(
+                out,
+                "  if (view_index == {index}U) {{\n    long long local = {identity};"
+            )
+            .unwrap();
+            writeln!(out, "    for (unsigned long long row = worker; row < row_counts[{table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{\n      int selected = {selected};").unwrap();
+            match spec.reduce {
+                ViewReduce::Count => out.push_str("      if (selected) local += 1LL;\n"),
+                ViewReduce::Min | ViewReduce::Max => {
+                    let value = self
+                        .render(
+                            spec.value
+                                .as_ref()
+                                .expect("eligible min/max observation has a value"),
+                            rows,
+                            Some(&Ty::Int),
+                            "state",
+                            "row",
+                        )?
+                        .0;
+                    let comparison = if spec.reduce == ViewReduce::Min {
+                        "<"
+                    } else {
+                        ">"
+                    };
+                    writeln!(out, "      if (selected) {{ long long value = (long long)({value}); if (value {comparison} local) local = value; }}").unwrap();
+                }
+                ViewReduce::Sum => unreachable!("Sum is not device-observation eligible"),
+            }
+            out.push_str("    }\n    partials[threadIdx.x] = local;\n    __syncthreads();\n    for (unsigned int stride = (blockDim.x + 1U) / 2U; stride != 0U; stride = (stride + 1U) / 2U) {\n      if (threadIdx.x < stride && threadIdx.x + stride < blockDim.x) {\n");
+            match spec.reduce {
+                ViewReduce::Count => out.push_str("        partials[threadIdx.x] += partials[threadIdx.x + stride];\n"),
+                ViewReduce::Min => out.push_str("        if (partials[threadIdx.x + stride] < partials[threadIdx.x]) partials[threadIdx.x] = partials[threadIdx.x + stride];\n"),
+                ViewReduce::Max => out.push_str("        if (partials[threadIdx.x + stride] > partials[threadIdx.x]) partials[threadIdx.x] = partials[threadIdx.x + stride];\n"),
+                ViewReduce::Sum => unreachable!("Sum is not device-observation eligible"),
+            }
+            out.push_str("      }\n      __syncthreads();\n      if (stride == 1U) break;\n    }\n    if (threadIdx.x == 0U) {\n");
+            match spec.reduce {
+                ViewReduce::Count => writeln!(out, "      atomicAdd((unsigned long long*)(values + {index}), (unsigned long long)partials[0]);").unwrap(),
+                ViewReduce::Min => writeln!(out, "      sembla_atomic_min_i64(values + {index}, partials[0]);").unwrap(),
+                ViewReduce::Max => writeln!(out, "      sembla_atomic_max_i64(values + {index}, partials[0]);").unwrap(),
+                ViewReduce::Sum => unreachable!("Sum is not device-observation eligible"),
+            }
+            out.push_str("    }\n  }\n");
+        }
+        out.push_str("}\n");
         Ok(())
     }
 
@@ -2073,6 +2221,24 @@ __device__ __forceinline__ int sembla_total_equal(double left, double right) {
 __device__ __forceinline__ unsigned long long sembla_i64_order_key(long long value) {
   return ((unsigned long long)value) ^ 0x8000000000000000ULL;
 }
+__device__ __forceinline__ void sembla_atomic_min_i64(long long* address, long long value) {
+  unsigned long long* bits = (unsigned long long*)address;
+  unsigned long long observed = *bits;
+  while (value < (long long)observed) {
+    unsigned long long prior = atomicCAS(bits, observed, (unsigned long long)value);
+    if (prior == observed) return;
+    observed = prior;
+  }
+}
+__device__ __forceinline__ void sembla_atomic_max_i64(long long* address, long long value) {
+  unsigned long long* bits = (unsigned long long*)address;
+  unsigned long long observed = *bits;
+  while (value > (long long)observed) {
+    unsigned long long prior = atomicCAS(bits, observed, (unsigned long long)value);
+    if (prior == observed) return;
+    observed = prior;
+  }
+}
 __device__ __forceinline__ unsigned long long sembla_f64_order_key(double value) {
   return ((unsigned long long)sembla_total_key(value)) ^ 0x8000000000000000ULL;
 }
@@ -2203,7 +2369,7 @@ extern "C" __global__ void sembla_philox_vectors(const unsigned long long* seeds
 mod tests {
     use std::path::Path;
 
-    use super::{cuda_f64_order_key, generate, DUMP_ENV};
+    use super::{cuda_f64_order_key, generate, host_observation_fallback, DUMP_ENV};
 
     fn example_model(name: &str) -> sembla_ir::ValidatedModel {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/{name}"));
@@ -2448,13 +2614,51 @@ mod tests {
         assert!(first.source.contains("sembla_apply_effects"));
         assert!(first.source.contains("sembla_build_output_partials"));
         assert!(first.source.contains("sembla_finish_outputs"));
-        assert!(!first.source.contains("atomicAdd"));
+        let observation = kernel_body(&first.source, "sembla_observe_view");
+        assert!(observation.contains("extern __shared__ long long partials[]"));
+        assert!(observation.contains("atomicAdd"));
         // The argmin uses only order-independent atomic minima in staged
         // prefix passes. Finalization itself is a bounded own-claim lookup.
         let resolver = kernel_body(&first.source, "sembla_resolve_conflicts");
         assert!(!resolver.contains("atomicMin"));
         assert!(!resolver.contains("atomicAdd"));
         assert!(!resolver.contains("other_row"));
+    }
+
+    #[test]
+    fn host_ineligible_route_executes_download_and_device_route_does_not() {
+        let mut downloads = 0;
+        let fallback = host_observation_fallback(true, || {
+            downloads += 1;
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+        assert_eq!(fallback, Some(()));
+        assert_eq!(downloads, 1);
+
+        let fast = host_observation_fallback(false, || {
+            downloads += 1;
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+        assert_eq!(fast, None);
+        assert_eq!(downloads, 1);
+    }
+
+    #[test]
+    fn device_observation_codegen_is_all_or_nothing() {
+        let eligible = generate(&sir_model()).unwrap();
+        assert!(eligible.observation_eligibility.eligible);
+        assert_eq!(eligible.observation_view_tables.len(), 3);
+        let kernel = kernel_body(&eligible.source, "sembla_observe_view");
+        assert!(kernel.contains("extern __shared__ long long partials[]"));
+        assert!(kernel.contains("if (view_index == 0U)"));
+
+        let ineligible = generate(&example_model("observations.json")).unwrap();
+        assert!(!ineligible.observation_eligibility.eligible);
+        assert!(ineligible.observation_view_tables.is_empty());
+        let kernel = kernel_body(&ineligible.source, "sembla_observe_view");
+        assert!(!kernel.contains("if (view_index == 0U)"));
     }
 
     #[test]
@@ -2763,10 +2967,27 @@ mod tests {
     }
 
     #[test]
-    fn sir_source_matches_checked_in_golden() {
+    fn sir_simulation_source_matches_unchanged_checked_in_golden() {
         let generated = generate(&sir_model()).unwrap();
+        let mut simulation = generated.source;
+        let helpers_begin = simulation
+            .find("__device__ __forceinline__ void sembla_atomic_min_i64")
+            .unwrap();
+        let helpers_end = simulation[helpers_begin..]
+            .find("__device__ __forceinline__ unsigned long long sembla_f64_order_key")
+            .map(|offset| helpers_begin + offset)
+            .unwrap();
+        simulation.replace_range(helpers_begin..helpers_end, "");
+        let observation_begin = simulation
+            .find("\nextern \"C\" __global__ void sembla_init_observations")
+            .unwrap();
+        let observation_end = simulation[observation_begin..]
+            .find("\nextern \"C\" __global__ void sembla_philox_vectors")
+            .map(|offset| observation_begin + offset)
+            .unwrap();
+        simulation.replace_range(observation_begin..observation_end, "");
         assert_eq!(
-            generated.source,
+            simulation,
             include_str!("../tests/fixtures/sir.generated.cu")
         );
     }
