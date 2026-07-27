@@ -153,6 +153,10 @@ the design rather than against it. But:
 after them stays **deliberately unwritten**, per the discipline inherited from
 `prds-host-evaluator-performance`.
 
+8. **Bitmap double-write detection** (`0007`): PRD 0005 replaced a sort with a
+   `HashMap`, and the default SipHash costs about 12× the sort it replaced
+   (`docs/evidence/dupcheck-spike-20260727/`). A bitmap beats both.
+
 ### Not a PRD yet: worker join idle
 
 `host-profile-20260727` shows `__ulock_wait` at 347 samples top-of-stack, of
@@ -161,10 +165,11 @@ the barrier. The cause is unknown: it could be
 load imbalance across tiles, tasks too fine to amortise the barrier, or simply
 the tail of an uneven final tile.
 
-`DECISIONS.md` §M1 forbids scoping from a profile share, so this needs a spike
-first — vary tile size and worker count and measure idle time directly. It also
-caps what further tiling can return, so it is worth knowing before extending
-PRD 0003's work.
+**Resolved 2026-07-27** by `docs/evidence/parallel-scaling-spike-20260727/`.
+Scaling saturates at six workers at 1.52×; beyond that wall time is flat and
+user time rises. The idle is Amdahl, not imbalance or barrier overhead. No
+further parallel-side work can pay, and the default worker budget of
+`available_parallelism()` is larger than useful.
 
 ## Deferred: the RNG decision
 

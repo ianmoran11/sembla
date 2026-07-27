@@ -1,0 +1,9 @@
+writes=800000 rows=1000000 columns=10 duplicate_found=false
+
+method                          ms   vs hashmap
+sort (pre-0005)               2.16       12.27x
+hashmap (post-0005)          26.57        1.00x
+bitmap (proposed)             1.48       17.98x
+
+bitmap scratch: 1220.7 KiB, reused across ticks
+All arms asserted to agree on whether a duplicate exists.
