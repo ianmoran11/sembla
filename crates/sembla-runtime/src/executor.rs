@@ -11,8 +11,9 @@ use sembla_ir::{
 };
 
 use crate::eval::{
-    element_wise_map_with_initializer, element_wise_parallel_enabled, eval_column,
-    eval_typed_ref_column, AggCache, EvalError, EvalTable, ParamEnv, ValueColumn,
+    eval_column, eval_typed_ref_column, prepare_row_expr, tick_tile_rows, tick_tiling_enabled,
+    tick_worker_count, AggCache, EvalError, EvalTable, ParamEnv, PreparedColumn, PreparedExpr,
+    PreparedValue, ValueColumn,
 };
 use crate::rng::exp_f64;
 use crate::state::{ColumnData, InputTable, Snapshot, StateError, StateStore};
@@ -270,6 +271,44 @@ struct Resolution {
     fired_per_resource_table: Vec<usize>,
 }
 
+struct PreparedTransition<'state> {
+    box_index: usize,
+    transition_index: usize,
+    rule_id: u32,
+    rule_word: u32,
+    table_index: usize,
+    row_count: usize,
+    guard: PreparedExpr<'state>,
+    hazard: PreparedExpr<'state>,
+    claims: Vec<PreparedClaim<'state>>,
+}
+
+struct PreparedClaim<'state> {
+    resource_table_index: usize,
+    resource: PreparedExpr<'state>,
+    ordering: PreparedClaimOrdering<'state>,
+}
+
+enum PreparedClaimOrdering<'state> {
+    RaceTime,
+    Key {
+        expr: PreparedExpr<'state>,
+        enum_identity: Option<(usize, usize)>,
+    },
+}
+
+struct TileTask {
+    plan_indices: Vec<usize>,
+    start: usize,
+    end: usize,
+}
+
+struct TilePlanOutput {
+    plan_index: usize,
+    candidates: Vec<Candidate>,
+    error: Option<TickError>,
+}
+
 /// Executes and commits one deterministic, snapshot-isolated tick.
 pub fn run_tick(
     model: &ValidatedModel,
@@ -416,6 +455,389 @@ fn execute_tick(
     Ok(finish_tick(model, tick, box_outcomes, views, grouped_views))
 }
 
+fn prepare_tiled_transition<'state>(
+    model: &ValidatedModel,
+    box_index: usize,
+    transition_index: usize,
+    snapshot: &'state Snapshot<'_>,
+    params: &ParamEnv,
+) -> Result<Option<PreparedTransition<'state>>, TickError> {
+    let model_box = &model.model().boxes[box_index];
+    let transition = &model_box.transitions[transition_index];
+    let validated = model
+        .transitions()
+        .iter()
+        .find(|candidate| {
+            candidate.box_index == box_index && candidate.transition_index == transition_index
+        })
+        .expect("validated transition disappeared");
+    let table_index = model_box
+        .tables
+        .iter()
+        .position(|table| table.name == transition.table)
+        .expect("validated transition table disappeared");
+    let row_count = snapshot.row_count(&model_box.name, &transition.table)?;
+    if !tick_tiling_enabled(row_count) {
+        return Ok(None);
+    }
+    let table = EvalTable::new(model, &model_box.name, &transition.table)?;
+    let Some(guard) = prepare_row_expr(&transition.guard, table, snapshot, params)? else {
+        return Ok(None);
+    };
+    let Some(hazard) = prepare_row_expr(&transition.hazard, table, snapshot, params)? else {
+        return Ok(None);
+    };
+    let mut claims = Vec::with_capacity(transition.contests.len());
+    for claim in &transition.contests {
+        let Some(resource) = prepare_row_expr(&claim.resource, table, snapshot, params)? else {
+            return Ok(None);
+        };
+        let target_table = resource.ref_target().ok_or_else(|| {
+            TickError::Evaluation("contest resource did not prepare as Ref".to_owned())
+        })?;
+        let resource_table_index = model_box
+            .tables
+            .iter()
+            .position(|schema| schema.name == target_table)
+            .expect("validated Ref target table disappeared");
+        let ordering = match &claim.ordering {
+            ClaimOrdering::RaceTime => PreparedClaimOrdering::RaceTime,
+            ClaimOrdering::Key { expr } => {
+                let Some(prepared) = prepare_row_expr(expr, table, snapshot, params)? else {
+                    return Ok(None);
+                };
+                let enum_identity = if let Expr::SelfAttr { name } = expr {
+                    model_box.tables[table_index]
+                        .attrs
+                        .iter()
+                        .position(|attr| attr.name == *name)
+                        .filter(|attr_index| {
+                            matches!(
+                                model_box.tables[table_index].attrs[*attr_index].ty,
+                                AttrType::Enum { .. }
+                            )
+                        })
+                        .map(|attr_index| (table_index, attr_index))
+                } else {
+                    None
+                };
+                PreparedClaimOrdering::Key {
+                    expr: prepared,
+                    enum_identity,
+                }
+            }
+        };
+        claims.push(PreparedClaim {
+            resource_table_index,
+            resource,
+            ordering,
+        });
+    }
+    Ok(Some(PreparedTransition {
+        box_index,
+        transition_index,
+        rule_id: validated.rule_id,
+        rule_word: validated.rule_word,
+        table_index,
+        row_count,
+        guard,
+        hazard,
+        claims,
+    }))
+}
+
+fn prepared_ordering_value(
+    value: PreparedValue,
+    enum_identity: Option<(usize, usize)>,
+) -> Result<OrderingValue, TickError> {
+    match value {
+        PreparedValue::Real(value) => Ok(OrderingValue::Real(value)),
+        PreparedValue::Int(value) => Ok(OrderingValue::Int(value)),
+        PreparedValue::Enum(value) => {
+            let (table_index, attr_index) = enum_identity.ok_or_else(|| {
+                TickError::Evaluation(
+                    "Enum contest key has no source attribute identity".to_owned(),
+                )
+            })?;
+            Ok(OrderingValue::Enum {
+                table_index,
+                attr_index,
+                value,
+            })
+        }
+        PreparedValue::Bool | PreparedValue::Ref => Err(TickError::InvalidRuntimeType {
+            context: "contest key".to_owned(),
+            found: match value {
+                PreparedValue::Bool => "Bool",
+                PreparedValue::Ref => "Ref",
+                _ => unreachable!(),
+            }
+            .to_owned(),
+        }),
+    }
+}
+
+fn evaluate_tile_task(
+    task: &TileTask,
+    plans: &[PreparedTransition<'_>],
+    seed: u64,
+    tick: u32,
+    dt: f64,
+) -> Vec<TilePlanOutput> {
+    task.plan_indices
+        .iter()
+        .map(|plan_index| {
+            let plan = &plans[*plan_index];
+            let evaluated = (|| -> Result<Vec<Candidate>, TickError> {
+                // Dispatch each expression node once per tile, not once per
+                // row. Every root is still evaluated eagerly before racing.
+                let guard = plan.guard.tile(task.start, task.end)?;
+                let hazard = plan.hazard.tile(task.start, task.end)?;
+                let mut claim_columns = Vec::with_capacity(plan.claims.len());
+                for claim in &plan.claims {
+                    let resource = claim.resource.tile(task.start, task.end)?;
+                    let ordering = match &claim.ordering {
+                        PreparedClaimOrdering::RaceTime => None,
+                        PreparedClaimOrdering::Key { expr, .. } => {
+                            Some(expr.tile(task.start, task.end)?)
+                        }
+                    };
+                    claim_columns.push((resource, ordering));
+                }
+                let PreparedColumn::Bool(guards) = guard else {
+                    return Err(TickError::Evaluation(
+                        "transition guard did not prepare as Bool".to_owned(),
+                    ));
+                };
+                let PreparedColumn::Real(hazards) = hazard else {
+                    return Err(TickError::Evaluation(
+                        "transition hazard did not prepare as Real".to_owned(),
+                    ));
+                };
+                let mut candidates = Vec::new();
+                for (offset, (guard, lambda)) in guards
+                    .iter()
+                    .copied()
+                    .zip(hazards.iter().copied())
+                    .enumerate()
+                {
+                    if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
+                        continue;
+                    }
+                    let row = task.start + offset;
+                    let entity_id =
+                        u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
+                            rule_id: plan.rule_id,
+                            row,
+                        })?;
+                    let race_time = exp_f64(seed, tick, plan.rule_word, entity_id, 0, lambda);
+                    if race_time.partial_cmp(&dt) != Some(Ordering::Less) {
+                        continue;
+                    }
+                    let mut claims = Vec::with_capacity(plan.claims.len());
+                    for (claim, (resource, ordering)) in plan.claims.iter().zip(&claim_columns) {
+                        let PreparedColumn::Ref(resources) = resource else {
+                            return Err(TickError::Evaluation(
+                                "contest resource did not prepare as Ref".to_owned(),
+                            ));
+                        };
+                        let ordering = match (&claim.ordering, ordering) {
+                            (PreparedClaimOrdering::RaceTime, None) => {
+                                OrderingValue::RaceTime(race_time)
+                            }
+                            (PreparedClaimOrdering::Key { enum_identity, .. }, Some(values)) => {
+                                let value = match values {
+                                    PreparedColumn::Real(values) => {
+                                        PreparedValue::Real(values[offset])
+                                    }
+                                    PreparedColumn::Int(values) => {
+                                        PreparedValue::Int(values[offset])
+                                    }
+                                    PreparedColumn::Enum(values) => {
+                                        PreparedValue::Enum(values[offset])
+                                    }
+                                    PreparedColumn::Bool(_) => PreparedValue::Bool,
+                                    PreparedColumn::Ref(_) => PreparedValue::Ref,
+                                };
+                                prepared_ordering_value(value, *enum_identity)?
+                            }
+                            _ => unreachable!("prepared claim ordering is exhaustive"),
+                        };
+                        claims.push(CandidateClaim {
+                            table_index: claim.resource_table_index,
+                            resource_row: resources[offset],
+                            ordering,
+                        });
+                    }
+                    candidates.push(Candidate {
+                        rule_id: plan.rule_id,
+                        rule_word: plan.rule_word,
+                        table_index: plan.table_index,
+                        entity_id,
+                        row,
+                        claims,
+                    });
+                }
+                Ok(candidates)
+            })();
+            match evaluated {
+                Ok(candidates) => TilePlanOutput {
+                    plan_index: *plan_index,
+                    candidates,
+                    error: None,
+                },
+                Err(error) => TilePlanOutput {
+                    plan_index: *plan_index,
+                    candidates: Vec::new(),
+                    error: Some(error),
+                },
+            }
+        })
+        .collect()
+}
+
+type TiledCandidateResults = Vec<Vec<Option<Result<Vec<Candidate>, TickError>>>>;
+
+/// Prepares every eligible transition, then opens at most one parallel region
+/// for the tick. Fixed task boundaries are `(table, tile_start, tile_end)` and
+/// depend only on stable model indices, row count, and tile size. Worker count
+/// changes only which worker receives a complete fixed task.
+fn prepare_tiled_candidates(
+    model: &ValidatedModel,
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+    seed: u64,
+    tick: u32,
+) -> TiledCandidateResults {
+    let mut results = model
+        .model()
+        .boxes
+        .iter()
+        .map(|model_box| {
+            std::iter::repeat_with(|| None)
+                .take(model_box.transitions.len())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let mut plans = Vec::new();
+    for (box_index, model_box) in model.model().boxes.iter().enumerate() {
+        for transition_index in 0..model_box.transitions.len() {
+            match prepare_tiled_transition(model, box_index, transition_index, snapshot, params) {
+                Ok(Some(plan)) => plans.push(plan),
+                Ok(None) => {}
+                Err(error) => results[box_index][transition_index] = Some(Err(error)),
+            }
+        }
+    }
+    if plans.is_empty() {
+        return results;
+    }
+
+    let mut groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
+    for (plan_index, plan) in plans.iter().enumerate() {
+        if let Some((_, _, _, indices)) =
+            groups.iter_mut().find(|(box_index, table_index, _, _)| {
+                (*box_index, *table_index) == (plan.box_index, plan.table_index)
+            })
+        {
+            indices.push(plan_index);
+        } else {
+            groups.push((
+                plan.box_index,
+                plan.table_index,
+                plan.row_count,
+                vec![plan_index],
+            ));
+        }
+    }
+    let tile_rows = tick_tile_rows();
+    let mut tasks = Vec::new();
+    for (_, _, row_count, plan_indices) in groups {
+        for start in (0..row_count).step_by(tile_rows) {
+            tasks.push(TileTask {
+                plan_indices: plan_indices.clone(),
+                start,
+                end: (start + tile_rows).min(row_count),
+            });
+        }
+    }
+
+    let worker_count = tick_worker_count().max(1).min(tasks.len().max(1));
+    let mut task_outputs = std::iter::repeat_with(|| None)
+        .take(tasks.len())
+        .collect::<Vec<_>>();
+    if worker_count == 1 {
+        for (task_index, task) in tasks.iter().enumerate() {
+            task_outputs[task_index] = Some(evaluate_tile_task(
+                task,
+                &plans,
+                seed,
+                tick,
+                model.model().dt,
+            ));
+        }
+    } else {
+        let mut worker_tasks = std::iter::repeat_with(Vec::new)
+            .take(worker_count)
+            .collect::<Vec<Vec<usize>>>();
+        for task_index in 0..tasks.len() {
+            worker_tasks[task_index % worker_count].push(task_index);
+        }
+        let worker_outputs = std::thread::scope(|scope| {
+            let handles = worker_tasks
+                .into_iter()
+                .map(|task_indices| {
+                    let tasks = &tasks;
+                    let plans = &plans;
+                    scope.spawn(move || {
+                        task_indices
+                            .into_iter()
+                            .map(|task_index| {
+                                (
+                                    task_index,
+                                    evaluate_tile_task(
+                                        &tasks[task_index],
+                                        plans,
+                                        seed,
+                                        tick,
+                                        model.model().dt,
+                                    ),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .flat_map(|handle| handle.join().expect("tile worker panicked"))
+                .collect::<Vec<_>>()
+        });
+        for (task_index, output) in worker_outputs {
+            task_outputs[task_index] = Some(output);
+        }
+    }
+
+    for outputs in task_outputs.into_iter().map(Option::unwrap) {
+        for output in outputs {
+            let plan = &plans[output.plan_index];
+            let slot = &mut results[plan.box_index][plan.transition_index];
+            if let Some(error) = output.error {
+                if slot.is_none() {
+                    *slot = Some(Err(error));
+                }
+            } else if !matches!(slot, Some(Err(_))) {
+                match slot {
+                    Some(Ok(candidates)) => candidates.extend(output.candidates),
+                    None => *slot = Some(Ok(output.candidates)),
+                    Some(Err(_)) => unreachable!(),
+                }
+            }
+        }
+    }
+    results
+}
+
 fn execute_tick_state(
     model: &ValidatedModel,
     state: &mut StateStore,
@@ -424,9 +846,12 @@ fn execute_tick_state(
     tick: u32,
 ) -> Result<Vec<BoxOutcome>, TickError> {
     let snapshot = state.snapshot();
+    let mut tiled_candidates = prepare_tiled_candidates(model, &snapshot, params, seed, tick);
     let mut box_outcomes = Vec::with_capacity(model.model().boxes.len());
-    for box_index in 0..model.model().boxes.len() {
-        box_outcomes.push(stage_box(model, box_index, &snapshot, params, seed, tick)?);
+    for (box_index, candidates) in tiled_candidates.iter_mut().enumerate() {
+        box_outcomes.push(stage_box(
+            model, box_index, &snapshot, params, seed, tick, candidates,
+        )?);
     }
 
     let pending: Vec<_> = box_outcomes
@@ -544,6 +969,157 @@ fn finish_tick(
     }
 }
 
+struct PreparedCountView<'state> {
+    ordinal: usize,
+    box_index: usize,
+    view_index: usize,
+    table_index: usize,
+    row_count: usize,
+    filter: Option<PreparedExpr<'state>>,
+}
+
+/// Tiles observation-only count filters on the calling thread. This is a second
+/// row-wise phase but not a second parallel region: committed views cannot share
+/// the tick-start snapshot used by transition staging. Numeric views, including
+/// every `f64` reduction, retain the original column-wise ascending-row path.
+fn prepare_tiled_count_views(
+    model: &ValidatedModel,
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+) -> Vec<Option<Result<ObservationValue, TickError>>> {
+    let view_count = model
+        .model()
+        .boxes
+        .iter()
+        .map(|model_box| model_box.views.len())
+        .sum();
+    let mut results = std::iter::repeat_with(|| None)
+        .take(view_count)
+        .collect::<Vec<_>>();
+    let mut plans = Vec::new();
+    let mut ordinal = 0;
+    for (box_index, model_box) in model.model().boxes.iter().enumerate() {
+        for (view_index, view) in model_box.views.iter().enumerate() {
+            if view.reduce != ViewReduce::Count {
+                ordinal += 1;
+                continue;
+            }
+            let table_index = model_box
+                .tables
+                .iter()
+                .position(|table| table.name == view.table)
+                .expect("validated view table disappeared");
+            let row_count = match snapshot.row_count(&model_box.name, &view.table) {
+                Ok(row_count) => row_count,
+                Err(error) => {
+                    results[ordinal] = Some(Err(error.into()));
+                    ordinal += 1;
+                    continue;
+                }
+            };
+            if !tick_tiling_enabled(row_count) {
+                ordinal += 1;
+                continue;
+            }
+            let table = match EvalTable::new(model, &model_box.name, &view.table) {
+                Ok(table) => table,
+                Err(error) => {
+                    results[ordinal] = Some(Err(error.into()));
+                    ordinal += 1;
+                    continue;
+                }
+            };
+            let filter = match &view.filter {
+                Some(filter) => match prepare_row_expr(filter, table, snapshot, params) {
+                    Ok(Some(filter)) => Some(filter),
+                    Ok(None) => {
+                        ordinal += 1;
+                        continue;
+                    }
+                    Err(error) => {
+                        results[ordinal] = Some(Err(error.into()));
+                        ordinal += 1;
+                        continue;
+                    }
+                },
+                None => None,
+            };
+            plans.push(PreparedCountView {
+                ordinal,
+                box_index,
+                view_index,
+                table_index,
+                row_count,
+                filter,
+            });
+            ordinal += 1;
+        }
+    }
+
+    let mut groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
+    for (plan_index, plan) in plans.iter().enumerate() {
+        if let Some((_, _, _, indices)) =
+            groups.iter_mut().find(|(box_index, table_index, _, _)| {
+                (*box_index, *table_index) == (plan.box_index, plan.table_index)
+            })
+        {
+            indices.push(plan_index);
+        } else {
+            groups.push((
+                plan.box_index,
+                plan.table_index,
+                plan.row_count,
+                vec![plan_index],
+            ));
+        }
+    }
+    let mut counts = vec![0_usize; plans.len()];
+    let tile_rows = tick_tile_rows();
+    for (_, _, row_count, plan_indices) in groups {
+        for start in (0..row_count).step_by(tile_rows) {
+            let end = (start + tile_rows).min(row_count);
+            for plan_index in &plan_indices {
+                let plan = &plans[*plan_index];
+                if matches!(results[plan.ordinal], Some(Err(_))) {
+                    continue;
+                }
+                let selected = match &plan.filter {
+                    Some(filter) => match filter.tile(start, end) {
+                        Ok(PreparedColumn::Bool(selected)) => selected,
+                        Ok(_) => {
+                            results[plan.ordinal] = Some(Err(TickError::Evaluation(
+                                "view filter did not prepare as Bool".to_owned(),
+                            )));
+                            continue;
+                        }
+                        Err(error) => {
+                            results[plan.ordinal] = Some(Err(error.into()));
+                            continue;
+                        }
+                    },
+                    None => vec![true; end - start].into(),
+                };
+                counts[*plan_index] += selected.iter().filter(|value| **value).count();
+            }
+        }
+    }
+    for (plan_index, plan) in plans.iter().enumerate() {
+        if matches!(results[plan.ordinal], Some(Err(_))) {
+            continue;
+        }
+        let model_box = &model.model().boxes[plan.box_index];
+        let view = &model_box.views[plan.view_index];
+        let count = i64::try_from(counts[plan_index]).map_err(|_| {
+            TickError::Evaluation(format!(
+                "view '{}.{}' count exceeds i64",
+                model_box.name, view.name
+            ))
+        });
+        results[plan.ordinal] = Some(count.map(ObservationValue::Int));
+    }
+    results
+}
+
 /// Evaluates declaration-ordered views from an already committed state.
 ///
 /// Alternate execution backends use this observation-only entry point after
@@ -555,37 +1131,52 @@ pub fn observe_views(
     params: &ParamEnv,
 ) -> Result<Vec<ViewValue>, TickError> {
     let snapshot = state.snapshot();
+    let mut tiled_counts = prepare_tiled_count_views(model, &snapshot, params);
     let mut cache = AggCache::new(model, &snapshot, params);
     let mut observations = Vec::new();
+    let mut view_ordinal = 0;
     for model_box in &model.model().boxes {
         for view in &model_box.views {
-            let table = EvalTable::new(model, &model_box.name, &view.table)?;
-            let row_count = snapshot.row_count(&model_box.name, &view.table)?;
-            let selected = match &view.filter {
-                Some(filter) => match eval_column(filter, table, &snapshot, params, &mut cache)? {
-                    ValueColumn::Bool(values) => values,
-                    other => return Err(runtime_type("view filter", &other)),
-                },
-                None => vec![true; row_count],
-            };
-            let value = match view.reduce {
-                ViewReduce::Count => ObservationValue::Int(
-                    i64::try_from(selected.iter().filter(|selected| **selected).count()).map_err(
-                        |_| {
-                            TickError::Evaluation(format!(
-                                "view '{}.{}' count exceeds i64",
-                                model_box.name, view.name
-                            ))
-                        },
-                    )?,
-                ),
-                ViewReduce::Sum | ViewReduce::Min | ViewReduce::Max => {
-                    let expression = view
-                        .value
-                        .as_ref()
-                        .expect("validated numeric view has a value");
-                    let column = eval_column(expression, table, &snapshot, params, &mut cache)?;
-                    reduce_view_column(&model_box.name, &view.name, view.reduce, column, &selected)?
+            let tiled_value = tiled_counts[view_ordinal].take();
+            view_ordinal += 1;
+            let value = if let Some(value) = tiled_value {
+                value?
+            } else {
+                let table = EvalTable::new(model, &model_box.name, &view.table)?;
+                let row_count = snapshot.row_count(&model_box.name, &view.table)?;
+                let selected = match &view.filter {
+                    Some(filter) => {
+                        match eval_column(filter, table, &snapshot, params, &mut cache)? {
+                            ValueColumn::Bool(values) => values,
+                            other => return Err(runtime_type("view filter", &other)),
+                        }
+                    }
+                    None => vec![true; row_count],
+                };
+                match view.reduce {
+                    ViewReduce::Count => ObservationValue::Int(
+                        i64::try_from(selected.iter().filter(|selected| **selected).count())
+                            .map_err(|_| {
+                                TickError::Evaluation(format!(
+                                    "view '{}.{}' count exceeds i64",
+                                    model_box.name, view.name
+                                ))
+                            })?,
+                    ),
+                    ViewReduce::Sum | ViewReduce::Min | ViewReduce::Max => {
+                        let expression = view
+                            .value
+                            .as_ref()
+                            .expect("validated numeric view has a value");
+                        let column = eval_column(expression, table, &snapshot, params, &mut cache)?;
+                        reduce_view_column(
+                            &model_box.name,
+                            &view.name,
+                            view.reduce,
+                            column,
+                            &selected,
+                        )?
+                    }
                 }
             };
             observations.push(ViewValue {
@@ -850,35 +1441,6 @@ fn report_table_name(model_box: &sembla_ir::Box, table_index: usize, qualify: bo
     }
 }
 
-fn racing_clock_times(
-    guards: &[bool],
-    hazards: &[f64],
-    seed: u64,
-    tick: u32,
-    rule_id: u32,
-    rule_word: u32,
-    dt: f64,
-) -> Result<Vec<Option<(u32, f64)>>, TickError> {
-    let row_count = guards.len().min(hazards.len());
-    element_wise_map_with_initializer(
-        row_count,
-        || Ok(None),
-        |row| {
-            let lambda = hazards[row];
-            if !guards[row] || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                return Ok(None);
-            }
-            let entity_id =
-                u32::try_from(row).map_err(|_| TickError::EntityIdOverflow { rule_id, row })?;
-            let race_time = exp_f64(seed, tick, rule_word, entity_id, 0, lambda);
-            Ok((race_time.partial_cmp(&dt) == Some(Ordering::Less))
-                .then_some((entity_id, race_time)))
-        },
-    )
-    .into_iter()
-    .collect()
-}
-
 fn stage_box(
     model: &ValidatedModel,
     box_index: usize,
@@ -886,6 +1448,7 @@ fn stage_box(
     params: &ParamEnv,
     seed: u64,
     tick: u32,
+    tiled_candidates: &mut [Option<Result<Vec<Candidate>, TickError>>],
 ) -> Result<BoxOutcome, TickError> {
     let model_box = &model.model().boxes[box_index];
     let transitions: Vec<_> = model
@@ -896,6 +1459,10 @@ fn stage_box(
     let mut cache = AggCache::new(model, snapshot, params);
     let mut candidates = Vec::new();
     for validated in &transitions {
+        if let Some(result) = tiled_candidates[validated.transition_index].take() {
+            candidates.extend(result?);
+            continue;
+        }
         let transition = &model_box.transitions[validated.transition_index];
         let table_index = model_box
             .tables
@@ -955,36 +1522,19 @@ fn stage_box(
                 });
                 Ok(())
             };
-        if element_wise_parallel_enabled(guards.len().min(hazards.len())) {
-            let race_times = racing_clock_times(
-                &guards,
-                &hazards,
-                seed,
-                tick,
-                validated.rule_id,
-                validated.rule_word,
-                model.model().dt,
-            )?;
-            for (row, race_time) in race_times.into_iter().enumerate() {
-                if let Some((entity_id, race_time)) = race_time {
-                    push_candidate(row, entity_id, race_time)?;
-                }
+        for (row, (guard, lambda)) in guards.into_iter().zip(hazards).enumerate() {
+            if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
+                continue;
             }
-        } else {
-            for (row, (guard, lambda)) in guards.into_iter().zip(hazards).enumerate() {
-                if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                    continue;
-                }
-                let entity_id = u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
-                    rule_id: validated.rule_id,
-                    row,
-                })?;
-                let race_time = exp_f64(seed, tick, validated.rule_word, entity_id, 0, lambda);
-                if race_time.partial_cmp(&model.model().dt) != Some(Ordering::Less) {
-                    continue;
-                }
-                push_candidate(row, entity_id, race_time)?;
+            let entity_id = u32::try_from(row).map_err(|_| TickError::EntityIdOverflow {
+                rule_id: validated.rule_id,
+                row,
+            })?;
+            let race_time = exp_f64(seed, tick, validated.rule_word, entity_id, 0, lambda);
+            if race_time.partial_cmp(&model.model().dt) != Some(Ordering::Less) {
+                continue;
             }
+            push_candidate(row, entity_id, race_time)?;
         }
     }
     let resolution = resolve_claims(&candidates, model_box.tables.len(), model_box)?;
@@ -1439,37 +1989,373 @@ fn detect_double_writes(pending: &[PendingWrite], model: &ValidatedModel) -> Res
 #[cfg(test)]
 mod parallel_tests {
     use super::*;
-    use crate::eval::with_test_element_wise_workers;
+    use crate::eval::with_test_tick_tiles;
+    use crate::state::{ColumnInit, StateStore, TableInit};
+    use sembla_ir::{
+        validate, Attr, Box as ModelBox, Model, ParamDecl, ParamType, ParamValue, ResourceClaim,
+        Table, Transition, ViewDecl,
+    };
+
+    fn tiled_fixture(row_count: usize) -> (ValidatedModel, StateStore) {
+        let model = validate(Model {
+            name: "tile-determinism".to_owned(),
+            dt: 5.0,
+            params: Vec::new(),
+            boxes: vec![ModelBox {
+                name: "world".to_owned(),
+                tables: vec![
+                    Table {
+                        name: "Resource".to_owned(),
+                        size_hint: 1_024,
+                        attrs: Vec::new(),
+                    },
+                    Table {
+                        name: "KeyResource".to_owned(),
+                        size_hint: 1_024,
+                        attrs: Vec::new(),
+                    },
+                    Table {
+                        name: "Person".to_owned(),
+                        size_hint: row_count as u64,
+                        attrs: vec![
+                            Attr {
+                                name: "x".to_owned(),
+                                ty: AttrType::Real,
+                            },
+                            Attr {
+                                name: "resource".to_owned(),
+                                ty: AttrType::Ref {
+                                    table: "Resource".to_owned(),
+                                },
+                            },
+                            Attr {
+                                name: "key_resource".to_owned(),
+                                ty: AttrType::Ref {
+                                    table: "KeyResource".to_owned(),
+                                },
+                            },
+                        ],
+                    },
+                ],
+                transitions: vec![
+                    Transition {
+                        name: "race".to_owned(),
+                        table: "Person".to_owned(),
+                        guard: Expr::Gt {
+                            lhs: Box::new(Expr::SelfAttr {
+                                name: "x".to_owned(),
+                            }),
+                            rhs: Box::new(Expr::Real { value: -0.5 }),
+                        },
+                        hazard: Expr::Div {
+                            lhs: Box::new(Expr::Add {
+                                lhs: Box::new(Expr::Mul {
+                                    lhs: Box::new(Expr::SelfAttr {
+                                        name: "x".to_owned(),
+                                    }),
+                                    rhs: Box::new(Expr::Real { value: 0.000_001 }),
+                                }),
+                                rhs: Box::new(Expr::Real { value: 0.001 }),
+                            }),
+                            rhs: Box::new(Expr::Real { value: 3.0 }),
+                        },
+                        effects: Vec::new(),
+                        contests: vec![ResourceClaim {
+                            resource: Expr::SelfAttr {
+                                name: "resource".to_owned(),
+                            },
+                            ordering: ClaimOrdering::RaceTime,
+                        }],
+                    },
+                    Transition {
+                        name: "key".to_owned(),
+                        table: "Person".to_owned(),
+                        guard: Expr::Bool { value: true },
+                        hazard: Expr::Real { value: 0.001 },
+                        effects: Vec::new(),
+                        contests: vec![ResourceClaim {
+                            resource: Expr::SelfAttr {
+                                name: "key_resource".to_owned(),
+                            },
+                            ordering: ClaimOrdering::Key {
+                                expr: Expr::SelfAttr {
+                                    name: "x".to_owned(),
+                                },
+                            },
+                        }],
+                    },
+                ],
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                views: vec![ViewDecl {
+                    name: "positive_x".to_owned(),
+                    table: "Person".to_owned(),
+                    filter: Some(Expr::Gt {
+                        lhs: Box::new(Expr::Div {
+                            lhs: Box::new(Expr::Add {
+                                lhs: Box::new(Expr::SelfAttr {
+                                    name: "x".to_owned(),
+                                }),
+                                rhs: Box::new(Expr::Real { value: 0.25 }),
+                            }),
+                            rhs: Box::new(Expr::Real { value: 3.0 }),
+                        }),
+                        rhs: Box::new(Expr::Real { value: 0.1 }),
+                    }),
+                    value: None,
+                    reduce: ViewReduce::Count,
+                }],
+                grouped_views: Vec::new(),
+            }],
+            wires: Vec::new(),
+            summaries: Vec::new(),
+        })
+        .unwrap();
+        let x = (0..row_count)
+            .map(|row| (row % 997) as f64 / 997.0)
+            .collect();
+        let resources = (0..row_count).map(|row| (row % 1_024) as u32).collect();
+        let key_resources = (0..row_count)
+            .map(|row| ((row * 17) % 1_024) as u32)
+            .collect();
+        let state = StateStore::new(
+            &model,
+            vec![
+                TableInit::new("world", "Resource", 1_024, Vec::new()),
+                TableInit::new("world", "KeyResource", 1_024, Vec::new()),
+                TableInit::new(
+                    "world",
+                    "Person",
+                    row_count,
+                    vec![
+                        ColumnInit::new("x", ColumnData::Real(x)),
+                        ColumnInit::new("resource", ColumnData::Ref(resources)),
+                        ColumnInit::new("key_resource", ColumnData::Ref(key_resources)),
+                    ],
+                ),
+            ],
+        )
+        .unwrap();
+        (model, state)
+    }
+
+    fn parameter_type_fixture(
+        row_count: usize,
+        parameter_type: ParamType,
+        default: ParamValue,
+    ) -> ValidatedModel {
+        validate(Model {
+            name: "tile-parameter-type".to_owned(),
+            dt: 1.0,
+            params: vec![ParamDecl {
+                name: "rate".to_owned(),
+                ty: parameter_type,
+                default,
+                prior: None,
+            }],
+            boxes: vec![ModelBox {
+                name: "world".to_owned(),
+                tables: vec![Table {
+                    name: "Person".to_owned(),
+                    size_hint: row_count as u64,
+                    attrs: Vec::new(),
+                }],
+                transitions: vec![Transition {
+                    name: "parameter-hazard".to_owned(),
+                    table: "Person".to_owned(),
+                    guard: Expr::Bool { value: true },
+                    hazard: Expr::Add {
+                        lhs: Box::new(Expr::Param {
+                            name: "rate".to_owned(),
+                        }),
+                        rhs: Box::new(Expr::Real { value: 0.0 }),
+                    },
+                    effects: Vec::new(),
+                    contests: Vec::new(),
+                }],
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                views: Vec::new(),
+                grouped_views: Vec::new(),
+            }],
+            wires: Vec::new(),
+            summaries: Vec::new(),
+        })
+        .unwrap()
+    }
+
+    fn parameter_type_state(model: &ValidatedModel, row_count: usize) -> StateStore {
+        StateStore::new(
+            model,
+            vec![TableInit::new("world", "Person", row_count, Vec::new())],
+        )
+        .unwrap()
+    }
+
+    fn tiled_race_fingerprint(
+        model: &ValidatedModel,
+        state: &StateStore,
+        workers: usize,
+        tile_rows: usize,
+    ) -> Vec<(u32, u32, usize, u32, usize, u32, u64)> {
+        with_test_tick_tiles(workers, tile_rows, 0, || {
+            let params = ParamEnv::defaults(model);
+            let snapshot = state.snapshot();
+            let mut results = prepare_tiled_candidates(model, &snapshot, &params, 0xC0FFEE, 7);
+            results[0][0]
+                .take()
+                .expect("transition should clear the tiling threshold")
+                .unwrap()
+                .into_iter()
+                .map(|candidate| {
+                    let claim = &candidate.claims[0];
+                    let OrderingValue::RaceTime(time) = claim.ordering else {
+                        panic!("test claim must retain its race time");
+                    };
+                    (
+                        candidate.rule_id,
+                        candidate.rule_word,
+                        candidate.row,
+                        candidate.entity_id,
+                        claim.table_index,
+                        claim.resource_row,
+                        time.to_bits(),
+                    )
+                })
+                .collect()
+        })
+    }
+
+    fn tiled_key_fingerprint(
+        model: &ValidatedModel,
+        state: &StateStore,
+        workers: usize,
+        tile_rows: usize,
+    ) -> Vec<(usize, u32, u64)> {
+        with_test_tick_tiles(workers, tile_rows, 0, || {
+            let params = ParamEnv::defaults(model);
+            let snapshot = state.snapshot();
+            let mut results = prepare_tiled_candidates(model, &snapshot, &params, 0xC0FFEE, 7);
+            results[0][1]
+                .take()
+                .expect("key transition should clear the tiling threshold")
+                .unwrap()
+                .into_iter()
+                .map(|candidate| {
+                    let claim = &candidate.claims[0];
+                    let OrderingValue::Real(key) = claim.ordering else {
+                        panic!("test claim must retain its Real key");
+                    };
+                    (candidate.row, claim.resource_row, key.to_bits())
+                })
+                .collect()
+        })
+    }
 
     #[test]
-    fn racing_clock_is_bit_identical_across_worker_counts() {
-        let row_count = 262_144;
-        let guards = (0..row_count).map(|row| row % 5 != 0).collect::<Vec<_>>();
-        let hazards = (0..row_count)
-            .map(|row| {
-                if row % 11 == 0 {
-                    0.0
-                } else {
-                    0.001 + (row % 97) as f64 * 0.000_001
-                }
-            })
-            .collect::<Vec<_>>();
-        let evaluate = |workers| {
-            with_test_element_wise_workers(workers, || {
-                racing_clock_times(&guards, &hazards, 0xC0FFEE, 7, 19, 3, 1_000.0)
-                    .unwrap()
-                    .into_iter()
-                    .map(|value| value.map(|(entity, time)| (entity, time.to_bits())))
-                    .collect::<Vec<_>>()
+    fn real_chain_racing_clock_and_key_are_bit_identical_across_workers_and_tiles() {
+        let (model, state) = tiled_fixture(65_537);
+        let serial_races = tiled_race_fingerprint(&model, &state, 1, 257);
+        let serial_keys = tiled_key_fingerprint(&model, &state, 1, 257);
+        assert!(!serial_races.is_empty());
+        assert!(!serial_keys.is_empty());
+        for workers in [1, 2, 4] {
+            for tile_rows in [257, 1_024, 4_093] {
+                assert_eq!(
+                    tiled_race_fingerprint(&model, &state, workers, tile_rows),
+                    serial_races,
+                    "racing clock changed at {workers} workers and {tile_rows} rows/tile"
+                );
+                assert_eq!(
+                    tiled_key_fingerprint(&model, &state, workers, tile_rows),
+                    serial_keys,
+                    "claim key changed at {workers} workers and {tile_rows} rows/tile"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tick_report_is_identical_across_workers_and_tiles() {
+        let evaluate = |workers, tile_rows| {
+            let (model, mut state) = tiled_fixture(65_537);
+            with_test_tick_tiles(workers, tile_rows, 0, || {
+                let params = ParamEnv::defaults(&model);
+                run_tick(&model, &mut state, &params, 0xC0FFEE, 7).unwrap()
             })
         };
-        let serial = evaluate(1);
-        for workers in [2, 4] {
-            assert_eq!(
-                evaluate(workers),
-                serial,
-                "racing-clock draws changed at {workers} workers"
-            );
+        let serial = evaluate(1, 257);
+        for workers in [1, 2, 4] {
+            for tile_rows in [257, 1_024, 4_093] {
+                assert_eq!(
+                    evaluate(workers, tile_rows),
+                    serial,
+                    "tick output changed at {workers} workers and {tile_rows} rows/tile"
+                );
+            }
         }
+    }
+
+    #[test]
+    fn wrong_typed_parameter_environment_matches_fallback_across_workers_and_tiles() {
+        let row_count = 65_537;
+        let model = parameter_type_fixture(
+            row_count,
+            ParamType::Real,
+            ParamValue::Real { value: 0.001 },
+        );
+        let environment_model =
+            parameter_type_fixture(row_count, ParamType::Int, ParamValue::Int { value: 1 });
+        let params = ParamEnv::defaults(&environment_model);
+        let evaluate = |workers, tile_rows, threshold| {
+            let mut state = parameter_type_state(&model, row_count);
+            with_test_tick_tiles(workers, tile_rows, threshold, || {
+                run_tick(&model, &mut state, &params, 0xC0FFEE, 7)
+                    .expect_err("the mismatched parameter environment must be rejected")
+                    .to_string()
+            })
+        };
+
+        let fallback_error = evaluate(1, 1_024, row_count + 1);
+        assert!(
+            fallback_error.contains("parameter environment value for 'rate' has the wrong type")
+        );
+        for workers in [1, 2, 4] {
+            for tile_rows in [257, 1_024, 4_093] {
+                assert_eq!(
+                    evaluate(workers, tile_rows, 0),
+                    fallback_error,
+                    "parameter error changed at {workers} workers and {tile_rows} rows/tile"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn threshold_falls_back_and_only_tick_orchestration_can_spawn() {
+        let row_count = 4_097;
+        let (model, state) = tiled_fixture(row_count);
+        with_test_tick_tiles(4, 257, row_count + 1, || {
+            let params = ParamEnv::defaults(&model);
+            let snapshot = state.snapshot();
+            let results = prepare_tiled_candidates(&model, &snapshot, &params, 1, 0);
+            assert!(results[0][0].is_none());
+        });
+
+        let production_executor = include_str!("executor.rs")
+            .split_once("#[cfg(test)]")
+            .unwrap()
+            .0;
+        let production_eval = include_str!("eval.rs")
+            .split_once("#[cfg(test)]")
+            .unwrap()
+            .0;
+        assert_eq!(
+            production_executor
+                .matches("std::thread::scope(|scope|")
+                .count(),
+            1
+        );
+        assert!(!production_eval.contains("std::thread::scope(|scope|"));
     }
 }

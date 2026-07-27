@@ -1,0 +1,772 @@
+{
+  "schema": "sembla-evaluator-tiled-tick-before-after-v1",
+  "session": {
+    "date": "2026-07-27",
+    "baseline_commit": "44142f3",
+    "machine": "Apple M2 Pro",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "os": "macOS 15.5 (24F74)",
+    "physical_cores": 10,
+    "logical_cores": 10,
+    "available_parallelism": 10
+  },
+  "case": {
+    "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+    "scale": 1000000,
+    "ticks": 24,
+    "seed": 9009,
+    "areas": 4,
+    "present_fraction": 0.8,
+    "streams": "birth:600,overseas:250,internal:150",
+    "backend": "cpu"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "implementation": {
+    "scope": "aggregate/input-free, row-infallible transition guard, hazard, claim-resource and claim-key expressions are evaluated per fixed tile in one tick-level scoped region; eligible Count views are tiled serially post-commit; aggregates, numeric views, effects, writes and conflict resolution remain column-wise/sequential",
+    "default_tile_rows": 1024,
+    "parallel_threshold_rows": 1000000,
+    "worker_override_environment": "SEMBLA_EVAL_THREADS",
+    "tile_override_environment": "SEMBLA_EVAL_TILE_ROWS",
+    "threshold_override_environment": "SEMBLA_EVAL_TILE_THRESHOLD",
+    "default_worker_budget": 10,
+    "official_case_cleared_threshold": true,
+    "partitioning": "fixed row-index tiles; worker assignment changes only which worker receives each complete tile task; merge is canonical transition then tile then row order",
+    "live_set_bytes": {
+      "deepest_benchmark_guard_conservative_peak": 20480,
+      "final_guard_bool": 1024,
+      "final_hazard_real": 8192,
+      "final_claim_ref": 4096,
+      "final_roots_total": 13312,
+      "l1_data_cache_assumed": 32768
+    }
+  },
+  "binaries": {
+    "before_sha256": "406edaaf98d21e630b55409d9db72fde58ef0c989ceb53ac24421834c9c615ed",
+    "after_sha256": "5b93233b42429da08021eb8eb2945465505f5ca13ee0be680437da6616b86fb8"
+  },
+  "tile_size_sweep_6_ticks": [
+    {
+      "mode": "column",
+      "tile_rows": null,
+      "workers": 1,
+      "threshold_rows": 1000001,
+      "wall_seconds": 2.15,
+      "user_seconds": 1.77,
+      "sys_seconds": 0.37,
+      "wall_minus_user_and_sys_seconds": 0.01,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "parallel",
+      "tile_rows": 1024,
+      "workers": 10,
+      "threshold_rows": 0,
+      "wall_seconds": 1.96,
+      "user_seconds": 2.06,
+      "sys_seconds": 0.47,
+      "wall_minus_user_and_sys_seconds": -0.57,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "parallel",
+      "tile_rows": 2048,
+      "workers": 10,
+      "threshold_rows": 0,
+      "wall_seconds": 1.71,
+      "user_seconds": 1.96,
+      "sys_seconds": 0.34,
+      "wall_minus_user_and_sys_seconds": -0.59,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "parallel",
+      "tile_rows": 256,
+      "workers": 10,
+      "threshold_rows": 0,
+      "wall_seconds": 1.74,
+      "user_seconds": 2.05,
+      "sys_seconds": 0.35,
+      "wall_minus_user_and_sys_seconds": -0.66,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "parallel",
+      "tile_rows": 4096,
+      "workers": 10,
+      "threshold_rows": 0,
+      "wall_seconds": 1.82,
+      "user_seconds": 1.98,
+      "sys_seconds": 0.42,
+      "wall_minus_user_and_sys_seconds": -0.58,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "parallel",
+      "tile_rows": 512,
+      "workers": 10,
+      "threshold_rows": 0,
+      "wall_seconds": 1.85,
+      "user_seconds": 2.07,
+      "sys_seconds": 0.4,
+      "wall_minus_user_and_sys_seconds": -0.62,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "single",
+      "tile_rows": 1024,
+      "workers": 1,
+      "threshold_rows": 0,
+      "wall_seconds": 2.28,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.38,
+      "wall_minus_user_and_sys_seconds": 0.02,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "single",
+      "tile_rows": 2048,
+      "workers": 1,
+      "threshold_rows": 0,
+      "wall_seconds": 2.23,
+      "user_seconds": 1.86,
+      "sys_seconds": 0.36,
+      "wall_minus_user_and_sys_seconds": 0.01,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "single",
+      "tile_rows": 256,
+      "workers": 1,
+      "threshold_rows": 0,
+      "wall_seconds": 2.25,
+      "user_seconds": 1.89,
+      "sys_seconds": 0.35,
+      "wall_minus_user_and_sys_seconds": 0.01,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "single",
+      "tile_rows": 4096,
+      "workers": 1,
+      "threshold_rows": 0,
+      "wall_seconds": 2.31,
+      "user_seconds": 1.87,
+      "sys_seconds": 0.4,
+      "wall_minus_user_and_sys_seconds": 0.04,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    },
+    {
+      "mode": "single",
+      "tile_rows": 512,
+      "workers": 1,
+      "threshold_rows": 0,
+      "wall_seconds": 2.27,
+      "user_seconds": 1.89,
+      "sys_seconds": 0.37,
+      "wall_minus_user_and_sys_seconds": 0.01,
+      "contended": false,
+      "csv_sha256": "486f528ac450e839d9a47a8adbe0b3175a8a32157e868db6a1b1b1d226f687fc"
+    }
+  ],
+  "threshold_sweep_24_ticks": [
+    {
+      "row_count": 32768,
+      "mode": "column",
+      "runs": [
+        {
+          "wall_seconds": 0.19,
+          "user_seconds": 0.17,
+          "sys_seconds": 0.01,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.19,
+          "user_seconds": 0.18,
+          "sys_seconds": 0.01,
+          "wall_minus_user_and_sys_seconds": 0.0,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.19,
+          "user_seconds": 0.17,
+          "sys_seconds": 0.01,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.17,
+      "median_user_seconds": 0.17,
+      "fastest_wall_seconds": 0.19,
+      "csv_sha256": "747ba8d6b31893f59c4e30c097e68516cffc4903084edee892d8f15864fb66d3",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 32768,
+      "mode": "single",
+      "runs": [
+        {
+          "wall_seconds": 0.2,
+          "user_seconds": 0.19,
+          "sys_seconds": 0.01,
+          "wall_minus_user_and_sys_seconds": 0.0,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.21,
+          "user_seconds": 0.19,
+          "sys_seconds": 0.01,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.2,
+          "user_seconds": 0.19,
+          "sys_seconds": 0.01,
+          "wall_minus_user_and_sys_seconds": 0.0,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.19,
+      "median_user_seconds": 0.19,
+      "fastest_wall_seconds": 0.2,
+      "csv_sha256": "747ba8d6b31893f59c4e30c097e68516cffc4903084edee892d8f15864fb66d3",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 32768,
+      "mode": "parallel",
+      "runs": [
+        {
+          "wall_seconds": 0.15,
+          "user_seconds": 0.21,
+          "sys_seconds": 0.03,
+          "wall_minus_user_and_sys_seconds": -0.09,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.15,
+          "user_seconds": 0.21,
+          "sys_seconds": 0.03,
+          "wall_minus_user_and_sys_seconds": -0.09,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.15,
+          "user_seconds": 0.21,
+          "sys_seconds": 0.03,
+          "wall_minus_user_and_sys_seconds": -0.09,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.21,
+      "median_user_seconds": 0.21,
+      "fastest_wall_seconds": 0.15,
+      "csv_sha256": "747ba8d6b31893f59c4e30c097e68516cffc4903084edee892d8f15864fb66d3",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 65536,
+      "mode": "column",
+      "runs": [
+        {
+          "wall_seconds": 0.4,
+          "user_seconds": 0.36,
+          "sys_seconds": 0.03,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.4,
+          "user_seconds": 0.36,
+          "sys_seconds": 0.03,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.39,
+          "user_seconds": 0.36,
+          "sys_seconds": 0.03,
+          "wall_minus_user_and_sys_seconds": 0.0,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.36,
+      "median_user_seconds": 0.36,
+      "fastest_wall_seconds": 0.39,
+      "csv_sha256": "37c62b1ac9ddfc2b2f1cab8049b661f45a1b601f4c64b8614261bebf4b1d9241",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 65536,
+      "mode": "single",
+      "runs": [
+        {
+          "wall_seconds": 0.43,
+          "user_seconds": 0.38,
+          "sys_seconds": 0.05,
+          "wall_minus_user_and_sys_seconds": -0.0,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.44,
+          "user_seconds": 0.38,
+          "sys_seconds": 0.05,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.44,
+          "user_seconds": 0.38,
+          "sys_seconds": 0.05,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.38,
+      "median_user_seconds": 0.38,
+      "fastest_wall_seconds": 0.43,
+      "csv_sha256": "37c62b1ac9ddfc2b2f1cab8049b661f45a1b601f4c64b8614261bebf4b1d9241",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 65536,
+      "mode": "parallel",
+      "runs": [
+        {
+          "wall_seconds": 0.32,
+          "user_seconds": 0.42,
+          "sys_seconds": 0.06,
+          "wall_minus_user_and_sys_seconds": -0.16,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.31,
+          "user_seconds": 0.42,
+          "sys_seconds": 0.06,
+          "wall_minus_user_and_sys_seconds": -0.17,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.32,
+          "user_seconds": 0.42,
+          "sys_seconds": 0.06,
+          "wall_minus_user_and_sys_seconds": -0.16,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.42,
+      "median_user_seconds": 0.42,
+      "fastest_wall_seconds": 0.31,
+      "csv_sha256": "37c62b1ac9ddfc2b2f1cab8049b661f45a1b601f4c64b8614261bebf4b1d9241",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 131072,
+      "mode": "column",
+      "runs": [
+        {
+          "wall_seconds": 0.86,
+          "user_seconds": 0.73,
+          "sys_seconds": 0.12,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.84,
+          "user_seconds": 0.73,
+          "sys_seconds": 0.11,
+          "wall_minus_user_and_sys_seconds": -0.0,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.88,
+          "user_seconds": 0.75,
+          "sys_seconds": 0.13,
+          "wall_minus_user_and_sys_seconds": 0.0,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.73,
+      "median_user_seconds": 0.73,
+      "fastest_wall_seconds": 0.84,
+      "csv_sha256": "5b2befda99d100c31c6686d7b9706539ba83f8824dca4223e7499fcf7762b667",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 131072,
+      "mode": "single",
+      "runs": [
+        {
+          "wall_seconds": 0.97,
+          "user_seconds": 0.79,
+          "sys_seconds": 0.16,
+          "wall_minus_user_and_sys_seconds": 0.02,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.96,
+          "user_seconds": 0.79,
+          "sys_seconds": 0.15,
+          "wall_minus_user_and_sys_seconds": 0.02,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.97,
+          "user_seconds": 0.79,
+          "sys_seconds": 0.16,
+          "wall_minus_user_and_sys_seconds": 0.02,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.79,
+      "median_user_seconds": 0.79,
+      "fastest_wall_seconds": 0.96,
+      "csv_sha256": "5b2befda99d100c31c6686d7b9706539ba83f8824dca4223e7499fcf7762b667",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 131072,
+      "mode": "parallel",
+      "runs": [
+        {
+          "wall_seconds": 0.73,
+          "user_seconds": 0.87,
+          "sys_seconds": 0.18,
+          "wall_minus_user_and_sys_seconds": -0.32,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.78,
+          "user_seconds": 0.88,
+          "sys_seconds": 0.19,
+          "wall_minus_user_and_sys_seconds": -0.29,
+          "contended": false
+        },
+        {
+          "wall_seconds": 0.71,
+          "user_seconds": 0.87,
+          "sys_seconds": 0.16,
+          "wall_minus_user_and_sys_seconds": -0.32,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 0.87,
+      "median_user_seconds": 0.87,
+      "fastest_wall_seconds": 0.71,
+      "csv_sha256": "5b2befda99d100c31c6686d7b9706539ba83f8824dca4223e7499fcf7762b667",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 262144,
+      "mode": "column",
+      "runs": [
+        {
+          "wall_seconds": 1.89,
+          "user_seconds": 1.54,
+          "sys_seconds": 0.33,
+          "wall_minus_user_and_sys_seconds": 0.02,
+          "contended": false
+        },
+        {
+          "wall_seconds": 1.92,
+          "user_seconds": 1.56,
+          "sys_seconds": 0.35,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 1.9,
+          "user_seconds": 1.56,
+          "sys_seconds": 0.33,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 1.54,
+      "median_user_seconds": 1.56,
+      "fastest_wall_seconds": 1.89,
+      "csv_sha256": "d8f940f4345445c6d3f902646462e999d26b16e22aa97cea8690e6d26b37babd",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 262144,
+      "mode": "single",
+      "runs": [
+        {
+          "wall_seconds": 1.93,
+          "user_seconds": 1.61,
+          "sys_seconds": 0.31,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "wall_seconds": 3.01,
+          "user_seconds": 1.85,
+          "sys_seconds": 0.51,
+          "wall_minus_user_and_sys_seconds": 0.65,
+          "contended": true
+        },
+        {
+          "wall_seconds": 4.16,
+          "user_seconds": 2.07,
+          "sys_seconds": 0.6,
+          "wall_minus_user_and_sys_seconds": 1.49,
+          "contended": true
+        }
+      ],
+      "fastest_user_seconds": 1.61,
+      "median_user_seconds": 1.85,
+      "fastest_wall_seconds": 1.93,
+      "csv_sha256": "d8f940f4345445c6d3f902646462e999d26b16e22aa97cea8690e6d26b37babd",
+      "outputs_identical_within_mode": true
+    },
+    {
+      "row_count": 262144,
+      "mode": "parallel",
+      "runs": [
+        {
+          "wall_seconds": 2.82,
+          "user_seconds": 2.11,
+          "sys_seconds": 0.59,
+          "wall_minus_user_and_sys_seconds": 0.12,
+          "contended": false
+        },
+        {
+          "wall_seconds": 2.17,
+          "user_seconds": 1.96,
+          "sys_seconds": 0.48,
+          "wall_minus_user_and_sys_seconds": -0.27,
+          "contended": false
+        },
+        {
+          "wall_seconds": 2.21,
+          "user_seconds": 2.0,
+          "sys_seconds": 0.5,
+          "wall_minus_user_and_sys_seconds": -0.29,
+          "contended": false
+        }
+      ],
+      "fastest_user_seconds": 1.96,
+      "median_user_seconds": 2.0,
+      "fastest_wall_seconds": 2.17,
+      "csv_sha256": "d8f940f4345445c6d3f902646462e999d26b16e22aa97cea8690e6d26b37babd",
+      "outputs_identical_within_mode": true
+    }
+  ],
+  "official_24_tick_five_run": {
+    "before": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 7.88,
+          "user_seconds": 6.01,
+          "sys_seconds": 1.54,
+          "wall_minus_user_and_sys_seconds": 0.33,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 7.68,
+          "user_seconds": 6.05,
+          "sys_seconds": 1.52,
+          "wall_minus_user_and_sys_seconds": 0.11,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 7.71,
+          "user_seconds": 6.0,
+          "sys_seconds": 1.53,
+          "wall_minus_user_and_sys_seconds": 0.18,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 8.28,
+          "user_seconds": 6.21,
+          "sys_seconds": 1.75,
+          "wall_minus_user_and_sys_seconds": 0.32,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 8.56,
+          "user_seconds": 6.47,
+          "sys_seconds": 1.75,
+          "wall_minus_user_and_sys_seconds": 0.34,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 3,
+        "wall_seconds": 7.71,
+        "user_seconds": 6.0,
+        "sys_seconds": 1.53,
+        "wall_minus_user_and_sys_seconds": 0.18,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 7.88,
+        "user_seconds": 6.05,
+        "sys_seconds": 1.54
+      }
+    },
+    "after": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 6.48,
+          "user_seconds": 7.0,
+          "sys_seconds": 1.57,
+          "wall_minus_user_and_sys_seconds": -2.09,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 5.47,
+          "user_seconds": 6.66,
+          "sys_seconds": 1.3,
+          "wall_minus_user_and_sys_seconds": -2.49,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 5.59,
+          "user_seconds": 6.73,
+          "sys_seconds": 1.36,
+          "wall_minus_user_and_sys_seconds": -2.5,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 5.77,
+          "user_seconds": 6.75,
+          "sys_seconds": 1.44,
+          "wall_minus_user_and_sys_seconds": -2.42,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 5.8,
+          "user_seconds": 6.85,
+          "sys_seconds": 1.4,
+          "wall_minus_user_and_sys_seconds": -2.45,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 2,
+        "wall_seconds": 5.47,
+        "user_seconds": 6.66,
+        "sys_seconds": 1.3,
+        "wall_minus_user_and_sys_seconds": -2.49,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 5.77,
+        "user_seconds": 6.75,
+        "sys_seconds": 1.4
+      }
+    },
+    "single": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 7.65,
+          "user_seconds": 6.17,
+          "sys_seconds": 1.43,
+          "wall_minus_user_and_sys_seconds": 0.05,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 7.4,
+          "user_seconds": 6.12,
+          "sys_seconds": 1.24,
+          "wall_minus_user_and_sys_seconds": 0.04,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 7.32,
+          "user_seconds": 6.1,
+          "sys_seconds": 1.18,
+          "wall_minus_user_and_sys_seconds": 0.04,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 7.34,
+          "user_seconds": 6.1,
+          "sys_seconds": 1.23,
+          "wall_minus_user_and_sys_seconds": 0.01,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 7.41,
+          "user_seconds": 6.14,
+          "sys_seconds": 1.21,
+          "wall_minus_user_and_sys_seconds": 0.06,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 3,
+        "wall_seconds": 7.32,
+        "user_seconds": 6.1,
+        "sys_seconds": 1.18,
+        "wall_minus_user_and_sys_seconds": 0.04,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 7.4,
+        "user_seconds": 6.12,
+        "sys_seconds": 1.23
+      }
+    }
+  },
+  "comparison": {
+    "load_bearing_metric": "user_seconds",
+    "headline_single_worker_user_ratio": 0.9836065573770493,
+    "headline_default_user_ratio": 0.9009009009009009,
+    "headline_single_worker_wall_ratio": 1.0532786885245902,
+    "headline_default_wall_ratio": 1.4095063985374772,
+    "finding": "No user-time crossover was measured below 1M, so production tiling starts at the binding case. There single-worker user time is near-flat while wall time improves; ten workers reduce wall time materially but consume more aggregate CPU user time. The partial tiled interpreter is correct but does not reproduce the hand-written spike serial speedup."
+  },
+  "outputs": {
+    "all_primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_manifests_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f",
+    "all_stdout_sha256": "a034ac5ea499bc5ee82b57c93daf43a8d6580a5d98cf1c0757341aa71fc8154f",
+    "final_state_sha256": "2d509ead9aa506e71be155faaa5608542f7ca32cee203ee42b0d3179d670020c",
+    "all_before_after_and_single_outputs_match": true,
+    "all_before_after_and_single_manifests_match": true
+  },
+  "checks": {
+    "cargo_test_locked": "passed",
+    "scripts_check_rust": "passed",
+    "markdown_links": {
+      "status": "passed",
+      "local_links": 118,
+      "tracked_markdown_files": 168
+    },
+    "git_diff_check": "passed",
+    "tracked_golden_and_cuda_evidence_paths_unchanged": true
+  }
+}

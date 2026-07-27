@@ -19,8 +19,8 @@ fn typed_snapshot_accessors_do_not_regress_into_evaluator_row_loops() {
     }
     assert_eq!(
         EVAL_SOURCE.matches("snapshot.resolve_column(").count(),
-        10,
-        "the four SelfAttr types, EnumIs, and five aggregate reads must each resolve once"
+        12,
+        "whole-column and prepared-tile SelfAttr/EnumIs paths plus aggregate reads must each resolve once"
     );
 }
 

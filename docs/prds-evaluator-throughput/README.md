@@ -183,25 +183,30 @@ serial efficiency cannot hide behind core count.
 
 ## PRD 0001 implementation status
 
-PRD 0001 uses `std::thread::scope` above a measured 5,000,000-row threshold,
-with fixed 16,384-row chunks. Chunk boundaries and final output positions are
-functions only of row index and row count; the available worker count changes
-only which worker receives a complete fixed chunk. Real reductions and conflict
-resolution remain sequential. `SEMBLA_EVAL_THREADS` provides the semantically
-inert worker-budget override used by the required 1-, 2-, and 4-worker
-bit-identity tests and the single-worker measurements.
+Revised PRD 0001 implements the permitted rigorous partial tiling scope.
+Aggregate-free, input-reduction-free, row-infallible transition guards, hazards,
+claim resources, and claim keys are evaluated in fixed 1,024-row tiles. Racing
+clocks and candidate construction share the same task. One tick-level
+`std::thread::scope` distributes complete fixed tasks from 1,000,000 rows;
+post-commit `Count` views use the same tile shape serially. Aggregates, numeric
+views, effects, writes, and conflict resolution retain their canonical
+column-wise or sequential paths.
 
-Threshold trials found that one scoped region per expression node regressed the
-full 1M and 2M cases even though isolated maps were already faster. The 5M
-threshold therefore preserves the original serial path for those cases and is
-where the binding spike measured 5.3–5.6× isolated speedups. This is the
-expected near-1× finding that motivates the later one-region-per-tick tiling
-PRD; it is recorded rather than hidden behind a premature pool or fusion
-workaround.
+Tile boundaries depend only on row count and tile size. Worker count changes
+only task assignment, and candidates merge in transition/tile/row order.
+`SEMBLA_EVAL_THREADS` remains the worker override; tile and threshold sweeps use
+`SEMBLA_EVAL_TILE_ROWS` and `SEMBLA_EVAL_TILE_THRESHOLD`. Tests cross workers 1,
+2, and 4 with tile sizes 257, 1,024, and 4,093, comparing Real chains and racing
+clocks by `to_bits`, complete tick reports exactly, and Real aggregate fallback
+bits. Prepared and column evaluation share the same checked parameter resolver;
+a cross-model wrong-type regression test pins identical diagnostics across the
+same worker/tile matrix.
 
-The binding five-run corpus reported a fastest uncontended 7.30 s wall / 5.81 s
-user before, 7.25 / 5.79 s after, and 7.26 / 5.80 s with an explicit single
-worker. All CSVs, summaries, manifests, stdout hashes, and final-state hashes
-were byte-identical. Threshold measurements, every run, contention flags,
-thread counts, input and binary hashes, medians, and output hashes are under
-[`docs/evidence/evaluator-parallel-element-wise-20260727/`](../evidence/evaluator-parallel-element-wise-20260727/).
+The binding five-run corpus kept every output byte-identical. After rerunning the
+revised binary, fastest uncontended user/wall times were 6.00/7.71 seconds
+before, 6.10/7.32 with tiled single-worker execution, and 6.66/5.47 with ten
+workers. Thus single-worker user time is near-flat while ten workers reduce wall
+time 1.41× at the cost of more aggregate CPU. The separated tile sweep,
+threshold sweep, every official run, contention flags, live-set arithmetic, and
+hashes are under
+[`docs/evidence/evaluator-tiled-tick-20260727/`](../evidence/evaluator-tiled-tick-20260727/).

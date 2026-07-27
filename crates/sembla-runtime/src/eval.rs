@@ -6,26 +6,36 @@
 //! Aggregate sums make one sequential target-table pass in ascending row order;
 //! that order is the canonical Level A CPU reduction order (`DESIGN.md` §5.2).
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::sync::OnceLock;
 
-/// Fixed row-index tiling keeps result partitioning independent of worker count.
-const ELEMENT_WISE_CHUNK_ROWS: usize = 16_384;
-/// Below this measured crossover, scoped-thread setup costs more than it saves.
-const ELEMENT_WISE_PARALLEL_THRESHOLD: usize = 5_000_000;
+/// Default row tile chosen by the PRD 0001 sweep recorded under `docs/evidence`.
+/// At 1,024 rows the benchmark's deepest guard peaks at about 20 KiB: an
+/// 8 KiB borrowed Int attribute, an 8 KiB literal, Bool results, and enclosing
+/// Bool operands. Final guard, hazard, and Ref claim roots occupy at most 13 KiB.
+/// Both bounds fit the M2 Pro's 32 KiB L1 data cache.
+pub(crate) const TICK_TILE_ROWS: usize = 1_024;
+/// Smaller measured cases consumed 3–6% more single-worker user time. The 1M
+/// binding case is the first measured size where that primary metric is flat.
+pub(crate) const TICK_TILE_THRESHOLD: usize = 1_000_000;
 const EVALUATOR_THREADS_ENV: &str = "SEMBLA_EVAL_THREADS";
+const EVALUATOR_TILE_ROWS_ENV: &str = "SEMBLA_EVAL_TILE_ROWS";
+const EVALUATOR_TILE_THRESHOLD_ENV: &str = "SEMBLA_EVAL_TILE_THRESHOLD";
 
-static ELEMENT_WISE_WORKERS: OnceLock<usize> = OnceLock::new();
+static TICK_WORKERS: OnceLock<usize> = OnceLock::new();
+static CONFIGURED_TILE_ROWS: OnceLock<usize> = OnceLock::new();
+static CONFIGURED_TILE_THRESHOLD: OnceLock<usize> = OnceLock::new();
 
 #[inline]
-fn element_wise_worker_count() -> usize {
+pub(crate) fn tick_worker_count() -> usize {
     #[cfg(test)]
-    if let Some(workers) = TEST_ELEMENT_WISE_WORKERS.with(std::cell::Cell::get) {
+    if let Some(workers) = TEST_TICK_WORKERS.with(std::cell::Cell::get) {
         return workers;
     }
 
-    *ELEMENT_WISE_WORKERS.get_or_init(|| {
+    *TICK_WORKERS.get_or_init(|| {
         std::env::var(EVALUATOR_THREADS_ENV)
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
@@ -35,121 +45,96 @@ fn element_wise_worker_count() -> usize {
 }
 
 #[inline]
-fn element_wise_parallel_threshold() -> usize {
+pub(crate) fn tick_tile_rows() -> usize {
     #[cfg(test)]
-    if let Some(threshold) = TEST_ELEMENT_WISE_THRESHOLD.with(std::cell::Cell::get) {
-        return threshold;
+    if let Some(rows) = TEST_TICK_TILE_ROWS.with(std::cell::Cell::get) {
+        return rows;
     }
-    ELEMENT_WISE_PARALLEL_THRESHOLD
+
+    *CONFIGURED_TILE_ROWS.get_or_init(|| {
+        std::env::var(EVALUATOR_TILE_ROWS_ENV)
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|rows| *rows > 0)
+            .unwrap_or(TICK_TILE_ROWS)
+    })
 }
 
 #[inline]
-pub(crate) fn element_wise_parallel_enabled(row_count: usize) -> bool {
-    row_count >= element_wise_parallel_threshold()
-        && element_wise_worker_count() > 1
-        && row_count.div_ceil(ELEMENT_WISE_CHUNK_ROWS) > 1
+pub(crate) fn tick_tile_threshold() -> usize {
+    #[cfg(test)]
+    if let Some(rows) = TEST_TICK_TILE_THRESHOLD.with(std::cell::Cell::get) {
+        return rows;
+    }
+
+    *CONFIGURED_TILE_THRESHOLD.get_or_init(|| {
+        std::env::var(EVALUATOR_TILE_THRESHOLD_ENV)
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(TICK_TILE_THRESHOLD)
+    })
 }
 
-/// Maps rows in fixed index chunks and restores those chunks in index order.
-///
-/// Worker count affects only which worker claims each fixed chunk. It cannot
-/// affect chunk boundaries, operation order within a row, or output order.
+#[inline]
+pub(crate) fn tick_tiling_enabled(row_count: usize) -> bool {
+    row_count >= tick_tile_threshold() && row_count > tick_tile_rows()
+}
+
+/// Legacy whole-column maps are deliberately serial. PRD 0001 moved the only
+/// execution parallel region above expression evaluation, where a complete row
+/// tile carries every eligible transition expression and racing clock.
+#[inline]
+pub(crate) fn element_wise_parallel_enabled(_row_count: usize) -> bool {
+    false
+}
+
 #[inline]
 pub(crate) fn element_wise_map<T, F>(row_count: usize, map: F) -> Vec<T>
 where
-    T: Default + Send,
-    F: Fn(usize) -> T + Sync,
+    F: Fn(usize) -> T,
 {
-    element_wise_map_with_initializer(row_count, T::default, map)
+    (0..row_count).map(map).collect()
 }
 
 #[inline]
 pub(crate) fn element_wise_map_with_initializer<T, I, F>(
     row_count: usize,
-    initialize: I,
+    _initialize: I,
     map: F,
 ) -> Vec<T>
 where
-    T: Send,
     I: Fn() -> T,
-    F: Fn(usize) -> T + Sync,
+    F: Fn(usize) -> T,
 {
-    element_wise_map_initialized_with_workers(
-        row_count,
-        element_wise_worker_count(),
-        initialize,
-        map,
-    )
-}
-
-#[cfg(test)]
-fn element_wise_map_with_workers<T, F>(row_count: usize, workers: usize, map: F) -> Vec<T>
-where
-    T: Default + Send,
-    F: Fn(usize) -> T + Sync,
-{
-    element_wise_map_initialized_with_workers(row_count, workers, T::default, map)
-}
-
-#[inline]
-fn element_wise_map_initialized_with_workers<T, I, F>(
-    row_count: usize,
-    workers: usize,
-    initialize: I,
-    map: F,
-) -> Vec<T>
-where
-    T: Send,
-    I: Fn() -> T,
-    F: Fn(usize) -> T + Sync,
-{
-    let chunk_count = row_count.div_ceil(ELEMENT_WISE_CHUNK_ROWS);
-    let workers = workers.max(1).min(chunk_count.max(1));
-    if row_count < element_wise_parallel_threshold() || workers == 1 {
-        return (0..row_count).map(map).collect();
-    }
-
-    let mut output = std::iter::repeat_with(initialize)
-        .take(row_count)
-        .collect::<Vec<_>>();
-    let mut worker_chunks = std::iter::repeat_with(Vec::new)
-        .take(workers)
-        .collect::<Vec<Vec<(usize, &mut [T])>>>();
-    for (chunk, values) in output.chunks_mut(ELEMENT_WISE_CHUNK_ROWS).enumerate() {
-        worker_chunks[chunk % workers].push((chunk, values));
-    }
-    std::thread::scope(|scope| {
-        for chunks in worker_chunks {
-            let map = &map;
-            scope.spawn(move || {
-                for (chunk, values) in chunks {
-                    let start = chunk * ELEMENT_WISE_CHUNK_ROWS;
-                    for (offset, output) in values.iter_mut().enumerate() {
-                        *output = map(start + offset);
-                    }
-                }
-            });
-        }
-    });
-    output
+    (0..row_count).map(map).collect()
 }
 
 #[cfg(test)]
 thread_local! {
-    static TEST_ELEMENT_WISE_WORKERS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
-    static TEST_ELEMENT_WISE_THRESHOLD: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    static TEST_TICK_WORKERS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    static TEST_TICK_TILE_ROWS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    static TEST_TICK_TILE_THRESHOLD: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
 }
 
 #[cfg(test)]
-pub(crate) fn with_test_element_wise_workers<R>(workers: usize, run: impl FnOnce() -> R) -> R {
-    TEST_ELEMENT_WISE_WORKERS.with(|worker_slot| {
-        TEST_ELEMENT_WISE_THRESHOLD.with(|threshold_slot| {
-            let previous_workers = worker_slot.replace(Some(workers.max(1)));
-            let previous_threshold = threshold_slot.replace(Some(0));
-            let result = run();
-            threshold_slot.set(previous_threshold);
-            worker_slot.set(previous_workers);
-            result
+pub(crate) fn with_test_tick_tiles<R>(
+    workers: usize,
+    tile_rows: usize,
+    threshold: usize,
+    run: impl FnOnce() -> R,
+) -> R {
+    TEST_TICK_WORKERS.with(|worker_slot| {
+        TEST_TICK_TILE_ROWS.with(|tile_slot| {
+            TEST_TICK_TILE_THRESHOLD.with(|threshold_slot| {
+                let previous_workers = worker_slot.replace(Some(workers.max(1)));
+                let previous_tile = tile_slot.replace(Some(tile_rows.max(1)));
+                let previous_threshold = threshold_slot.replace(Some(threshold));
+                let result = run();
+                threshold_slot.set(previous_threshold);
+                tile_slot.set(previous_tile);
+                worker_slot.set(previous_workers);
+                result
+            })
         })
     })
 }
@@ -323,6 +308,27 @@ impl ParamEnv {
             .ok_or_else(|| {
                 EvalError::new(format!("parameter environment has no value for '{name}'"))
             })
+    }
+}
+
+fn checked_parameter_value<'params>(
+    model: &ValidatedModel,
+    params: &'params ParamEnv,
+    name: &str,
+) -> Result<&'params ParamValue, EvalError> {
+    let declaration = model
+        .model()
+        .params
+        .iter()
+        .find(|param| param.name == name)
+        .ok_or_else(|| EvalError::new(format!("unresolved parameter '{name}'")))?;
+    let value = params.get(name)?;
+    if parameter_value_matches(declaration.ty, value) {
+        Ok(value)
+    } else {
+        Err(EvalError::new(format!(
+            "parameter environment value for '{name}' has the wrong type"
+        )))
     }
 }
 
@@ -776,6 +782,468 @@ impl From<&AttrType> for RuntimeType {
     }
 }
 
+/// One row-local value produced by a prepared, aggregate-free expression.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PreparedValue {
+    Real(f64),
+    Int(i64),
+    Bool,
+    Enum(u16),
+    Ref,
+}
+
+#[derive(Debug)]
+pub(crate) enum PreparedColumn<'state> {
+    Real(Cow<'state, [f64]>),
+    Int(Cow<'state, [i64]>),
+    Bool(Cow<'state, [bool]>),
+    Enum(Cow<'state, [u16]>),
+    Ref(Cow<'state, [u32]>),
+}
+
+/// An expression whose parameters and state columns were resolved once before
+/// entering the tick's tile loop. The tree contains no aggregate, input-table
+/// reduction, or fallible integer arithmetic, so row evaluation is side-effect
+/// free and cannot change the executor's declaration-ordered error behaviour.
+#[derive(Debug)]
+pub(crate) struct PreparedExpr<'state> {
+    node: PreparedNode<'state>,
+    ty: RuntimeType,
+}
+
+#[derive(Debug)]
+enum PreparedNode<'state> {
+    Real(f64),
+    Int(i64),
+    Bool(bool),
+    Enum(u16),
+    RealAttr(&'state [f64]),
+    IntAttr(&'state [i64]),
+    EnumAttr(&'state [u16]),
+    RefAttr(&'state [u32]),
+    Add(Box<Self>, Box<Self>),
+    Sub(Box<Self>, Box<Self>),
+    Mul(Box<Self>, Box<Self>),
+    Div(Box<Self>, Box<Self>),
+    Eq(Box<Self>, Box<Self>),
+    Ne(Box<Self>, Box<Self>),
+    Lt(Box<Self>, Box<Self>),
+    Le(Box<Self>, Box<Self>),
+    Gt(Box<Self>, Box<Self>),
+    Ge(Box<Self>, Box<Self>),
+    And(Box<Self>, Box<Self>),
+    Or(Box<Self>, Box<Self>),
+    Not(Box<Self>),
+    EnumIs(&'state [u16], u16),
+}
+
+impl<'state> PreparedExpr<'state> {
+    /// Evaluates one fixed absolute row range with expression dispatch outside
+    /// the row loops. Intermediate vectors are at most one tile long.
+    pub(crate) fn tile(
+        &self,
+        start: usize,
+        end: usize,
+    ) -> Result<PreparedColumn<'state>, EvalError> {
+        eval_prepared_tile(&self.node, start, end)
+    }
+
+    pub(crate) fn ref_target(&self) -> Option<&str> {
+        match &self.ty {
+            RuntimeType::Ref(table) => Some(table),
+            _ => None,
+        }
+    }
+}
+
+fn prepared_column_as_real(column: PreparedColumn<'_>) -> Result<Cow<'_, [f64]>, EvalError> {
+    match column {
+        PreparedColumn::Real(values) => Ok(values),
+        PreparedColumn::Int(values) => Ok(Cow::Owned(
+            values.iter().map(|value| *value as f64).collect(),
+        )),
+        _ => Err(EvalError::new(
+            "prepared numeric expression did not evaluate to Real or Int",
+        )),
+    }
+}
+
+fn eval_prepared_tile<'state>(
+    node: &PreparedNode<'state>,
+    start: usize,
+    end: usize,
+) -> Result<PreparedColumn<'state>, EvalError> {
+    let row_count = end - start;
+    match node {
+        PreparedNode::Real(value) => Ok(PreparedColumn::Real(Cow::Owned(vec![*value; row_count]))),
+        PreparedNode::Int(value) => Ok(PreparedColumn::Int(Cow::Owned(vec![*value; row_count]))),
+        PreparedNode::Bool(value) => Ok(PreparedColumn::Bool(Cow::Owned(vec![*value; row_count]))),
+        PreparedNode::Enum(value) => Ok(PreparedColumn::Enum(Cow::Owned(vec![*value; row_count]))),
+        PreparedNode::RealAttr(values) => {
+            Ok(PreparedColumn::Real(Cow::Borrowed(&values[start..end])))
+        }
+        PreparedNode::IntAttr(values) => {
+            Ok(PreparedColumn::Int(Cow::Borrowed(&values[start..end])))
+        }
+        PreparedNode::EnumAttr(values) => {
+            Ok(PreparedColumn::Enum(Cow::Borrowed(&values[start..end])))
+        }
+        PreparedNode::RefAttr(values) => {
+            Ok(PreparedColumn::Ref(Cow::Borrowed(&values[start..end])))
+        }
+        PreparedNode::Add(lhs, rhs) | PreparedNode::Sub(lhs, rhs) | PreparedNode::Mul(lhs, rhs) => {
+            let lhs = eval_prepared_tile(lhs, start, end)?;
+            let rhs = eval_prepared_tile(rhs, start, end)?;
+            if matches!(lhs, PreparedColumn::Real(_)) || matches!(rhs, PreparedColumn::Real(_)) {
+                let lhs = prepared_column_as_real(lhs)?;
+                let rhs = prepared_column_as_real(rhs)?;
+                return Ok(PreparedColumn::Real(Cow::Owned(
+                    lhs.iter()
+                        .copied()
+                        .zip(rhs.iter().copied())
+                        .map(|(lhs, rhs)| match node {
+                            PreparedNode::Add(_, _) => lhs + rhs,
+                            PreparedNode::Sub(_, _) => lhs - rhs,
+                            PreparedNode::Mul(_, _) => lhs * rhs,
+                            _ => unreachable!(),
+                        })
+                        .collect(),
+                )));
+            }
+            let (PreparedColumn::Int(lhs), PreparedColumn::Int(rhs)) = (lhs, rhs) else {
+                return Err(EvalError::new(
+                    "prepared arithmetic operands are not numeric",
+                ));
+            };
+            let values = lhs
+                .iter()
+                .copied()
+                .zip(rhs.iter().copied())
+                .enumerate()
+                .map(|(offset, (lhs, rhs))| {
+                    let value = match node {
+                        PreparedNode::Add(_, _) => lhs.checked_add(rhs),
+                        PreparedNode::Sub(_, _) => lhs.checked_sub(rhs),
+                        PreparedNode::Mul(_, _) => lhs.checked_mul(rhs),
+                        _ => unreachable!(),
+                    };
+                    value.ok_or_else(|| {
+                        EvalError::new(format!(
+                            "integer arithmetic overflow at row {}",
+                            start + offset
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(PreparedColumn::Int(Cow::Owned(values)))
+        }
+        PreparedNode::Div(lhs, rhs) => {
+            let lhs = prepared_column_as_real(eval_prepared_tile(lhs, start, end)?)?;
+            let rhs = prepared_column_as_real(eval_prepared_tile(rhs, start, end)?)?;
+            Ok(PreparedColumn::Real(Cow::Owned(
+                lhs.iter()
+                    .copied()
+                    .zip(rhs.iter().copied())
+                    .map(|(lhs, rhs)| lhs / rhs)
+                    .collect(),
+            )))
+        }
+        PreparedNode::Eq(lhs, rhs) | PreparedNode::Ne(lhs, rhs) => {
+            let lhs = eval_prepared_tile(lhs, start, end)?;
+            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let equal: Vec<bool> = match (lhs, rhs) {
+                (PreparedColumn::Real(lhs), PreparedColumn::Real(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| lhs == rhs)
+                    .collect(),
+                (PreparedColumn::Real(lhs), PreparedColumn::Int(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| *lhs == *rhs as f64)
+                    .collect(),
+                (PreparedColumn::Int(lhs), PreparedColumn::Real(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| *lhs as f64 == *rhs)
+                    .collect(),
+                (PreparedColumn::Int(lhs), PreparedColumn::Int(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| lhs == rhs)
+                    .collect(),
+                (PreparedColumn::Bool(lhs), PreparedColumn::Bool(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| lhs == rhs)
+                    .collect(),
+                (PreparedColumn::Enum(lhs), PreparedColumn::Enum(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| lhs == rhs)
+                    .collect(),
+                (PreparedColumn::Ref(lhs), PreparedColumn::Ref(rhs)) => lhs
+                    .iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| lhs == rhs)
+                    .collect(),
+                _ => {
+                    return Err(EvalError::new(
+                        "prepared equality operands have incompatible types",
+                    ))
+                }
+            };
+            Ok(PreparedColumn::Bool(Cow::Owned(
+                if matches!(node, PreparedNode::Ne(_, _)) {
+                    equal.into_iter().map(|value| !value).collect()
+                } else {
+                    equal
+                },
+            )))
+        }
+        PreparedNode::Lt(lhs, rhs)
+        | PreparedNode::Le(lhs, rhs)
+        | PreparedNode::Gt(lhs, rhs)
+        | PreparedNode::Ge(lhs, rhs) => {
+            let lhs = eval_prepared_tile(lhs, start, end)?;
+            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let values = if let (PreparedColumn::Int(lhs), PreparedColumn::Int(rhs)) = (&lhs, &rhs)
+            {
+                lhs.iter()
+                    .zip(rhs.iter())
+                    .map(|(lhs, rhs)| match node {
+                        PreparedNode::Lt(_, _) => lhs < rhs,
+                        PreparedNode::Le(_, _) => lhs <= rhs,
+                        PreparedNode::Gt(_, _) => lhs > rhs,
+                        PreparedNode::Ge(_, _) => lhs >= rhs,
+                        _ => unreachable!(),
+                    })
+                    .collect()
+            } else {
+                let lhs = prepared_column_as_real(lhs)?;
+                let rhs = prepared_column_as_real(rhs)?;
+                lhs.iter()
+                    .copied()
+                    .zip(rhs.iter().copied())
+                    .map(|(lhs, rhs)| match node {
+                        PreparedNode::Lt(_, _) => lhs < rhs,
+                        PreparedNode::Le(_, _) => lhs <= rhs,
+                        PreparedNode::Gt(_, _) => lhs > rhs,
+                        PreparedNode::Ge(_, _) => lhs >= rhs,
+                        _ => unreachable!(),
+                    })
+                    .collect()
+            };
+            Ok(PreparedColumn::Bool(Cow::Owned(values)))
+        }
+        PreparedNode::And(lhs, rhs) | PreparedNode::Or(lhs, rhs) => {
+            let lhs = eval_prepared_tile(lhs, start, end)?;
+            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let (PreparedColumn::Bool(lhs), PreparedColumn::Bool(rhs)) = (lhs, rhs) else {
+                return Err(EvalError::new("prepared boolean operands are not Bool"));
+            };
+            Ok(PreparedColumn::Bool(Cow::Owned(
+                lhs.iter()
+                    .copied()
+                    .zip(rhs.iter().copied())
+                    .map(|(lhs, rhs)| {
+                        if matches!(node, PreparedNode::And(_, _)) {
+                            lhs && rhs
+                        } else {
+                            lhs || rhs
+                        }
+                    })
+                    .collect(),
+            )))
+        }
+        PreparedNode::Not(expr) => match eval_prepared_tile(expr, start, end)? {
+            PreparedColumn::Bool(values) => Ok(PreparedColumn::Bool(Cow::Owned(
+                values.iter().map(|value| !*value).collect(),
+            ))),
+            _ => Err(EvalError::new("prepared Not operand is not Bool")),
+        },
+        PreparedNode::EnumIs(values, expected) => Ok(PreparedColumn::Bool(Cow::Owned(
+            values[start..end]
+                .iter()
+                .map(|value| *value == *expected)
+                .collect(),
+        ))),
+    }
+}
+
+/// Prepares a row expression only when tiling cannot alter error precedence.
+/// Aggregate and input reductions stay on the canonical whole-column path, as
+/// does checked integer arithmetic whose first overflowing row is observable.
+pub(crate) fn prepare_row_expr<'state>(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    snapshot: &'state Snapshot<'_>,
+    params: &ParamEnv,
+) -> Result<Option<PreparedExpr<'state>>, EvalError> {
+    let inferred = infer_root_type(expr, table)?;
+    if !expr_is_row_infallible(expr, table, &table.schema().attrs)? {
+        return Ok(None);
+    }
+    let node = prepare_node(
+        expr,
+        table,
+        &table.schema().attrs,
+        snapshot,
+        params,
+        Some(&inferred),
+    )?;
+    Ok(Some(PreparedExpr { node, ty: inferred }))
+}
+
+fn expr_is_row_infallible(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    row_attrs: &[Attr],
+) -> Result<bool, EvalError> {
+    Ok(match expr {
+        Expr::Real { .. }
+        | Expr::Int { .. }
+        | Expr::Bool { .. }
+        | Expr::Enum { .. }
+        | Expr::Param { .. }
+        | Expr::SelfAttr { .. }
+        | Expr::EnumIs { .. } => true,
+        Expr::Add { lhs, rhs } | Expr::Sub { lhs, rhs } | Expr::Mul { lhs, rhs } => {
+            infer_expr_type(expr, table, row_attrs, None)? == RuntimeType::Real
+                && expr_is_row_infallible(lhs, table, row_attrs)?
+                && expr_is_row_infallible(rhs, table, row_attrs)?
+        }
+        Expr::Div { lhs, rhs }
+        | Expr::Eq { lhs, rhs }
+        | Expr::Ne { lhs, rhs }
+        | Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs }
+        | Expr::And { lhs, rhs }
+        | Expr::Or { lhs, rhs } => {
+            expr_is_row_infallible(lhs, table, row_attrs)?
+                && expr_is_row_infallible(rhs, table, row_attrs)?
+        }
+        Expr::Not { expr } => expr_is_row_infallible(expr, table, row_attrs)?,
+        Expr::Input { .. } | Expr::Agg { .. } => false,
+    })
+}
+
+fn prepare_node<'state>(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    row_attrs: &[Attr],
+    snapshot: &'state Snapshot<'_>,
+    params: &ParamEnv,
+    expected: Option<&RuntimeType>,
+) -> Result<PreparedNode<'state>, EvalError> {
+    match expr {
+        Expr::Real { value } => Ok(PreparedNode::Real(*value)),
+        Expr::Int { value } => Ok(PreparedNode::Int(*value)),
+        Expr::Bool { value } => Ok(PreparedNode::Bool(*value)),
+        Expr::Enum { variant } => {
+            let RuntimeType::Enum(variants) = expected.ok_or_else(|| {
+                EvalError::new(format!("enum literal '{variant}' has no type context"))
+            })?
+            else {
+                return Err(EvalError::new(format!(
+                    "enum literal '{variant}' requires an Enum context"
+                )));
+            };
+            let index = variants
+                .iter()
+                .position(|candidate| candidate == variant)
+                .ok_or_else(|| EvalError::new(format!("unknown enum variant '{variant}'")))?;
+            Ok(PreparedNode::Enum(u16::try_from(index).map_err(|_| {
+                EvalError::new(format!("enum variant '{variant}' exceeds u16"))
+            })?))
+        }
+        Expr::Param { name } => match checked_parameter_value(table.model, params, name)? {
+            ParamValue::Real { value } => Ok(PreparedNode::Real(*value)),
+            ParamValue::Int { value } => Ok(PreparedNode::Int(*value)),
+        },
+        Expr::SelfAttr { name } => {
+            let attr = find_attr(row_attrs, name)?;
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
+            Ok(match &attr.ty {
+                AttrType::Real => PreparedNode::RealAttr(column.real_values()?),
+                AttrType::Int => PreparedNode::IntAttr(column.int_values()?),
+                AttrType::Enum { .. } => PreparedNode::EnumAttr(column.enum_values()?),
+                AttrType::Ref { .. } => PreparedNode::RefAttr(column.ref_values()?),
+            })
+        }
+        Expr::Add { lhs, rhs }
+        | Expr::Sub { lhs, rhs }
+        | Expr::Mul { lhs, rhs }
+        | Expr::Div { lhs, rhs }
+        | Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs }
+        | Expr::And { lhs, rhs }
+        | Expr::Or { lhs, rhs } => {
+            let lhs = Box::new(prepare_node(lhs, table, row_attrs, snapshot, params, None)?);
+            let rhs = Box::new(prepare_node(rhs, table, row_attrs, snapshot, params, None)?);
+            Ok(match expr {
+                Expr::Add { .. } => PreparedNode::Add(lhs, rhs),
+                Expr::Sub { .. } => PreparedNode::Sub(lhs, rhs),
+                Expr::Mul { .. } => PreparedNode::Mul(lhs, rhs),
+                Expr::Div { .. } => PreparedNode::Div(lhs, rhs),
+                Expr::Lt { .. } => PreparedNode::Lt(lhs, rhs),
+                Expr::Le { .. } => PreparedNode::Le(lhs, rhs),
+                Expr::Gt { .. } => PreparedNode::Gt(lhs, rhs),
+                Expr::Ge { .. } => PreparedNode::Ge(lhs, rhs),
+                Expr::And { .. } => PreparedNode::And(lhs, rhs),
+                Expr::Or { .. } => PreparedNode::Or(lhs, rhs),
+                _ => unreachable!(),
+            })
+        }
+        Expr::Eq { lhs, rhs } | Expr::Ne { lhs, rhs } => {
+            let (lhs, rhs) = if matches!(lhs.as_ref(), Expr::Enum { .. }) {
+                let rhs_type = infer_expr_type(rhs, table, row_attrs, None)?;
+                (
+                    prepare_node(lhs, table, row_attrs, snapshot, params, Some(&rhs_type))?,
+                    prepare_node(rhs, table, row_attrs, snapshot, params, None)?,
+                )
+            } else {
+                let lhs_type = infer_expr_type(lhs, table, row_attrs, None)?;
+                (
+                    prepare_node(lhs, table, row_attrs, snapshot, params, None)?,
+                    prepare_node(rhs, table, row_attrs, snapshot, params, Some(&lhs_type))?,
+                )
+            };
+            Ok(if matches!(expr, Expr::Eq { .. }) {
+                PreparedNode::Eq(Box::new(lhs), Box::new(rhs))
+            } else {
+                PreparedNode::Ne(Box::new(lhs), Box::new(rhs))
+            })
+        }
+        Expr::Not { expr } => Ok(PreparedNode::Not(Box::new(prepare_node(
+            expr, table, row_attrs, snapshot, params, None,
+        )?))),
+        Expr::EnumIs { attr, variant } => {
+            let declaration = find_attr(row_attrs, attr)?;
+            let AttrType::Enum { variants } = &declaration.ty else {
+                return Err(EvalError::new(format!(
+                    "EnumIs attribute '{attr}' is not Enum-typed"
+                )));
+            };
+            let expected = variants
+                .iter()
+                .position(|candidate| candidate == variant)
+                .ok_or_else(|| EvalError::new(format!("unknown enum variant for '{attr}'")))?;
+            let expected = u16::try_from(expected)
+                .map_err(|_| EvalError::new(format!("enum attribute '{attr}' exceeds u16")))?;
+            let column = snapshot.resolve_column(table.box_name(), table.table_name(), attr)?;
+            Ok(PreparedNode::EnumIs(column.enum_values()?, expected))
+        }
+        Expr::Input { .. } | Expr::Agg { .. } => Err(EvalError::new(
+            "aggregate expressions are not eligible for row tiling",
+        )),
+    }
+}
+
 fn infer_root_type(expr: &Expr, table: EvalTable<'_>) -> Result<RuntimeType, EvalError> {
     let expected = table.expected_type();
     let actual = infer_expr_type(expr, table, &table.schema().attrs, expected.as_ref())?;
@@ -891,26 +1359,10 @@ fn eval_expr(
                 .map_err(|_| EvalError::new(format!("enum variant '{variant}' exceeds u16")))?;
             Ok(InternalColumn::Enum(vec![index; row_count]))
         }
-        Expr::Param { name } => {
-            let declaration = table
-                .model
-                .model()
-                .params
-                .iter()
-                .find(|param| param.name == *name)
-                .ok_or_else(|| EvalError::new(format!("unresolved parameter '{name}'")))?;
-            match (declaration.ty, params.get(name)?) {
-                (ParamType::Real, ParamValue::Real { value }) => {
-                    Ok(InternalColumn::Real(vec![*value; row_count]))
-                }
-                (ParamType::Int, ParamValue::Int { value }) => {
-                    Ok(InternalColumn::Int(vec![*value; row_count]))
-                }
-                _ => Err(EvalError::new(format!(
-                    "parameter environment value for '{name}' has the wrong type"
-                ))),
-            }
-        }
+        Expr::Param { name } => match checked_parameter_value(table.model, params, name)? {
+            ParamValue::Real { value } => Ok(InternalColumn::Real(vec![*value; row_count])),
+            ParamValue::Int { value } => Ok(InternalColumn::Int(vec![*value; row_count])),
+        },
         Expr::SelfAttr { name } => eval_self_attr(table, row_attrs, snapshot, name, row_count),
         Expr::Add { lhs, rhs } => eval_arithmetic(
             Arithmetic::Add,
@@ -2079,8 +2531,6 @@ mod tests {
     use super::*;
     use crate::state::{ColumnInit, StateStore, TableInit};
     use sembla_ir::{validate, Box as ModelBox, Model};
-    use std::collections::HashSet;
-    use std::sync::{Arc, Barrier, Mutex};
 
     #[test]
     fn input_enum_equality_accepts_literal_on_the_left() {
@@ -2197,59 +2647,57 @@ mod tests {
         model: &ValidatedModel,
         state: &StateStore,
         workers: usize,
+        tile_rows: usize,
     ) -> Vec<u64> {
-        with_test_element_wise_workers(workers, || {
+        with_test_tick_tiles(workers, tile_rows, 0, || {
             let params = ParamEnv::defaults(model);
             let snapshot = state.snapshot();
-            let mut cache = AggCache::new(model, &snapshot, &params);
-            let ValueColumn::Real(values) = eval_column(
-                expr,
-                EvalTable::new(model, "world", "Person").unwrap(),
-                &snapshot,
-                &params,
-                &mut cache,
-            )
-            .unwrap() else {
-                panic!("parallel test expression must be Real");
-            };
-            values.into_iter().map(f64::to_bits).collect()
+            let table = EvalTable::new(model, "world", "Person").unwrap();
+            if let Some(prepared) = prepare_row_expr(expr, table, &snapshot, &params).unwrap() {
+                let row_count = snapshot.row_count("world", "Person").unwrap();
+                let mut bits = Vec::with_capacity(row_count);
+                for start in (0..row_count).step_by(tick_tile_rows()) {
+                    let end = (start + tick_tile_rows()).min(row_count);
+                    let PreparedColumn::Real(values) = prepared.tile(start, end).unwrap() else {
+                        panic!("prepared test expression must be Real");
+                    };
+                    bits.extend(values.iter().copied().map(f64::to_bits));
+                }
+                bits
+            } else {
+                let mut cache = AggCache::new(model, &snapshot, &params);
+                let ValueColumn::Real(values) =
+                    eval_column(expr, table, &snapshot, &params, &mut cache).unwrap()
+                else {
+                    panic!("fallback test expression must be Real");
+                };
+                values.into_iter().map(f64::to_bits).collect()
+            }
         })
     }
 
     #[test]
-    fn fixed_row_chunks_honour_the_parallel_threshold() {
-        let caller = std::thread::current().id();
-        let below_threads = Mutex::new(HashSet::new());
-        let below = element_wise_map_with_workers(ELEMENT_WISE_PARALLEL_THRESHOLD - 1, 4, |row| {
-            below_threads
-                .lock()
-                .unwrap()
-                .insert(std::thread::current().id());
-            row
-        });
-        assert_eq!(below.len(), ELEMENT_WISE_PARALLEL_THRESHOLD - 1);
-        assert_eq!(below_threads.into_inner().unwrap(), HashSet::from([caller]));
-        drop(below);
-
-        let row_count = ELEMENT_WISE_PARALLEL_THRESHOLD;
-        let barrier = Arc::new(Barrier::new(4));
-        let above_threads = Mutex::new(HashSet::new());
-        let above = element_wise_map_with_workers(row_count, 4, |row| {
-            if row < ELEMENT_WISE_CHUNK_ROWS * 4 && row % ELEMENT_WISE_CHUNK_ROWS == 0 {
-                barrier.wait();
+    fn fixed_row_tiles_depend_only_on_row_index_and_tile_size() {
+        let row_count = 10_003;
+        for tile_rows in [257, 1_024, 4_093] {
+            let expected = (0..row_count)
+                .step_by(tile_rows)
+                .map(|start| (start, (start + tile_rows).min(row_count)))
+                .collect::<Vec<_>>();
+            for workers in [1, 2, 4] {
+                let actual = with_test_tick_tiles(workers, tile_rows, 0, || {
+                    (0..row_count)
+                        .step_by(tick_tile_rows())
+                        .map(|start| (start, (start + tick_tile_rows()).min(row_count)))
+                        .collect::<Vec<_>>()
+                });
+                assert_eq!(actual, expected, "boundaries changed at {workers} workers");
             }
-            above_threads
-                .lock()
-                .unwrap()
-                .insert(std::thread::current().id());
-            row
-        });
-        assert_eq!(above, (0..row_count).collect::<Vec<_>>());
-        assert_eq!(above_threads.into_inner().unwrap().len(), 4);
+        }
     }
 
     #[test]
-    fn real_arithmetic_chain_is_bit_identical_across_worker_counts() {
+    fn real_arithmetic_chain_is_bit_identical_across_workers_and_tile_sizes() {
         let (model, state) = parallel_fixture(262_144);
         let expr = Expr::Div {
             lhs: Box::new(Expr::Mul {
@@ -2268,13 +2716,15 @@ mod tests {
             }),
             rhs: Box::new(Expr::Real { value: 3.0 }),
         };
-        let serial = evaluate_real_bits(&expr, &model, &state, 1);
-        for workers in [2, 4] {
-            assert_eq!(
-                evaluate_real_bits(&expr, &model, &state, workers),
-                serial,
-                "Real arithmetic changed at {workers} workers"
-            );
+        let serial = evaluate_real_bits(&expr, &model, &state, 1, 257);
+        for workers in [1, 2, 4] {
+            for tile_rows in [257, 1_024, 4_093] {
+                assert_eq!(
+                    evaluate_real_bits(&expr, &model, &state, workers, tile_rows),
+                    serial,
+                    "Real arithmetic changed at {workers} workers and {tile_rows} rows/tile"
+                );
+            }
         }
     }
 
@@ -2294,13 +2744,28 @@ mod tests {
             },
             filter: Box::new(Expr::Bool { value: true }),
         };
-        let serial = evaluate_real_bits(&expr, &model, &state, 1);
-        for workers in [2, 4] {
-            assert_eq!(
-                evaluate_real_bits(&expr, &model, &state, workers),
-                serial,
-                "Real aggregate changed at {workers} workers"
-            );
+        let params = ParamEnv::defaults(&model);
+        let snapshot = state.snapshot();
+        assert!(
+            prepare_row_expr(
+                &expr,
+                EvalTable::new(&model, "world", "Person").unwrap(),
+                &snapshot,
+                &params,
+            )
+            .unwrap()
+            .is_none(),
+            "expressions containing f64 reductions must remain off the tiled path"
+        );
+        let serial = evaluate_real_bits(&expr, &model, &state, 1, 257);
+        for workers in [1, 2, 4] {
+            for tile_rows in [257, 1_024, 4_093] {
+                assert_eq!(
+                    evaluate_real_bits(&expr, &model, &state, workers, tile_rows),
+                    serial,
+                    "Real aggregate changed at {workers} workers and {tile_rows} rows/tile"
+                );
+            }
         }
 
         let reduction = include_str!("eval.rs")
