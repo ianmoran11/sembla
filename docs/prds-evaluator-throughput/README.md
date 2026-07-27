@@ -149,6 +149,11 @@ the design rather than against it. But:
 7. **Evaluate effects at winner rows** (`0006`): effect values are computed for
    every row and used for the ~2% that fire.
 
+8. **Generalise the tiling constants** (`0008`): `TICK_TILE_ROWS` and
+   `TICK_TILE_THRESHOLD` were measured on one model and derive nothing from the
+   model being run. **Sequenced after `docs/prds-device-observation/`** — it is
+   insurance rather than a gain, and the device work is worth more first.
+
 `0003`–`0006` were scoped from measurements, not from profile shares. Anything
 after them stays **deliberately unwritten**, per the discipline inherited from
 `prds-host-evaluator-performance`.

@@ -255,6 +255,15 @@ observation, and every reduction in the benchmark model is `count` or `max` over
 must stay on the host, and eligibility is a property of the whole run: one
 host-bound view means the state is downloaded anyway.
 
+**After device observation**: `prds-evaluator-throughput/0008` generalises the
+tiling constants. `TICK_TILE_ROWS = 1_024` and `TICK_TILE_THRESHOLD = 1_000_000`
+were both measured on `demographic_slots` and neither derives anything from the
+model. The tile size assumes this model's ~20 KB live set fits L1; a model with
+many more views would spill and tiling would *hurt*. The threshold sits exactly
+at the benchmark's row count while `threading_spike` measured parallelism paying
+from ~262k rows. 0008 derives both from the IR and adds a second benchmark shape
+so the problem cannot recur.
+
 **Not queued**: the RNG change (deferred, see above), and device-side reduction
 of the `wins`/`deferred` arrays — worth 22% and needing no semantic decision,
 but deliberately separate so its measurement stays interpretable.
