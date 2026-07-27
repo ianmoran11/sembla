@@ -4,7 +4,7 @@ use cudarc::driver::{CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKer
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::state::{ColumnData, ColumnInit, InputTable, StateStore, TableInit};
+use sembla_runtime::state::{ColumnData, InputTable, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
@@ -35,6 +35,17 @@ pub struct CudaTickObservation {
     pub fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
     pub deferred_per_resource_table: Vec<(String, usize)>,
 }
+
+pub type CudaFiredPerBox = Vec<(String, Vec<(u32, usize)>)>;
+pub type CudaDeferredPerResourceTable = Vec<(String, usize)>;
+pub type ReusedCudaTickObservation = (u32, CudaFiredPerBox, CudaDeferredPerResourceTable);
+pub type TimedReusedCudaTickObservation = (
+    u32,
+    CudaFiredPerBox,
+    CudaDeferredPerResourceTable,
+    [std::time::Duration; 5],
+);
+type DownloadedStateParts = (Vec<u8>, Vec<u8>, Vec<u64>);
 
 #[derive(Debug)]
 struct Layout {
@@ -96,6 +107,8 @@ impl ConflictLaunchGeometry {
 #[derive(Debug)]
 pub struct CudaBackend {
     model: ValidatedModel,
+    host_state: StateStore,
+    host_tables: Vec<TableInit>,
     generated: GeneratedCuda,
     layout: Layout,
     stream: std::sync::Arc<cudarc::driver::CudaStream>,
@@ -210,9 +223,9 @@ impl CudaBackend {
             nvrtc_library,
         })?;
 
-        // Reuse the oracle's public constructor solely to validate initial
-        // schema/ranges. It is dropped before CUDA construction and never runs.
-        StateStore::new(model, initial_tables.clone())
+        // Reuse the oracle's constructor for the exact schema/range checks and
+        // retain its buffers for every subsequent host readback.
+        let host_state = StateStore::new(model, initial_tables.clone())
             .map_err(|error| CudaError::InvalidInput(error.to_string()))?;
 
         let generated = generate(model)?;
@@ -423,6 +436,8 @@ impl CudaBackend {
 
         Ok(Self {
             model: model.clone(),
+            host_state,
+            host_tables: initial_tables,
             generated,
             layout,
             stream,
@@ -516,16 +531,28 @@ impl CudaBackend {
     /// Executes one tick on CUDA and downloads a read-only observation snapshot.
     /// State remains resident on the device for subsequent ticks.
     pub fn run_tick_observed(&mut self) -> Result<CudaTickObservation, CudaError> {
+        let (tick, fired_per_box, deferred_per_resource_table) = self.run_tick_observed_reused()?;
+        Ok(CudaTickObservation {
+            tick,
+            state: self.host_state.clone(),
+            fired_per_box,
+            deferred_per_resource_table,
+        })
+    }
+
+    /// Executes one observed tick while retaining the host state allocation.
+    ///
+    /// The CLI uses this lending-style path and reads [`Self::observed_state`]
+    /// before the next tick. The owned-observation method remains available for
+    /// callers that need to retain snapshots from multiple ticks.
+    #[doc(hidden)]
+    pub fn run_tick_observed_reused(&mut self) -> Result<ReusedCudaTickObservation, CudaError> {
         let tick = self.next_tick;
         self.execute_tick()?;
         let (wins, deferred) = self.readback_control()?;
         let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
-        Ok(CudaTickObservation {
-            tick,
-            state: self.download_state_store()?,
-            fired_per_box,
-            deferred_per_resource_table,
-        })
+        self.download_state_store()?;
+        Ok((tick, fired_per_box, deferred_per_resource_table))
     }
 
     /// Executes one observed CUDA tick and returns durations in this order:
@@ -536,6 +563,27 @@ impl CudaBackend {
     pub fn run_tick_observed_timed(
         &mut self,
     ) -> Result<(CudaTickObservation, [std::time::Duration; 5]), CudaError> {
+        let (tick, fired_per_box, deferred_per_resource_table, mut phases) =
+            self.run_tick_observed_reused_timed()?;
+        let started = std::time::Instant::now();
+        let state = self.host_state.clone();
+        phases[3] += started.elapsed();
+        Ok((
+            CudaTickObservation {
+                tick,
+                state,
+                fired_per_box,
+                deferred_per_resource_table,
+            },
+            phases,
+        ))
+    }
+
+    /// Timed counterpart of [`Self::run_tick_observed_reused`].
+    #[doc(hidden)]
+    pub fn run_tick_observed_reused_timed(
+        &mut self,
+    ) -> Result<TimedReusedCudaTickObservation, CudaError> {
         let tick = self.next_tick;
 
         let started = std::time::Instant::now();
@@ -555,16 +603,13 @@ impl CudaBackend {
         let state_transfer = started.elapsed();
 
         let started = std::time::Instant::now();
-        let state = self.reconstruct_state_store(&state, &inputs, &input_counts)?;
+        self.reconstruct_state_store(&state, &inputs, &input_counts)?;
         let state_reconstruct = started.elapsed();
 
         Ok((
-            CudaTickObservation {
-                tick,
-                state,
-                fired_per_box,
-                deferred_per_resource_table,
-            },
+            tick,
+            fired_per_box,
+            deferred_per_resource_table,
             [
                 kernels,
                 readback_control,
@@ -573,6 +618,18 @@ impl CudaBackend {
                 report,
             ],
         ))
+    }
+
+    /// Returns the backend-owned state refreshed by the latest observed tick.
+    #[doc(hidden)]
+    pub fn observed_state(&self) -> &StateStore {
+        &self.host_state
+    }
+
+    /// Moves the final refreshed state out when the CUDA run is complete.
+    #[doc(hidden)]
+    pub fn into_observed_state(self) -> StateStore {
+        self.host_state
     }
 
     fn readback_control(&self) -> Result<(Vec<u8>, Vec<u8>), CudaError> {
@@ -588,7 +645,7 @@ impl CudaBackend {
         &self,
         wins: &[u8],
         deferred: &[u8],
-    ) -> (Vec<(String, Vec<(u32, usize)>)>, Vec<(String, usize)>) {
+    ) -> (CudaFiredPerBox, CudaDeferredPerResourceTable) {
         let mut fired_per_box = Vec::with_capacity(self.model.model().boxes.len());
         for (box_index, model_box) in self.model.model().boxes.iter().enumerate() {
             let mut fired = Vec::with_capacity(model_box.transitions.len());
@@ -1412,12 +1469,12 @@ impl CudaBackend {
         Ok(())
     }
 
-    fn download_state_store(&self) -> Result<StateStore, CudaError> {
+    fn download_state_store(&mut self) -> Result<(), CudaError> {
         let (state, inputs, input_counts) = self.download_state_parts()?;
         self.reconstruct_state_store(&state, &inputs, &input_counts)
     }
 
-    fn download_state_parts(&self) -> Result<(Vec<u8>, Vec<u8>, Vec<u64>), CudaError> {
+    fn download_state_parts(&self) -> Result<DownloadedStateParts, CudaError> {
         let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
         let inputs = self
             .stream
@@ -1431,23 +1488,16 @@ impl CudaBackend {
     }
 
     fn reconstruct_state_store(
-        &self,
+        &mut self,
         state: &[u8],
         inputs: &[u8],
         input_counts: &[u64],
-    ) -> Result<StateStore, CudaError> {
-        let initial = unpack_state(&self.model, &self.layout, state);
-        let mut store = StateStore::new(&self.model, initial)
-            .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
-        store
-            .replace_backend_inputs(unpack_inputs(
-                &self.model,
-                &self.layout,
-                inputs,
-                input_counts,
-            ))
-            .map_err(|error| CudaError::DeviceExecution(error.to_string()))?;
-        Ok(store)
+    ) -> Result<(), CudaError> {
+        unpack_state_into(&self.model, &self.layout, state, &mut self.host_tables)?;
+        let inputs = unpack_inputs(&self.model, &self.layout, inputs, input_counts);
+        self.host_state
+            .refresh_backend_snapshot(&self.model, &self.host_tables, inputs)
+            .map_err(|error| CudaError::DeviceExecution(error.to_string()))
     }
 
     fn download_hash(&self) -> Result<[u8; 32], CudaError> {
@@ -1474,32 +1524,57 @@ fn format_cuda_driver_version(version: i32) -> String {
     format!("{}.{}", version / 1000, (version % 1000) / 10)
 }
 
-fn unpack_state(model: &ValidatedModel, layout: &Layout, bytes: &[u8]) -> Vec<TableInit> {
-    let mut tables = Vec::new();
+fn unpack_state_into(
+    model: &ValidatedModel,
+    layout: &Layout,
+    bytes: &[u8],
+    tables: &mut [TableInit],
+) -> Result<(), CudaError> {
     let mut global_table = 0;
     let mut column = 0;
     for model_box in &model.model().boxes {
         for table in &model_box.tables {
             let rows = layout.row_counts[global_table] as usize;
-            let columns = table
-                .attrs
-                .iter()
-                .map(|attr| {
-                    let data = read_column(
-                        bytes,
-                        layout.column_offsets[column] as usize,
-                        rows,
-                        &attr.ty,
-                    );
-                    column += 1;
-                    ColumnInit::new(&attr.name, data)
-                })
-                .collect();
-            tables.push(TableInit::new(&model_box.name, &table.name, rows, columns));
+            let destination = tables.get_mut(global_table).ok_or_else(|| {
+                CudaError::DeviceExecution(
+                    "backend state staging table count changed after construction".to_owned(),
+                )
+            })?;
+            if destination.box_name != model_box.name
+                || destination.table_name != table.name
+                || destination.row_count != rows
+                || destination.columns.len() != table.attrs.len()
+            {
+                return Err(CudaError::DeviceExecution(format!(
+                    "backend state staging shape changed for box '{}', table '{}'",
+                    model_box.name, table.name
+                )));
+            }
+            for (attr, destination) in table.attrs.iter().zip(&mut destination.columns) {
+                if destination.name != attr.name {
+                    return Err(CudaError::DeviceExecution(format!(
+                        "backend state staging shape changed for box '{}', table '{}', column '{}'",
+                        model_box.name, table.name, attr.name
+                    )));
+                }
+                read_column_into(
+                    bytes,
+                    layout.column_offsets[column] as usize,
+                    rows,
+                    &attr.ty,
+                    &mut destination.data,
+                )?;
+                column += 1;
+            }
             global_table += 1;
         }
     }
-    tables
+    if global_table != tables.len() {
+        return Err(CudaError::DeviceExecution(
+            "backend state staging table count changed after construction".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn unpack_inputs(
@@ -1532,6 +1607,63 @@ fn unpack_inputs(
         });
     }
     tables
+}
+
+fn read_column_into(
+    bytes: &[u8],
+    offset: usize,
+    rows: usize,
+    ty: &AttrType,
+    destination: &mut ColumnData,
+) -> Result<(), CudaError> {
+    match (ty, destination) {
+        (AttrType::Real, ColumnData::Real(values)) => {
+            values.clear();
+            values.extend((0..rows).map(|row| {
+                f64::from_bits(u64::from_le_bytes(
+                    bytes[offset + row * 8..offset + row * 8 + 8]
+                        .try_into()
+                        .unwrap(),
+                ))
+            }));
+        }
+        (AttrType::Int, ColumnData::Int(values)) => {
+            values.clear();
+            values.extend((0..rows).map(|row| {
+                i64::from_le_bytes(
+                    bytes[offset + row * 8..offset + row * 8 + 8]
+                        .try_into()
+                        .unwrap(),
+                )
+            }));
+        }
+        (AttrType::Enum { .. }, ColumnData::Enum(values)) => {
+            values.clear();
+            values.extend((0..rows).map(|row| {
+                u16::from_le_bytes(
+                    bytes[offset + row * 2..offset + row * 2 + 2]
+                        .try_into()
+                        .unwrap(),
+                )
+            }));
+        }
+        (AttrType::Ref { .. }, ColumnData::Ref(values)) => {
+            values.clear();
+            values.extend((0..rows).map(|row| {
+                u32::from_le_bytes(
+                    bytes[offset + row * 4..offset + row * 4 + 4]
+                        .try_into()
+                        .unwrap(),
+                )
+            }));
+        }
+        _ => {
+            return Err(CudaError::DeviceExecution(
+                "backend state staging column type changed after construction".to_owned(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn read_column(bytes: &[u8], offset: usize, rows: usize, ty: &AttrType) -> ColumnData {

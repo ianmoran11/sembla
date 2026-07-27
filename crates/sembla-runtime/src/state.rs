@@ -221,7 +221,7 @@ pub struct StateStore {
 impl StateStore {
     /// Builds state from a validated IR schema and box-qualified initial data.
     pub fn new(model: &ValidatedModel, initial_tables: Vec<TableInit>) -> Result<Self, StateError> {
-        validate_table_initializers(model, &initial_tables)?;
+        validate_state_initializers(model, &initial_tables)?;
 
         let mut tables = Vec::new();
         for model_box in &model.model().boxes {
@@ -243,15 +243,13 @@ impl StateStore {
                                 model_box.name, table.name, attr.name
                             ))
                         })?;
-                    columns.push(build_column(
+                    columns.push(build_validated_column(
                         model,
-                        &initial_tables,
                         box_table_base,
                         &model_box.name,
-                        &table.name,
                         attr,
                         initial_column,
-                    )?);
+                    ));
                 }
                 tables.push(TableState {
                     box_name: model_box.name.clone(),
@@ -352,10 +350,79 @@ impl StateStore {
         self.inputs = inputs;
     }
 
+    /// Refreshes committed state downloaded by an execution backend.
+    ///
+    /// The complete constructor validation runs before the existing store shape
+    /// is checked or any value is overwritten, so a malformed readback has the
+    /// same diagnostic as [`Self::new`] and cannot partially update the store.
+    /// A prepared write buffer is rejected rather than silently discarded.
+    #[doc(hidden)]
+    pub fn refresh_backend_state(
+        &mut self,
+        model: &ValidatedModel,
+        tables: &[TableInit],
+    ) -> Result<(), StateError> {
+        self.validate_backend_state_refresh(model, tables)?;
+        self.apply_backend_state_refresh(model, tables);
+        Ok(())
+    }
+
+    /// Atomically refreshes state and input tables from one backend snapshot.
+    #[doc(hidden)]
+    pub fn refresh_backend_snapshot(
+        &mut self,
+        model: &ValidatedModel,
+        tables: &[TableInit],
+        inputs: Vec<InputTable>,
+    ) -> Result<(), StateError> {
+        self.validate_backend_state_refresh(model, tables)?;
+        self.validate_backend_inputs(&inputs)?;
+        self.apply_backend_state_refresh(model, tables);
+        self.inputs = inputs;
+        Ok(())
+    }
+
     /// Replaces input tables while reconstructing a read-only snapshot from an
     /// external execution backend. The schema and declaration order must match
     /// the validated model-derived inputs already owned by this store.
     pub fn replace_backend_inputs(&mut self, inputs: Vec<InputTable>) -> Result<(), StateError> {
+        self.validate_backend_inputs(&inputs)?;
+        self.inputs = inputs;
+        Ok(())
+    }
+
+    fn validate_backend_state_refresh(
+        &self,
+        model: &ValidatedModel,
+        tables: &[TableInit],
+    ) -> Result<(), StateError> {
+        if self.write_prepared {
+            return Err(StateError::new(
+                "cannot refresh backend state: a write buffer is already pending",
+            ));
+        }
+        validate_state_initializers(model, tables)?;
+        validate_backend_refresh_shape(&self.current, model, tables)
+    }
+
+    fn apply_backend_state_refresh(&mut self, model: &ValidatedModel, tables: &[TableInit]) {
+        let mut table_index = 0;
+        for model_box in &model.model().boxes {
+            for table in &model_box.tables {
+                let current = &mut self.current.tables[table_index];
+                let initial = find_table_init(tables, &model_box.name, &table.name)
+                    .expect("validated backend table disappeared");
+                for (column, attr) in current.columns.iter_mut().zip(&table.attrs) {
+                    let incoming = find_column_init(&initial.columns, &attr.name)
+                        .expect("validated backend column disappeared");
+                    overwrite_validated_column(column, &incoming.data);
+                }
+                table_index += 1;
+            }
+        }
+    }
+
+    fn validate_backend_inputs(&self, inputs: &[InputTable]) -> Result<(), StateError> {
         if inputs.len() != self.inputs.len() {
             return Err(StateError::new(format!(
                 "backend snapshot supplied {} input tables, expected {}",
@@ -363,7 +430,7 @@ impl StateStore {
                 self.inputs.len()
             )));
         }
-        for (expected, actual) in self.inputs.iter().zip(&inputs) {
+        for (expected, actual) in self.inputs.iter().zip(inputs) {
             if expected.box_name != actual.box_name
                 || expected.port_name != actual.port_name
                 || expected.schema != actual.schema
@@ -395,7 +462,6 @@ impl StateStore {
                 )));
             }
         }
-        self.inputs = inputs;
         Ok(())
     }
 
@@ -405,7 +471,7 @@ impl StateStore {
                 "cannot prepare state writes: a write buffer is already pending",
             ));
         }
-        self.next.clone_from(&self.current);
+        copy_state_values(&mut self.next, &self.current);
         self.write_prepared = true;
         Ok(())
     }
@@ -808,6 +874,41 @@ impl WriteBuffer<'_> {
     }
 }
 
+fn validate_state_initializers(
+    model: &ValidatedModel,
+    initial_tables: &[TableInit],
+) -> Result<(), StateError> {
+    validate_table_initializers(model, initial_tables)?;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let initial = find_table_init(initial_tables, &model_box.name, &table.name)
+                .ok_or_else(|| {
+                    StateError::new(format!(
+                        "box '{}', table '{}': missing initial data",
+                        model_box.name, table.name
+                    ))
+                })?;
+            for attr in &table.attrs {
+                let column = find_column_init(&initial.columns, &attr.name).ok_or_else(|| {
+                    StateError::new(format!(
+                        "box '{}', table '{}', column '{}': missing initial data",
+                        model_box.name, table.name, attr.name
+                    ))
+                })?;
+                validate_column_initializer_value(
+                    model,
+                    initial_tables,
+                    &model_box.name,
+                    &table.name,
+                    attr,
+                    column,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_table_initializers(
     model: &ValidatedModel,
     initial_tables: &[TableInit],
@@ -891,15 +992,14 @@ fn validate_column_initializers(initial: &TableInit) -> Result<(), StateError> {
     Ok(())
 }
 
-fn build_column(
+fn validate_column_initializer_value(
     model: &ValidatedModel,
     initial_tables: &[TableInit],
-    box_table_base: usize,
     box_name: &str,
     table_name: &str,
     attr: &sembla_ir::Attr,
     initial: &ColumnInit,
-) -> Result<ColumnState, StateError> {
+) -> Result<(), StateError> {
     let type_error = || {
         StateError::new(format!(
             "box '{box_name}', table '{table_name}', column '{}': expected {}, found {}",
@@ -910,14 +1010,7 @@ fn build_column(
     };
 
     match (&attr.ty, &initial.data) {
-        (AttrType::Real, ColumnData::Real(values)) => Ok(ColumnState::Real {
-            name: attr.name.clone(),
-            values: values.clone(),
-        }),
-        (AttrType::Int, ColumnData::Int(values)) => Ok(ColumnState::Int {
-            name: attr.name.clone(),
-            values: values.clone(),
-        }),
+        (AttrType::Real, ColumnData::Real(_)) | (AttrType::Int, ColumnData::Int(_)) => Ok(()),
         (AttrType::Enum { variants }, ColumnData::Enum(values)) => {
             for (row, value) in values.iter().copied().enumerate() {
                 if usize::from(value) >= variants.len() {
@@ -928,11 +1021,7 @@ fn build_column(
                     )));
                 }
             }
-            Ok(ColumnState::Enum {
-                name: attr.name.clone(),
-                variant_count: variants.len(),
-                values: values.clone(),
-            })
+            Ok(())
         }
         (AttrType::Ref { table: target }, ColumnData::Ref(values)) => {
             let model_box = model
@@ -943,16 +1032,12 @@ fn build_column(
                 .ok_or_else(|| {
                     StateError::new(format!("box '{box_name}': no such box in model"))
                 })?;
-            let target_offset = model_box
-                .tables
-                .iter()
-                .position(|table| table.name == *target)
-                .ok_or_else(|| {
-                    StateError::new(format!(
-                        "box '{box_name}', table '{table_name}', column '{}': unknown target table '{target}'",
-                        attr.name
-                    ))
-                })?;
+            if !model_box.tables.iter().any(|table| table.name == *target) {
+                return Err(StateError::new(format!(
+                    "box '{box_name}', table '{table_name}', column '{}': unknown target table '{target}'",
+                    attr.name
+                )));
+            }
             let target_initial =
                 find_table_init(initial_tables, box_name, target).ok_or_else(|| {
                     StateError::new(format!(
@@ -967,13 +1052,190 @@ fn build_column(
                     )));
                 }
             }
-            Ok(ColumnState::Ref {
+            Ok(())
+        }
+        _ => Err(type_error()),
+    }
+}
+
+fn build_validated_column(
+    model: &ValidatedModel,
+    box_table_base: usize,
+    box_name: &str,
+    attr: &sembla_ir::Attr,
+    initial: &ColumnInit,
+) -> ColumnState {
+    match (&attr.ty, &initial.data) {
+        (AttrType::Real, ColumnData::Real(values)) => ColumnState::Real {
+            name: attr.name.clone(),
+            values: values.clone(),
+        },
+        (AttrType::Int, ColumnData::Int(values)) => ColumnState::Int {
+            name: attr.name.clone(),
+            values: values.clone(),
+        },
+        (AttrType::Enum { variants }, ColumnData::Enum(values)) => ColumnState::Enum {
+            name: attr.name.clone(),
+            variant_count: variants.len(),
+            values: values.clone(),
+        },
+        (AttrType::Ref { table: target }, ColumnData::Ref(values)) => {
+            let model_box = model
+                .model()
+                .boxes
+                .iter()
+                .find(|model_box| model_box.name == box_name)
+                .expect("validated state box disappeared");
+            let target_offset = model_box
+                .tables
+                .iter()
+                .position(|table| table.name == *target)
+                .expect("validated reference target disappeared");
+            ColumnState::Ref {
                 name: attr.name.clone(),
                 target_table: box_table_base + target_offset,
                 values: values.clone(),
-            })
+            }
         }
-        _ => Err(type_error()),
+        _ => unreachable!("validated state column type changed"),
+    }
+}
+
+fn validate_backend_refresh_shape(
+    state: &StateData,
+    model: &ValidatedModel,
+    tables: &[TableInit],
+) -> Result<(), StateError> {
+    let model_table_count = model
+        .model()
+        .boxes
+        .iter()
+        .map(|model_box| model_box.tables.len())
+        .sum::<usize>();
+    if state.tables.len() != model_table_count {
+        return Err(StateError::new(format!(
+            "backend state snapshot has {model_table_count} tables, but the existing store has {}",
+            state.tables.len()
+        )));
+    }
+
+    let mut table_index = 0;
+    let mut box_table_base = 0;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let current = &state.tables[table_index];
+            let incoming = find_table_init(tables, &model_box.name, &table.name)
+                .expect("validated backend table disappeared");
+            if current.box_name != model_box.name
+                || current.name != table.name
+                || current.columns.len() != table.attrs.len()
+            {
+                return Err(StateError::new(format!(
+                    "backend state snapshot for box '{}', table '{}' does not match the existing store shape",
+                    model_box.name, table.name
+                )));
+            }
+            if current.row_count != incoming.row_count {
+                return Err(StateError::new(format!(
+                    "backend state snapshot for box '{}', table '{}' has {} rows, but the existing store has {}",
+                    model_box.name, table.name, incoming.row_count, current.row_count
+                )));
+            }
+            for (column_index, attr) in table.attrs.iter().enumerate() {
+                let current_column = &current.columns[column_index];
+                let incoming_column = find_column_init(&incoming.columns, &attr.name)
+                    .expect("validated backend column disappeared");
+                let metadata_matches = match (current_column, &attr.ty) {
+                    (ColumnState::Real { .. }, AttrType::Real)
+                    | (ColumnState::Int { .. }, AttrType::Int) => true,
+                    (ColumnState::Enum { variant_count, .. }, AttrType::Enum { variants }) => {
+                        *variant_count == variants.len()
+                    }
+                    (ColumnState::Ref { target_table, .. }, AttrType::Ref { table: target }) => {
+                        model_box
+                            .tables
+                            .iter()
+                            .position(|candidate| candidate.name == *target)
+                            .is_some_and(|offset| *target_table == box_table_base + offset)
+                    }
+                    _ => false,
+                };
+                if current_column.name() != attr.name
+                    || current_column.kind_name() != incoming_column.data.kind_name()
+                    || !metadata_matches
+                {
+                    return Err(StateError::new(format!(
+                        "backend state snapshot for box '{}', table '{}', column '{}' does not match the existing store shape",
+                        model_box.name, table.name, attr.name
+                    )));
+                }
+            }
+            table_index += 1;
+        }
+        box_table_base += model_box.tables.len();
+    }
+    Ok(())
+}
+
+fn copy_state_values(destination: &mut StateData, source: &StateData) {
+    debug_assert_eq!(destination.tables.len(), source.tables.len());
+    for (destination_table, source_table) in destination.tables.iter_mut().zip(&source.tables) {
+        debug_assert_eq!(destination_table.columns.len(), source_table.columns.len());
+        for (destination, source) in destination_table
+            .columns
+            .iter_mut()
+            .zip(&source_table.columns)
+        {
+            match (destination, source) {
+                (
+                    ColumnState::Real {
+                        values: destination,
+                        ..
+                    },
+                    ColumnState::Real { values: source, .. },
+                ) => destination.copy_from_slice(source),
+                (
+                    ColumnState::Int {
+                        values: destination,
+                        ..
+                    },
+                    ColumnState::Int { values: source, .. },
+                ) => destination.copy_from_slice(source),
+                (
+                    ColumnState::Enum {
+                        values: destination,
+                        ..
+                    },
+                    ColumnState::Enum { values: source, .. },
+                ) => destination.copy_from_slice(source),
+                (
+                    ColumnState::Ref {
+                        values: destination,
+                        ..
+                    },
+                    ColumnState::Ref { values: source, .. },
+                ) => destination.copy_from_slice(source),
+                _ => unreachable!("fixed state buffer shape changed"),
+            }
+        }
+    }
+}
+
+fn overwrite_validated_column(column: &mut ColumnState, incoming: &ColumnData) {
+    match (column, incoming) {
+        (ColumnState::Real { values, .. }, ColumnData::Real(incoming)) => {
+            values.copy_from_slice(incoming);
+        }
+        (ColumnState::Int { values, .. }, ColumnData::Int(incoming)) => {
+            values.copy_from_slice(incoming);
+        }
+        (ColumnState::Enum { values, .. }, ColumnData::Enum(incoming)) => {
+            values.copy_from_slice(incoming);
+        }
+        (ColumnState::Ref { values, .. }, ColumnData::Ref(incoming)) => {
+            values.copy_from_slice(incoming);
+        }
+        _ => unreachable!("validated backend column type changed"),
     }
 }
 
@@ -1274,5 +1536,93 @@ mod resolved_write_tests {
                 .to_string(),
             "box 'world', table 'Edge', column 'to', row 0: reference index 2 is out of bounds for target table 'Node' with 2 rows"
         );
+    }
+
+    fn refresh_model() -> ValidatedModel {
+        let source = r#"
+        {
+          "name": "refresh",
+          "dt": 1.0,
+          "params": [],
+          "boxes": [{
+            "name": "world",
+            "tables": [
+              {"name": "Node", "size_hint": 3, "attrs": [
+                {"name": "real", "ty": {"kind": "real"}},
+                {"name": "int", "ty": {"kind": "int"}},
+                {"name": "enum", "ty": {"kind": "enum", "variants": ["a", "b"]}}
+              ]},
+              {"name": "Edge", "size_hint": 2, "attrs": [
+                {"name": "to", "ty": {"kind": "ref", "table": "Node"}}
+              ]}
+            ],
+            "transitions": [],
+            "inputs": [],
+            "outputs": []
+          }],
+          "wires": []
+        }
+        "#;
+        sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+    }
+
+    fn refresh_initial(offset: i64) -> Vec<TableInit> {
+        vec![
+            TableInit::new(
+                "world",
+                "Node",
+                3,
+                vec![
+                    ColumnInit::new("real", ColumnData::Real(vec![offset as f64, 1.0, 2.0])),
+                    ColumnInit::new("int", ColumnData::Int(vec![offset, offset + 1, offset + 2])),
+                    ColumnInit::new("enum", ColumnData::Enum(vec![0, 1, 0])),
+                ],
+            ),
+            TableInit::new(
+                "world",
+                "Edge",
+                2,
+                vec![ColumnInit::new("to", ColumnData::Ref(vec![0, 2]))],
+            ),
+        ]
+    }
+
+    fn allocation_signature(state: &StateData) -> Vec<(usize, usize)> {
+        state
+            .tables
+            .iter()
+            .flat_map(|table| &table.columns)
+            .map(|column| match column {
+                ColumnState::Real { values, .. } => (values.as_ptr() as usize, values.capacity()),
+                ColumnState::Int { values, .. } => (values.as_ptr() as usize, values.capacity()),
+                ColumnState::Enum { values, .. } => (values.as_ptr() as usize, values.capacity()),
+                ColumnState::Ref { values, .. } => (values.as_ptr() as usize, values.capacity()),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn backend_refresh_retains_current_and_next_column_allocations() {
+        let model = refresh_model();
+        let mut store = StateStore::new(&model, refresh_initial(0)).unwrap();
+        let current_before = allocation_signature(&store.current);
+        let next_before = allocation_signature(&store.next);
+
+        store
+            .refresh_backend_state(&model, &refresh_initial(10))
+            .unwrap();
+        assert_eq!(allocation_signature(&store.current), current_before);
+        assert_eq!(allocation_signature(&store.next), next_before);
+        assert_eq!(store.snapshot().int("world", "Node", "int", 2), Ok(12));
+
+        store
+            .refresh_backend_state(&model, &refresh_initial(20))
+            .unwrap();
+        assert_eq!(allocation_signature(&store.current), current_before);
+        assert_eq!(allocation_signature(&store.next), next_before);
+        {
+            let _writes = store.write_buffer().unwrap();
+        }
+        assert_eq!(allocation_signature(&store.next), next_before);
     }
 }

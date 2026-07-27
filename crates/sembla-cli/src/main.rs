@@ -3212,6 +3212,7 @@ fn cuda_tick_report(
     }
 }
 
+#[cfg(not(feature = "cuda"))]
 fn run_results_output_cuda(
     model: &sembla_ir::ValidatedModel,
     initial: Vec<TableInit>,
@@ -3262,6 +3263,56 @@ fn run_results_output_cuda(
 }
 
 #[cfg(feature = "cuda")]
+fn run_results_output_cuda(
+    model: &sembla_ir::ValidatedModel,
+    initial: Vec<TableInit>,
+    params: &ParamEnv,
+    seed: u64,
+    ticks: u32,
+    hash_mode: HashMode,
+) -> Result<BackendRunOutput, String> {
+    let mut backend = CudaBackend::new(model, initial, params, seed, hash_mode)
+        .map_err(|error| error.to_string())?;
+    let device = backend.device_identity().clone();
+    let identity =
+        manifest::BackendIdentity::cuda_native_f64(device.gpu_model, device.driver_version);
+    let mut hashes = (hash_mode == HashMode::EveryTick).then(|| Vec::with_capacity(ticks as usize));
+    let mut output = RunOutputAccumulator::new(model, params, ticks)?;
+
+    let started = Instant::now();
+    for tick in 0..ticks {
+        let (observed_tick, fired_per_box, deferred_per_resource_table) = backend
+            .run_tick_observed_reused()
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        debug_assert_eq!(observed_tick, tick);
+        let state = backend.observed_state();
+        if let Some(hashes) = hashes.as_mut() {
+            hashes.push(state.state_hash());
+        }
+        let views = executor::observe_views(model, state, params)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
+        let report = cuda_tick_report(
+            model,
+            tick,
+            fired_per_box,
+            deferred_per_resource_table,
+            views,
+        );
+        output.push_tick(state, tick, report)?;
+    }
+    let elapsed = started.elapsed();
+    let output = output.finish(model, hashes.clone())?;
+    let state = backend.into_observed_state();
+    Ok(BackendRunOutput {
+        output,
+        state,
+        identity,
+        per_tick_hashes: hashes,
+        elapsed,
+    })
+}
+
+#[cfg(feature = "cuda")]
 fn run_results_output_cuda_timed(
     model: &sembla_ir::ValidatedModel,
     initial: Vec<TableInit>,
@@ -3270,7 +3321,6 @@ fn run_results_output_cuda_timed(
     ticks: u32,
     hash_mode: HashMode,
 ) -> Result<(BackendRunOutput, Vec<TickTiming>), String> {
-    let mut state = StateStore::new(model, initial.clone()).map_err(|error| error.to_string())?;
     let mut backend = CudaBackend::new(model, initial, params, seed, hash_mode)
         .map_err(|error| error.to_string())?;
     let device = backend.device_identity().clone();
@@ -3283,11 +3333,11 @@ fn run_results_output_cuda_timed(
     let started = Instant::now();
     for tick in 0..ticks {
         let tick_started = Instant::now();
-        let (observation, backend_phases) = backend
-            .run_tick_observed_timed()
+        let (observed_tick, fired_per_box, deferred_per_resource_table, backend_phases) = backend
+            .run_tick_observed_reused_timed()
             .map_err(|error| format!("tick {tick}: {error}"))?;
-        debug_assert_eq!(observation.tick, tick);
-        state = observation.state;
+        debug_assert_eq!(observed_tick, tick);
+        let state = backend.observed_state();
 
         let state_hash = if let Some(hashes) = hashes.as_mut() {
             let phase_started = Instant::now();
@@ -3298,7 +3348,7 @@ fn run_results_output_cuda_timed(
         };
 
         let phase_started = Instant::now();
-        let views = executor::observe_views(model, &state, params)
+        let views = executor::observe_views(model, state, params)
             .map_err(|error| format!("tick {tick}: {error}"))?;
         let observe_views = phase_started.elapsed();
 
@@ -3306,11 +3356,11 @@ fn run_results_output_cuda_timed(
         let report = cuda_tick_report(
             model,
             tick,
-            observation.fired_per_box,
-            observation.deferred_per_resource_table,
+            fired_per_box,
+            deferred_per_resource_table,
             views,
         );
-        output.push_tick(&state, tick, report)?;
+        output.push_tick(state, tick, report)?;
         let report = backend_phases[4] + phase_started.elapsed();
 
         let wall_time = tick_started.elapsed();
@@ -3331,6 +3381,7 @@ fn run_results_output_cuda_timed(
     }
     let elapsed = started.elapsed();
     let output = output.finish(model, hashes.clone())?;
+    let state = backend.into_observed_state();
     Ok((
         BackendRunOutput {
             output,

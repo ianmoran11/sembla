@@ -273,3 +273,88 @@ fn write_time_enum_and_ref_bounds_name_the_cell() {
         );
     }
 }
+
+fn assert_refresh_validation_parity(model: &sembla_ir::ValidatedModel, malformed: Vec<TableInit>) {
+    let constructor_error = StateStore::new(model, malformed.clone())
+        .unwrap_err()
+        .to_string();
+    let mut store = StateStore::new(model, all_types_init()).unwrap();
+    let original_hash = store.state_hash();
+    let refresh_error = store
+        .refresh_backend_state(model, &malformed)
+        .unwrap_err()
+        .to_string();
+    assert_eq!(refresh_error, constructor_error);
+    assert_eq!(
+        store.state_hash(),
+        original_hash,
+        "failed refresh was partial"
+    );
+}
+
+#[test]
+fn backend_refresh_matches_constructor_validation_diagnostics() {
+    let model = all_types_model();
+
+    let mut wrong_rows = all_types_init();
+    wrong_rows[0].columns[0].data = ColumnData::Real(vec![1.0, 2.0]);
+    assert_refresh_validation_parity(&model, wrong_rows);
+
+    let mut invalid_enum = all_types_init();
+    invalid_enum[0].columns[2].data = ColumnData::Enum(vec![0, 2, 0]);
+    assert_refresh_validation_parity(&model, invalid_enum);
+
+    let mut invalid_ref = all_types_init();
+    invalid_ref[1].columns[0].data = ColumnData::Ref(vec![0, 3]);
+    assert_refresh_validation_parity(&model, invalid_ref);
+}
+
+#[test]
+fn backend_refresh_rejects_store_shape_changes() {
+    let model = all_types_model();
+    let mut store = StateStore::new(&model, all_types_init()).unwrap();
+    let mut changed_shape = all_types_init();
+    changed_shape[0].row_count = 4;
+    changed_shape[0].columns[0].data = ColumnData::Real(vec![1.5, -0.0, 3.25, 4.0]);
+    changed_shape[0].columns[1].data = ColumnData::Int(vec![-2, 0, 9, 10]);
+    changed_shape[0].columns[2].data = ColumnData::Enum(vec![0, 1, 0, 1]);
+
+    StateStore::new(&model, changed_shape.clone()).expect("changed shape remains model-valid");
+    assert_eq!(
+        store
+            .refresh_backend_state(&model, &changed_shape)
+            .unwrap_err()
+            .to_string(),
+        "backend state snapshot for box 'network', table 'Node' has 4 rows, but the existing store has 3"
+    );
+    assert_eq!(store.snapshot().row_count("network", "Node"), Ok(3));
+}
+
+#[test]
+fn backend_refresh_rejects_and_preserves_a_prepared_write_buffer() {
+    let model = all_types_model();
+    let mut store = StateStore::new(&model, all_types_init()).unwrap();
+    store
+        .write_buffer()
+        .unwrap()
+        .set_real("network", "Node", "weight", 0, 99.0)
+        .unwrap();
+
+    let mut refreshed = all_types_init();
+    refreshed[0].columns[0].data = ColumnData::Real(vec![7.0, 8.0, 9.0]);
+    assert_eq!(
+        store
+            .refresh_backend_state(&model, &refreshed)
+            .unwrap_err()
+            .to_string(),
+        "cannot refresh backend state: a write buffer is already pending"
+    );
+
+    store
+        .commit()
+        .expect("rejected refresh must retain staged writes");
+    assert_eq!(
+        store.snapshot().real("network", "Node", "weight", 0),
+        Ok(99.0)
+    );
+}

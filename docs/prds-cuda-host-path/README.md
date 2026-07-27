@@ -116,3 +116,20 @@ new split is directly comparable to the table above, and report
 
 `BENCH_PROFILE=1 bash run-demographic-benchmark.sh` collects this; see
 `spikes/precision/infra-hyperstack/RUNBOOK.md`. Re-pin `repository_ref` first.
+
+## PRD 0001 implementation status
+
+The local implementation retains one backend-owned `StateStore`, refreshes its
+committed columns with shared constructor validation and fixed-shape checks, and
+reuses both state-unpack staging and `next` column allocations. Refresh while a
+write buffer is prepared is rejected without discarding the staged write. The
+normal and timed CUDA CLI loops borrow the refreshed store each tick and move it
+out once at run completion; the minimal CUDA-only CLI integration was explicitly
+approved because the prior owned-observation contract cannot retain the same
+allocation across ticks.
+
+Local tests cover allocation retention, validation/error parity, shape mismatch,
+prepared-write behavior, backend structure, and both CLI paths. CUDA-feature
+checking, tests, and clippy pass locally without claiming GPU execution. Full
+implementation notes and the §J14.2 hardware-pending phase table are in
+[`docs/evidence/cuda-host-state-reuse-local-20260727/`](../evidence/cuda-host-state-reuse-local-20260727/).
