@@ -141,8 +141,10 @@ so run them from here rather than folder by folder.
 
 | # | PRD | GPU? | why here |
 |---|---|---|---|
-| 1 | `prds-evaluator-throughput/0001` tile the tick | no | tiling is worth 2.2× alone and is what gives parallelism a granularity that pays; the two only work together |
-| 2 | `prds-evaluator-throughput/0002` guarded `ln` | no | independent of the evaluator's shape; self-contained correctness argument |
+| 1 | `prds-evaluator-throughput/0001` tile the tick | no | **landed**: wall 7.68 s → 5.47 s (1.40×), user +11% |
+| 2 | `prds-evaluator-throughput/0002` guarded `ln` | no | **landed**: user −10.7%, wall flat |
+| 2a | `prds-evaluator-throughput/0003` tile the remainder | no | 0002's flat wall time located the critical path in the untiled serial half |
+| 2b | `prds-evaluator-throughput/0004` degenerate hazards | no | `age_monthly` holds 97% of the surviving `ln` calls |
 | 3 | `prds-cuda-host-path/0001` reuse the state buffer | local only | largest single CUDA-path item at 45.8%; its *local* criteria need no GPU |
 | 4 | **one GPU session** | yes | verify 3's hardware criteria and re-measure the CUDA phase split, in a single trip |
 | 5 | re-scope | no | write `prds-evaluator-throughput/0003+` and `prds-cuda-host-path/0002+` from the measurements 1–4 produce |

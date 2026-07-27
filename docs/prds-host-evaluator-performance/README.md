@@ -132,11 +132,16 @@ to the effect sizes being measured, so the protocol is tightened:
   workload on a quiet machine, the fastest run is the one least polluted by
   scheduling; the median rewards nothing and absorbs outliers badly at n=3.
   Report the median too, but the minimum is the headline.
-- **User time is primary; wall time is secondary.** Quote both. Where they
-  disagree, user time decides and the discrepancy is explained.
+- **Serial work: user time is primary**, wall time secondary. Quote both; where
+  they disagree, user time decides and the discrepancy is explained.
+- **Parallel work: wall time is primary** — see the note below. Quote both,
+  plus the CPU-efficiency ratio, and report single-worker figures separately.
 - **Flag contention per run (binding).** Compute `wall − (user + sys)`; any run
   exceeding **0.5 s** is marked `contended: true` in `measurements.json`, as
-  0003's evidence already does.
+  0003's evidence already does. **This test is only valid for single-threaded
+  runs.** With N workers, `user` can legitimately approach `N × wall`, so the
+  quantity goes large and negative and means nothing. For parallel runs compare
+  wall against the fastest observed wall instead, and say which test was used.
 - **Report the fastest uncontended run on each side (binding).** A comparison
   is reportable once **at least one uncontended run exists on each side**. If
   five runs on a side are all contended, run more; if they stay contended,
@@ -146,6 +151,36 @@ to the effect sizes being measured, so the protocol is tightened:
   criterion** — see the note below.
 - Continue recording binary and input SHA-256 digests, and commit a
   full-duration `sample` profile of the post-change build.
+
+### Why parallel work is judged on wall time (added 2026-07-27)
+
+The "user time decides" rule was written when everything here was
+single-threaded, where user ≈ wall and user time is the less noisy of the two.
+**Under parallelism it inverts, and applying it unchanged would reject every
+parallel change on principle.**
+
+Total CPU consumed necessarily *rises* with worker count — spawn and join,
+per-worker setup, cache and memory-controller contention. Wall time is the thing
+that improves and the thing a user experiences. `prds-evaluator-throughput/0001`
+measured wall 7.68 s → 5.47 s (1.40×) while user time went 6.00 s → 6.66 s
+(+11%). By the old rule that is a regression; it is plainly an improvement.
+
+So: **wall time is primary whenever worker count exceeds one.** Three guards,
+because wall time alone is easy to abuse:
+
+- **Report single-worker figures separately.** A change that is only fast
+  because it uses ten cores is a different thing from one that is fast, and the
+  separation is what later PRDs are scoped from.
+- **Report the CPU-efficiency ratio** (`user_after / user_before`). Burning ten
+  cores for 5% of wall should be visible as a bad trade even when the headline
+  improves.
+- **A wall-time win with a large user-time loss needs justifying**, not just
+  reporting. On a shared or batch host, aggregate CPU is a real cost.
+
+`prds-evaluator-throughput/0002` is the mirror image and shows why both metrics
+must be quoted: user time fell 10.7% while wall time stayed flat, because after
+0001 the critical path is the *untiled serial remainder*. Neither metric alone
+would have told that story.
 
 ### Why quiescence is advisory (added 2026-07-26 after PRD 0004 stalled)
 

@@ -135,8 +135,15 @@ the design rather than against it. But:
    than separate work. Do not scope them separately.
 5. **Buffer reuse**: after tiling, which changes what would be pooled.
 
-PRDs after 0002 are **deliberately unwritten**. Each is re-scoped from a fresh
-measurement once its predecessor lands, per the discipline inherited from
+4. **Tile the remainder** (`0003`): 0001 tiled half the tick and 0002 then showed
+   the consequence — making the parallel half 10.7% cheaper moved wall time by
+   0.19%, because the critical path is the untiled serial half.
+5. **The degenerate hazards** (`0004`): 0002's own evidence shows `age_monthly`
+   alone holds 97% of the surviving `ln` calls, retained by a choice made before
+   that distribution was known.
+
+`0003` and `0004` were scoped from 0001's and 0002's measurements. Anything
+after them stays **deliberately unwritten**, per the discipline inherited from
 `prds-host-evaluator-performance`.
 
 ## Deferred: the RNG decision
