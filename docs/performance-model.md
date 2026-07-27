@@ -40,6 +40,12 @@ workload is RNG-bound**, and quoting the bandwidth floor becomes misleading.
 
 ### CUDA path, 5M rows over 2 ticks
 
+**Superseded 2026-07-27** by `hyperstack-l4-20260727T120050Z/profile/`, after
+`prds-cuda-host-path/0001`: wall `1674.4ms → 936.1ms` (1.79×),
+`state_reconstruct` `766.8 → 220.7ms`, `observe_views` `338.9 → 93.5ms`,
+`state_transfer` flat, `kernels` 9.3ms (1.0%). The split below is the
+pre-fix baseline the PRD was scoped from.
+
 From `docs/evidence/demographic-bench/hyperstack-l4-20260726T140326Z/profile/`,
 via the `--timing-json` instrumentation:
 
@@ -258,9 +264,12 @@ removed a provable 8 MB-per-operand copy, the allocator symbols duly dropped
 failed the serial-correlation screen by ~40×, which is the only reason to
 believe the screen had power to reject anything.
 
-**A ratio is not a goal.** §L4 asks whether the GPU beats the CPU by 3×.
-Optimising the CPU *lowers* that ratio while improving the product. The gate has
-served its purpose; do not steer work by it (`DECISIONS.md` §L8).
+**A ratio is not a goal, and §L4 is now retired.** It asked whether the GPU
+beats the CPU by 3×. Optimising the CPU *lowers* that ratio while improving the
+product — and on 2026-07-27 it did exactly that, flipping to **1.914× NOT MET**
+while CUDA improved 1.21× and CPU 2.65× (`DECISIONS.md` §L9). A criterion whose
+verdict inverts because unrelated work improved is measuring the wrong thing.
+Use absolute wall time and the per-phase split instead.
 
 ## Measurement protocol
 

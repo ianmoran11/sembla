@@ -1478,6 +1478,66 @@ served its purpose and should not be used to steer work from here.
 (0.321 / 0.328 / 0.330), materially above earlier measurements and well above
 §K2's 10% threshold. §K2 is not revisited here.
 
+### L9. §L4 verdict after the throughput tracks: not met at 1.91x, and the gate has outlived its question (2026-07-27)
+
+**Decision.** The §L4 gate is **not met**. Three replicates per backend on one
+host (commit `00389a7`, one shared 10M artifact, one binary, the unchanged
+frozen protocol): CUDA median `26.37s`, CPU median `50.48s`, ratio **1.914x**
+against a required 3x. All seven collector assertions pass, including
+byte-identical results across both backends and every replicate. Evidence:
+`docs/evidence/demographic-bench/hyperstack-l4-20260727T120050Z/`.
+
+**Nothing regressed. Both backends got substantially faster.**
+
+| | §L7 | §L8 | §L9 |
+|---|---:|---:|---:|
+| CUDA median | 171.2s | 31.82s | **26.37s** |
+| CPU median | 438.7s | 133.86s | **50.48s** |
+| ratio | 2.56x | 4.207x | **1.914x** |
+
+Since §L8, CUDA improved 1.21x and CPU improved 2.65x. The gate fell because it
+measures a *ratio*, and the slower backend improved faster.
+
+**This is the failure §L8 predicted in writing.** It recorded that "further
+CPU-side work now *lowers* this ratio while improving the product, so §L4 has
+served its purpose and should not be used to steer work from here." Seven PRDs
+in `prds-evaluator-throughput` then did exactly that.
+
+**PRD 0001 of `prds-cuda-host-path` succeeded and is verified on hardware.** At
+5M rows over 2 ticks: wall `1674.4ms -> 936.1ms` (**1.79x**), with
+`state_reconstruct` `766.8ms -> 220.7ms` (**-71%**) and `state_transfer` flat at
+`232.6ms -> 239.6ms`. That flat transfer is the control the PRD specified: it
+confirms the gain came from removing host allocation, not from anything changing
+about the device copy. `observe_views` also fell `338.9ms -> 93.5ms`, inherited
+from the CPU evaluator work because it runs on the host in both backends.
+
+**Kernels are 9.3ms of 936.1ms — 1.0%.** Unchanged in absolute terms across
+§L7, §L8 and §L9. The GPU has never been the constraint and still is not.
+
+**Alternatives rejected.** Treating this as a regression — nothing got slower and
+the product improved by every absolute measure. Lowering the bar to fit 1.91x —
+§L7 rejected that reasoning when the gate failed and §L8 rejected its mirror
+when the gate passed; a bar moved to suit the result is not a bar. Reverting
+CPU-side work to restore the ratio — that would make the system slower to satisfy
+a number.
+
+**Reason.** §L4 asked whether the GPU is worth using for this model class. It
+has now answered that question three times with three different verdicts while
+the underlying answer — yes, and the host is what limits it — never changed. A
+criterion whose verdict inverts because unrelated work improved is measuring the
+wrong thing.
+
+**Consequent direction.** §L4 is **retired as a steering criterion**. It is not
+re-run by default and no PRD should cite it as justification or success. Absolute
+per-run wall time, and the per-phase attribution from `--timing-json`, replace it.
+Should a successor gate be wanted, it must be an absolute target — "50M slots in
+under N seconds" — not a ratio between two implementations that are both moving.
+
+**Recorded, not decided.** The ageing cost share measured **0.402** median
+(0.392 / 0.402 / 0.408), the third consecutive rise: 0.122, then 0.328, now
+0.402, against §K2's 10% threshold. §K2 is not revisited here, but three
+measurements moving one way is now worth its own look.
+
 ## M. Performance methodology
 
 ### M1. Optimisation is scoped from direct measurement, not from profile shares (2026-07-27)
