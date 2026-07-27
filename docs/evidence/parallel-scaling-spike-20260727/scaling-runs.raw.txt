@@ -1,0 +1,72 @@
+real 6.60
+user 5.35
+sys 1.12
+n=1
+real 6.79
+user 5.32
+sys 1.16
+n=1
+real 7.24
+user 5.42
+sys 1.25
+n=1
+real 6.14
+user 5.50
+sys 1.25
+n=2
+real 5.82
+user 5.41
+sys 1.22
+n=2
+real 5.53
+user 5.32
+sys 1.10
+n=2
+real 5.03
+user 5.41
+sys 1.13
+n=4
+real 4.93
+user 5.36
+sys 1.10
+n=4
+real 4.57
+user 5.23
+sys 1.00
+n=4
+real 4.34
+user 5.29
+sys 0.94
+n=6
+real 4.45
+user 5.32
+sys 1.03
+n=6
+real 4.56
+user 5.40
+sys 1.07
+n=6
+real 4.78
+user 5.71
+sys 1.12
+n=8
+real 4.56
+user 5.67
+sys 1.03
+n=8
+real 4.42
+user 5.56
+sys 0.98
+n=8
+real 4.50
+user 5.68
+sys 1.10
+n=10
+real 4.35
+user 5.68
+sys 0.97
+n=10
+real 4.40
+user 5.69
+sys 1.00
+n=10

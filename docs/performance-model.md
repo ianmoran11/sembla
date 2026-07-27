@@ -180,11 +180,29 @@ serial remainder is four ordinary costs, three of which share one cause.
 Conflict resolution's ordering — the thing that looked like the obstacle — is
 not involved.
 
-**Not a PRD: worker join idle.** `__ulock_wait` totals 347 samples top-of-stack,
-of which the scoped-thread join path accounts for 152 directly. The cause is
-unknown — load imbalance, tasks too fine to amortise the barrier, or an uneven
-final tile. §M1 forbids scoping from a profile share, so this needs a spike
-before a PRD. It also caps what further tiling returns.
+**Worker join idle: diagnosed 2026-07-27, and it closes off a whole direction.**
+`docs/evidence/parallel-scaling-spike-20260727/` swept worker count on the
+binding case:
+
+| workers | 1 | 2 | 4 | 6 | 8 | 10 |
+|---|---:|---:|---:|---:|---:|---:|
+| wall (s) | 6.60 | 5.53 | 4.57 | **4.34** | 4.42 | 4.35 |
+| speedup | 1.00× | 1.19× | 1.44× | **1.52×** | 1.49× | 1.52× |
+
+**Scaling saturates at six workers**, and beyond that user time rises from
+5.29 s to 5.68 s for no wall-time gain. The idle is not imbalance and not
+barrier overhead — it is Amdahl. The serial fraction inverted from the measured
+speedup is 0.621, close to the 0.687 PRD 0006 derived independently, and a
+serial fraction near 0.65 caps speedup at about 1.5× at any core count.
+
+Three consequences:
+
+- **No further parallel-side work can pay.** Tile tuning, worker tuning and
+  rebalancing are closed off.
+- **The default worker budget is wrong** — `available_parallelism()` gives 10
+  where 6 is as fast and uses less CPU.
+- **Only serial reduction moves wall time**, which is why PRD 0005 removed ~590
+  samples of confirmed serial work for a 3% wall gain.
 
 **Order revised 2026-07-27.** Threading was step 1, scoped as a standalone PRD
 on the argument that it was structurally independent and multiplicative. It was

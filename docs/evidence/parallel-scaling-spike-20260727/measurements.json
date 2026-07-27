@@ -1,0 +1,72 @@
+{
+ "evidence_kind": "parallel-scaling-spike",
+ "recorded_at": "2026-07-27",
+ "purpose": "Diagnose the 348-sample __ulock_wait join idle, which PRDs 0005 and 0006 left unchanged.",
+ "case": "binding 1M / 24 ticks / seed 9009, cpu backend",
+ "host": {
+  "machine": "Apple M2 Pro",
+  "logical_cores": 10
+ },
+ "scaling": [
+  {
+   "workers": 1,
+   "wall_seconds": 6.6,
+   "user_seconds": 5.32,
+   "speedup": 1.0,
+   "efficiency": 1.0
+  },
+  {
+   "workers": 2,
+   "wall_seconds": 5.53,
+   "user_seconds": 5.32,
+   "speedup": 1.193,
+   "efficiency": 0.5967
+  },
+  {
+   "workers": 4,
+   "wall_seconds": 4.57,
+   "user_seconds": 5.23,
+   "speedup": 1.444,
+   "efficiency": 0.3611
+  },
+  {
+   "workers": 6,
+   "wall_seconds": 4.34,
+   "user_seconds": 5.29,
+   "speedup": 1.521,
+   "efficiency": 0.2535
+  },
+  {
+   "workers": 8,
+   "wall_seconds": 4.42,
+   "user_seconds": 5.56,
+   "speedup": 1.493,
+   "efficiency": 0.1867
+  },
+  {
+   "workers": 10,
+   "wall_seconds": 4.35,
+   "user_seconds": 5.68,
+   "speedup": 1.517,
+   "efficiency": 0.1517
+  }
+ ],
+ "amdahl_serial_fraction_from_scaling": 0.621,
+ "profile_sample_split": {
+  "main_thread": 3917,
+  "worker_threads": 2632
+ },
+ "findings": {
+  "saturation_workers": 6,
+  "peak_speedup": 1.52,
+  "beyond_saturation": "wall time flat, user time rises 5.29 -> 5.68 s: cores burned for nothing",
+  "join_idle_diagnosis": "not imbalance and not barrier overhead; workers wait because the serial part dominates",
+  "serial_work_named": {
+   "execute_tick_state": 1439,
+   "observe_tick_observe_views": 148,
+   "state_hash_plus_state_artifact_hash": 236,
+   "note": "of 3263 main-thread execute_tick samples"
+  }
+ },
+ "consequence": "No further parallel-side work can pay. Only serial reduction moves wall time."
+}
