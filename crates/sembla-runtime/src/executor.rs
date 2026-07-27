@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
@@ -380,6 +380,94 @@ struct PendingWrite {
     row: usize,
     value: PendingValue,
     rule_id: u32,
+}
+
+type WriteCell = (usize, usize, usize, usize);
+type WriteColumn = (usize, usize, usize);
+
+#[derive(Clone, Copy, Debug)]
+struct BitmapColumn {
+    identity: WriteColumn,
+    row_span: usize,
+    word_start: usize,
+}
+
+#[derive(Default)]
+struct DoubleWriteScratch {
+    destination_slots: Vec<usize>,
+    columns: Vec<BitmapColumn>,
+    words: Vec<u64>,
+    touched_words: Vec<usize>,
+}
+
+impl DoubleWriteScratch {
+    fn prepare(&mut self, pending: &[PendingWrite], destinations: &[PendingDestination]) {
+        for word_index in self.touched_words.drain(..) {
+            self.words[word_index] = 0;
+        }
+        self.destination_slots.clear();
+        self.columns.clear();
+        self.destination_slots.reserve(destinations.len());
+        self.columns.reserve(destinations.len());
+
+        for destination in destinations {
+            let identity = (
+                destination.box_index,
+                destination.table_index,
+                destination.attr_index,
+            );
+            let slot = self
+                .columns
+                .iter()
+                .position(|column| column.identity == identity)
+                .unwrap_or_else(|| {
+                    let slot = self.columns.len();
+                    self.columns.push(BitmapColumn {
+                        identity,
+                        row_span: 0,
+                        word_start: 0,
+                    });
+                    slot
+                });
+            self.destination_slots.push(slot);
+        }
+
+        for write in pending {
+            let column = &mut self.columns[self.destination_slots[write.destination_index]];
+            column.row_span = column.row_span.max(write.row + 1);
+        }
+
+        let mut word_count = 0;
+        for column in &mut self.columns {
+            column.word_start = word_count;
+            word_count = word_count
+                .checked_add(column.row_span.div_ceil(u64::BITS as usize))
+                .expect("double-write bitmap size exceeds usize");
+        }
+        self.words.resize(word_count, 0);
+        self.words.truncate(word_count);
+        self.touched_words.reserve(word_count);
+    }
+
+    fn mark(&mut self, write: &PendingWrite) -> bool {
+        let column = &self.columns[self.destination_slots[write.destination_index]];
+        let word_index = column.word_start + write.row / u64::BITS as usize;
+        let mask = 1_u64 << (write.row % u64::BITS as usize);
+        let word = self.words[word_index];
+        if word & mask != 0 {
+            return true;
+        }
+        if word == 0 {
+            self.touched_words.push(word_index);
+        }
+        self.words[word_index] = word | mask;
+        false
+    }
+}
+
+thread_local! {
+    static DOUBLE_WRITE_SCRATCH: std::cell::RefCell<DoubleWriteScratch> =
+        std::cell::RefCell::new(DoubleWriteScratch::default());
 }
 
 struct TickOutcome {
@@ -2474,39 +2562,58 @@ fn detect_double_writes(
     destinations: &[PendingDestination],
     model: &ValidatedModel,
 ) -> Result<(), TickError> {
-    type Cell = (usize, usize, usize, usize);
+    DOUBLE_WRITE_SCRATCH.with(|scratch| {
+        let mut scratch = scratch.borrow_mut();
+        scratch.prepare(pending, destinations);
 
-    // The replaced stable sort reported the lexicographically first duplicate
-    // cell and, within that cell, the first two writes in push order. Retain
-    // both properties while scanning once: the map remembers each cell's first
-    // writer and `collision` remembers the smallest duplicated cell seen.
-    let mut first_writers = HashMap::<Cell, usize>::with_capacity(pending.len());
-    let mut collision: Option<(Cell, usize, usize)> = None;
-    for (index, write) in pending.iter().enumerate() {
-        let destination = &destinations[write.destination_index];
-        let cell = (
-            destination.box_index,
-            destination.table_index,
-            destination.attr_index,
-            write.row,
-        );
-        if let Some(&first_index) = first_writers.get(&cell) {
-            if collision
-                .as_ref()
-                .map_or(true, |(reported, _, _)| cell < *reported)
-            {
-                collision = Some((cell, first_index, index));
+        // The replaced stable sort and map both reported the lexicographically
+        // first duplicated cell. The bitmap finds that cell without retaining
+        // writer identity; the terminating error path recovers the first two
+        // push-order writers with one linear scan.
+        let mut collision = None;
+        for write in pending {
+            if scratch.mark(write) {
+                let cell = write_cell(write, destinations);
+                if collision.map_or(true, |reported| cell < reported) {
+                    collision = Some(cell);
+                }
             }
-        } else {
-            first_writers.insert(cell, index);
         }
-    }
 
-    let Some((_, first_index, second_index)) = collision else {
-        return Ok(());
-    };
-    let first = &pending[first_index];
-    let second = &pending[second_index];
+        let Some(collision) = collision else {
+            return Ok(());
+        };
+        let mut first_index = None;
+        for (index, write) in pending.iter().enumerate() {
+            if write_cell(write, destinations) != collision {
+                continue;
+            }
+            let Some(first_index) = first_index else {
+                first_index = Some(index);
+                continue;
+            };
+            return double_write_error(&pending[first_index], write, destinations, model);
+        }
+        unreachable!("a bitmap collision must have at least two writers")
+    })
+}
+
+fn write_cell(write: &PendingWrite, destinations: &[PendingDestination]) -> WriteCell {
+    let destination = &destinations[write.destination_index];
+    (
+        destination.box_index,
+        destination.table_index,
+        destination.attr_index,
+        write.row,
+    )
+}
+
+fn double_write_error(
+    first: &PendingWrite,
+    second: &PendingWrite,
+    destinations: &[PendingDestination],
+    model: &ValidatedModel,
+) -> Result<(), TickError> {
     let destination = &destinations[first.destination_index];
     let model_box = &model.model().boxes[destination.box_index];
     Err(TickError::DoubleWrite {
@@ -2534,6 +2641,104 @@ fn transition_name(model: &ValidatedModel, rule_id: u32) -> &str {
         .find(|transition| transition.rule_id == rule_id)
         .expect("pending write has a validated transition");
     &model.model().boxes[validated.box_index].transitions[validated.transition_index].name
+}
+
+#[cfg(test)]
+mod double_write_bitmap_tests {
+    use super::*;
+    use crate::state::{ColumnData, ColumnInit, StateStore, TableInit};
+    use sembla_ir::{validate, Attr, Box as ModelBox, Effect, Model, Table, Transition};
+
+    #[test]
+    fn scratch_reuses_storage_and_sizes_only_written_columns() {
+        const ATTRS: usize = 128;
+        const ROWS: usize = 130;
+
+        DOUBLE_WRITE_SCRATCH.with(|scratch| {
+            *scratch.borrow_mut() = DoubleWriteScratch::default();
+        });
+        let attrs = (0..ATTRS)
+            .map(|index| Attr {
+                name: format!("field_{index}"),
+                ty: AttrType::Int,
+            })
+            .collect::<Vec<_>>();
+        let model = validate(Model {
+            name: "bitmap-scratch".to_owned(),
+            dt: 1.0,
+            params: Vec::new(),
+            boxes: vec![ModelBox {
+                name: "world".to_owned(),
+                tables: vec![Table {
+                    name: "Item".to_owned(),
+                    size_hint: ROWS as u64,
+                    attrs: attrs.clone(),
+                }],
+                transitions: vec![Transition {
+                    name: "write-one-of-many".to_owned(),
+                    table: "Item".to_owned(),
+                    guard: Expr::Bool { value: true },
+                    hazard: Expr::Real { value: 1.0e300 },
+                    effects: vec![Effect::SetAttr {
+                        attr: "field_0".to_owned(),
+                        value: Expr::Int { value: 1 },
+                    }],
+                    contests: Vec::new(),
+                }],
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                views: Vec::new(),
+                grouped_views: Vec::new(),
+            }],
+            wires: Vec::new(),
+            summaries: Vec::new(),
+        })
+        .unwrap();
+        let columns = attrs
+            .iter()
+            .map(|attr| ColumnInit::new(&attr.name, ColumnData::Int(vec![0; ROWS])))
+            .collect();
+        let mut state =
+            StateStore::new(&model, vec![TableInit::new("world", "Item", ROWS, columns)]).unwrap();
+        let params = ParamEnv::defaults(&model);
+
+        run_tick(&model, &mut state, &params, 7, 0).unwrap();
+        let first = DOUBLE_WRITE_SCRATCH.with(|scratch| {
+            let scratch = scratch.borrow();
+            assert_eq!(scratch.destination_slots.len(), 1);
+            assert_eq!(
+                scratch.columns.len(),
+                1,
+                "127 unwritten columns need no bitmap"
+            );
+            assert_eq!(scratch.words.len(), ROWS.div_ceil(u64::BITS as usize));
+            assert_eq!(scratch.touched_words.len(), scratch.words.len());
+            (
+                scratch.words.as_ptr(),
+                scratch.words.capacity(),
+                scratch.touched_words.as_ptr(),
+                scratch.touched_words.capacity(),
+            )
+        });
+
+        run_tick(&model, &mut state, &params, 7, 1).unwrap();
+        DOUBLE_WRITE_SCRATCH.with(|scratch| {
+            let scratch = scratch.borrow();
+            assert_eq!(scratch.destination_slots.len(), 1);
+            assert_eq!(scratch.columns.len(), 1);
+            assert_eq!(scratch.words.len(), ROWS.div_ceil(u64::BITS as usize));
+            assert_eq!(
+                (
+                    scratch.words.as_ptr(),
+                    scratch.words.capacity(),
+                    scratch.touched_words.as_ptr(),
+                    scratch.touched_words.capacity(),
+                ),
+                first,
+                "bitmap and touched-word storage must be reused across ticks"
+            );
+        });
+    }
 }
 
 #[cfg(test)]

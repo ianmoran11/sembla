@@ -75,17 +75,31 @@ fn write_application_does_not_regress_to_per_write_name_resolution() {
 }
 
 #[test]
-fn double_write_detection_remains_linear_and_sort_free() {
+fn double_write_detection_uses_a_reused_bitmap_without_hashing_or_sorting() {
+    let scratch = section(
+        EXECUTOR_SOURCE,
+        "struct DoubleWriteScratch {",
+        "\nstruct TickOutcome",
+    );
+    assert!(scratch.contains("words: Vec<u64>"));
+    assert!(scratch.contains("touched_words: Vec<usize>"));
+    assert!(scratch.contains("destination_slots: Vec<usize>"));
+    assert!(scratch.contains("columns: Vec<BitmapColumn>"));
+    assert!(scratch.contains("thread_local!"));
+    assert!(scratch.contains("self.touched_words.drain(..)"));
+
     let detector = section(
         EXECUTOR_SOURCE,
         "fn detect_double_writes(",
         "\nfn transition_name(",
     );
-    assert!(detector.contains("HashMap::<Cell, usize>::with_capacity"));
-    assert!(detector.contains("destinations[write.destination_index]"));
-    assert!(detector.contains("type Cell = (usize, usize, usize, usize);"));
-    assert!(
-        !detector.contains(".sort"),
-        "double-write detection must not call a sorting method"
-    );
+    assert!(detector.contains("scratch.prepare(pending, destinations)"));
+    assert!(detector.contains("scratch.mark(write)"));
+    assert!(detector.contains("write_cell(write, destinations)"));
+    for forbidden in ["HashMap", "Hasher", ".sort"] {
+        assert!(
+            !detector.contains(forbidden),
+            "double-write detection must not use {forbidden}"
+        );
+    }
 }

@@ -377,3 +377,33 @@ inversion estimates that the serial fraction fell from 72.49% to 68.66%. All 20
 outputs, summaries, manifests, stdout, and final-state hashes remain
 byte-identical. Full counts, measurements, formulas, tests, and hashes are under
 [`docs/evidence/evaluator-effect-gather-20260727/`](../evidence/evaluator-effect-gather-20260727/).
+
+## PRD 0007 implementation status
+
+PRD 0007 corrects PRD 0005's measured hash-map regression with a reusable
+bitmap, while retaining 0005's String-free writes and once-per-effect resolved
+destinations. A thread-local scratch maps only destination columns written in
+the tick to bit segments, clears only words touched by the prior tick, and
+retains all vector capacity. A 128-column test that writes one column proves
+both active-destination sizing and two-tick storage reuse.
+
+The detector performs no hashing or sorting. Its common pass records the
+lexicographically first duplicate cell; a terminating-path linear scan recovers
+that cell's first two push-order writers. PRD 0005's unchanged three-writer test
+still names `first` and `second`. The full-process profile reduced
+`sip::Hasher`, `BuildHasher::hash_one`, and `HashMap::insert` from 450/306/106
+samples to 0/0/0.
+
+Fastest default wall improved from 4.25 to 3.32 seconds (**1.280×**, 21.88%);
+median wall improved from 4.30 to 3.37 seconds. Single-worker wall/user improved
+from 5.92/5.05 to 4.78/4.08 seconds. CPU efficiency changed from 15.41% to
+16.90%, and PRD 0003's Amdahl inversion estimates that the serial fraction fell
+from 68.66% to 66.06%. All 20 outputs, summaries, manifests, stdout, and
+final-state hashes remain byte-identical. Full scratch reasoning, profile,
+measurements, tests, and hashes are under
+[`docs/evidence/evaluator-bitmap-double-write-20260727/`](../evidence/evaluator-bitmap-double-write-20260727/).
+
+The map outcome and its correction are the measurement process working as
+intended: the accepted implementation met its semantic criteria, the next
+profile exposed an unexpected serial cost, and this separately measured PRD
+removes it without reopening unrelated work.

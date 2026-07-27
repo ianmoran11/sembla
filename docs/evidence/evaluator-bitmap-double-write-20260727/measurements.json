@@ -1,0 +1,136 @@
+{
+  "evidence_kind": "evaluator_bitmap_double_write_detection",
+  "recorded_at": "2026-07-27",
+  "baseline_commit": "34a5162",
+  "protocol": {
+    "hardware": "Apple M2 Pro, 10 cores, 16 GiB RAM",
+    "available_parallelism": 10,
+    "case": "no-grouped demographic model, 1,000,000 slots, 24 ticks, seed 9009, CPU backend",
+    "load_bearing_metric": "wall_seconds",
+    "headline": "fastest uncontended of five runs",
+    "contention_rule": "wall - (user + sys) > 0.5 seconds",
+    "measurement_scope": "in-run",
+    "single_worker_environment": "SEMBLA_EVAL_THREADS=1",
+    "before_source": "approved PRD 0006 after measurements; runtime source is unchanged from commit 6a4601c through baseline 34a5162 and the baseline binary SHA-256 was reverified before editing"
+  },
+  "implementation": {
+    "detector": "one bit per written physical destination-column row; no hash and no sort",
+    "scratch_lifetime": "thread-local DoubleWriteScratch reused by successive ticks on the executor thread",
+    "scratch_vectors": ["destination_slots", "columns", "words", "touched_words"],
+    "clearing": "only words recorded in touched_words are zeroed before the next tick",
+    "sizing": "unique destination columns present in the tick and each column's maximum written row plus one",
+    "collision_recovery": "bitmap selects the lexicographically first duplicate cell; one error-only linear scan selects its first two push-order writers",
+    "binding_unique_written_columns": 5,
+    "binding_bitmap_bytes": 625000
+  },
+  "binaries": {
+    "before_sha256": "b7d07ab2902064b2af9f7679608cd2424d06a7f67c748654bd2dd6ca0a0ff37a",
+    "after_sha256": "ac5e54c60348e38af3a96acff5cf3e4d289db20d43dc6c52586dc06ee7506838"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "official_24_tick_five_run": {
+    "before_default": {
+      "runs": [
+        {"run": 1, "wall_seconds": 4.39, "user_seconds": 5.67, "sys_seconds": 1.02, "wall_minus_user_and_sys_seconds": -2.30, "contended": false},
+        {"run": 2, "wall_seconds": 4.28, "user_seconds": 5.63, "sys_seconds": 0.95, "wall_minus_user_and_sys_seconds": -2.30, "contended": false},
+        {"run": 3, "wall_seconds": 4.30, "user_seconds": 5.64, "sys_seconds": 0.96, "wall_minus_user_and_sys_seconds": -2.30, "contended": false},
+        {"run": 4, "wall_seconds": 4.25, "user_seconds": 5.62, "sys_seconds": 0.93, "wall_minus_user_and_sys_seconds": -2.30, "contended": false},
+        {"run": 5, "wall_seconds": 4.34, "user_seconds": 5.64, "sys_seconds": 0.99, "wall_minus_user_and_sys_seconds": -2.29, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 4, "wall_seconds": 4.25, "user_seconds": 5.62, "sys_seconds": 0.93},
+      "median": {"wall_seconds": 4.30, "user_seconds": 5.64, "sys_seconds": 0.96}
+    },
+    "before_single": {
+      "runs": [
+        {"run": 1, "wall_seconds": 6.11, "user_seconds": 5.10, "sys_seconds": 0.93, "wall_minus_user_and_sys_seconds": 0.08, "contended": false},
+        {"run": 2, "wall_seconds": 5.92, "user_seconds": 5.05, "sys_seconds": 0.85, "wall_minus_user_and_sys_seconds": 0.02, "contended": false},
+        {"run": 3, "wall_seconds": 6.57, "user_seconds": 5.27, "sys_seconds": 1.10, "wall_minus_user_and_sys_seconds": 0.20, "contended": false},
+        {"run": 4, "wall_seconds": 6.49, "user_seconds": 5.27, "sys_seconds": 1.16, "wall_minus_user_and_sys_seconds": 0.06, "contended": false},
+        {"run": 5, "wall_seconds": 6.43, "user_seconds": 5.20, "sys_seconds": 1.06, "wall_minus_user_and_sys_seconds": 0.17, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 2, "wall_seconds": 5.92, "user_seconds": 5.05, "sys_seconds": 0.85},
+      "median": {"wall_seconds": 6.43, "user_seconds": 5.20, "sys_seconds": 1.06}
+    },
+    "after_default": {
+      "runs": [
+        {"run": 1, "wall_seconds": 3.63, "user_seconds": 4.78, "sys_seconds": 0.99, "wall_minus_user_and_sys_seconds": -2.14, "contended": false},
+        {"run": 2, "wall_seconds": 3.37, "user_seconds": 4.73, "sys_seconds": 0.91, "wall_minus_user_and_sys_seconds": -2.27, "contended": false},
+        {"run": 3, "wall_seconds": 3.38, "user_seconds": 4.72, "sys_seconds": 0.95, "wall_minus_user_and_sys_seconds": -2.29, "contended": false},
+        {"run": 4, "wall_seconds": 3.33, "user_seconds": 4.72, "sys_seconds": 0.92, "wall_minus_user_and_sys_seconds": -2.31, "contended": false},
+        {"run": 5, "wall_seconds": 3.32, "user_seconds": 4.72, "sys_seconds": 0.89, "wall_minus_user_and_sys_seconds": -2.29, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 5, "wall_seconds": 3.32, "user_seconds": 4.72, "sys_seconds": 0.89},
+      "median": {"wall_seconds": 3.37, "user_seconds": 4.72, "sys_seconds": 0.92}
+    },
+    "after_single": {
+      "runs": [
+        {"run": 1, "wall_seconds": 5.05, "user_seconds": 4.14, "sys_seconds": 0.89, "wall_minus_user_and_sys_seconds": 0.02, "contended": false},
+        {"run": 2, "wall_seconds": 5.01, "user_seconds": 4.15, "sys_seconds": 0.83, "wall_minus_user_and_sys_seconds": 0.03, "contended": false},
+        {"run": 3, "wall_seconds": 5.12, "user_seconds": 4.16, "sys_seconds": 0.92, "wall_minus_user_and_sys_seconds": 0.04, "contended": false},
+        {"run": 4, "wall_seconds": 5.07, "user_seconds": 4.16, "sys_seconds": 0.87, "wall_minus_user_and_sys_seconds": 0.04, "contended": false},
+        {"run": 5, "wall_seconds": 4.78, "user_seconds": 4.08, "sys_seconds": 0.69, "wall_minus_user_and_sys_seconds": 0.01, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 5, "wall_seconds": 4.78, "user_seconds": 4.08, "sys_seconds": 0.69},
+      "median": {"wall_seconds": 5.05, "user_seconds": 4.15, "sys_seconds": 0.87}
+    }
+  },
+  "comparison": {
+    "headline_wall_speedup": 1.280120481927711,
+    "headline_wall_reduction_fraction": 0.21882352941176475,
+    "median_wall_speedup": 1.2759643916913945,
+    "headline_user_speedup": 1.190677966101695,
+    "single_worker_wall_speedup": 1.2384937238493723,
+    "cpu_efficiency": {
+      "definition": "(user + sys) / (wall * 10 logical cores), fastest uncontended default run",
+      "before": 0.15411764705882353,
+      "after": 0.16897590361445783
+    },
+    "estimated_serial_fraction": {
+      "definition": "S = (1 / (T1 / T10) - 1/10) / (1 - 1/10), using fastest uncontended wall times",
+      "before": 0.6865615615615617,
+      "after": 0.6606229660622965
+    }
+  },
+  "profile_symbols": {
+    "tool": "/usr/bin/sample, 1 ms interval, full process lifetime",
+    "before_source": "docs/evidence/parallel-scaling-spike-20260727/post-0006.sample.txt",
+    "before_sha256": "667f29b875938d7580976256c3e29f9fab4832de55d3d37d6efe6f2c3c6aeef6",
+    "after_source": "after.sample.txt",
+    "after_sha256": "c4708cf5068cb6bf44ceeb107c0216b933c9b64e16c383d4b136a1f253506b35",
+    "before": {
+      "core_hash_sip_hasher_write": 450,
+      "core_hash_build_hasher_hash_one": 306,
+      "hashbrown_hash_map_insert": 106,
+      "total_named_hash_samples": 862
+    },
+    "after": {
+      "core_hash_sip_hasher_write": 0,
+      "core_hash_build_hasher_hash_one": 0,
+      "hashbrown_hash_map_insert": 0,
+      "total_named_hash_samples": 0
+    }
+  },
+  "outputs": {
+    "verified_run_count": 20,
+    "all_primary_csv_identical": true,
+    "primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_identical": true,
+    "summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_manifests_identical": true,
+    "manifest_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f",
+    "all_stdout_identical": true,
+    "stdout_sha256": "a034ac5ea499bc5ee82b57c93daf43a8d6580a5d98cf1c0757341aa71fc8154f",
+    "final_state_sha256": "2d509ead9aa506e71be155faaa5608542f7ca32cee203ee42b0d3179d670020c"
+  },
+  "gates": {
+    "cargo_test_locked": "pass",
+    "check_rust": "pass",
+    "cargo_fmt_check": "pass",
+    "git_diff_check": "pass",
+    "markdown_links": "pass",
+    "evidence_json": "pass"
+  }
+}
