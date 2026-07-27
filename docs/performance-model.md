@@ -244,8 +244,16 @@ broadcast, whole-tick tiling, buffer reuse, and whatever the CUDA phase split
 ranks next. Each is re-scoped from a fresh measurement because removing one cost
 re-ranks everything behind it.
 
-**Not queued**: the RNG change (deferred, see above) and device-side observation
-(a §K6/§L5 semantic decision, needing its own folder).
+**Device-side observation is now scoped** — `docs/prds-device-observation/`.
+The 2026-07-27 profile shows 81% of CUDA wall time exists to serve host-side
+observation, and every reduction in the benchmark model is `count` or `max` over
+`int`, so a device reduction is bit-identical by construction. `Sum` over `Real`
+must stay on the host, and eligibility is a property of the whole run: one
+host-bound view means the state is downloaded anyway.
+
+**Not queued**: the RNG change (deferred, see above), and device-side reduction
+of the `wins`/`deferred` arrays — worth 22% and needing no semantic decision,
+but deliberately separate so its measurement stays interpretable.
 
 ## Methodology, learned the hard way
 
