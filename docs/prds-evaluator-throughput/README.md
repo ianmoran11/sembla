@@ -142,9 +142,29 @@ the design rather than against it. But:
    alone holds 97% of the surviving `ln` calls, retained by a choice made before
    that distribution was known.
 
-`0003` and `0004` were scoped from 0001's and 0002's measurements. Anything
+6. **Resolve write identity once** (`0005`): the re-profile
+   (`docs/evidence/host-profile-20260727/`) shows the serial remainder is the
+   write path, and three of its four costs share one cause — identity carried
+   and re-resolved per write when it is per transition.
+7. **Evaluate effects at winner rows** (`0006`): effect values are computed for
+   every row and used for the ~2% that fire.
+
+`0003`–`0006` were scoped from measurements, not from profile shares. Anything
 after them stays **deliberately unwritten**, per the discipline inherited from
 `prds-host-evaluator-performance`.
+
+### Not a PRD yet: worker join idle
+
+`host-profile-20260727` shows `__ulock_wait` at 347 samples top-of-stack, of
+which the scoped-thread join path accounts for 152 directly — workers idle at
+the barrier. The cause is unknown: it could be
+load imbalance across tiles, tasks too fine to amortise the barrier, or simply
+the tail of an uneven final tile.
+
+`DECISIONS.md` §M1 forbids scoping from a profile share, so this needs a spike
+first — vary tile size and worker count and measure idle time directly. It also
+caps what further tiling can return, so it is worth knowing before extending
+PRD 0003's work.
 
 ## Deferred: the RNG decision
 

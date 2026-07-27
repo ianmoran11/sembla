@@ -169,7 +169,22 @@ so run them from here rather than folder by folder.
 | 2b | `prds-evaluator-throughput/0004` degenerate hazards | no | `age_monthly` holds 97% of the surviving `ln` calls |
 | 3 | `prds-cuda-host-path/0001` reuse the state buffer | local only | largest single CUDA-path item at 45.8%; its *local* criteria need no GPU |
 | 4 | **one GPU session** | yes | verify 3's hardware criteria and re-measure the CUDA phase split, in a single trip |
-| 5 | re-scope | no | **done 2026-07-27**: see `docs/evidence/host-profile-20260727/`. Next, in order: buffer reuse (largest aggregate, 4.04× ceiling measured, never scoped); write-path column resolution (small, proven pattern); write staging, which is the largest single item but needs a design idea because conflict resolution's sequential winner order is load-bearing; and diagnosing the 347-sample join idle before extending tiling further |
+| 5 | re-scope | no | **done 2026-07-27**: `docs/evidence/host-profile-20260727/` |
+| 6 | `prds-evaluator-throughput/0005` write identity | no | the serial remainder is the write path; three of its four costs share one cause |
+| 7 | `prds-evaluator-throughput/0006` effect gathering | no | effect values computed for every row, used for the ~2% that fire |
+
+The write path was earlier described here as needing "a design idea, not an
+optimisation". That was wrong, and it was wrong for the reason §M1 warns about:
+it reasoned from an aggregate share without decomposing it. Decomposed, the
+serial remainder is four ordinary costs, three of which share one cause.
+Conflict resolution's ordering — the thing that looked like the obstacle — is
+not involved.
+
+**Not a PRD: worker join idle.** `__ulock_wait` totals 347 samples top-of-stack,
+of which the scoped-thread join path accounts for 152 directly. The cause is
+unknown — load imbalance, tasks too fine to amortise the barrier, or an uneven
+final tile. §M1 forbids scoping from a profile share, so this needs a spike
+before a PRD. It also caps what further tiling returns.
 
 **Order revised 2026-07-27.** Threading was step 1, scoped as a standalone PRD
 on the argument that it was structurally independent and multiplicative. It was
