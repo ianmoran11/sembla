@@ -617,8 +617,88 @@ fn multi_claim_candidate_must_win_every_resource() {
 }
 
 #[test]
-fn double_write_names_both_transitions_and_leaves_state_reusable() {
+fn triple_write_reports_the_first_two_transitions_and_leaves_state_reusable() {
     let bad = model(
+        vec![table("Item", vec![attr("value", AttrType::Int)])],
+        vec![
+            transition(
+                "first",
+                "Item",
+                Expr::Bool { value: true },
+                Expr::Real { value: ALWAYS },
+                vec![set("value", Expr::Int { value: 1 })],
+                Vec::new(),
+            ),
+            transition(
+                "second",
+                "Item",
+                Expr::Bool { value: true },
+                Expr::Real { value: ALWAYS },
+                vec![set("value", Expr::Int { value: 2 })],
+                Vec::new(),
+            ),
+            transition(
+                "third",
+                "Item",
+                Expr::Bool { value: true },
+                Expr::Real { value: ALWAYS },
+                vec![set("value", Expr::Int { value: 3 })],
+                Vec::new(),
+            ),
+        ],
+        1.0,
+    );
+    let mut state = StateStore::new(
+        &bad,
+        vec![TableInit::new(
+            "world",
+            "Item",
+            1,
+            vec![ColumnInit::new("value", ColumnData::Int(vec![0]))],
+        )],
+    )
+    .unwrap();
+    let old_hash = state.state_hash();
+    let error = run_tick(&bad, &mut state, &ParamEnv::defaults(&bad), 1, 0).unwrap_err();
+    assert_eq!(
+        error,
+        TickError::DoubleWrite {
+            box_name: "world".into(),
+            table: "Item".into(),
+            attr: "value".into(),
+            row: 0,
+            first_rule_id: 0,
+            first_transition: "first".into(),
+            second_rule_id: 1,
+            second_transition: "second".into(),
+        },
+        "the third writer must not replace the stable-sort era's first pair"
+    );
+    assert_eq!(state.state_hash(), old_hash);
+    state
+        .write_buffer()
+        .unwrap()
+        .set_int("world", "Item", "value", 0, 9)
+        .unwrap();
+    state.commit().unwrap();
+    assert_eq!(
+        state.snapshot().int("world", "Item", "value", 0).unwrap(),
+        9
+    );
+}
+
+fn item_state_without_attributes() -> StateStore {
+    let state_model = model(vec![table("Item", Vec::new())], Vec::new(), 1.0);
+    StateStore::new(
+        &state_model,
+        vec![TableInit::new("world", "Item", 1, Vec::new())],
+    )
+    .unwrap()
+}
+
+#[test]
+fn double_write_precedes_deferred_destination_error() {
+    let execution_model = model(
         vec![table("Item", vec![attr("value", AttrType::Int)])],
         vec![
             transition(
@@ -640,33 +720,141 @@ fn double_write_names_both_transitions_and_leaves_state_reusable() {
         ],
         1.0,
     );
-    let mut state = StateStore::new(
-        &bad,
-        vec![TableInit::new(
-            "world",
-            "Item",
-            1,
-            vec![ColumnInit::new("value", ColumnData::Int(vec![0]))],
-        )],
+    let mut state = item_state_without_attributes();
+
+    let error = run_tick(
+        &execution_model,
+        &mut state,
+        &ParamEnv::defaults(&execution_model),
+        1,
+        0,
     )
-    .unwrap();
-    let old_hash = state.state_hash();
-    let error = run_tick(&bad, &mut state, &ParamEnv::defaults(&bad), 1, 0).unwrap_err();
-    assert!(matches!(error, TickError::DoubleWrite { .. }));
-    let message = error.to_string();
-    assert!(message.contains("'first' (rule 0)"));
-    assert!(message.contains("'second' (rule 1)"));
-    assert_eq!(state.state_hash(), old_hash);
-    state
-        .write_buffer()
-        .unwrap()
-        .set_int("world", "Item", "value", 0, 9)
-        .unwrap();
-    state.commit().unwrap();
+    .unwrap_err();
     assert_eq!(
-        state.snapshot().int("world", "Item", "value", 0).unwrap(),
-        9
+        error,
+        TickError::DoubleWrite {
+            box_name: "world".into(),
+            table: "Item".into(),
+            attr: "value".into(),
+            row: 0,
+            first_rule_id: 0,
+            first_transition: "first".into(),
+            second_rule_id: 1,
+            second_transition: "second".into(),
+        }
     );
+}
+
+#[test]
+fn later_effect_evaluation_error_precedes_earlier_destination_error() {
+    let execution_model = model(
+        vec![table(
+            "Item",
+            vec![attr("first", AttrType::Int), attr("second", AttrType::Int)],
+        )],
+        vec![transition(
+            "write",
+            "Item",
+            Expr::Bool { value: true },
+            Expr::Real { value: ALWAYS },
+            vec![
+                set("first", Expr::Int { value: 1 }),
+                set(
+                    "second",
+                    Expr::Add {
+                        lhs: Box::new(Expr::Int { value: i64::MAX }),
+                        rhs: Box::new(Expr::Int { value: 1 }),
+                    },
+                ),
+            ],
+            Vec::new(),
+        )],
+        1.0,
+    );
+    let mut state = item_state_without_attributes();
+
+    let error = run_tick(
+        &execution_model,
+        &mut state,
+        &ParamEnv::defaults(&execution_model),
+        1,
+        0,
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        TickError::Evaluation("integer arithmetic overflow at row 0".to_owned())
+    );
+}
+
+#[test]
+fn deferred_destination_error_keeps_its_original_message_and_discards_writes() {
+    let execution_model = model(
+        vec![table("Item", vec![attr("value", AttrType::Int)])],
+        vec![transition(
+            "write",
+            "Item",
+            Expr::Bool { value: true },
+            Expr::Real { value: ALWAYS },
+            vec![set("value", Expr::Int { value: 1 })],
+            Vec::new(),
+        )],
+        1.0,
+    );
+    let mut state = item_state_without_attributes();
+    let old_hash = state.state_hash();
+
+    let error = run_tick(
+        &execution_model,
+        &mut state,
+        &ParamEnv::defaults(&execution_model),
+        1,
+        0,
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        TickError::State(
+            "box 'world', table 'Item', column 'value': no such state column".to_owned()
+        )
+    );
+    assert_eq!(state.state_hash(), old_hash);
+    state.write_buffer().unwrap();
+    state.commit().unwrap();
+}
+
+#[test]
+fn write_buffer_error_precedes_deferred_destination_error() {
+    let execution_model = model(
+        vec![table("Item", vec![attr("value", AttrType::Int)])],
+        vec![transition(
+            "write",
+            "Item",
+            Expr::Bool { value: true },
+            Expr::Real { value: ALWAYS },
+            vec![set("value", Expr::Int { value: 1 })],
+            Vec::new(),
+        )],
+        1.0,
+    );
+    let mut state = item_state_without_attributes();
+    state.write_buffer().unwrap();
+
+    let error = run_tick(
+        &execution_model,
+        &mut state,
+        &ParamEnv::defaults(&execution_model),
+        1,
+        0,
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        TickError::State(
+            "cannot prepare state writes: a write buffer is already pending".to_owned()
+        )
+    );
+    state.commit().unwrap();
 }
 
 #[test]

@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use std::fmt;
 
@@ -17,7 +17,7 @@ use crate::eval::{
     PreparedValue, ValueColumn,
 };
 use crate::rng::{exp_f64, exp_f64_from_uniform, uniform_f64};
-use crate::state::{ColumnData, InputTable, Snapshot, StateError, StateStore};
+use crate::state::{ColumnData, InputTable, ResolvedWriteColumn, Snapshot, StateError, StateStore};
 
 /// Relative slack below the `exp(-lambda * dt)` boundary used only to reject
 /// certain non-firers. Near the benchmark's thresholds, one binary64 ULP is at
@@ -366,14 +366,19 @@ enum PendingValue {
 }
 
 #[derive(Clone, Debug)]
-struct PendingWrite {
+struct PendingDestination {
     box_index: usize,
     table_index: usize,
     attr_index: usize,
+    resolution: Result<ResolvedWriteColumn, StateError>,
+}
+
+#[derive(Clone, Debug)]
+struct PendingWrite {
+    destination_index: usize,
     row: usize,
     value: PendingValue,
     rule_id: u32,
-    transition_name: String,
 }
 
 struct TickOutcome {
@@ -382,6 +387,7 @@ struct TickOutcome {
 }
 
 struct BoxOutcome {
+    destinations: Vec<PendingDestination>,
     pending: Vec<PendingWrite>,
     fired: Vec<(u32, usize)>,
     deferred: Vec<usize>,
@@ -1004,30 +1010,38 @@ fn execute_tick_state(
         )?);
     }
 
-    let pending: Vec<_> = box_outcomes
-        .iter_mut()
-        .flat_map(|outcome| std::mem::take(&mut outcome.pending))
-        .collect();
-    detect_double_writes(&pending, model)?;
+    let mut destinations = Vec::new();
+    let mut pending = Vec::new();
+    for outcome in &mut box_outcomes {
+        let destination_base = destinations.len();
+        destinations.append(&mut outcome.destinations);
+        pending.extend(
+            std::mem::take(&mut outcome.pending)
+                .into_iter()
+                .map(|mut write| {
+                    write.destination_index += destination_base;
+                    write
+                }),
+        );
+    }
+    detect_double_writes(&pending, &destinations, model)?;
     let apply_result = {
         let mut writes = state.write_buffer()?;
         pending.iter().try_for_each(|write| {
-            let model_box = &model.model().boxes[write.box_index];
-            let table = &model_box.tables[write.table_index];
-            let attr = &table.attrs[write.attr_index];
+            let destination = destinations[write.destination_index]
+                .resolution
+                .as_ref()
+                .copied()
+                .map_err(Clone::clone)?;
             match &write.value {
                 PendingValue::Real(value) => {
-                    writes.set_real(&model_box.name, &table.name, &attr.name, write.row, *value)
+                    writes.set_resolved_real(destination, write.row, *value)
                 }
-                PendingValue::Int(value) => {
-                    writes.set_int(&model_box.name, &table.name, &attr.name, write.row, *value)
-                }
+                PendingValue::Int(value) => writes.set_resolved_int(destination, write.row, *value),
                 PendingValue::Enum(value) => {
-                    writes.set_enum(&model_box.name, &table.name, &attr.name, write.row, *value)
+                    writes.set_resolved_enum(destination, write.row, *value)
                 }
-                PendingValue::Ref(value) => {
-                    writes.set_ref(&model_box.name, &table.name, &attr.name, write.row, *value)
-                }
+                PendingValue::Ref(value) => writes.set_resolved_ref(destination, write.row, *value),
             }
         })
     };
@@ -1965,6 +1979,7 @@ fn stage_box(
         }
     }
     let resolution = resolve_claims(&candidates, model_box.tables.len(), model_box)?;
+    let mut destinations = Vec::new();
     let mut pending = Vec::new();
     for validated in &transitions {
         let transition = &model_box.transitions[validated.transition_index];
@@ -2003,19 +2018,31 @@ fn stage_box(
                     &mut cache,
                 )?),
             };
-            effect_columns.push((attr_index, value));
+            // Resolve once now, but publish a failure only at this effect's
+            // first pending write. That retains later effect-evaluation,
+            // DoubleWrite, and write-buffer error precedence from the original
+            // per-write lookup path.
+            let destination_index = destinations.len();
+            destinations.push(PendingDestination {
+                box_index,
+                table_index,
+                attr_index,
+                resolution: snapshot.resolve_write_column(
+                    &model_box.name,
+                    &schema.name,
+                    &destination.name,
+                ),
+            });
+            effect_columns.push((destination_index, value));
         }
         for candidate_index in winner_indices {
             let candidate = &candidates[candidate_index];
-            for (attr_index, values) in &effect_columns {
+            for (destination_index, values) in &effect_columns {
                 pending.push(PendingWrite {
-                    box_index,
-                    table_index,
-                    attr_index: *attr_index,
+                    destination_index: *destination_index,
                     row: candidate.row,
                     value: values.at(candidate.row)?,
                     rule_id: candidate.rule_id,
-                    transition_name: transition.name.clone(),
                 });
             }
         }
@@ -2034,6 +2061,7 @@ fn stage_box(
         }
     }
     Ok(BoxOutcome {
+        destinations,
         pending,
         fired,
         deferred: resolution.deferred,
@@ -2380,51 +2408,71 @@ impl PendingColumn {
     }
 }
 
-fn detect_double_writes(pending: &[PendingWrite], model: &ValidatedModel) -> Result<(), TickError> {
-    let mut order: Vec<usize> = (0..pending.len()).collect();
-    order.sort_by_key(|index| {
-        let write = &pending[*index];
-        (
-            write.box_index,
-            write.table_index,
-            write.attr_index,
+fn detect_double_writes(
+    pending: &[PendingWrite],
+    destinations: &[PendingDestination],
+    model: &ValidatedModel,
+) -> Result<(), TickError> {
+    type Cell = (usize, usize, usize, usize);
+
+    // The replaced stable sort reported the lexicographically first duplicate
+    // cell and, within that cell, the first two writes in push order. Retain
+    // both properties while scanning once: the map remembers each cell's first
+    // writer and `collision` remembers the smallest duplicated cell seen.
+    let mut first_writers = HashMap::<Cell, usize>::with_capacity(pending.len());
+    let mut collision: Option<(Cell, usize, usize)> = None;
+    for (index, write) in pending.iter().enumerate() {
+        let destination = &destinations[write.destination_index];
+        let cell = (
+            destination.box_index,
+            destination.table_index,
+            destination.attr_index,
             write.row,
-        )
-    });
-    for pair in order.windows(2) {
-        let first = &pending[pair[0]];
-        let second = &pending[pair[1]];
-        if (
-            first.box_index,
-            first.table_index,
-            first.attr_index,
-            first.row,
-        ) == (
-            second.box_index,
-            second.table_index,
-            second.attr_index,
-            second.row,
-        ) {
-            let model_box = &model.model().boxes[first.box_index];
-            return Err(TickError::DoubleWrite {
-                box_name: model_box.name.clone().into_boxed_str(),
-                table: model_box.tables[first.table_index]
-                    .name
-                    .clone()
-                    .into_boxed_str(),
-                attr: model_box.tables[first.table_index].attrs[first.attr_index]
-                    .name
-                    .clone()
-                    .into_boxed_str(),
-                row: first.row,
-                first_rule_id: first.rule_id,
-                first_transition: first.transition_name.clone().into_boxed_str(),
-                second_rule_id: second.rule_id,
-                second_transition: second.transition_name.clone().into_boxed_str(),
-            });
+        );
+        if let Some(&first_index) = first_writers.get(&cell) {
+            if collision
+                .as_ref()
+                .map_or(true, |(reported, _, _)| cell < *reported)
+            {
+                collision = Some((cell, first_index, index));
+            }
+        } else {
+            first_writers.insert(cell, index);
         }
     }
-    Ok(())
+
+    let Some((_, first_index, second_index)) = collision else {
+        return Ok(());
+    };
+    let first = &pending[first_index];
+    let second = &pending[second_index];
+    let destination = &destinations[first.destination_index];
+    let model_box = &model.model().boxes[destination.box_index];
+    Err(TickError::DoubleWrite {
+        box_name: model_box.name.clone().into_boxed_str(),
+        table: model_box.tables[destination.table_index]
+            .name
+            .clone()
+            .into_boxed_str(),
+        attr: model_box.tables[destination.table_index].attrs[destination.attr_index]
+            .name
+            .clone()
+            .into_boxed_str(),
+        row: first.row,
+        first_rule_id: first.rule_id,
+        first_transition: transition_name(model, first.rule_id).into(),
+        second_rule_id: second.rule_id,
+        second_transition: transition_name(model, second.rule_id).into(),
+    })
+}
+
+fn transition_name(model: &ValidatedModel, rule_id: u32) -> &str {
+    let validated = model
+        .transitions()
+        .iter()
+        .find(|transition| transition.rule_id == rule_id)
+        .expect("pending write has a validated transition");
+    &model.model().boxes[validated.box_index].transitions[validated.transition_index].name
 }
 
 #[cfg(test)]

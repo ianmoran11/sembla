@@ -264,5 +264,12 @@ fn write_time_enum_and_ref_bounds_name_the_cell() {
                 .to_string(),
             "box 'network', table 'Edge', column 'to', row 0: reference index 3 is out of bounds for target table 'Node' with 3 rows"
         );
+        assert_eq!(
+            writes
+                .set_real("network", "Node", "weight", 3, 0.0)
+                .unwrap_err()
+                .to_string(),
+            "box 'network', table 'Node', column 'weight', row 3: row index is out of bounds for 3 rows"
+        );
     }
 }

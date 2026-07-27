@@ -430,6 +430,16 @@ pub(crate) struct ResolvedColumn<'a> {
     column: &'a ColumnState,
 }
 
+/// Stable destination identity shared by the tick-start and prepared buffers.
+///
+/// State schema and declaration order never change after construction, so the
+/// same table/column indices address both buffers without repeating name scans.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub(crate) struct ResolvedWriteColumn {
+    table_index: usize,
+    column_index: usize,
+}
+
 impl<'a> ResolvedColumn<'a> {
     pub(crate) fn real_values(self) -> Result<&'a [f64], StateError> {
         match self.column {
@@ -470,6 +480,16 @@ impl Snapshot<'_> {
     ) -> Result<ResolvedColumn<'_>, StateError> {
         let (table, column) = find_column(self.state, box_name, table_name, column_name)?;
         Ok(ResolvedColumn { table, column })
+    }
+
+    /// Resolves a destination once for later use against the prepared buffer.
+    pub(crate) fn resolve_write_column(
+        &self,
+        box_name: &str,
+        table_name: &str,
+        column_name: &str,
+    ) -> Result<ResolvedWriteColumn, StateError> {
+        resolve_writable_column(self.state, box_name, table_name, column_name)
     }
 
     /// Returns the table delivered to `box_name.port_name` for this tick.
@@ -645,8 +665,18 @@ impl WriteBuffer<'_> {
         row: usize,
         value: f64,
     ) -> Result<(), StateError> {
+        let destination = resolve_writable_column(self.state, box_name, table_name, column_name)?;
+        self.set_resolved_real(destination, row, value)
+    }
+
+    pub(crate) fn set_resolved_real(
+        &mut self,
+        destination: ResolvedWriteColumn,
+        row: usize,
+        value: f64,
+    ) -> Result<(), StateError> {
         let (table_index, column_index) =
-            locate_writable_cell(self.state, box_name, table_name, column_name, row, "Real")?;
+            locate_resolved_writable_cell(self.state, destination, row, "Real")?;
         if let ColumnState::Real { values, .. } =
             &mut self.state.tables[table_index].columns[column_index]
         {
@@ -665,8 +695,18 @@ impl WriteBuffer<'_> {
         row: usize,
         value: i64,
     ) -> Result<(), StateError> {
+        let destination = resolve_writable_column(self.state, box_name, table_name, column_name)?;
+        self.set_resolved_int(destination, row, value)
+    }
+
+    pub(crate) fn set_resolved_int(
+        &mut self,
+        destination: ResolvedWriteColumn,
+        row: usize,
+        value: i64,
+    ) -> Result<(), StateError> {
         let (table_index, column_index) =
-            locate_writable_cell(self.state, box_name, table_name, column_name, row, "Int")?;
+            locate_resolved_writable_cell(self.state, destination, row, "Int")?;
         if let ColumnState::Int { values, .. } =
             &mut self.state.tables[table_index].columns[column_index]
         {
@@ -685,8 +725,19 @@ impl WriteBuffer<'_> {
         row: usize,
         value: u16,
     ) -> Result<(), StateError> {
+        let destination = resolve_writable_column(self.state, box_name, table_name, column_name)?;
+        self.set_resolved_enum(destination, row, value)
+    }
+
+    pub(crate) fn set_resolved_enum(
+        &mut self,
+        destination: ResolvedWriteColumn,
+        row: usize,
+        value: u16,
+    ) -> Result<(), StateError> {
         let (table_index, column_index) =
-            locate_writable_cell(self.state, box_name, table_name, column_name, row, "Enum")?;
+            locate_resolved_writable_cell(self.state, destination, row, "Enum")?;
+        let column_name = self.state.tables[table_index].columns[column_index].name();
         let variant_count = match &self.state.tables[table_index].columns[column_index] {
             ColumnState::Enum { variant_count, .. } => *variant_count,
             _ => unreachable!("column type checked before range validation"),
@@ -717,8 +768,19 @@ impl WriteBuffer<'_> {
         row: usize,
         value: u32,
     ) -> Result<(), StateError> {
+        let destination = resolve_writable_column(self.state, box_name, table_name, column_name)?;
+        self.set_resolved_ref(destination, row, value)
+    }
+
+    pub(crate) fn set_resolved_ref(
+        &mut self,
+        destination: ResolvedWriteColumn,
+        row: usize,
+        value: u32,
+    ) -> Result<(), StateError> {
         let (table_index, column_index) =
-            locate_writable_cell(self.state, box_name, table_name, column_name, row, "Ref")?;
+            locate_resolved_writable_cell(self.state, destination, row, "Ref")?;
+        let column_name = self.state.tables[table_index].columns[column_index].name();
         let target_table = match &self.state.tables[table_index].columns[column_index] {
             ColumnState::Ref { target_table, .. } => *target_table,
             _ => unreachable!("column type checked before range validation"),
@@ -983,14 +1045,12 @@ fn find_cell<'a>(
     Ok((table, column))
 }
 
-fn locate_writable_cell(
+fn resolve_writable_column(
     state: &StateData,
     box_name: &str,
     table_name: &str,
     column_name: &str,
-    row: usize,
-    expected_type: &str,
-) -> Result<(usize, usize), StateError> {
+) -> Result<ResolvedWriteColumn, StateError> {
     let table_index = state
         .tables
         .iter()
@@ -1000,8 +1060,7 @@ fn locate_writable_cell(
                 "box '{box_name}', table '{table_name}': no such state table"
             ))
         })?;
-    let table = &state.tables[table_index];
-    let column_index = table
+    let column_index = state.tables[table_index]
         .columns
         .iter()
         .position(|column| column.name() == column_name)
@@ -1010,11 +1069,24 @@ fn locate_writable_cell(
                 "box '{box_name}', table '{table_name}', column '{column_name}': no such state column"
             ))
         })?;
-    let column = &table.columns[column_index];
+    Ok(ResolvedWriteColumn {
+        table_index,
+        column_index,
+    })
+}
+
+fn locate_resolved_writable_cell(
+    state: &StateData,
+    destination: ResolvedWriteColumn,
+    row: usize,
+    expected_type: &str,
+) -> Result<(usize, usize), StateError> {
+    let table = &state.tables[destination.table_index];
+    let column = &table.columns[destination.column_index];
     if row >= table.row_count {
         return Err(cell_error(
             table,
-            column_name,
+            column.name(),
             row,
             format!("row index is out of bounds for {} rows", table.row_count),
         ));
@@ -1022,7 +1094,7 @@ fn locate_writable_cell(
     if column.kind_name() != expected_type {
         return Err(wrong_column_type(table, column, expected_type));
     }
-    Ok((table_index, column_index))
+    Ok((destination.table_index, destination.column_index))
 }
 
 fn wrong_column_type(table: &TableState, column: &ColumnState, expected_type: &str) -> StateError {
@@ -1129,4 +1201,78 @@ fn update_u64(hash: &mut Sha256, value: usize) {
 fn update_string(hash: &mut Sha256, value: &str) {
     update_u64(hash, value.len());
     hash.update(value.as_bytes());
+}
+
+#[cfg(test)]
+mod resolved_write_tests {
+    use super::*;
+
+    fn state_data() -> StateData {
+        StateData {
+            tables: vec![
+                TableState {
+                    box_name: "world".to_owned(),
+                    name: "Node".to_owned(),
+                    row_count: 2,
+                    columns: vec![ColumnState::Enum {
+                        name: "color".to_owned(),
+                        variant_count: 2,
+                        values: vec![0, 1],
+                    }],
+                },
+                TableState {
+                    box_name: "world".to_owned(),
+                    name: "Edge".to_owned(),
+                    row_count: 1,
+                    columns: vec![ColumnState::Ref {
+                        name: "to".to_owned(),
+                        target_table: 0,
+                        values: vec![0],
+                    }],
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn resolved_writes_preserve_row_enum_and_ref_validation() {
+        let mut state = state_data();
+        let (color, target) = {
+            let snapshot = Snapshot {
+                state: &state,
+                inputs: &[],
+            };
+            (
+                snapshot
+                    .resolve_write_column("world", "Node", "color")
+                    .unwrap(),
+                snapshot
+                    .resolve_write_column("world", "Edge", "to")
+                    .unwrap(),
+            )
+        };
+        let mut writes = WriteBuffer { state: &mut state };
+
+        assert_eq!(
+            writes
+                .set_resolved_real(color, 2, 0.0)
+                .unwrap_err()
+                .to_string(),
+            "box 'world', table 'Node', column 'color', row 2: row index is out of bounds for 2 rows"
+        );
+        assert_eq!(
+            writes
+                .set_resolved_enum(color, 1, 2)
+                .unwrap_err()
+                .to_string(),
+            "box 'world', table 'Node', column 'color', row 1: enum index 2 is out of bounds for 2 variants"
+        );
+        assert_eq!(
+            writes
+                .set_resolved_ref(target, 0, 2)
+                .unwrap_err()
+                .to_string(),
+            "box 'world', table 'Edge', column 'to', row 0: reference index 2 is out of bounds for target table 'Node' with 2 rows"
+        );
+    }
 }

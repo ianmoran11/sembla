@@ -318,3 +318,32 @@ summaries, manifests, and final-state hashes remain byte-identical. Full
 measurements, per-transition counts, tests, hashes, and the structural argument
 are under
 [`docs/evidence/evaluator-degenerate-hazard-fast-path-20260727/`](../evidence/evaluator-degenerate-hazard-fast-path-20260727/).
+
+## PRD 0005 implementation status
+
+PRD 0005 replaces per-write owned and re-resolved identity with a per-effect
+destination table. Each destination stores model identity and the single
+`ResolvedWriteColumn` lookup result; each staged write carries only a slot, row,
+typed value, and `rule_id`. The lookup result is captured after its effect value
+is evaluated but is published only at the effect's first pending write. Later
+effect errors, `DoubleWrite`, and write-buffer preparation therefore retain
+their original precedence. Row, type, enum-variant, and Ref-target validation
+and exact messages remain unchanged.
+
+Double-write detection is now one expected-linear, sort-free map pass over model
+cell identity. It still selects the lexicographically first duplicated cell and
+the first two writers in push order, including when distinct effect slots target
+the same cell. Transition names are derived from `rule_id` only on the error
+path. Tests pin the three-writer pair, deferred-error precedence corpus,
+validation text, String-free record, once-per-effect resolution, resolved-only
+application, and absence of a detector sort.
+
+On the revised wall-primary protocol, fastest default-worker wall improved from
+4.90 to 4.74 seconds (**1.034×**, 3.27%); median wall was unchanged at 4.97
+seconds. Single-worker wall/user changed from 6.28/5.21 to 6.30/5.20 seconds.
+CPU efficiency changed from 14.59% to 14.68%, and PRD 0003's Amdahl inversion
+estimates that the serial fraction fell from 75.58% to 72.49%.
+All 20 before/after outputs, summaries, manifests, stdout, and final-state hashes
+remain byte-identical. Full reasoning, measurements, formulas, tests, and hashes
+are under
+[`docs/evidence/evaluator-write-identity-once-20260727/`](../evidence/evaluator-write-identity-once-20260727/).
