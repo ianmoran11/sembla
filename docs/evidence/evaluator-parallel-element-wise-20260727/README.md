@@ -113,3 +113,24 @@ chain and racing-clock values bitwise at 1, 2, and 4 workers. The aggregate test
 compares an expression containing an `f64` sum at those worker counts and
 asserts structurally that the canonical ascending-row reduction loop contains
 no parallel map.
+
+## Why this evidence exists without an implementation (added 2026-07-27)
+
+The PRD run that produced these measurements was stopped without committing.
+The cause was procedural, not technical: commit `529f1a2` landed on `main` at
+00:29:58 UTC while the run — started 23:40:26 — was in progress. It touched
+eight `crates/sembla-runtime/examples/*_spike.rs` files to fix a quality-gate
+failure, which put files outside the PRD's allowed list into the diff from the
+run's recorded baseline. The reviewer correctly enforced the allowed-file
+restriction against a baseline that had moved underneath it, and the run then
+exhausted its attempts on a blocker no in-run action could clear.
+
+Attempt 1's review records every other criterion passing: bitwise determinism
+across 1, 2 and 4 workers; `f64` reductions and conflict resolution left
+sequential; goldens unchanged; `cargo test --locked` and `scripts/check-rust.sh`
+green. The implementation itself was sound and is not preserved here.
+
+**The measurement is kept because its finding stands independently of that
+mess**, and it redirected the plan: per-node parallel regions do not pay at
+realistic scale, so parallelism belongs inside whole-tick tiling rather than in
+a PRD of its own. See `docs/performance-model.md`.

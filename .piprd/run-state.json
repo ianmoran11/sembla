@@ -1,7 +1,7 @@
 {
   "runId": "2026-07-26T23-40-26-313Z",
   "startedAt": "2026-07-26T23:40:26.313Z",
-  "updatedAt": "2026-07-26T23:41:49.081Z",
+  "updatedAt": "2026-07-27T00:50:55.797Z",
   "cwd": "/Users/ian/projects/sembla",
   "runner": "piprd",
   "runDir": "/Users/ian/projects/sembla/docs/prds-evaluator-throughput",
@@ -13,8 +13,9 @@
   "approved": [],
   "commits": [],
   "total": 2,
-  "status": "running",
-  "stage": "implement",
-  "attempt": 1,
-  "adviseEnabled": true
+  "status": "stopped",
+  "stage": "review",
+  "attempt": 5,
+  "adviseEnabled": true,
+  "stoppedReason": "still needs revision after 5 attempt(s)"
 }
