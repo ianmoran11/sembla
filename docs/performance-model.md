@@ -244,7 +244,11 @@ broadcast, whole-tick tiling, buffer reuse, and whatever the CUDA phase split
 ranks next. Each is re-scoped from a fresh measurement because removing one cost
 re-ranks everything behind it.
 
-**Device-side observation is now scoped** — `docs/prds-device-observation/`.
+**Device-side observation is now scoped** — `docs/prds-device-observation/`,
+with `0001` for ungrouped views and `0002` for grouped. `0002` is the one that
+matters: the driver model's calibration and validation outputs *are* grouped
+views, and eligibility is all-or-nothing per run, so `0001` alone leaves the
+real workload downloading the state anyway.
 The 2026-07-27 profile shows 81% of CUDA wall time exists to serve host-side
 observation, and every reduction in the benchmark model is `count` or `max` over
 `int`, so a device reduction is bit-identical by construction. `Sum` over `Real`

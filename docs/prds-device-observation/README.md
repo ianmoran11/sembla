@@ -53,6 +53,11 @@ argument.
 The evaluator is more general than the model, and a device path must respect
 that:
 
+Grouped views reduce by count as well, and their key spaces are small and dense
+in practice — `population_cells` is sex(2) × area(4) × ~20 age bands ≈ 160
+groups. Enum and `Ref` cardinalities are known from the schema; only banded
+`Int` keys are unbounded, and one min/max reduction bounds them exactly.
+
 - **`Sum` over `Real` must stay on the host.** `eval.rs` fixes ascending row
   order as the canonical Level A reduction order. Any tree or per-tile
   reduction changes the sum.
@@ -104,9 +109,20 @@ Hyperstack session. Presenting an unbuilt CUDA path as verified is rejected.
 - `0001-device-side-ungrouped-observation` — evaluate eligible ungrouped views on
   the device and skip the per-tick state download when the whole model qualifies.
 
-Later PRDs are **deliberately unwritten**. Grouped views are the obvious next
-one, and they should be scoped from the phase split measured after 0001, because
-0001 removes the cost that makes them look expensive.
+- `0002-device-side-grouped-observation` — the same for grouped views, which is
+  what the real workflow actually uses.
+
+**0002 is required, not optional.** The demographic model's calibration and
+validation outputs *are* grouped views — `population_cells` (sex × area ×
+five-year age band), `deaths_cells`, `vacancy_cells` — and
+`docs/demographic-model.md` runs the calibration workflow with
+`--enable grouped-observations` throughout. The §L4 benchmark uses the
+*no-grouped* configuration only because `main.rs:2660` rejects grouped views on
+CUDA.
+
+So 0001 alone delivers nothing for the driver model: eligibility is
+all-or-nothing per run, and a model with grouped views downloads the state
+regardless. **0001 is the mechanism; 0002 is the payoff.**
 
 ## Measurement protocol
 
