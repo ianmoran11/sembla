@@ -462,10 +462,9 @@ fn diff_backends_accepts_plans_rejects_plan_dt_and_checks_corpus_exclusivity() {
         .unwrap();
     assert_eq!(corpus.status.code(), Some(1));
     let stderr = String::from_utf8(corpus.stderr).unwrap();
-    // DECISIONS §K6 adds one CPU-only feature-bearing fixture; corpus-mode
-    // diff-backends must reject it rather than silently skipping or falling back.
+    // Grouped plans remain explicitly gated by the manifest-recorded runtime flag.
     assert!(
-        stderr.contains("grouped-observations backend follow-up PRD"),
+        stderr.contains("requires --enable grouped-observations"),
         "{stderr}"
     );
 

@@ -19,11 +19,8 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] [--enable grouped-observations] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
-const GROUPED_SCOPE_FOLLOW_UP: &str =
-    "--enable grouped-observations is not yet supported for diff-backends; see the grouped-observations backend follow-up PRD";
-
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let exit_code = run(&arguments);
@@ -626,17 +623,6 @@ fn read_input(path: &str) -> Result<(String, sembla_ir::ParsedInput), String> {
     let source = std::fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
     let input = sembla_ir::parse_input(&source).map_err(|error| format!("{path}: {error}"))?;
     Ok((source, input))
-}
-
-fn input_uses_grouped_views(path: &str) -> Result<bool, String> {
-    let model = match read_input(path)?.1 {
-        sembla_ir::ParsedInput::LegacyModel(model) => model,
-        sembla_ir::ParsedInput::Plan(plan) => plan.model,
-    };
-    Ok(model
-        .boxes
-        .iter()
-        .any(|model_box| !model_box.grouped_views.is_empty()))
 }
 
 fn read_model(path: &str) -> Result<sembla_ir::Model, String> {
@@ -2622,25 +2608,6 @@ impl BackendRunMode {
     }
 }
 
-fn execute_backend_output(
-    model: &sembla_ir::ValidatedModel,
-    initial: Vec<TableInit>,
-    params: &ParamEnv,
-    seed: u64,
-    ticks: u32,
-    run_mode: BackendRunMode,
-) -> Result<BackendRunOutput, String> {
-    execute_backend_output_with_features(
-        model,
-        initial,
-        params,
-        seed,
-        ticks,
-        run_mode,
-        &FeatureSet::new(),
-    )
-}
-
 fn execute_backend_output_with_features(
     model: &sembla_ir::ValidatedModel,
     initial: Vec<TableInit>,
@@ -2650,15 +2617,6 @@ fn execute_backend_output_with_features(
     run_mode: BackendRunMode,
     enabled_features: &FeatureSet,
 ) -> Result<BackendRunOutput, String> {
-    if run_mode.backend == BackendSelection::Cuda
-        && model
-            .model()
-            .boxes
-            .iter()
-            .any(|model_box| !model_box.grouped_views.is_empty())
-    {
-        return Err("grouped observations run on the cpu backend only for now".to_owned());
-    }
     match run_mode.backend {
         BackendSelection::Cpu => {
             let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
@@ -2699,15 +2657,6 @@ fn execute_backend_output_timed_with_features(
     enabled_features: &FeatureSet,
     scale: usize,
 ) -> Result<(BackendRunOutput, TimingDocument), String> {
-    if run_mode.backend == BackendSelection::Cuda
-        && model
-            .model()
-            .boxes
-            .iter()
-            .any(|model_box| !model_box.grouped_views.is_empty())
-    {
-        return Err("grouped observations run on the cpu backend only for now".to_owned());
-    }
     match run_mode.backend {
         BackendSelection::Cpu => {
             let mut state = StateStore::new(model, initial).map_err(|error| error.to_string())?;
@@ -2993,6 +2942,16 @@ impl RunOutputAccumulator {
         tick: u32,
         report: executor::TickReport,
     ) -> Result<(), String> {
+        self.push_tick_with_enum_counts(state, tick, report, None)
+    }
+
+    fn push_tick_with_enum_counts(
+        &mut self,
+        state: &StateStore,
+        tick: u32,
+        report: executor::TickReport,
+        generic_enum_counts: Option<&[usize]>,
+    ) -> Result<(), String> {
         let mut row = Vec::with_capacity(self.headers.len() - 1);
         if self.has_views {
             row.extend(
@@ -3001,6 +2960,21 @@ impl RunOutputAccumulator {
                     .iter()
                     .map(|view| ReportedValue::from(view.value)),
             );
+        } else if let Some(counts) = generic_enum_counts {
+            let expected = self
+                .enums
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(|descriptor| descriptor.variants.len())
+                .sum::<usize>();
+            if counts.len() != expected {
+                return Err(format!(
+                    "tick {tick}: device generic enum report has {} counts, expected {expected}",
+                    counts.len()
+                ));
+            }
+            row.extend(counts.iter().copied().map(ReportedValue::Unsigned));
         } else {
             let snapshot = state.snapshot();
             for descriptor in self.enums.as_deref().unwrap_or_default() {
@@ -3204,6 +3178,7 @@ fn cuda_tick_report(
     fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
     deferred_per_resource_table: Vec<(String, usize)>,
     views: Vec<sembla_runtime::executor::ViewValue>,
+    grouped_views: Vec<sembla_runtime::executor::GroupedViewValue>,
 ) -> executor::TickReport {
     let fired = model
         .transitions()
@@ -3220,7 +3195,7 @@ fn cuda_tick_report(
     executor::TickReport {
         tick,
         views,
-        grouped_views: Vec::new(),
+        grouped_views,
         fired,
         fired_per_box,
         deferred_per_resource_table,
@@ -3258,12 +3233,15 @@ fn run_results_output_cuda(
         }
         let views = executor::observe_views(model, &state, params)
             .map_err(|error| format!("tick {tick}: {error}"))?;
+        let grouped_views = executor::observe_grouped_views(model, &state, params)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
         let report = cuda_tick_report(
             model,
             tick,
             observation.fired_per_box,
             observation.deferred_per_resource_table,
             views,
+            grouped_views,
         );
         output.push_tick(&state, tick, report)?;
     }
@@ -3309,10 +3287,20 @@ fn run_results_output_cuda(
                     .map_err(|error| format!("tick {tick}: {error}"))?,
             );
         }
-        let views = match device_views {
-            Some(views) => views,
-            None => executor::observe_views(model, backend.observed_state(), params)
-                .map_err(|error| format!("tick {tick}: {error}"))?,
+        let (views, grouped_views, generic_enum_counts) = match device_views {
+            Some(observation) => (
+                observation.views,
+                observation.grouped_views,
+                observation.generic_enum_counts,
+            ),
+            None => {
+                let views = executor::observe_views(model, backend.observed_state(), params)
+                    .map_err(|error| format!("tick {tick}: {error}"))?;
+                let grouped_views =
+                    executor::observe_grouped_views(model, backend.observed_state(), params)
+                        .map_err(|error| format!("tick {tick}: {error}"))?;
+                (views, grouped_views, None)
+            }
         };
         let report = cuda_tick_report(
             model,
@@ -3320,8 +3308,14 @@ fn run_results_output_cuda(
             fired_per_box,
             deferred_per_resource_table,
             views,
+            grouped_views,
         );
-        output.push_tick(backend.observed_state(), tick, report)?;
+        output.push_tick_with_enum_counts(
+            backend.observed_state(),
+            tick,
+            report,
+            generic_enum_counts.as_deref(),
+        )?;
     }
     let output = output.finish(model, hashes.clone())?;
     let state = backend
@@ -3383,10 +3377,20 @@ fn run_results_output_cuda_timed(
         };
 
         let phase_started = Instant::now();
-        let views = match device_views {
-            Some(views) => views,
-            None => executor::observe_views(model, backend.observed_state(), params)
-                .map_err(|error| format!("tick {tick}: {error}"))?,
+        let (views, grouped_views, generic_enum_counts) = match device_views {
+            Some(observation) => (
+                observation.views,
+                observation.grouped_views,
+                observation.generic_enum_counts,
+            ),
+            None => {
+                let views = executor::observe_views(model, backend.observed_state(), params)
+                    .map_err(|error| format!("tick {tick}: {error}"))?;
+                let grouped_views =
+                    executor::observe_grouped_views(model, backend.observed_state(), params)
+                        .map_err(|error| format!("tick {tick}: {error}"))?;
+                (views, grouped_views, None)
+            }
         };
         let observe_views = phase_started.elapsed();
 
@@ -3397,8 +3401,14 @@ fn run_results_output_cuda_timed(
             fired_per_box,
             deferred_per_resource_table,
             views,
+            grouped_views,
         );
-        output.push_tick(backend.observed_state(), tick, report)?;
+        output.push_tick_with_enum_counts(
+            backend.observed_state(),
+            tick,
+            report,
+            generic_enum_counts.as_deref(),
+        )?;
         let report = backend_phases[4] + phase_started.elapsed();
 
         let wall_time = tick_started.elapsed();
@@ -4306,6 +4316,7 @@ struct DiffOptions {
     ticks: u32,
     dt: Option<f64>,
     params: Option<String>,
+    enabled_features: FeatureSet,
 }
 
 fn diff_backends_command(arguments: &[String]) -> i32 {
@@ -4337,6 +4348,7 @@ fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
     let mut ticks = None;
     let mut dt = None;
     let mut params = None;
+    let mut enabled_features = FeatureSet::new();
     let mut index = 1;
     while index < arguments.len() {
         let flag = &arguments[index];
@@ -4365,7 +4377,9 @@ fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
                 set_once(&mut dt, value, "--dt")?;
             }
             "--params" => set_once(&mut params, value.clone(), "--params")?,
-            "--enable" => return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned()),
+            "--enable" => {
+                enabled_features.insert(parse_feature(value)?);
+            }
             flag => return Err(format!("unknown diff-backends flag '{flag}'")),
         }
         index += 2;
@@ -4410,6 +4424,7 @@ fn parse_diff_options(arguments: &[String]) -> Result<DiffOptions, String> {
         ticks: ticks.unwrap_or(10),
         dt,
         params,
+        enabled_features,
     })
 }
 
@@ -4467,9 +4482,6 @@ fn compare_per_tick_hashes<'a>(
 
 fn diff_backends(options: DiffOptions) -> Result<(), String> {
     for path in &options.models {
-        if input_uses_grouped_views(path)? {
-            return Err(GROUPED_SCOPE_FOLLOW_UP.to_owned());
-        }
         let run_options = RunOptions {
             seed: options.seed,
             ticks: options.ticks,
@@ -4480,26 +4492,28 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
             params: options.params.clone(),
             timing_json: None,
             backend: BackendSelection::Cpu,
-            enabled_features: FeatureSet::new(),
+            enabled_features: options.enabled_features.clone(),
         };
         let model = read_run_input(path, &run_options)?.model;
         let params = resolve_params(&model, options.params.as_deref())?;
         let initial = initialized_tables(&model, &options.population)?.tables;
-        let cpu = execute_backend_output(
+        let cpu = execute_backend_output_with_features(
             &model,
             initial.clone(),
             &params,
             options.seed,
             options.ticks,
             BackendRunMode::every_tick(BackendSelection::Cpu),
+            &options.enabled_features,
         )?;
-        let cuda = execute_backend_output(
+        let cuda = execute_backend_output_with_features(
             &model,
             initial,
             &params,
             options.seed,
             options.ticks,
             BackendRunMode::every_tick(BackendSelection::Cuda),
+            &options.enabled_features,
         )?;
         let (cpu_per_tick_hashes, cuda_per_tick_hashes) =
             compare_per_tick_hashes(path, &cpu.per_tick_hashes, &cuda.per_tick_hashes)?;
@@ -4541,6 +4555,18 @@ fn diff_backends(options: DiffOptions) -> Result<(), String> {
         if cpu.output.summaries_csv.as_bytes() != cuda.output.summaries_csv.as_bytes() {
             return Err(format!(
                 "{path}: summaries bytes differ after matching state hashes"
+            ));
+        }
+        if cpu.output.grouped.len() != cuda.output.grouped.len()
+            || cpu.output.grouped.iter().zip(&cuda.output.grouped).any(
+                |(cpu_grouped, cuda_grouped)| {
+                    cpu_grouped.view != cuda_grouped.view
+                        || cpu_grouped.csv.as_bytes() != cuda_grouped.csv.as_bytes()
+                },
+            )
+        {
+            return Err(format!(
+                "{path}: grouped observation bytes differ after matching state hashes"
             ));
         }
         let rate = |elapsed: std::time::Duration| {
@@ -4675,6 +4701,22 @@ mod tests {
         .unwrap();
         assert_eq!(options.dt, Some(0.5));
         assert_eq!(options.params.as_deref(), Some("params.json"));
+        let grouped = parse_diff_options(&[
+            "model.json".to_owned(),
+            "--enable".to_owned(),
+            sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned(),
+        ])
+        .unwrap();
+        assert!(grouped
+            .enabled_features
+            .contains(sembla_ir::GROUPED_OBSERVATIONS_FEATURE));
+        assert!(parse_diff_options(&[
+            "model.json".to_owned(),
+            "--enable".to_owned(),
+            "future-feature".to_owned(),
+        ])
+        .unwrap_err()
+        .contains("unknown feature 'future-feature'"));
         assert!(parse_diff_options(&[
             "--all-examples".to_owned(),
             "--params".to_owned(),
@@ -4776,6 +4818,29 @@ mod tests {
             "B to A must still have a zero-valued column"
         );
         assert!(first.series.rows.last().unwrap()[1].as_usize("B").unwrap() > 0);
+    }
+
+    #[test]
+    fn device_generic_enum_counts_preserve_legacy_csv_bytes() {
+        let model = load(include_str!("../../../examples/reversible_ctmc.json"));
+        let params = ParamEnv::defaults(&model);
+        let mut state = initialized(&model, 100);
+        let report =
+            sembla_runtime::executor::run_tick(&model, &mut state, &params, 55, 0).unwrap();
+        let snapshot = state.snapshot();
+        let values = snapshot.enum_values("chain", "particle", "phase").unwrap();
+        let counts = [
+            values.iter().filter(|value| **value == 0).count(),
+            values.iter().filter(|value| **value == 1).count(),
+        ];
+
+        let mut host = super::RunOutputAccumulator::new(&model, &params, 1).unwrap();
+        host.push_tick(&state, 0, report.clone()).unwrap();
+        let mut device = super::RunOutputAccumulator::new(&model, &params, 1).unwrap();
+        device
+            .push_tick_with_enum_counts(&state, 0, report, Some(&counts))
+            .unwrap();
+        assert_eq!(host.csv, device.csv);
     }
 
     #[test]

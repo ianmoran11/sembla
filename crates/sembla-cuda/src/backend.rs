@@ -4,11 +4,16 @@ use cudarc::driver::{CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKer
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::{DeviceObservationEligibility, ObservationValue, ViewValue};
+use sembla_runtime::executor::{
+    DeviceObservationEligibility, GroupedViewValue, ObservationValue, ViewValue,
+};
 use sembla_runtime::state::{ColumnData, InputTable, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
-use crate::codegen::host_observation_fallback;
+use crate::codegen::{
+    decode_grouped_histogram, grouped_observation_layout, host_observation_fallback,
+    GroupedObservationLayout, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
+};
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -38,19 +43,28 @@ pub struct CudaTickObservation {
     pub deferred_per_resource_table: Vec<(String, usize)>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CudaDeviceObservations {
+    pub views: Vec<ViewValue>,
+    pub grouped_views: Vec<GroupedViewValue>,
+    /// Flattened descriptor/variant counts for the legacy generic CSV. Present
+    /// only when grouped views are the model's sole declared observations.
+    pub generic_enum_counts: Option<Vec<usize>>,
+}
+
 pub type CudaFiredPerBox = Vec<(String, Vec<(u32, usize)>)>;
 pub type CudaDeferredPerResourceTable = Vec<(String, usize)>;
 pub type ReusedCudaTickObservation = (
     u32,
     CudaFiredPerBox,
     CudaDeferredPerResourceTable,
-    Option<Vec<ViewValue>>,
+    Option<CudaDeviceObservations>,
 );
 pub type TimedReusedCudaTickObservation = (
     u32,
     CudaFiredPerBox,
     CudaDeferredPerResourceTable,
-    Option<Vec<ViewValue>>,
+    Option<CudaDeviceObservations>,
     [std::time::Duration; 5],
 );
 type DownloadedStateParts = (Vec<u8>, Vec<u8>, Vec<u64>);
@@ -147,6 +161,12 @@ pub struct CudaBackend {
     check_output_errors: CudaFunction,
     init_observations: CudaFunction,
     observe_view: CudaFunction,
+    init_grouped_extrema: CudaFunction,
+    bound_grouped_view: CudaFunction,
+    init_grouped_histogram: CudaFunction,
+    observe_grouped_view: CudaFunction,
+    init_generic_enum_counts: CudaFunction,
+    observe_generic_enum: CudaFunction,
     philox_vectors_kernel: CudaFunction,
     init_validation_scratch: CudaFunction,
     commit_validation_status: CudaFunction,
@@ -189,6 +209,11 @@ pub struct CudaBackend {
     output_partials: CudaSlice<u64>,
     output_errors: CudaSlice<u8>,
     observation_values: CudaSlice<i64>,
+    grouped_extrema: CudaSlice<i64>,
+    grouped_axis_mins: CudaSlice<i64>,
+    grouped_axis_cardinalities: CudaSlice<u64>,
+    grouped_histogram: CudaSlice<u64>,
+    generic_enum_counts: CudaSlice<u64>,
     effect_active: CudaSlice<u32>,
     status: CudaSlice<u64>,
     seed: u64,
@@ -319,6 +344,12 @@ impl CudaBackend {
         let check_output_errors = load("sembla_check_output_errors")?;
         let init_observations = load("sembla_init_observations")?;
         let observe_view = load("sembla_observe_view")?;
+        let init_grouped_extrema = load("sembla_init_grouped_extrema")?;
+        let bound_grouped_view = load("sembla_bound_grouped_view")?;
+        let init_grouped_histogram = load("sembla_init_grouped_histogram")?;
+        let observe_grouped_view = load("sembla_observe_grouped_view")?;
+        let init_generic_enum_counts = load("sembla_init_generic_enum_counts")?;
+        let observe_generic_enum = load("sembla_observe_generic_enum")?;
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
         let init_validation_scratch = load("sembla_init_validation_scratch")?;
         let commit_validation_status = load("sembla_commit_validation_status")?;
@@ -443,6 +474,35 @@ impl CudaBackend {
         let observation_values = stream
             .alloc_zeros::<i64>(generated.observation_view_tables.len().max(1))
             .map_err(driver_error)?;
+        let grouped_extrema_len = generated
+            .grouped_observation_band_axes
+            .checked_mul(2)
+            .ok_or_else(|| CudaError::InvalidInput("grouped extrema size overflow".to_owned()))?;
+        let grouped_extrema = stream
+            .alloc_zeros::<i64>(grouped_extrema_len.max(1))
+            .map_err(driver_error)?;
+        let grouped_axis_count = generated
+            .grouped_observation_views
+            .iter()
+            .try_fold(0_usize, |count, view| count.checked_add(view.axes.len()))
+            .ok_or_else(|| CudaError::InvalidInput("grouped axis count overflow".to_owned()))?;
+        let grouped_axis_mins = stream
+            .alloc_zeros::<i64>(grouped_axis_count.max(1))
+            .map_err(driver_error)?;
+        let grouped_axis_cardinalities = stream
+            .alloc_zeros::<u64>(grouped_axis_count.max(1))
+            .map_err(driver_error)?;
+        let grouped_histogram_len = if generated.grouped_observation_views.is_empty() {
+            1
+        } else {
+            GROUPED_OBSERVATION_KEY_SPACE_LIMIT
+        };
+        let grouped_histogram = stream
+            .alloc_zeros::<u64>(grouped_histogram_len)
+            .map_err(driver_error)?;
+        let generic_enum_counts = stream
+            .alloc_zeros::<u64>(generated.generic_enum_count.max(1))
+            .map_err(driver_error)?;
         // status[0..=3] is the committed diagnostic; status[4..=11] is the
         // per-tick validation-reduction scratch (lock, scan, ordering identity,
         // code, branch, and selected payload) prepared by the scratch kernel.
@@ -485,6 +545,12 @@ impl CudaBackend {
             check_output_errors,
             init_observations,
             observe_view,
+            init_grouped_extrema,
+            bound_grouped_view,
+            init_grouped_histogram,
+            observe_grouped_view,
+            init_generic_enum_counts,
+            observe_generic_enum,
             philox_vectors_kernel,
             init_validation_scratch,
             commit_validation_status,
@@ -527,6 +593,11 @@ impl CudaBackend {
             output_partials,
             output_errors,
             observation_values,
+            grouped_extrema,
+            grouped_axis_mins,
+            grouped_axis_cardinalities,
+            grouped_histogram,
+            generic_enum_counts,
             effect_active,
             status,
             seed,
@@ -575,7 +646,7 @@ impl CudaBackend {
     pub fn run_tick_observed_reused(&mut self) -> Result<ReusedCudaTickObservation, CudaError> {
         let tick = self.next_tick;
         self.execute_tick()?;
-        let views = self.observe_device_views()?;
+        let views = self.observe_device_views(tick)?;
         let (wins, deferred) = self.readback_control()?;
         let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
         host_observation_fallback(views.is_none(), || self.download_state_store())?;
@@ -616,7 +687,7 @@ impl CudaBackend {
 
         let started = std::time::Instant::now();
         self.execute_tick()?;
-        let views = self.observe_device_views()?;
+        let views = self.observe_device_views(tick)?;
         let kernels = started.elapsed();
 
         let started = std::time::Instant::now();
@@ -680,17 +751,24 @@ impl CudaBackend {
         Ok(self.host_state)
     }
 
-    fn observe_device_views(&mut self) -> Result<Option<Vec<ViewValue>>, CudaError> {
+    fn observe_device_views(
+        &mut self,
+        tick: u32,
+    ) -> Result<Option<CudaDeviceObservations>, CudaError> {
         if !self.generated.observation_eligibility.eligible {
             return Ok(None);
         }
-        let view_count =
+
+        let scalar_count =
             u32::try_from(self.generated.observation_view_tables.len()).map_err(|_| {
                 CudaError::InvalidInput("observation view count exceeds u32".to_owned())
             })?;
-        let mut init = self.stream.launch_builder(&self.init_observations);
-        init.arg(&mut self.observation_values).arg(&view_count);
-        unsafe { init.launch(LaunchConfig::for_num_elems(view_count)) }.map_err(driver_error)?;
+        if scalar_count != 0 {
+            let mut init = self.stream.launch_builder(&self.init_observations);
+            init.arg(&mut self.observation_values).arg(&scalar_count);
+            unsafe { init.launch(LaunchConfig::for_num_elems(scalar_count)) }
+                .map_err(driver_error)?;
+        }
 
         for (view_index, table) in self
             .generated
@@ -721,23 +799,214 @@ impl CudaBackend {
                 .arg(&view_index);
             unsafe { observe.launch(config) }.map_err(driver_error)?;
         }
-        let values = self
-            .stream
-            .memcpy_dtov(&self.observation_values)
-            .map_err(driver_error)?;
-        let views = self
-            .generated
-            .observation_eligibility
-            .views
-            .iter()
-            .zip(values)
-            .map(|(view, value)| ViewValue {
-                box_name: view.box_name.clone(),
-                name: view.name.clone(),
+        let scalar_values = if scalar_count == 0 {
+            Vec::new()
+        } else {
+            self.stream
+                .memcpy_dtov(&self.observation_values.slice(..scalar_count as usize))
+                .map_err(driver_error)?
+        };
+        let scalar_names = self.model.model().boxes.iter().flat_map(|model_box| {
+            model_box
+                .views
+                .iter()
+                .map(move |view| (model_box.name.clone(), view.name.clone()))
+        });
+        let views = scalar_names
+            .zip(scalar_values)
+            .map(|((box_name, name), value)| ViewValue {
+                box_name,
+                name,
                 value: ObservationValue::Int(value),
             })
             .collect();
-        Ok(Some(views))
+
+        let grouped_specs = self.generated.grouped_observation_views.clone();
+        let band_count = self.generated.grouped_observation_band_axes;
+        let band_extrema = if band_count == 0 {
+            Vec::new()
+        } else {
+            let band_count_u32 = u32::try_from(band_count).map_err(|_| {
+                CudaError::InvalidInput("grouped band axis count exceeds u32".to_owned())
+            })?;
+            let mut init = self.stream.launch_builder(&self.init_grouped_extrema);
+            init.arg(&mut self.grouped_extrema).arg(&band_count_u32);
+            unsafe { init.launch(LaunchConfig::for_num_elems(band_count_u32)) }
+                .map_err(driver_error)?;
+            for (view_index, view) in grouped_specs.iter().enumerate() {
+                if !view.axes.iter().any(|axis| {
+                    matches!(
+                        axis,
+                        crate::codegen::GroupedObservationAxis::BandedInt { .. }
+                    )
+                }) {
+                    continue;
+                }
+                let rows = u32::try_from(self.layout.row_counts[view.table]).map_err(|_| {
+                    CudaError::InvalidInput("grouped observation row count exceeds u32".to_owned())
+                })?;
+                if rows == 0 {
+                    continue;
+                }
+                let view_index = u32::try_from(view_index).map_err(|_| {
+                    CudaError::InvalidInput("grouped observation view index exceeds u32".to_owned())
+                })?;
+                let mut config = LaunchConfig::for_num_elems(rows);
+                config.grid_dim.0 = config.grid_dim.0.min(1024);
+                let mut bound = self.stream.launch_builder(&self.bound_grouped_view);
+                bound
+                    .arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&mut self.grouped_extrema)
+                    .arg(&view_index);
+                unsafe { bound.launch(config) }.map_err(driver_error)?;
+            }
+            self.stream
+                .memcpy_dtov(&self.grouped_extrema.slice(..band_count * 2))
+                .map_err(driver_error)?
+        };
+
+        let layouts = grouped_specs
+            .iter()
+            .map(|view| grouped_observation_layout(view, &self.layout.row_counts, &band_extrema))
+            .collect::<Result<Vec<GroupedObservationLayout>, CudaError>>()?;
+        let axis_mins = layouts
+            .iter()
+            .flat_map(|layout| layout.axes.iter().map(|axis| axis.minimum))
+            .collect::<Vec<_>>();
+        let axis_cardinalities = layouts
+            .iter()
+            .flat_map(|layout| layout.axes.iter().map(|axis| axis.cardinality))
+            .collect::<Vec<_>>();
+        if !axis_mins.is_empty() {
+            self.stream
+                .memcpy_htod(&axis_mins, &mut self.grouped_axis_mins)
+                .map_err(driver_error)?;
+            self.stream
+                .memcpy_htod(&axis_cardinalities, &mut self.grouped_axis_cardinalities)
+                .map_err(driver_error)?;
+        }
+
+        let mut grouped_views = Vec::new();
+        for (view_index, (view, layout)) in grouped_specs.iter().zip(&layouts).enumerate() {
+            if layout.key_space_size == 0 {
+                eprintln!(
+                    "cuda_device_grouped_observation tick={tick} box={:?} view={:?} key_space_size=0 occupied_groups=0 emitted_groups=0",
+                    view.box_name, view.name
+                );
+                continue;
+            }
+            let key_space = u32::try_from(layout.key_space_size)
+                .map_err(|_| CudaError::InvalidInput("grouped key space exceeds u32".to_owned()))?;
+            let key_space_u64 = u64::from(key_space);
+            let mut init = self.stream.launch_builder(&self.init_grouped_histogram);
+            init.arg(&mut self.grouped_histogram).arg(&key_space_u64);
+            unsafe { init.launch(LaunchConfig::for_num_elems(key_space)) }.map_err(driver_error)?;
+
+            let rows = u32::try_from(self.layout.row_counts[view.table]).map_err(|_| {
+                CudaError::InvalidInput("grouped observation row count exceeds u32".to_owned())
+            })?;
+            if rows != 0 {
+                let view_index = u32::try_from(view_index).map_err(|_| {
+                    CudaError::InvalidInput("grouped observation view index exceeds u32".to_owned())
+                })?;
+                let mut config = LaunchConfig::for_num_elems(rows);
+                config.grid_dim.0 = config.grid_dim.0.min(1024);
+                let mut observe = self.stream.launch_builder(&self.observe_grouped_view);
+                observe
+                    .arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.params)
+                    .arg(&self.grouped_axis_mins)
+                    .arg(&self.grouped_axis_cardinalities)
+                    .arg(&mut self.grouped_histogram)
+                    .arg(&view_index);
+                unsafe { observe.launch(config) }.map_err(driver_error)?;
+            }
+            let counters = self
+                .stream
+                .memcpy_dtov(&self.grouped_histogram.slice(..layout.key_space_size))
+                .map_err(driver_error)?;
+            let occupied = counters.iter().filter(|count| **count != 0).count();
+            let emitted = decode_grouped_histogram(view, layout, &counters)?;
+            eprintln!(
+                "cuda_device_grouped_observation tick={tick} box={:?} view={:?} key_space_size={} occupied_groups={} emitted_groups={}",
+                view.box_name,
+                view.name,
+                layout.key_space_size,
+                occupied,
+                emitted.len()
+            );
+            debug_assert_eq!(occupied, emitted.len());
+            grouped_views.extend(emitted);
+        }
+
+        let generic_enum_count = self.generated.generic_enum_count;
+        let generic_enum_counts = if generic_enum_count == 0 {
+            (self.generated.observation_view_tables.is_empty()
+                && !self.generated.grouped_observation_views.is_empty())
+            .then(Vec::new)
+        } else {
+            let generic_enum_count_u32 = u32::try_from(generic_enum_count).map_err(|_| {
+                CudaError::InvalidInput("generic enum observation count exceeds u32".to_owned())
+            })?;
+            let generic_enum_count_u64 = u64::from(generic_enum_count_u32);
+            let mut init = self.stream.launch_builder(&self.init_generic_enum_counts);
+            init.arg(&mut self.generic_enum_counts)
+                .arg(&generic_enum_count_u64);
+            unsafe { init.launch(LaunchConfig::for_num_elems(generic_enum_count_u32)) }
+                .map_err(driver_error)?;
+
+            let observations = self.generated.generic_enum_observations.clone();
+            for (observation_index, observation) in observations.iter().enumerate() {
+                let rows =
+                    u32::try_from(self.layout.row_counts[observation.table]).map_err(|_| {
+                        CudaError::InvalidInput(
+                            "generic enum observation row count exceeds u32".to_owned(),
+                        )
+                    })?;
+                if rows == 0 {
+                    continue;
+                }
+                let observation_index = u32::try_from(observation_index).map_err(|_| {
+                    CudaError::InvalidInput("generic enum observation index exceeds u32".to_owned())
+                })?;
+                let mut config = LaunchConfig::for_num_elems(rows);
+                config.grid_dim.0 = config.grid_dim.0.min(1024);
+                let mut observe = self.stream.launch_builder(&self.observe_generic_enum);
+                observe
+                    .arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&mut self.generic_enum_counts)
+                    .arg(&observation_index);
+                unsafe { observe.launch(config) }.map_err(driver_error)?;
+            }
+            let counts = self
+                .stream
+                .memcpy_dtov(&self.generic_enum_counts.slice(..generic_enum_count))
+                .map_err(driver_error)?;
+            Some(
+                counts
+                    .into_iter()
+                    .map(|count| {
+                        usize::try_from(count).map_err(|_| {
+                            CudaError::InvalidInput(
+                                "generic enum count exceeds host usize".to_owned(),
+                            )
+                        })
+                    })
+                    .collect::<Result<Vec<_>, CudaError>>()?,
+            )
+        };
+
+        Ok(Some(CudaDeviceObservations {
+            views,
+            grouped_views,
+            generic_enum_counts,
+        }))
     }
 
     fn ensure_host_state(&mut self) -> Result<(), CudaError> {

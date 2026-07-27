@@ -91,15 +91,30 @@ fn device_observation_eligibility_rejects_aggregate_and_input_expressions() {
 }
 
 #[test]
-fn grouped_and_zero_view_models_force_host_observation() {
+fn grouped_views_extend_the_same_conservative_model_gate() {
     let grouped = eligibility_model(
         r#"{"name":"count","table":"Person","filter":null,"value":null,"reduce":"count"}"#,
         r#"{"name":"by_group","table":"Person","filter":null,"keys":[{"attr":"group"}]}"#,
     );
     let grouped = device_observation_eligibility(&grouped);
-    assert!(!grouped.eligible);
+    assert!(grouped.eligible, "{grouped:?}");
     assert_eq!(grouped.views.len(), 2);
-    assert!(grouped.views[1].reason.contains("grouped"));
+    assert!(grouped.views[1].reason.contains("exactly boundable"));
+
+    let fallible = eligibility_model(
+        r#"{"name":"count","table":"Person","filter":null,"value":null,"reduce":"count"}"#,
+        r#"{"name":"by_group","table":"Person","filter":{"kind":"gt","lhs":{"kind":"add","lhs":{"kind":"self_attr","name":"n"},"rhs":{"kind":"int","value":1}},"rhs":{"kind":"int","value":0}},"keys":[{"attr":"group"}]}"#,
+    );
+    let fallible = device_observation_eligibility(&fallible);
+    assert!(!fallible.eligible);
+    assert!(!fallible.views[1].eligible);
+    assert!(fallible.views[1].reason.contains("row-local infallible"));
+
+    let grouped_only = device_observation_eligibility(&eligibility_model(
+        "",
+        r#"{"name":"by_group","table":"Person","filter":null,"keys":[{"attr":"group"}]}"#,
+    ));
+    assert!(grouped_only.eligible, "{grouped_only:?}");
 
     let empty = device_observation_eligibility(&eligibility_model("", ""));
     assert!(!empty.eligible);

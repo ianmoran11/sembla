@@ -66,8 +66,8 @@ pub struct DeviceViewEligibility {
 }
 
 /// Run-wide device-observation decision. State download may be skipped only
-/// when this decision is eligible; one host-bound or grouped view forces the
-/// complete run back to host observation.
+/// when this decision is eligible; one host-bound view forces the complete run
+/// back to host observation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceObservationEligibility {
     pub eligible: bool,
@@ -75,26 +75,28 @@ pub struct DeviceObservationEligibility {
     pub views: Vec<DeviceViewEligibility>,
 }
 
-/// Decides ungrouped device-observation eligibility from validated IR.
+/// Decides device-observation eligibility from validated IR.
 ///
 /// The expression check deliberately reuses the evaluator's gather predicate:
 /// `Expr::Agg`, `Expr::Input`, and row-fallible checked integer arithmetic are
 /// therefore rejected without maintaining another expression whitelist.
-/// Integer `count`, `min`, and `max` are commutative monoids. Sums stay on the
-/// host because Real has a canonical ascending-row order and reassociated Int
-/// can overflow differently. Real min/max also stay on the host because the
-/// CPU's total ordering (including NaNs) is not this integer reduction.
+/// Integer `count`, `min`, and `max` are commutative monoids. Grouped views are
+/// count-only and their validated Enum, Ref, and banded Int keys are exactly
+/// boundable at runtime. Sums stay on the host because Real has a canonical
+/// ascending-row order and reassociated Int can overflow differently. Real
+/// min/max also stay on the host because the CPU's total ordering (including
+/// NaNs) is not this integer reduction.
 pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservationEligibility {
-    const ELIGIBLE: &str = "all ungrouped views are device-eligible";
+    const ELIGIBLE: &str = "all scalar and grouped views are device-eligible";
     const FALLBACK: &str = "at least one view requires host observation";
     const NO_VIEWS: &str = "no declared views; legacy state reporting requires host state";
     const COUNT: &str = "count with a row-local filter";
     const INT_MIN_MAX: &str = "Int min/max with row-local filter and value";
+    const GROUPED_COUNT: &str = "grouped count with a row-local filter and exactly boundable keys";
     const FILTER: &str = "filter is not a row-local infallible expression";
     const VALUE: &str =
         "value is not a row-local infallible Int expression; Real extrema retain host NaN ordering";
     const SUM: &str = "Sum preserves host order for Real and host overflow association for Int";
-    const GROUPED: &str = "grouped views require host observation";
 
     let mut views = Vec::new();
     for model_box in &model.model().boxes {
@@ -133,17 +135,24 @@ pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservati
                 reason,
             });
         }
-        views.extend(
-            model_box
-                .grouped_views
-                .iter()
-                .map(|view| DeviceViewEligibility {
-                    box_name: model_box.name.clone(),
-                    name: view.name.clone(),
-                    eligible: false,
-                    reason: GROUPED,
-                }),
-        );
+        for view in &model_box.grouped_views {
+            let filter_eligible =
+                EvalTable::new(model, &model_box.name, &view.table).is_ok_and(|table| {
+                    view.filter.as_ref().map_or(true, |filter| {
+                        expr_is_gather_eligible(filter, table).unwrap_or(false)
+                    })
+                });
+            views.push(DeviceViewEligibility {
+                box_name: model_box.name.clone(),
+                name: view.name.clone(),
+                eligible: filter_eligible,
+                reason: if filter_eligible {
+                    GROUPED_COUNT
+                } else {
+                    FILTER
+                },
+            });
+        }
     }
     let eligible = !views.is_empty() && views.iter().all(|view| view.eligible);
     DeviceObservationEligibility {

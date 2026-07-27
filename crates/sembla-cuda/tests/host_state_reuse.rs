@@ -49,7 +49,7 @@ fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
         "    pub fn run_tick_observed_reused(&mut self)",
         "\n    /// Executes one observed CUDA tick and returns durations",
     );
-    assert!(reused.contains("let views = self.observe_device_views()?"));
+    assert!(reused.contains("let views = self.observe_device_views(tick)?"));
     assert!(reused.contains("host_observation_fallback(views.is_none()"));
     assert!(reused.contains("self.download_state_store()"));
 
@@ -58,6 +58,7 @@ fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
         "    pub fn run_tick_observed_reused_timed(",
         "\n    /// Returns the backend-owned host snapshot",
     );
+    assert!(timed.contains("let views = self.observe_device_views(tick)?"));
     assert!(timed.contains("host_observation_fallback("));
     assert!(timed.contains("views.is_none()"));
     assert!(timed.contains("self.download_state_parts()?"));

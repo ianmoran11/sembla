@@ -160,3 +160,36 @@ demographic no-grouped case and an explicit ineligible fallback case), and the
 record the complete before/after phase table, including `kernels`, and preserve
 the declaration-ordered eligibility breakdown in its log. No local result is
 presented as GPU evidence.
+
+## PRD 0002 implementation status (local)
+
+Grouped count views now extend the same all-or-nothing IR eligibility gate.
+Enum axes use schema variant counts, Ref axes use the target table's runtime row
+count, and each banded Int column is reduced to an exact device min/max every
+tick. The resulting dense histogram is capped at **1,048,576 counters per
+view**. Exceeding the cap is a deterministic CUDA error naming the box, view,
+exact computed size, and limit; it never silently selects host observation.
+When grouped views are the only declared observations, CUDA also returns the
+legacy generic enum counts so that CSV reporting does not force state download.
+
+The device returns only the exact histogram prefix. Host decoding walks its
+mixed-radix indices in declaration-axis lexicographic order, restores Enum,
+Ref, and Euclidean band-index keys as `i128`, and drops every zero counter.
+GPU-less tests cover signed band bounds, the exact limit and over-limit failure,
+empty histogram cells, and equality of the complete ordered
+`GroupedViewValue` sequence. CUDA execution and timing diagnostics report, per
+view and tick, key-space size, occupied groups, and emitted groups.
+
+The two CUDA grouped-view rejections are removed. The differential CLI now
+accepts `--enable grouped-observations`, and its hardware test corpus includes
+the canonical grouped demographic model with the tracked demographic state.
+The runtime flag remains required and manifest-recorded. Existing checked-in
+goldens and fixtures are unchanged, and `readback_control` remains outside this
+work.
+
+Per §J14.2, the following remain **hardware-pending**: a GPU-host
+`cargo build --release --features cuda`; CPU/CUDA differential equality on the
+full corpus including the grouped demographic configuration; complete
+`--timing-json` phase tables for both the frozen no-grouped case and a grouped
+run; and captured per-view key-space, occupied-group, and emitted-group counts.
+No local result is presented as GPU evidence.

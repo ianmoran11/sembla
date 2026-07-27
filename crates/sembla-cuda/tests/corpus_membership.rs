@@ -6,6 +6,8 @@ use sembla_runtime::executor::device_observation_eligibility;
 
 const DEMOGRAPHIC_MODEL: &str = "fixtures/demographic/benchmark/demographic_slots.no-grouped.json";
 const DEMOGRAPHIC_LISTING: &str = "corpus_model=fixtures/demographic/benchmark/demographic_slots.no-grouped.json configuration=no-grouped population=1000 seed=7 ticks=20";
+const GROUPED_DEMOGRAPHIC_MODEL: &str = "fixtures/demographic/demographic_slots.json";
+const GROUPED_DEMOGRAPHIC_LISTING: &str = "corpus_model=fixtures/demographic/demographic_slots.json configuration=grouped population=fixtures/state/demographic_slots.state seed=7 ticks=20 feature=grouped-observations";
 
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -46,6 +48,38 @@ fn demographic_corpus_member_is_no_grouped_and_exercises_the_coverage_gap() {
 }
 
 #[test]
+fn grouped_demographic_configuration_is_in_the_gpu_differential_corpus() {
+    let source = std::fs::read_to_string(repository_path(GROUPED_DEMOGRAPHIC_MODEL)).unwrap();
+    let features =
+        sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+    let model =
+        sembla_ir::validate_with_features(sembla_ir::parse_json(&source).unwrap(), &features)
+            .unwrap();
+    let eligibility = device_observation_eligibility(&model);
+    assert!(eligibility.eligible, "{eligibility:#?}");
+    assert_eq!(eligibility.views.len(), 22);
+    assert_eq!(
+        eligibility
+            .views
+            .iter()
+            .filter(|view| view.reason.contains("grouped count"))
+            .count(),
+        3
+    );
+
+    let harness = std::fs::read_to_string(repository_path(
+        "crates/sembla-cli/tests/gpu_differential.rs",
+    ))
+    .unwrap();
+    assert!(
+        harness.contains("grouped_demographic_configuration_uses_device_histograms_differentially")
+    );
+    assert!(harness.contains(GROUPED_DEMOGRAPHIC_MODEL));
+    assert!(harness.contains("fixtures/state/demographic_slots.state"));
+    assert!(harness.contains("grouped-observations"));
+}
+
+#[test]
 fn differential_runner_lists_the_demographic_corpus_contract() {
     let output = Command::new("bash")
         .arg(repository_path(
@@ -64,4 +98,7 @@ fn differential_runner_lists_the_demographic_corpus_contract() {
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.lines().any(|line| line == DEMOGRAPHIC_LISTING));
+    assert!(stdout
+        .lines()
+        .any(|line| line == GROUPED_DEMOGRAPHIC_LISTING));
 }

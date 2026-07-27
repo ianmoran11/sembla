@@ -334,7 +334,7 @@ fn flags_plan_artifacts_cuda_and_sweep_are_gated() {
         .unwrap();
     assert!(!cuda.status.success());
     assert!(String::from_utf8_lossy(&cuda.stderr)
-        .contains("grouped observations run on the cpu backend only for now"));
+        .contains("cuda backend unavailable: crate built without the 'cuda' feature"));
 
     let sweep_off = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .args([
@@ -450,7 +450,7 @@ fn flags_plan_artifacts_cuda_and_sweep_are_gated() {
     let compare_cuda = compare(&temp.join("compare-cuda.csv"), true, Some("cuda"));
     assert!(!compare_cuda.status.success());
     assert!(String::from_utf8_lossy(&compare_cuda.stderr)
-        .contains("grouped observations run on the cpu backend only for now"));
+        .contains("cuda backend unavailable: crate built without the 'cuda' feature"));
 
     let diff = Command::new(env!("CARGO_BIN_EXE_sembla"))
         .arg("diff-backends")
@@ -462,7 +462,7 @@ fn flags_plan_artifacts_cuda_and_sweep_are_gated() {
         .unwrap();
     assert!(!diff.status.success());
     assert!(String::from_utf8_lossy(&diff.stderr)
-        .contains("grouped-observations backend follow-up PRD"));
+        .contains("cuda backend unavailable: crate built without the 'cuda' feature"));
     std::fs::remove_dir_all(temp).unwrap();
 }
 

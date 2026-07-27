@@ -6,12 +6,63 @@ use std::path::{Path, PathBuf};
 use sembla_ir::{
     AggOp, AttrType, ClaimOrdering, Effect, Expr, ParamType, Table, ValidatedModel, ViewReduce,
 };
+#[cfg(any(feature = "cuda", test))]
+use sembla_runtime::executor::GroupedViewValue;
 use sembla_runtime::executor::{device_observation_eligibility, DeviceObservationEligibility};
 use sha2::{Digest, Sha256};
 
 use crate::CudaError;
 
 pub const DUMP_ENV: &str = "SEMBLA_CUDA_DUMP_DIR";
+
+/// Maximum counters allocated for one dense grouped-observation histogram.
+/// Runtime-derived key spaces above this bound fail instead of falling back.
+#[cfg(any(feature = "cuda", test))]
+pub const GROUPED_OBSERVATION_KEY_SPACE_LIMIT: usize = 1_048_576;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum GroupedObservationAxis {
+    Enum {
+        column: usize,
+        cardinality: u64,
+    },
+    Ref {
+        column: usize,
+        target_table: usize,
+    },
+    BandedInt {
+        column: usize,
+        width: u64,
+        extrema_index: usize,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GeneratedGroupedObservation {
+    pub box_name: String,
+    pub name: String,
+    pub table: usize,
+    pub axes: Vec<GroupedObservationAxis>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GeneratedEnumObservation {
+    pub table: usize,
+}
+
+#[cfg(any(feature = "cuda", test))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GroupedObservationAxisLayout {
+    pub minimum: i64,
+    pub cardinality: u64,
+}
+
+#[cfg(any(feature = "cuda", test))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GroupedObservationLayout {
+    pub axes: Vec<GroupedObservationAxisLayout>,
+    pub key_space_size: usize,
+}
 
 /// Executes the host-state fallback only when the run-wide observation gate
 /// requires it. Keeping this tiny router toolkit-free makes the transfer gate
@@ -27,6 +78,197 @@ pub(crate) fn host_observation_fallback<T, E>(
     } else {
         Ok(None)
     }
+}
+
+#[cfg(any(feature = "cuda", test))]
+fn decimal_product(factors: &[u128]) -> String {
+    const BASE: u128 = 1_000_000_000;
+    let mut digits = vec![1_u32];
+    for factor in factors {
+        let mut carry = 0_u128;
+        for digit in &mut digits {
+            let value = u128::from(*digit) * *factor + carry;
+            *digit = (value % BASE) as u32;
+            carry = value / BASE;
+        }
+        while carry != 0 {
+            digits.push((carry % BASE) as u32);
+            carry /= BASE;
+        }
+    }
+    let mut output = digits.pop().unwrap_or(0).to_string();
+    while let Some(digit) = digits.pop() {
+        write!(&mut output, "{digit:09}").unwrap();
+    }
+    output
+}
+
+#[cfg(any(feature = "cuda", test))]
+pub(crate) fn grouped_observation_layout(
+    view: &GeneratedGroupedObservation,
+    row_counts: &[u64],
+    band_extrema: &[i64],
+) -> Result<GroupedObservationLayout, CudaError> {
+    let rows = *row_counts.get(view.table).ok_or_else(|| {
+        CudaError::InvalidInput(format!(
+            "grouped observation '{}' in box '{}' has no source row count",
+            view.name, view.box_name
+        ))
+    })?;
+    if rows == 0 {
+        return Ok(GroupedObservationLayout {
+            axes: view
+                .axes
+                .iter()
+                .map(|_| GroupedObservationAxisLayout {
+                    minimum: 0,
+                    cardinality: 0,
+                })
+                .collect(),
+            key_space_size: 0,
+        });
+    }
+
+    let mut bounds = Vec::with_capacity(view.axes.len());
+    let mut factors = Vec::with_capacity(view.axes.len());
+    for axis in &view.axes {
+        let (minimum, cardinality) = match *axis {
+            GroupedObservationAxis::Enum { cardinality, .. } => (0_i64, u128::from(cardinality)),
+            GroupedObservationAxis::Ref { target_table, .. } => {
+                let cardinality = *row_counts.get(target_table).ok_or_else(|| {
+                    CudaError::InvalidInput(format!(
+                        "grouped observation '{}' in box '{}' has no Ref target row count",
+                        view.name, view.box_name
+                    ))
+                })?;
+                (0_i64, u128::from(cardinality))
+            }
+            GroupedObservationAxis::BandedInt {
+                width,
+                extrema_index,
+                ..
+            } => {
+                let offset = extrema_index.checked_mul(2).ok_or_else(|| {
+                    CudaError::InvalidInput("grouped extrema index overflow".to_owned())
+                })?;
+                let minimum = *band_extrema.get(offset).ok_or_else(|| {
+                    CudaError::InvalidInput(format!(
+                        "grouped observation '{}' in box '{}' is missing a band minimum",
+                        view.name, view.box_name
+                    ))
+                })?;
+                let maximum = *band_extrema.get(offset + 1).ok_or_else(|| {
+                    CudaError::InvalidInput(format!(
+                        "grouped observation '{}' in box '{}' is missing a band maximum",
+                        view.name, view.box_name
+                    ))
+                })?;
+                let width = i128::from(width);
+                let minimum = i128::from(minimum).div_euclid(width);
+                let maximum = i128::from(maximum).div_euclid(width);
+                let cardinality = u128::try_from(maximum - minimum + 1).map_err(|_| {
+                    CudaError::InvalidInput(format!(
+                        "grouped observation '{}' in box '{}' has invalid band bounds",
+                        view.name, view.box_name
+                    ))
+                })?;
+                (
+                    i64::try_from(minimum).map_err(|_| {
+                        CudaError::InvalidInput("grouped band minimum exceeds i64".to_owned())
+                    })?,
+                    cardinality,
+                )
+            }
+        };
+        bounds.push(minimum);
+        factors.push(cardinality);
+    }
+
+    let limit = GROUPED_OBSERVATION_KEY_SPACE_LIMIT;
+    let mut key_space_size = 1_usize;
+    let exceeds_limit = if factors.contains(&0) {
+        key_space_size = 0;
+        false
+    } else {
+        factors.iter().any(|factor| {
+            usize::try_from(*factor).map_or(true, |factor| {
+                key_space_size
+                    .checked_mul(factor)
+                    .filter(|size| *size <= limit)
+                    .map_or(true, |size| {
+                        key_space_size = size;
+                        false
+                    })
+            })
+        })
+    };
+    if exceeds_limit {
+        return Err(CudaError::InvalidInput(format!(
+            "grouped observation key space exceeds limit: box='{}' view='{}' computed_size={} limit={limit}",
+            view.box_name,
+            view.name,
+            decimal_product(&factors)
+        )));
+    }
+
+    let axes = bounds
+        .into_iter()
+        .zip(factors)
+        .map(|(minimum, cardinality)| {
+            Ok(GroupedObservationAxisLayout {
+                minimum,
+                cardinality: u64::try_from(cardinality).map_err(|_| {
+                    CudaError::InvalidInput("grouped axis cardinality exceeds u64".to_owned())
+                })?,
+            })
+        })
+        .collect::<Result<Vec<_>, CudaError>>()?;
+    Ok(GroupedObservationLayout {
+        axes,
+        key_space_size,
+    })
+}
+
+#[cfg(any(feature = "cuda", test))]
+pub(crate) fn decode_grouped_histogram(
+    view: &GeneratedGroupedObservation,
+    layout: &GroupedObservationLayout,
+    counters: &[u64],
+) -> Result<Vec<GroupedViewValue>, CudaError> {
+    if counters.len() != layout.key_space_size {
+        return Err(CudaError::InvalidInput(format!(
+            "grouped observation '{}' in box '{}' returned {} counters for key space {}",
+            view.name,
+            view.box_name,
+            counters.len(),
+            layout.key_space_size
+        )));
+    }
+    let mut output = Vec::new();
+    for (flat_index, count) in counters.iter().copied().enumerate() {
+        if count == 0 {
+            continue;
+        }
+        let mut remainder = flat_index as u64;
+        let mut keys = vec![0_i128; layout.axes.len()];
+        for (index, axis) in layout.axes.iter().enumerate().rev() {
+            let coordinate = remainder % axis.cardinality;
+            remainder /= axis.cardinality;
+            keys[index] = i128::from(axis.minimum) + i128::from(coordinate);
+        }
+        output.push(GroupedViewValue {
+            box_name: view.box_name.clone(),
+            name: view.name.clone(),
+            keys,
+            count: usize::try_from(count).map_err(|_| {
+                CudaError::InvalidInput(format!(
+                    "grouped observation '{}' count exceeds host usize",
+                    view.name
+                ))
+            })?,
+        });
+    }
+    Ok(output)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,8 +292,16 @@ pub struct GeneratedCuda {
     pub output_aggregate_indices: Vec<usize>,
     /// Run-wide IR decision used by the backend to gate host state download.
     pub observation_eligibility: DeviceObservationEligibility,
-    /// Global table supplying rows for each declaration-ordered device view.
+    /// Global table supplying rows for each declaration-ordered scalar view.
     pub observation_view_tables: Vec<usize>,
+    /// Declaration-ordered grouped views and their runtime-bound key axes.
+    pub(crate) grouped_observation_views: Vec<GeneratedGroupedObservation>,
+    /// Number of banded Int axes whose extrema are reduced each tick.
+    pub(crate) grouped_observation_band_axes: usize,
+    /// Hidden enum counts needed by the legacy CSV when grouped views are the
+    /// only declared observations.
+    pub(crate) generic_enum_observations: Vec<GeneratedEnumObservation>,
+    pub(crate) generic_enum_count: usize,
 }
 
 impl GeneratedCuda {
@@ -200,6 +450,41 @@ struct ObservationSpec {
     value: Option<Expr>,
 }
 
+#[derive(Clone)]
+enum GroupedObservationKeySpec {
+    Enum {
+        attr_index: usize,
+        cardinality: u64,
+    },
+    Ref {
+        attr_index: usize,
+        target_table_index: usize,
+    },
+    BandedInt {
+        attr_index: usize,
+        width: u64,
+        extrema_index: usize,
+    },
+}
+
+#[derive(Clone)]
+struct GroupedObservationSpec {
+    box_index: usize,
+    box_name: String,
+    name: String,
+    table_index: usize,
+    filter: Option<Expr>,
+    keys: Vec<GroupedObservationKeySpec>,
+}
+
+#[derive(Clone)]
+struct EnumObservationSpec {
+    box_index: usize,
+    table_index: usize,
+    attr_index: usize,
+    offset: usize,
+}
+
 struct Generator<'a> {
     model: &'a ValidatedModel,
     global_tables: Vec<(usize, usize)>,
@@ -211,6 +496,10 @@ struct Generator<'a> {
     inputs: Vec<InputSpec>,
     observation_eligibility: DeviceObservationEligibility,
     observation_views: Vec<ObservationSpec>,
+    grouped_observation_views: Vec<GroupedObservationSpec>,
+    grouped_observation_band_axes: usize,
+    generic_enum_observations: Vec<EnumObservationSpec>,
+    generic_enum_count: usize,
     next_validation_scan: Cell<u64>,
 }
 
@@ -253,6 +542,10 @@ impl<'a> Generator<'a> {
             .collect();
         let observation_eligibility = device_observation_eligibility(model);
         let mut observation_views = Vec::new();
+        let mut grouped_observation_views = Vec::new();
+        let mut grouped_observation_band_axes = 0;
+        let mut generic_enum_observations = Vec::new();
+        let mut generic_enum_count = 0_usize;
         if observation_eligibility.eligible {
             for (box_index, model_box) in model.model().boxes.iter().enumerate() {
                 for view in &model_box.views {
@@ -269,6 +562,85 @@ impl<'a> Generator<'a> {
                         value: view.value.clone(),
                     });
                 }
+                for view in &model_box.grouped_views {
+                    let table_index = model_box
+                        .tables
+                        .iter()
+                        .position(|table| table.name == view.table)
+                        .expect("validated grouped observation table is indexed");
+                    let table = &model_box.tables[table_index];
+                    let keys = view
+                        .keys
+                        .iter()
+                        .map(|key| {
+                            let attr_index = table
+                                .attrs
+                                .iter()
+                                .position(|attr| attr.name == key.attr)
+                                .expect("validated grouped observation key is indexed");
+                            match (&table.attrs[attr_index].ty, key.band_width) {
+                                (AttrType::Enum { variants }, None) => {
+                                    GroupedObservationKeySpec::Enum {
+                                        attr_index,
+                                        cardinality: u64::try_from(variants.len())
+                                            .expect("enum cardinality exceeds u64"),
+                                    }
+                                }
+                                (AttrType::Ref { table }, None) => {
+                                    let target_table_index = model_box
+                                        .tables
+                                        .iter()
+                                        .position(|candidate| candidate.name == *table)
+                                        .expect("validated grouped Ref target is indexed");
+                                    GroupedObservationKeySpec::Ref {
+                                        attr_index,
+                                        target_table_index,
+                                    }
+                                }
+                                (AttrType::Int, Some(width)) => {
+                                    let extrema_index = grouped_observation_band_axes;
+                                    grouped_observation_band_axes += 1;
+                                    GroupedObservationKeySpec::BandedInt {
+                                        attr_index,
+                                        width,
+                                        extrema_index,
+                                    }
+                                }
+                                _ => unreachable!("validated grouped key kind disappeared"),
+                            }
+                        })
+                        .collect();
+                    grouped_observation_views.push(GroupedObservationSpec {
+                        box_index,
+                        box_name: model_box.name.clone(),
+                        name: view.name.clone(),
+                        table_index,
+                        filter: view.filter.as_deref().cloned(),
+                        keys,
+                    });
+                }
+            }
+            if observation_views.is_empty() && !grouped_observation_views.is_empty() {
+                for (box_index, model_box) in model.model().boxes.iter().enumerate() {
+                    for (table_index, table) in model_box.tables.iter().enumerate() {
+                        for (attr_index, attr) in table.attrs.iter().enumerate() {
+                            let AttrType::Enum { variants } = &attr.ty else {
+                                continue;
+                            };
+                            let cardinality = variants.len();
+                            let offset = generic_enum_count;
+                            generic_enum_count = generic_enum_count
+                                .checked_add(cardinality)
+                                .ok_or_else(|| codegen("generic enum observation size overflow"))?;
+                            generic_enum_observations.push(EnumObservationSpec {
+                                box_index,
+                                table_index,
+                                attr_index,
+                                offset,
+                            });
+                        }
+                    }
+                }
             }
         }
         let mut this = Self {
@@ -282,6 +654,10 @@ impl<'a> Generator<'a> {
             inputs: Vec::new(),
             observation_eligibility,
             observation_views,
+            grouped_observation_views,
+            grouped_observation_band_axes,
+            generic_enum_observations,
+            generic_enum_count,
             next_validation_scan: Cell::new(0),
         };
         this.collect_all()?;
@@ -1180,6 +1556,51 @@ impl<'a> Generator<'a> {
             .iter()
             .map(|view| self.global_table(view.box_index, view.table_index))
             .collect();
+        let grouped_observation_views = self
+            .grouped_observation_views
+            .iter()
+            .map(|view| GeneratedGroupedObservation {
+                box_name: view.box_name.clone(),
+                name: view.name.clone(),
+                table: self.global_table(view.box_index, view.table_index),
+                axes: view
+                    .keys
+                    .iter()
+                    .map(|key| match *key {
+                        GroupedObservationKeySpec::Enum {
+                            attr_index,
+                            cardinality,
+                        } => GroupedObservationAxis::Enum {
+                            column: self.column(view.box_index, view.table_index, attr_index),
+                            cardinality,
+                        },
+                        GroupedObservationKeySpec::Ref {
+                            attr_index,
+                            target_table_index,
+                        } => GroupedObservationAxis::Ref {
+                            column: self.column(view.box_index, view.table_index, attr_index),
+                            target_table: self.global_table(view.box_index, target_table_index),
+                        },
+                        GroupedObservationKeySpec::BandedInt {
+                            attr_index,
+                            width,
+                            extrema_index,
+                        } => GroupedObservationAxis::BandedInt {
+                            column: self.column(view.box_index, view.table_index, attr_index),
+                            width,
+                            extrema_index,
+                        },
+                    })
+                    .collect(),
+            })
+            .collect();
+        let generic_enum_observations = self
+            .generic_enum_observations
+            .iter()
+            .map(|observation| GeneratedEnumObservation {
+                table: self.global_table(observation.box_index, observation.table_index),
+            })
+            .collect();
         Ok(GeneratedCuda {
             source: out,
             source_sha256,
@@ -1192,6 +1613,10 @@ impl<'a> Generator<'a> {
             output_aggregate_indices,
             observation_eligibility: self.observation_eligibility,
             observation_view_tables,
+            grouped_observation_views,
+            grouped_observation_band_axes: self.grouped_observation_band_axes,
+            generic_enum_observations,
+            generic_enum_count: self.generic_enum_count,
         })
     }
 
@@ -1425,6 +1850,109 @@ impl<'a> Generator<'a> {
                 ViewReduce::Sum => unreachable!("Sum is not device-observation eligible"),
             }
             out.push_str("    }\n  }\n");
+        }
+        out.push_str("}\n");
+
+        out.push_str("\nextern \"C\" __global__ void sembla_init_grouped_extrema(long long* extrema, unsigned int count) {\n  unsigned int axis = blockIdx.x * blockDim.x + threadIdx.x;\n  if (axis >= count) return;\n  extrema[(unsigned long long)axis * 2ULL] = 0x7fffffffffffffffLL;\n  extrema[(unsigned long long)axis * 2ULL + 1ULL] = (-0x7fffffffffffffffLL - 1LL);\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_bound_grouped_view(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, long long* extrema, unsigned int view_index) {\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n");
+        for (view_index, view) in self.grouped_observation_views.iter().enumerate() {
+            let rows = Rows::State {
+                box_index: view.box_index,
+                table_index: view.table_index,
+            };
+            let table = self.global_table(view.box_index, view.table_index);
+            writeln!(out, "  if (view_index == {view_index}U) {{").unwrap();
+            writeln!(out, "    for (unsigned long long row = worker; row < row_counts[{table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{").unwrap();
+            for key in &view.keys {
+                let GroupedObservationKeySpec::BandedInt {
+                    attr_index,
+                    extrema_index,
+                    ..
+                } = *key
+                else {
+                    continue;
+                };
+                let attr = &self.model.model().boxes[view.box_index].tables[view.table_index].attrs
+                    [attr_index];
+                let value = self.render_attr(rows, &attr.name, "state", "row")?.0;
+                writeln!(out, "      {{ long long value = (long long)({value}); sembla_atomic_min_i64(extrema + {extrema_index}ULL * 2ULL, value); sembla_atomic_max_i64(extrema + {extrema_index}ULL * 2ULL + 1ULL, value); }}").unwrap();
+            }
+            out.push_str("    }\n    return;\n  }\n");
+        }
+        out.push_str("}\n");
+
+        out.push_str("\nextern \"C\" __global__ void sembla_init_grouped_histogram(unsigned long long* counts, unsigned long long count) {\n  unsigned long long index = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (index < count) counts[index] = 0ULL;\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_observe_grouped_view(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* params, const long long* axis_mins, const unsigned long long* axis_cardinalities, unsigned long long* counts, unsigned int view_index) {\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        let mut axis_offset = 0_usize;
+        for (view_index, view) in self.grouped_observation_views.iter().enumerate() {
+            let rows = Rows::State {
+                box_index: view.box_index,
+                table_index: view.table_index,
+            };
+            let table = self.global_table(view.box_index, view.table_index);
+            let selected = match &view.filter {
+                Some(filter) => {
+                    self.render(filter, rows, Some(&Ty::Bool), "state", "row")?
+                        .0
+                }
+                None => "1".to_owned(),
+            };
+            writeln!(out, "  if (view_index == {view_index}U) {{").unwrap();
+            writeln!(out, "    for (unsigned long long row = worker; row < row_counts[{table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{\n      int selected = {selected};\n      if (selected) {{ unsigned long long group = 0ULL;").unwrap();
+            for (key_index, key) in view.keys.iter().enumerate() {
+                let global_axis = axis_offset + key_index;
+                let (attr_index, value) = match *key {
+                    GroupedObservationKeySpec::Enum { attr_index, .. }
+                    | GroupedObservationKeySpec::Ref { attr_index, .. } => {
+                        let attr = &self.model.model().boxes[view.box_index].tables
+                            [view.table_index]
+                            .attrs[attr_index];
+                        (
+                            attr_index,
+                            format!(
+                                "(long long)({})",
+                                self.render_attr(rows, &attr.name, "state", "row")?.0
+                            ),
+                        )
+                    }
+                    GroupedObservationKeySpec::BandedInt {
+                        attr_index, width, ..
+                    } => {
+                        let attr = &self.model.model().boxes[view.box_index].tables
+                            [view.table_index]
+                            .attrs[attr_index];
+                        (
+                            attr_index,
+                            format!(
+                                "sembla_div_euclid_i64_u64((long long)({}), {width}ULL)",
+                                self.render_attr(rows, &attr.name, "state", "row")?.0
+                            ),
+                        )
+                    }
+                };
+                let _ = attr_index;
+                writeln!(out, "        {{ long long key = {value}; unsigned long long coordinate = (unsigned long long)(key - axis_mins[{global_axis}]); group = group * axis_cardinalities[{global_axis}] + coordinate; }}").unwrap();
+            }
+            out.push_str(
+                "        atomicAdd(counts + group, 1ULL);\n      }\n    }\n    return;\n  }\n",
+            );
+            axis_offset += view.keys.len();
+        }
+        out.push_str("}\n");
+
+        out.push_str("\nextern \"C\" __global__ void sembla_init_generic_enum_counts(unsigned long long* counts, unsigned long long count) {\n  unsigned long long index = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (index < count) counts[index] = 0ULL;\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_observe_generic_enum(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, unsigned long long* counts, unsigned int observation_index) {\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n");
+        for (observation_index, observation) in self.generic_enum_observations.iter().enumerate() {
+            let rows = Rows::State {
+                box_index: observation.box_index,
+                table_index: observation.table_index,
+            };
+            let table = self.global_table(observation.box_index, observation.table_index);
+            let attr = &self.model.model().boxes[observation.box_index].tables
+                [observation.table_index]
+                .attrs[observation.attr_index];
+            let value = self.render_attr(rows, &attr.name, "state", "row")?.0;
+            writeln!(out, "  if (observation_index == {observation_index}U) {{\n    for (unsigned long long row = worker; row < row_counts[{table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ unsigned long long value = (unsigned long long)({value}); atomicAdd(counts + {}ULL + value, 1ULL); }}\n    return;\n  }}", observation.offset).unwrap();
         }
         out.push_str("}\n");
         Ok(())
@@ -2239,6 +2767,11 @@ __device__ __forceinline__ void sembla_atomic_max_i64(long long* address, long l
     observed = prior;
   }
 }
+__device__ __forceinline__ long long sembla_div_euclid_i64_u64(long long value, unsigned long long width) {
+  if (value >= 0LL) return (long long)((unsigned long long)value / width);
+  unsigned long long magnitude_minus_one = (unsigned long long)(-(value + 1LL));
+  return -1LL - (long long)(magnitude_minus_one / width);
+}
 __device__ __forceinline__ unsigned long long sembla_f64_order_key(double value) {
   return ((unsigned long long)sembla_total_key(value)) ^ 0x8000000000000000ULL;
 }
@@ -2369,7 +2902,13 @@ extern "C" __global__ void sembla_philox_vectors(const unsigned long long* seeds
 mod tests {
     use std::path::Path;
 
-    use super::{cuda_f64_order_key, generate, host_observation_fallback, DUMP_ENV};
+    use sembla_ir::{Expr, ViewReduce};
+
+    use super::{
+        cuda_f64_order_key, decode_grouped_histogram, generate, grouped_observation_layout,
+        host_observation_fallback, GeneratedGroupedObservation, GroupedObservationAxis,
+        GroupedViewValue, DUMP_ENV, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
+    };
 
     fn example_model(name: &str) -> sembla_ir::ValidatedModel {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../examples/{name}"));
@@ -2379,6 +2918,26 @@ mod tests {
 
     fn sir_model() -> sembla_ir::ValidatedModel {
         example_model("sir.json")
+    }
+
+    fn grouped_model() -> sembla_ir::ValidatedModel {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sembla-cli/tests/fixtures/grouped_observation.json");
+        let source = std::fs::read_to_string(path).unwrap();
+        let features =
+            sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+        sembla_ir::validate_with_features(sembla_ir::parse_json(&source).unwrap(), &features)
+            .unwrap()
+    }
+
+    fn grouped_only_model() -> sembla_ir::ValidatedModel {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sembla-cli/tests/fixtures/grouped_observation.json");
+        let mut model = sembla_ir::parse_json(&std::fs::read_to_string(path).unwrap()).unwrap();
+        model.boxes[0].views.clear();
+        let features =
+            sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+        sembla_ir::validate_with_features(model, &features).unwrap()
     }
 
     fn nested_output_model(wired: bool) -> sembla_ir::ValidatedModel {
@@ -2659,6 +3218,232 @@ mod tests {
         assert!(ineligible.observation_view_tables.is_empty());
         let kernel = kernel_body(&ineligible.source, "sembla_observe_view");
         assert!(!kernel.contains("if (view_index == 0U)"));
+
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sembla-cli/tests/fixtures/grouped_observation.json");
+        let mut raw = sembla_ir::parse_json(&std::fs::read_to_string(path).unwrap()).unwrap();
+        raw.boxes[0].views[0].reduce = ViewReduce::Sum;
+        raw.boxes[0].views[0].value = Some(Expr::SelfAttr {
+            name: "age_months".to_owned(),
+        });
+        let features =
+            sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+        let model = sembla_ir::validate_with_features(raw, &features).unwrap();
+        let ineligible_mixed = generate(&model).unwrap();
+        assert!(!ineligible_mixed.observation_eligibility.eligible);
+        assert!(ineligible_mixed.grouped_observation_views.is_empty());
+        let grouped = kernel_body(&ineligible_mixed.source, "sembla_observe_grouped_view");
+        assert!(!grouped.contains("if (view_index == 0U)"));
+    }
+
+    #[test]
+    fn generated_unsigned_band_formula_matches_host_euclidean_division() {
+        let cases = [
+            (-1_i64, 60_u64),
+            (-60, 60),
+            (-61, 60),
+            (0, 60),
+            (61, 60),
+            (i64::MIN, 1),
+            (i64::MIN, i64::MAX as u64 + 1),
+            (i64::MAX, u64::MAX),
+        ];
+        for (value, width) in cases {
+            let device_formula = if value >= 0 {
+                (value as u64 / width) as i64
+            } else {
+                let magnitude_minus_one = (-(value + 1)) as u64;
+                -1 - (magnitude_minus_one / width) as i64
+            };
+            let host = i128::from(value).div_euclid(i128::from(width));
+            assert_eq!(i128::from(device_formula), host, "{value} / {width}");
+        }
+    }
+
+    #[test]
+    fn grouped_layout_uses_exact_banded_extrema_and_fails_past_the_limit() {
+        let banded = GeneratedGroupedObservation {
+            box_name: "world".to_owned(),
+            name: "by_band".to_owned(),
+            table: 0,
+            axes: vec![GroupedObservationAxis::BandedInt {
+                column: 0,
+                width: 60,
+                extrema_index: 0,
+            }],
+        };
+        let layout = grouped_observation_layout(&banded, &[7], &[-121, 121]).unwrap();
+        assert_eq!(layout.axes[0].minimum, -3);
+        assert_eq!(layout.axes[0].cardinality, 6);
+        assert_eq!(layout.key_space_size, 6);
+
+        let exact = GeneratedGroupedObservation {
+            box_name: "world".to_owned(),
+            name: "exact_limit".to_owned(),
+            table: 0,
+            axes: vec![GroupedObservationAxis::Enum {
+                column: 0,
+                cardinality: GROUPED_OBSERVATION_KEY_SPACE_LIMIT as u64,
+            }],
+        };
+        assert_eq!(
+            grouped_observation_layout(&exact, &[1], &[])
+                .unwrap()
+                .key_space_size,
+            GROUPED_OBSERVATION_KEY_SPACE_LIMIT
+        );
+
+        let over = GeneratedGroupedObservation {
+            name: "over_limit".to_owned(),
+            axes: vec![GroupedObservationAxis::Enum {
+                column: 0,
+                cardinality: GROUPED_OBSERVATION_KEY_SPACE_LIMIT as u64 + 1,
+            }],
+            ..exact.clone()
+        };
+        let error = grouped_observation_layout(&over, &[1], &[])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("box='world' view='over_limit'"), "{error}");
+        assert!(
+            error.contains("computed_size=1048577 limit=1048576"),
+            "{error}"
+        );
+
+        let full_i64_range = GeneratedGroupedObservation {
+            box_name: "world".to_owned(),
+            name: "full_i64_range".to_owned(),
+            table: 0,
+            axes: vec![GroupedObservationAxis::BandedInt {
+                column: 0,
+                width: 1,
+                extrema_index: 0,
+            }],
+        };
+        let error = grouped_observation_layout(&full_i64_range, &[1], &[i64::MIN, i64::MAX])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("computed_size=18446744073709551616 limit=1048576"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn grouped_histogram_omits_empty_groups_and_matches_btree_order_exactly() {
+        let view = GeneratedGroupedObservation {
+            box_name: "world".to_owned(),
+            name: "cells".to_owned(),
+            table: 0,
+            axes: vec![
+                GroupedObservationAxis::Enum {
+                    column: 0,
+                    cardinality: 2,
+                },
+                GroupedObservationAxis::BandedInt {
+                    column: 1,
+                    width: 60,
+                    extrema_index: 0,
+                },
+            ],
+        };
+        let layout = grouped_observation_layout(&view, &[5], &[-61, 121]).unwrap();
+        assert_eq!(layout.key_space_size, 10);
+        let mut counters = vec![0_u64; layout.key_space_size];
+        counters[0] = 3;
+        counters[4] = 1;
+        counters[6] = 2;
+        assert_eq!(
+            decode_grouped_histogram(&view, &layout, &counters).unwrap(),
+            vec![
+                GroupedViewValue {
+                    box_name: "world".to_owned(),
+                    name: "cells".to_owned(),
+                    keys: vec![0, -2],
+                    count: 3,
+                },
+                GroupedViewValue {
+                    box_name: "world".to_owned(),
+                    name: "cells".to_owned(),
+                    keys: vec![0, 2],
+                    count: 1,
+                },
+                GroupedViewValue {
+                    box_name: "world".to_owned(),
+                    name: "cells".to_owned(),
+                    keys: vec![1, -1],
+                    count: 2,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn grouped_codegen_collects_boundable_axes_and_emits_dense_histogram_kernels() {
+        let generated = generate(&grouped_model()).unwrap();
+        assert!(generated.observation_eligibility.eligible);
+        assert_eq!(generated.grouped_observation_band_axes, 1);
+        assert_eq!(generated.grouped_observation_views.len(), 1);
+        let view = &generated.grouped_observation_views[0];
+        assert_eq!(
+            (view.box_name.as_str(), view.name.as_str()),
+            ("world", "population_cells")
+        );
+        assert!(matches!(
+            view.axes.as_slice(),
+            [
+                GroupedObservationAxis::Enum { cardinality: 2, .. },
+                GroupedObservationAxis::Ref { .. },
+                GroupedObservationAxis::BandedInt { width: 60, .. }
+            ]
+        ));
+        for symbol in [
+            "sembla_init_grouped_extrema",
+            "sembla_bound_grouped_view",
+            "sembla_init_grouped_histogram",
+            "sembla_observe_grouped_view",
+            "sembla_div_euclid_i64_u64",
+        ] {
+            assert!(generated.source.contains(symbol), "missing {symbol}");
+        }
+        let histogram = kernel_body(&generated.source, "sembla_observe_grouped_view");
+        assert!(histogram.contains("atomicAdd(counts + group, 1ULL)"));
+        assert!(histogram.contains("group = group * axis_cardinalities"));
+
+        let layout = grouped_observation_layout(view, &[4, 5], &[0, 119]).unwrap();
+        assert_eq!(layout.key_space_size, 16);
+        let mut counters = vec![0_u64; layout.key_space_size];
+        counters[0] = 2;
+        counters[15] = 1;
+        assert_eq!(
+            decode_grouped_histogram(view, &layout, &counters).unwrap(),
+            vec![
+                GroupedViewValue {
+                    box_name: "world".to_owned(),
+                    name: "population_cells".to_owned(),
+                    keys: vec![0, 0, 0],
+                    count: 2,
+                },
+                GroupedViewValue {
+                    box_name: "world".to_owned(),
+                    name: "population_cells".to_owned(),
+                    keys: vec![1, 3, 1],
+                    count: 1,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn grouped_only_models_emit_legacy_enum_counts_without_state_download() {
+        let generated = generate(&grouped_only_model()).unwrap();
+        assert!(generated.observation_eligibility.eligible);
+        assert!(generated.observation_view_tables.is_empty());
+        assert_eq!(generated.generic_enum_observations.len(), 2);
+        assert_eq!(generated.generic_enum_count, 4);
+        let kernel = kernel_body(&generated.source, "sembla_observe_generic_enum");
+        assert!(kernel.contains("atomicAdd(counts + 0ULL + value, 1ULL)"));
+        assert!(kernel.contains("atomicAdd(counts + 2ULL + value, 1ULL)"));
     }
 
     #[test]
