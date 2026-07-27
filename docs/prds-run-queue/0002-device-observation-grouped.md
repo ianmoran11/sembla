@@ -135,6 +135,8 @@ occupied, and the number emitted.
 - `crates/sembla-runtime/src/executor.rs`
 - `crates/sembla-cli/src/main.rs` — the CUDA path and the rejections at 2660/2709
 - `crates/**/tests/**` (tests only)
+- `crates/sembla-cuda/scripts/run-differential-corpus.sh` — **added 2026-07-28
+  by operator authorisation**, see below
 - `DECISIONS.md` — §K6 and §K9 amendments per §5
 - `fixtures/**` — only if the differential corpus needs a grouped entry
 - `docs/evidence/**` (new evidence only)
@@ -143,6 +145,19 @@ occupied, and the number emitted.
 **If a required gate fails on files outside this list, stop and report it** —
 `DECISIONS.md` §M2, whose carve-out also covers amending this list if it proves
 unachievable.
+
+### Why the corpus runner is in scope (authorised 2026-07-28)
+
+The original list omitted `run-differential-corpus.sh`, which made this PRD
+**self-contradictory**: §5 requires removing the CUDA rejection of grouped
+views, §6 requires adding the grouped demographic configuration to the
+differential corpus, and that script is where both live. It currently asserts
+that grouped observations *are* rejected — an assertion §5 necessarily breaks —
+so the corpus run cannot pass without editing it.
+
+The exception is limited to the corpus entry and the removal of the
+now-obsolete rejection assertion. It does not extend to changing how the corpus
+runs, what else it covers, or its failure semantics.
 
 ## Non-goals
 

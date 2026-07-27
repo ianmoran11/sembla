@@ -835,6 +835,42 @@ without-touching-IR, and the GPU spike must report "unanswered" rather than
 pass off software-rasterizer numbers as a verdict. A property with a failing
 test is real; a property in prose is a wish.
 
+### I7. Allowed-file lists are derived from the acceptance criteria (2026-07-28)
+
+**Decision.** A PRD's allowed-file list is written by walking its own acceptance
+criteria and asking, for each, which file must change to satisfy it. It is not
+written from where the author expects the code change to land.
+
+**Alternatives.** Relying on §M2's carve-out to repair lists mid-run is
+rejected: it works, but each repair costs a stopped run and up to five wasted
+attempts. Dropping the allowed-file restriction is also rejected — it is what
+stops an implementation quietly widening its own scope, and it has caught real
+cases.
+
+**Reason.** Four runs have now stalled on the same defect, and in every case the
+implementation was complete and passing every functional criterion:
+
+- `prds-evaluator-throughput/0001` — the baseline moved mid-run (§M2's original
+  case);
+- `prds-cuda-host-path/0001` — the list omitted `main.rs`, but retaining a
+  `StateStore` across ticks required changing an owned-value API that crosses
+  into the CLI;
+- `prds-device-observation/0002` — the list omitted the differential-corpus
+  runner, while §5 required removing the CUDA rejection of grouped views and §6
+  required adding the grouped model to the corpus. That script is where both
+  live, and it *asserted* the rejection §5 removes, so the PRD was
+  self-contradictory as written.
+
+The common cause is not carelessness about files. It is that the author reasons
+about the *change* and then writes the file list from that mental model, while
+the acceptance criteria demand more: a corpus entry, a registry addition, a
+fixture, an API the change necessarily crosses. **The criteria are the
+specification; the file list must be derived from them, not from the diff the
+author imagines.**
+
+A useful check: for every criterion that says *add*, *register*, *cover*, or
+*record*, name the file that owns that list and confirm it is present.
+
 ### I5. GPU spike quarantined outside the workspace
 
 **Consideration.** The throwaway spike could live in the workspace for
@@ -1194,15 +1230,23 @@ The plan validator's known-feature set grows from empty to
 `{"grouped-observations"}`; this is the one sanctioned revision to §J's
 "exactly `[]`" rule, and unknown features still reject. Composition sources may
 not carry grouped views in this track. Grouped observation is a sink, extending
-the §4.6 invariant mechanically. V1 is CPU-only and rejects grouped views
-deterministically on CUDA.
+the §4.6 invariant mechanically. CUDA supports grouped count observations when
+every key axis is exactly boundable: Enum axes use schema cardinality, Ref axes
+use the target table's runtime row count, and banded Int axes use a device
+min/max reduction over the column. One dense histogram is limited to 1,048,576
+counters; a larger exact product rejects deterministically with the qualified
+view name, computed size, and limit rather than falling back. CUDA preserves
+the host's underlying `i128` key values and declaration-axis lexicographic
+order, and it omits zero-count groups.
 
 **Alternatives.** A Cargo feature, inert syntax, unrecorded enablement,
-composition-source support, and implicit CUDA fallback are rejected.
+composition-source support, guessed or declared Int bounds, zero-count output,
+and implicit CUDA fallback are rejected.
 
 **Reason.** The first provisional-meaning construct exercises §5.5's complete
 flag contract while preserving observation non-feedback and explicit backend
-limits.
+limits. Exact runtime bounds keep grouped device observation within the closed
+commutative-monoid fragment without changing its semantics.
 
 ### K7. Contest surface syntax, `race_time` only
 
@@ -1239,12 +1283,13 @@ yet settled, not syntax for semantics the system already defines.
 > (trigger: aggregate model shows identity linkage is scientifically required
 > → design-options note first); paired migration events/quotas (trigger:
 > reported balance residual unacceptable → Option D Phase 6); keyed contest
-> orderings (v0.5); event-stream sinks; sub-annual rate tables; CUDA support for
-> grouped observations (follow-up folder).
+> orderings (v0.5); event-stream sinks; sub-annual rate tables.
 
-The household-identity trigger produces a design-options note, not PRDs, as its
-first artifact. Option D Phase 6 is the synchronized-family path for paired
-migration.
+CUDA grouped-observation support is discharged by the device-observation
+follow-up under §K6's exact-boundability and deterministic 1,048,576-counter
+limit; it is no longer deferred. The household-identity trigger produces a
+design-options note, not PRDs, as its first artifact. Option D Phase 6 is the
+synchronized-family path for paired migration.
 
 **Alternatives.** Half-building any deferred construct, admitting inert syntax,
 or advancing one without its named trigger is rejected.
