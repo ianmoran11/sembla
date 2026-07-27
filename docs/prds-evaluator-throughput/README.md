@@ -56,7 +56,7 @@ Individually measured, each against the real evaluator or the real RNG:
 
 | change | measured | spike |
 |---|---:|---|
-| threading, element-wise | 5.3–5.6× | `threading_spike` |
+| tiling + threading over tiles | 2.2× tiled; 12.2× with workers | `rowwise_spike`, `threading_spike` |
 | guarded racing clock | 12.6× on the draw path | `ln_threshold_spike` |
 | whole-tick tiling | 2.2× alone; 5.9× within an expression | `rowwise_spike`, `fusion_spike` |
 | histogram recognition | 7.1× on the view bands | `histogram_spike` |
@@ -120,9 +120,11 @@ the design rather than against it. But:
 
 ## Sequencing, and why
 
-1. **Threading** first: the largest single factor, structurally independent of
-   everything else, bit-identical by construction, and it multiplies whatever
-   follows. Nothing later can invalidate it.
+1. **Tile the tick** first, with parallelism over tiles folded in. Revised
+   2026-07-27: threading was originally scoped standalone and first, and the
+   measurement disproved the premise — per-node parallel regions do not pay
+   (`docs/evidence/evaluator-parallel-element-wise-20260727/`). Tiling is what
+   gives parallelism a granularity that works, and is worth 2.2× by itself.
 2. **Guarded `ln`** next: independent of the evaluator's shape, self-contained,
    and it attacks the largest non-allocation item in the profile.
 3. **Scalar broadcast**: contained, and *not* subsumed by tiling — a constant

@@ -83,7 +83,7 @@ cargo run --release -p sembla-runtime --example threading_spike
 
 | lever | measured | spike |
 |---|---:|---|
-| threading, element-wise | 5.3–5.6× on 10 cores | `threading_spike` |
+| threading, over tiles | 5.3–5.6× on 10 cores in isolation, but **only at tick granularity** — per node it measured 1.00× | `threading_spike`, `evaluator-parallel-element-wise-20260727` |
 | guarded racing clock | 12.6× on the draw path | `ln_threshold_spike` |
 | whole-tick tiling | 2.2×; 5.9× within one expression | `rowwise_spike`, `fusion_spike` |
 | histogram recognition | 7.1× on the view bands | `histogram_spike` |
@@ -141,11 +141,29 @@ so run them from here rather than folder by folder.
 
 | # | PRD | GPU? | why here |
 |---|---|---|---|
-| 1 | `prds-evaluator-throughput/0001` threading | no | largest single factor; structurally independent, so nothing later can invalidate it, and it multiplies everything that follows |
+| 1 | `prds-evaluator-throughput/0001` tile the tick | no | tiling is worth 2.2× alone and is what gives parallelism a granularity that pays; the two only work together |
 | 2 | `prds-evaluator-throughput/0002` guarded `ln` | no | independent of the evaluator's shape; self-contained correctness argument |
 | 3 | `prds-cuda-host-path/0001` reuse the state buffer | local only | largest single CUDA-path item at 45.8%; its *local* criteria need no GPU |
 | 4 | **one GPU session** | yes | verify 3's hardware criteria and re-measure the CUDA phase split, in a single trip |
 | 5 | re-scope | no | write `prds-evaluator-throughput/0003+` and `prds-cuda-host-path/0002+` from the measurements 1–4 produce |
+
+**Order revised 2026-07-27.** Threading was step 1, scoped as a standalone PRD
+on the argument that it was structurally independent and multiplicative. It was
+implemented and measured, and the measurement disproved that
+(`docs/evidence/evaluator-parallel-element-wise-20260727/`): parallelism gives
+4.5–5.6× in isolation at 1M rows but **does not pay applied per expression
+node**, because a tick evaluates ~127 nodes and the spawn/join cost exceeds the
+saving. The implementer set the threshold above the binding case and the
+headline was 1.00×.
+
+Threading is therefore *not* independent — it needs one parallel region per tick
+over row ranges, which is what tiling creates. The two are now one PRD. Tiling
+also stands on its own at 2.2×, so it leads.
+
+The general lesson, which cost an hour to learn: **an isolated speedup can fail
+to survive contact with the real granularity.** A spike measures whether a
+mechanism is fast; it does not measure whether the surrounding structure lets
+you use it.
 
 **Why batch the GPU work into step 4.** A Hyperstack session costs money, needs
 you at the keyboard, and every session so far has produced at least one

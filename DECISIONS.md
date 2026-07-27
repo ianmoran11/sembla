@@ -1521,3 +1521,36 @@ justify — see `crates/sembla-runtime/examples/` and `docs/performance-model.md
 They are not implementations and carry no acceptance obligations, but they are
 evidence and are kept.
 
+### M2. The baseline is frozen for the duration of a managed run (2026-07-27)
+
+**Decision.** While a `/piprd run` is in progress, the operator does not commit
+to the branch it is running on. A PRD's allowed-file restriction is enforced by
+diffing HEAD against the baseline recorded at run start, so any commit the
+operator lands mid-run appears to the reviewer as the implementation exceeding
+its scope. Work that cannot wait is done on another branch and merged after the
+run stops.
+
+Relatedly, a PRD may **not** be failed for a defect in its own baseline. Where a
+required gate fails on clean HEAD, the correct outcome is to stop and report it,
+not to expand scope or to loop. PRDs in performance folders now say so
+explicitly in their allowed-files section.
+
+**Alternatives.** Having the runner re-derive its baseline, or having reviewers
+attribute commits by author, are rejected as tooling changes to compensate for
+an operator error that is free to avoid.
+
+**Reason.** It happened. A run of `prds-evaluator-throughput/0001` started at
+23:40:26 UTC; at 00:29:58 a commit landed on `main` fixing a quality-gate
+failure in eight spike examples — files outside that PRD's allowed list. Every
+subsequent review correctly flagged a scope violation, and the run exhausted all
+five attempts on a blocker no in-run action could clear, because the offending
+commit was not the implementer's to revise. The implementation itself had passed
+every other criterion on the first attempt and was lost.
+
+This is the second failure of the same shape. §L4's quiescence requirement, as
+first written, demanded that no agent session be active — a condition a run
+cannot create from inside itself — and stalled a run at five attempts before
+being made advisory. **An acceptance criterion that no in-run action can satisfy
+is a defect in the criterion**, and both the runner and the operator should treat
+repeated identical blockers as evidence of one.
+
