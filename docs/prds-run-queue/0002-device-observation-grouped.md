@@ -1,0 +1,1 @@
+../prds-device-observation/0002-device-side-grouped-observation.md
