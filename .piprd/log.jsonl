@@ -553,3 +553,5 @@
 {"ts":"2026-07-27T09:55:30.988Z","ms":1785146130988,"level":"info","runId":"2026-07-27T09-50-17-310Z","action":"review.result","prd":"docs/prds-cuda-host-path/0001-reuse-the-host-state-buffer.md","detail":"APPROVED — .piprd/reviews/2026-07-27T09-50-17-310Z-docs-prds-cuda-host-path-0001-reuse-the-host-state-buffer.md-attempt-1-1785146130988-44e51320-642b-4c55-b676-c19187b98534.json"}
 {"ts":"2026-07-27T09:55:31.085Z","ms":1785146131085,"level":"info","runId":"2026-07-27T09-50-17-310Z","action":"prd.approved","prd":"docs/prds-cuda-host-path/0001-reuse-the-host-state-buffer.md","detail":"no file changes to commit"}
 {"ts":"2026-07-27T09:55:31.096Z","ms":1785146131096,"level":"info","runId":"2026-07-27T09-50-17-310Z","action":"run.complete","detail":"1/1 PRD(s) approved"}
+{"ts":"2026-07-27T12:49:22.141Z","ms":1785156562141,"level":"info","runId":"2026-07-27T12-49-22-139Z","action":"run.start","detail":"1 PRD(s) from docs/prds-run-queue with advise"}
+{"ts":"2026-07-27T12:53:11.848Z","ms":1785156791848,"level":"info","runId":"2026-07-27T12-49-22-139Z","action":"implement.sent","prd":"docs/prds-run-queue/0001-device-observation-ungrouped.md","stage":"implement"}
