@@ -1,0 +1,24 @@
+Sort by top of stack (>=5 samples)
+        _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$GT$::from_iter::h3451d60a9b2d824e  (in sembla-prof-20260727)        691
+        _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h5313bfbfe28c2e8c  (in sembla-prof-20260727)        449
+        sembla_runtime::rng::draw_u32x4::h3969c5cb3a84936d  (in sembla-prof-20260727)        447
+        _platform_memmove  (in libsystem_platform.dylib)        425
+        sembla_runtime::executor::candidate_race_time::hb77beabb84963983  (in sembla-prof-20260727)        415
+        __ulock_wait  (in libsystem_kernel.dylib)        347
+        sha2::sha256::compress256::h35585d372e4a92dc  (in sembla-prof-20260727)        328
+        sembla_runtime::executor::stage_box::h35112862eb14e6d4  (in sembla-prof-20260727)        283
+        core::slice::sort::merge_sort::h370a7db62b0dc1ec  (in sembla-prof-20260727)        261
+        _nanov2_free  (in libsystem_malloc.dylib)        250
+        madvise  (in libsystem_kernel.dylib)        250
+        _platform_memcmp  (in libsystem_platform.dylib)        238
+        _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$GT$::from_iter::h33d0224eeb37da1b  (in sembla-prof-20260727)        198
+        _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$GT$::from_iter::h2009cf95bc93ccad  (in sembla-prof-20260727)        165
+        _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h66319e8b053fa2ed  (in sembla-prof-20260727)        165
+        _$LT$core..iter..adapters..flatten..FlatMap$LT$I$C$U$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h37a0e704a1c1bae8  (in sembla-prof-20260727)        143
+        sembla_runtime::state::locate_writable_cell::h749951898409041f  (in sembla-prof-20260727)        135
+        _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$GT$::from_iter::hcfcd8b6b0c939ef8  (in sembla-prof-20260727)        127
+        sembla_runtime::eval::eval_prepared_tile::hfb74e37c8e4568a3  (in sembla-prof-20260727)        127
+        _dyld_start  (in dyld)        122
+        _free  (in libsystem_malloc.dylib)        115
+        nanov2_malloc_type  (in libsystem_malloc.dylib)        99
+        _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::try_fold::h5535d4bba49a763b  (in sembla-prof-20260727)

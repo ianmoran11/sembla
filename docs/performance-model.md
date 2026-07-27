@@ -59,6 +59,28 @@ allocation, **not PCIe** — transfer is a third of its cost. Roughly 80% of CUD
 wall time is "bring state to the host and observe it there".
 `docs/prds-cuda-host-path/` addresses the reconstruction.
 
+### CPU tick after PRDs 0001–0004 (`host-profile-20260727/`)
+
+Binding 1M case, 24 ticks, 10 workers: `real 5.88s user 6.12s`. Main thread
+4,217 samples, workers 2,618.
+
+| | samples | reading |
+|---|---:|---|
+| `stage_box` and children | ~1,561 | **write staging — 46% of the tick, serial** |
+| `Vec::from_iter` + free + `madvise` | ~1,930 | allocation churn, aggregated |
+| `draw_u32x4` | 447 | Philox, irreducible without SIMD |
+| `__ulock_wait` | 347 | workers idle at the join |
+| `sha2::compress256` | 328 | final + results hashing |
+| `merge_sort` | 261 | conflict resolution |
+| `memcmp` + `locate_writable_cell` | 373 | **write path still resolves columns by string** |
+
+`log` has left the ranking entirely — it was 554 samples and the largest
+non-allocation item before PRD 0004 removed it.
+
+Estimated serial fraction, by Amdahl inversion on single-versus-parallel wall
+time: **68.8%** after 0003, down from 74.2%. That, not the speedup, is the
+number the remaining work has to move.
+
 ### CPU evaluator, 5M rows, representative tick shape
 
 From `rowwise_spike`, 18 view bands + 5 guards + 1 racing clock:
@@ -147,7 +169,7 @@ so run them from here rather than folder by folder.
 | 2b | `prds-evaluator-throughput/0004` degenerate hazards | no | `age_monthly` holds 97% of the surviving `ln` calls |
 | 3 | `prds-cuda-host-path/0001` reuse the state buffer | local only | largest single CUDA-path item at 45.8%; its *local* criteria need no GPU |
 | 4 | **one GPU session** | yes | verify 3's hardware criteria and re-measure the CUDA phase split, in a single trip |
-| 5 | re-scope | no | write `prds-evaluator-throughput/0003+` and `prds-cuda-host-path/0002+` from the measurements 1–4 produce |
+| 5 | re-scope | no | **done 2026-07-27**: see `docs/evidence/host-profile-20260727/`. Next, in order: buffer reuse (largest aggregate, 4.04× ceiling measured, never scoped); write-path column resolution (small, proven pattern); write staging, which is the largest single item but needs a design idea because conflict resolution's sequential winner order is load-bearing; and diagnosing the 347-sample join idle before extending tiling further |
 
 **Order revised 2026-07-27.** Threading was step 1, scoped as a standalone PRD
 on the argument that it was structurally independent and multiplicative. It was
