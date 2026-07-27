@@ -1,0 +1,150 @@
+{
+  "evidence_kind": "evaluator_degenerate_hazard_fast_path",
+  "recorded_at": "2026-07-27",
+  "baseline_commit": "74cdb63",
+  "protocol": {
+    "hardware": "Apple M2 Pro, 10 cores, 16 GiB RAM",
+    "available_parallelism": 10,
+    "case": "no-grouped demographic model, 1,000,000 slots, 24 ticks, seed 9009, CPU backend",
+    "load_bearing_metric": "wall_seconds",
+    "headline": "fastest uncontended of five runs",
+    "contention_rule": "wall - (user + sys) > 0.5 seconds",
+    "measurement_scope": "in-run",
+    "single_worker_environment": "SEMBLA_EVAL_THREADS=1",
+    "before_source": "The exact PRD 0004 baseline binary and its five-run default/single measurements are the PRD 0003 after measurements. The binary was rebuilt from commit 74cdb63 before editing and its SHA-256 matched the recorded binary."
+  },
+  "fast_path": {
+    "constant_hazard_fragment": [
+      "Expr::Real",
+      "Expr::Param"
+    ],
+    "conditions": [
+      "exp(-(lambda * dt)) == 0.0 exactly",
+      "transition.contests.is_empty()"
+    ],
+    "contested_policy": "Every contest conservatively counts as consuming the sampled time; degenerate contested transitions retain the guarded draw and canonical ln transform.",
+    "diagnostic_order": "row-to-entity_id conversion runs before strategy dispatch"
+  },
+  "binaries": {
+    "before_sha256": "0cc340f1db993f064c2220716486d2749c18a1999e5deee8378ba8521593e103",
+    "after_sha256": "57a7297766debcfc6a88fc4b5743bd18cde90e12207f2c7f61099c652df440d0",
+    "measurement_stats_sha256": "4e927c7f14c1bc89a2cfb8bbb36d64f07bd5a17a76b31bf685415dd7b498e2d3"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "official_24_tick_five_run": {
+    "before_default": {
+      "runs": [
+        {"run": 1, "wall_seconds": 5.40, "user_seconds": 6.25, "sys_seconds": 1.37, "wall_minus_user_and_sys_seconds": -2.22, "contended": false},
+        {"run": 2, "wall_seconds": 5.10, "user_seconds": 6.21, "sys_seconds": 1.39, "wall_minus_user_and_sys_seconds": -2.50, "contended": false},
+        {"run": 3, "wall_seconds": 4.93, "user_seconds": 6.11, "sys_seconds": 1.33, "wall_minus_user_and_sys_seconds": -2.51, "contended": false},
+        {"run": 4, "wall_seconds": 5.27, "user_seconds": 6.22, "sys_seconds": 1.46, "wall_minus_user_and_sys_seconds": -2.41, "contended": false},
+        {"run": 5, "wall_seconds": 4.81, "user_seconds": 6.10, "sys_seconds": 1.20, "wall_minus_user_and_sys_seconds": -2.49, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 5, "wall_seconds": 4.81, "user_seconds": 6.10, "sys_seconds": 1.20, "wall_minus_user_and_sys_seconds": -2.49, "contended": false},
+      "median": {"wall_seconds": 5.10, "user_seconds": 6.21, "sys_seconds": 1.37}
+    },
+    "before_single": {
+      "runs": [
+        {"run": 1, "wall_seconds": 7.07, "user_seconds": 5.61, "sys_seconds": 1.38, "wall_minus_user_and_sys_seconds": 0.08, "contended": false},
+        {"run": 2, "wall_seconds": 6.71, "user_seconds": 5.51, "sys_seconds": 1.17, "wall_minus_user_and_sys_seconds": 0.03, "contended": false},
+        {"run": 3, "wall_seconds": 6.75, "user_seconds": 5.52, "sys_seconds": 1.19, "wall_minus_user_and_sys_seconds": 0.04, "contended": false},
+        {"run": 4, "wall_seconds": 6.69, "user_seconds": 5.51, "sys_seconds": 1.16, "wall_minus_user_and_sys_seconds": 0.02, "contended": false},
+        {"run": 5, "wall_seconds": 6.70, "user_seconds": 5.51, "sys_seconds": 1.15, "wall_minus_user_and_sys_seconds": 0.04, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 4, "wall_seconds": 6.69, "user_seconds": 5.51, "sys_seconds": 1.16, "wall_minus_user_and_sys_seconds": 0.02, "contended": false},
+      "median": {"wall_seconds": 6.71, "user_seconds": 5.51, "sys_seconds": 1.17}
+    },
+    "after_default": {
+      "runs": [
+        {"run": 1, "wall_seconds": 5.24, "user_seconds": 5.97, "sys_seconds": 1.45, "wall_minus_user_and_sys_seconds": -2.18, "contended": false},
+        {"run": 2, "wall_seconds": 5.11, "user_seconds": 6.00, "sys_seconds": 1.39, "wall_minus_user_and_sys_seconds": -2.28, "contended": false},
+        {"run": 3, "wall_seconds": 4.94, "user_seconds": 5.88, "sys_seconds": 1.35, "wall_minus_user_and_sys_seconds": -2.29, "contended": false},
+        {"run": 4, "wall_seconds": 4.97, "user_seconds": 5.88, "sys_seconds": 1.34, "wall_minus_user_and_sys_seconds": -2.25, "contended": false},
+        {"run": 5, "wall_seconds": 4.90, "user_seconds": 5.87, "sys_seconds": 1.28, "wall_minus_user_and_sys_seconds": -2.25, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 5, "wall_seconds": 4.90, "user_seconds": 5.87, "sys_seconds": 1.28, "wall_minus_user_and_sys_seconds": -2.25, "contended": false},
+      "median": {"wall_seconds": 4.97, "user_seconds": 5.88, "sys_seconds": 1.35}
+    },
+    "after_single": {
+      "runs": [
+        {"run": 1, "wall_seconds": 6.62, "user_seconds": 5.30, "sys_seconds": 1.28, "wall_minus_user_and_sys_seconds": 0.04, "contended": false},
+        {"run": 2, "wall_seconds": 6.28, "user_seconds": 5.21, "sys_seconds": 1.05, "wall_minus_user_and_sys_seconds": 0.02, "contended": false},
+        {"run": 3, "wall_seconds": 6.77, "user_seconds": 5.38, "sys_seconds": 1.35, "wall_minus_user_and_sys_seconds": 0.04, "contended": false},
+        {"run": 4, "wall_seconds": 6.52, "user_seconds": 5.29, "sys_seconds": 1.18, "wall_minus_user_and_sys_seconds": 0.05, "contended": false},
+        {"run": 5, "wall_seconds": 6.29, "user_seconds": 5.22, "sys_seconds": 1.06, "wall_minus_user_and_sys_seconds": 0.01, "contended": false}
+      ],
+      "fastest_uncontended": {"run": 2, "wall_seconds": 6.28, "user_seconds": 5.21, "sys_seconds": 1.05, "wall_minus_user_and_sys_seconds": 0.02, "contended": false},
+      "median": {"wall_seconds": 6.52, "user_seconds": 5.29, "sys_seconds": 1.18}
+    }
+  },
+  "comparison": {
+    "headline_wall_speedup": 0.9816326530612244,
+    "headline_wall_change_fraction": 0.01871101871101888,
+    "median_wall_speedup": 1.0261569416498995,
+    "headline_user_speedup": 1.039182282793867,
+    "headline_user_reduction_fraction": 0.03770491803278686,
+    "single_worker_wall_speedup": 1.0652866242038217,
+    "single_worker_user_speedup": 1.0575815738963532,
+    "cpu_efficiency": {
+      "definition": "(user + sys) / (wall * 10 logical cores), fastest uncontended default run",
+      "before": 0.15176715176715178,
+      "after": 0.14591836734693878
+    }
+  },
+  "per_transition_ln_counts": {
+    "before": [
+      {"rule_id": 0, "transition": "age_monthly", "enabled_candidates": 18547052, "ln_computed": 18547052, "ln_fraction": 1.0, "ln_percent": 100.0},
+      {"rule_id": 1, "transition": "clear_event", "enabled_candidates": 279009, "ln_computed": 279009, "ln_fraction": 1.0, "ln_percent": 100.0},
+      {"rule_id": 2, "transition": "birth_activate", "enabled_candidates": 3721059, "ln_computed": 91823, "ln_fraction": 0.02467657728619729, "ln_percent": 2.467657728619729},
+      {"rule_id": 3, "transition": "overseas_arrive", "enabled_candidates": 972512, "ln_computed": 19280, "ln_fraction": 0.01982494817544668, "ln_percent": 1.9824948175446677},
+      {"rule_id": 4, "transition": "internal_arrive", "enabled_candidates": 596491, "ln_computed": 10560, "ln_fraction": 0.017703536180763833, "ln_percent": 1.7703536180763835},
+      {"rule_id": 5, "transition": "die_young", "enabled_candidates": 4700929, "ln_computed": 4708, "ln_fraction": 0.0010015041707713518, "ln_percent": 0.10015041707713518},
+      {"rule_id": 6, "transition": "die_adult", "enabled_candidates": 9081191, "ln_computed": 27148, "ln_fraction": 0.002989475719649548, "ln_percent": 0.2989475719649548},
+      {"rule_id": 7, "transition": "die_old", "enabled_candidates": 4648809, "ln_computed": 55388, "ln_fraction": 0.011914449485879072, "ln_percent": 1.191444948587907},
+      {"rule_id": 8, "transition": "emigrate", "enabled_candidates": 18430929, "ln_computed": 36962, "ln_fraction": 0.0020054333669236096, "ln_percent": 0.20054333669236096},
+      {"rule_id": 9, "transition": "internal_depart", "enabled_candidates": 18430929, "ln_computed": 45819, "ln_fraction": 0.0024859842930326516, "ln_percent": 0.24859842930326517}
+    ],
+    "after": [
+      {"rule_id": 0, "transition": "age_monthly", "enabled_candidates": 18547052, "ln_computed": 0, "ln_fraction": 0.0, "ln_percent": 0.0},
+      {"rule_id": 1, "transition": "clear_event", "enabled_candidates": 279009, "ln_computed": 0, "ln_fraction": 0.0, "ln_percent": 0.0},
+      {"rule_id": 2, "transition": "birth_activate", "enabled_candidates": 3721059, "ln_computed": 91823, "ln_fraction": 0.02467657728619729, "ln_percent": 2.467657728619729},
+      {"rule_id": 3, "transition": "overseas_arrive", "enabled_candidates": 972512, "ln_computed": 19280, "ln_fraction": 0.01982494817544668, "ln_percent": 1.9824948175446677},
+      {"rule_id": 4, "transition": "internal_arrive", "enabled_candidates": 596491, "ln_computed": 10560, "ln_fraction": 0.017703536180763833, "ln_percent": 1.7703536180763835},
+      {"rule_id": 5, "transition": "die_young", "enabled_candidates": 4700929, "ln_computed": 4708, "ln_fraction": 0.0010015041707713518, "ln_percent": 0.10015041707713518},
+      {"rule_id": 6, "transition": "die_adult", "enabled_candidates": 9081191, "ln_computed": 27148, "ln_fraction": 0.002989475719649548, "ln_percent": 0.2989475719649548},
+      {"rule_id": 7, "transition": "die_old", "enabled_candidates": 4648809, "ln_computed": 55388, "ln_fraction": 0.011914449485879072, "ln_percent": 1.191444948587907},
+      {"rule_id": 8, "transition": "emigrate", "enabled_candidates": 18430929, "ln_computed": 36962, "ln_fraction": 0.0020054333669236096, "ln_percent": 0.20054333669236096},
+      {"rule_id": 9, "transition": "internal_depart", "enabled_candidates": 18430929, "ln_computed": 45819, "ln_fraction": 0.0024859842930326516, "ln_percent": 0.24859842930326517}
+    ],
+    "totals": {
+      "enabled_candidates": 79408910,
+      "before_ln_computed": 19117749,
+      "after_ln_computed": 291688,
+      "before_ln_fraction": 0.24075067898551938,
+      "after_ln_fraction": 0.003673240194330838,
+      "surviving_ln_removed_fraction": 0.9847425552035441
+    }
+  },
+  "instrumentation": {
+    "timed_binary_instrumented": false,
+    "stats_method": "A temporary measurement-only build used relaxed per-rule atomic counters after entity-id conversion and immediately before each canonical ln transform. It was built in a separate target directory, run once, and fully reverted before the final binary and gates.",
+    "stats_primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "stats_summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "stats_manifest_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f"
+  },
+  "outputs": {
+    "verified_run_count": 20,
+    "all_primary_csv_identical": true,
+    "primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_identical": true,
+    "summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_manifests_identical": true,
+    "manifest_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f",
+    "all_stdout_identical": true,
+    "stdout_sha256": "a034ac5ea499bc5ee82b57c93daf43a8d6580a5d98cf1c0757341aa71fc8154f",
+    "final_state_sha256": "2d509ead9aa506e71be155faaa5608542f7ca32cee203ee42b0d3179d670020c"
+  }
+}

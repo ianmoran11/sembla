@@ -205,8 +205,9 @@ impl From<StateError> for TickError {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct RacingClockFilter {
+    threshold: f64,
     lo: f64,
 }
 
@@ -217,11 +218,36 @@ impl RacingClockFilter {
         }
         let threshold = (-(lambda * dt)).exp();
         let lo = threshold * (1.0 - RACING_CLOCK_FILTER_RELATIVE_MARGIN);
-        (!lo.is_nan()).then_some(Self { lo })
+        (!lo.is_nan()).then_some(Self { threshold, lo })
     }
 
     fn admits(self, uniform: f64) -> bool {
         uniform.partial_cmp(&self.lo) != Some(Ordering::Less)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum RacingClockStrategy {
+    Canonical,
+    Guarded(RacingClockFilter),
+    AlwaysFires,
+}
+
+impl RacingClockStrategy {
+    fn for_transition(
+        filter: Option<RacingClockFilter>,
+        transition: &sembla_ir::Transition,
+    ) -> Self {
+        match filter {
+            // `Candidate` carries no sampled time. The only IR locations that
+            // consume it are contests, and every contest is conservatively
+            // treated as a consumer even when its ordering is key-based.
+            Some(filter) if filter.threshold == 0.0 && transition.contests.is_empty() => {
+                Self::AlwaysFires
+            }
+            Some(filter) => Self::Guarded(filter),
+            None => Self::Canonical,
+        }
     }
 }
 
@@ -238,41 +264,60 @@ struct RacingClockCoordinates {
     row: usize,
 }
 
-/// Converts the row before consulting the filter so an enabled candidate keeps
-/// the canonical `EntityIdOverflow` path even when its draw would be rejected.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct CandidateFiring {
+    entity_id: u32,
+    race_time: Option<f64>,
+}
+
+/// Converts the row before consulting the strategy so every enabled candidate
+/// keeps the canonical `EntityIdOverflow` path. `AlwaysFires` therefore skips
+/// only the draw and transform, never a diagnostic.
 fn candidate_race_time(
     coordinates: RacingClockCoordinates,
     lambda: f64,
     dt: f64,
-    filter: Option<RacingClockFilter>,
-) -> Result<Option<(u32, f64)>, TickError> {
+    strategy: RacingClockStrategy,
+) -> Result<Option<CandidateFiring>, TickError> {
     let entity_id = u32::try_from(coordinates.row).map_err(|_| TickError::EntityIdOverflow {
         rule_id: coordinates.rule_id,
         row: coordinates.row,
     })?;
-    let race_time = if let Some(filter) = filter {
-        let uniform = uniform_f64(
-            coordinates.seed,
-            coordinates.tick,
-            coordinates.rule_word,
-            entity_id,
-            0,
-        );
-        if !filter.admits(uniform) {
-            return Ok(None);
+    let race_time = match strategy {
+        RacingClockStrategy::AlwaysFires => {
+            return Ok(Some(CandidateFiring {
+                entity_id,
+                race_time: None,
+            }));
         }
-        exp_f64_from_uniform(uniform, lambda)
-    } else {
-        exp_f64(
+        RacingClockStrategy::Guarded(filter) => {
+            let uniform = uniform_f64(
+                coordinates.seed,
+                coordinates.tick,
+                coordinates.rule_word,
+                entity_id,
+                0,
+            );
+            if !filter.admits(uniform) {
+                return Ok(None);
+            }
+            exp_f64_from_uniform(uniform, lambda)
+        }
+        RacingClockStrategy::Canonical => exp_f64(
             coordinates.seed,
             coordinates.tick,
             coordinates.rule_word,
             entity_id,
             0,
             lambda,
-        )
+        ),
     };
-    Ok((race_time.partial_cmp(&dt) == Some(Ordering::Less)).then_some((entity_id, race_time)))
+    Ok(
+        (race_time.partial_cmp(&dt) == Some(Ordering::Less)).then_some(CandidateFiring {
+            entity_id,
+            race_time: Some(race_time),
+        }),
+    )
 }
 
 #[derive(Clone, Debug)]
@@ -359,7 +404,7 @@ struct PreparedTransition<'state> {
     row_count: usize,
     guard: PreparedExpr<'state>,
     hazard: PreparedExpr<'state>,
-    race_filter: Option<RacingClockFilter>,
+    race_strategy: RacingClockStrategy,
     claims: Vec<PreparedClaim<'state>>,
 }
 
@@ -616,15 +661,18 @@ fn prepare_tiled_transition<'state>(
     // Direct literals and parameters are the deliberately narrow row-invariant
     // fragment. Compute their filter only after all eager preparation succeeds,
     // preserving declaration-ordered expression errors.
-    let race_filter = if row_count != 0 && has_constant_hazard(&transition.hazard) {
+    let race_strategy = if row_count != 0 && has_constant_hazard(&transition.hazard) {
         let PreparedColumn::Real(values) = hazard.tile(0, 1)? else {
             return Err(TickError::Evaluation(
                 "transition hazard did not prepare as Real".to_owned(),
             ));
         };
-        RacingClockFilter::for_hazard(values[0], model.model().dt)
+        RacingClockStrategy::for_transition(
+            RacingClockFilter::for_hazard(values[0], model.model().dt),
+            transition,
+        )
     } else {
-        None
+        RacingClockStrategy::Canonical
     };
     Ok(Some(PreparedTransition {
         box_index,
@@ -635,7 +683,7 @@ fn prepare_tiled_transition<'state>(
         row_count,
         guard,
         hazard,
-        race_filter,
+        race_strategy,
         claims,
     }))
 }
@@ -719,7 +767,7 @@ fn evaluate_tile_task(
                         continue;
                     }
                     let row = task.start + offset;
-                    let Some((entity_id, race_time)) = candidate_race_time(
+                    let Some(firing) = candidate_race_time(
                         RacingClockCoordinates {
                             seed,
                             tick,
@@ -729,7 +777,7 @@ fn evaluate_tile_task(
                         },
                         lambda,
                         dt,
-                        plan.race_filter,
+                        plan.race_strategy,
                     )?
                     else {
                         continue;
@@ -742,9 +790,11 @@ fn evaluate_tile_task(
                             ));
                         };
                         let ordering = match (&claim.ordering, ordering) {
-                            (PreparedClaimOrdering::RaceTime, None) => {
-                                OrderingValue::RaceTime(race_time)
-                            }
+                            (PreparedClaimOrdering::RaceTime, None) => OrderingValue::RaceTime(
+                                firing
+                                    .race_time
+                                    .expect("a contested transition must sample its race time"),
+                            ),
                             (PreparedClaimOrdering::Key { enum_identity, .. }, Some(values)) => {
                                 let value = match values {
                                     PreparedColumn::Real(values) => {
@@ -773,7 +823,7 @@ fn evaluate_tile_task(
                         rule_id: plan.rule_id,
                         rule_word: plan.rule_word,
                         table_index: plan.table_index,
-                        entity_id,
+                        entity_id: firing.entity_id,
                         row,
                         claims,
                     });
@@ -1852,45 +1902,51 @@ fn stage_box(
             };
             claim_columns.push((resource_table_index, resources.values, ordering, claim));
         }
-        let race_filter = if has_constant_hazard(&transition.hazard) {
-            hazards
-                .first()
-                .and_then(|lambda| RacingClockFilter::for_hazard(*lambda, model.model().dt))
+        let race_strategy = if has_constant_hazard(&transition.hazard) {
+            RacingClockStrategy::for_transition(
+                hazards
+                    .first()
+                    .and_then(|lambda| RacingClockFilter::for_hazard(*lambda, model.model().dt)),
+                transition,
+            )
         } else {
-            None
+            RacingClockStrategy::Canonical
         };
-        let mut push_candidate =
-            |row: usize, entity_id: u32, race_time: f64| -> Result<(), TickError> {
-                let mut claims = Vec::with_capacity(claim_columns.len());
-                for (resource_table, resources, key_column, claim) in &claim_columns {
-                    let ordering = match (&claim.ordering, key_column) {
-                        (ClaimOrdering::RaceTime, None) => OrderingValue::RaceTime(race_time),
-                        (ClaimOrdering::Key { expr }, Some(column)) => {
-                            key_at(column, expr, table_index, model_box, row)?
-                        }
-                        _ => unreachable!("claim ordering column construction is exhaustive"),
-                    };
-                    claims.push(CandidateClaim {
-                        table_index: *resource_table,
-                        resource_row: resources[row],
-                        ordering,
-                    });
-                }
-                candidates.push(Candidate {
-                    rule_id: validated.rule_id,
-                    rule_word: validated.rule_word,
-                    table_index,
-                    entity_id,
-                    row,
-                    claims,
+        let mut push_candidate = |row: usize, firing: CandidateFiring| -> Result<(), TickError> {
+            let mut claims = Vec::with_capacity(claim_columns.len());
+            for (resource_table, resources, key_column, claim) in &claim_columns {
+                let ordering = match (&claim.ordering, key_column) {
+                    (ClaimOrdering::RaceTime, None) => OrderingValue::RaceTime(
+                        firing
+                            .race_time
+                            .expect("a contested transition must sample its race time"),
+                    ),
+                    (ClaimOrdering::Key { expr }, Some(column)) => {
+                        key_at(column, expr, table_index, model_box, row)?
+                    }
+                    _ => unreachable!("claim ordering column construction is exhaustive"),
+                };
+                claims.push(CandidateClaim {
+                    table_index: *resource_table,
+                    resource_row: resources[row],
+                    ordering,
                 });
-                Ok(())
-            };
+            }
+            candidates.push(Candidate {
+                rule_id: validated.rule_id,
+                rule_word: validated.rule_word,
+                table_index,
+                entity_id: firing.entity_id,
+                row,
+                claims,
+            });
+            Ok(())
+        };
         for (row, (guard, lambda)) in guards.into_iter().zip(hazards).enumerate() {
             if !guard || lambda.partial_cmp(&0.0) != Some(Ordering::Greater) {
                 continue;
             }
-            let Some((entity_id, race_time)) = candidate_race_time(
+            let Some(firing) = candidate_race_time(
                 RacingClockCoordinates {
                     seed,
                     tick,
@@ -1900,12 +1956,12 @@ fn stage_box(
                 },
                 lambda,
                 model.model().dt,
-                race_filter,
+                race_strategy,
             )?
             else {
                 continue;
             };
-            push_candidate(row, entity_id, race_time)?;
+            push_candidate(row, firing)?;
         }
     }
     let resolution = resolve_claims(&candidates, model_box.tables.len(), model_box)?;
@@ -2860,9 +2916,17 @@ mod parallel_tests {
                     },
                     lambda,
                     dt,
-                    Some(filter),
+                    RacingClockStrategy::Guarded(filter),
                 )?
-                .map(|(entity_id, race_time)| (entity_id, race_time.to_bits()));
+                .map(|firing| {
+                    (
+                        firing.entity_id,
+                        firing
+                            .race_time
+                            .expect("the guarded path samples a race time")
+                            .to_bits(),
+                    )
+                });
                 assert_eq!(actual, expected, "firing set changed for hazard {lambda}");
             }
         }
@@ -2894,7 +2958,7 @@ mod parallel_tests {
                     oracle_winners[resource] = Some(candidate);
                 }
             }
-            if let Some((entity_id, race_time)) = candidate_race_time(
+            if let Some(firing) = candidate_race_time(
                 RacingClockCoordinates {
                     seed,
                     tick,
@@ -2904,9 +2968,14 @@ mod parallel_tests {
                 },
                 lambda,
                 dt,
-                Some(filter),
+                RacingClockStrategy::Guarded(filter),
             )? {
-                let candidate = (race_time, entity_id);
+                let candidate = (
+                    firing
+                        .race_time
+                        .expect("the guarded path samples a race time"),
+                    firing.entity_id,
+                );
                 if guarded_winners[resource].map_or(true, |winner| {
                     candidate
                         .0
@@ -2932,32 +3001,114 @@ mod parallel_tests {
         Ok::<(), TickError>(())
     }
 
-    #[cfg(target_pointer_width = "64")]
     #[test]
-    fn racing_clock_filter_cannot_hide_entity_id_overflow() {
-        let row = u32::MAX as usize + 1;
-        let error = candidate_race_time(
+    fn degenerate_uncontested_transition_skips_clock_but_contested_transition_does_not() {
+        let make_transition = |contests| Transition {
+            name: "degenerate".to_owned(),
+            table: "Person".to_owned(),
+            guard: Expr::Bool { value: true },
+            hazard: Expr::Real { value: 1e300 },
+            effects: Vec::new(),
+            contests,
+        };
+        let filter = RacingClockFilter::for_hazard(1e300, 1.0).unwrap();
+        assert_eq!(filter.threshold, 0.0);
+
+        let uncontested = make_transition(Vec::new());
+        let uncontested_strategy = RacingClockStrategy::for_transition(Some(filter), &uncontested);
+        assert_eq!(uncontested_strategy, RacingClockStrategy::AlwaysFires);
+        let firing = candidate_race_time(
             RacingClockCoordinates {
                 seed: 1,
                 tick: 0,
                 rule_id: 7,
                 rule_word: 11,
-                row,
+                row: 0,
             },
-            0.001,
+            1e300,
             1.0,
-            Some(RacingClockFilter { lo: 1.0 }),
+            uncontested_strategy,
         )
-        .expect_err("row conversion must precede a filter that rejects every draw");
-        match error {
-            TickError::EntityIdOverflow {
-                rule_id,
-                row: error_row,
-            } => {
-                assert_eq!(rule_id, 7);
-                assert_eq!(error_row, row);
+        .unwrap()
+        .expect("the exact-zero threshold must always fire");
+        assert_eq!(firing.entity_id, 0);
+        assert_eq!(firing.race_time, None, "the fast path must not draw");
+
+        let contested = make_transition(vec![ResourceClaim {
+            resource: Expr::SelfAttr {
+                name: "resource".to_owned(),
+            },
+            ordering: ClaimOrdering::RaceTime,
+        }]);
+        let contested_strategy = RacingClockStrategy::for_transition(Some(filter), &contested);
+        assert_eq!(
+            contested_strategy,
+            RacingClockStrategy::Guarded(filter),
+            "a contested transition consumes the exact race time"
+        );
+        let contested_firing = candidate_race_time(
+            RacingClockCoordinates {
+                seed: 1,
+                tick: 0,
+                rule_id: 7,
+                rule_word: 11,
+                row: 0,
+            },
+            1e300,
+            1.0,
+            contested_strategy,
+        )
+        .unwrap()
+        .expect("the degenerate contested transition must still fire");
+        assert_eq!(
+            contested_firing.race_time.unwrap().to_bits(),
+            exp_f64(1, 0, 11, 0, 0, 1e300).to_bits(),
+            "the contested path must retain the canonical sampled time"
+        );
+
+        let ordinary = make_transition(Vec::new());
+        let ordinary_filter = RacingClockFilter::for_hazard(0.025, 1.0).unwrap();
+        assert_eq!(
+            RacingClockStrategy::for_transition(Some(ordinary_filter), &ordinary),
+            RacingClockStrategy::Guarded(ordinary_filter),
+            "an uncontested transition with a nonzero threshold is not provably certain"
+        );
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn racing_clock_fast_paths_cannot_hide_entity_id_overflow() {
+        let row = u32::MAX as usize + 1;
+        for strategy in [
+            RacingClockStrategy::Guarded(RacingClockFilter {
+                threshold: 1.0,
+                lo: 1.0,
+            }),
+            RacingClockStrategy::AlwaysFires,
+        ] {
+            let error = candidate_race_time(
+                RacingClockCoordinates {
+                    seed: 1,
+                    tick: 0,
+                    rule_id: 7,
+                    rule_word: 11,
+                    row,
+                },
+                0.001,
+                1.0,
+                strategy,
+            )
+            .expect_err("row conversion must precede every fast path");
+            match error {
+                TickError::EntityIdOverflow {
+                    rule_id,
+                    row: error_row,
+                } => {
+                    assert_eq!(rule_id, 7);
+                    assert_eq!(error_row, row);
+                }
+                other => panic!("unexpected error: {other}"),
             }
-            other => panic!("unexpected error: {other}"),
         }
     }
 

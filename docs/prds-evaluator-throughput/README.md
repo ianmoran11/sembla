@@ -272,3 +272,29 @@ the coarse Amdahl serial-fraction estimate fell from 74.22% to 68.78%. All 20
 official outputs, summaries, manifests, and final-state hashes are byte-identical.
 Full measurements and the structural argument are under
 [`docs/evidence/evaluator-tiled-views-20260727/`](../evidence/evaluator-tiled-views-20260727/).
+
+## PRD 0004 implementation status
+
+PRD 0004 adds an `AlwaysFires` strategy alongside PRD 0002's guarded racing
+clock. It applies only to a constant hazard whose exact `exp(-(lambda * dt))`
+threshold is `0.0` and whose IR declaration has no contests. Every contest is
+conservatively treated as a sampled-time consumer, so degenerate contested
+transitions still draw and retain the canonical `ln` race-time bits.
+
+The proof depends on three frozen properties. The racing-clock inequality is
+`u > exp(-(lambda * dt))`; `uniform_f64` excludes zero, so every open uniform is
+strictly above an exact-zero threshold; and §E1's coordinate-pure RNG has no
+stream state for a skipped draw to perturb. Entity-id conversion remains before
+strategy dispatch, preserving its overflow diagnostic. No RNG, guarded-filter,
+tiling, conflict-resolution, IR, CUDA, or CLI behavior changed.
+
+Measured `ln` calls fell from 19,117,749 to 291,688, removing 98.47% of PRD
+0002's residue. Fastest default wall changed from 4.81 to 4.90 seconds while
+median wall improved from 5.10 to 4.97 seconds; fastest user time improved from
+6.10 to 5.87 seconds. Single-worker wall/user improved from 6.69/5.51 to
+6.28/5.21 seconds. CPU efficiency changed from 15.18% to 14.59%, consistent
+with less CPU work on an effectively flat wall-time critical path. All outputs,
+summaries, manifests, and final-state hashes remain byte-identical. Full
+measurements, per-transition counts, tests, hashes, and the structural argument
+are under
+[`docs/evidence/evaluator-degenerate-hazard-fast-path-20260727/`](../evidence/evaluator-degenerate-hazard-fast-path-20260727/).
