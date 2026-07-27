@@ -1707,3 +1707,20 @@ specification cannot be argued with by an implementer.** Where the specification
 is wrong, only the operator can fix it, and must do so promptly rather than at
 the end of the run.
 
+**Extended 2026-07-28: the freeze covers the working tree, not just commits.**
+A fourth run stalled because the operator committed `DECISIONS.md` between
+attempts to record an unrelated decision, and `git add` swept up §K6/§K9
+amendments the implementer had left uncommitted. The PRD required those
+amendments to share a commit with the code change; half of them were now in the
+operator's pushed commit, so the requirement had become unsatisfiable.
+
+So: **before committing anything between attempts, check what is actually in the
+working tree.** An implementer's uncommitted work is part of the run. Stage
+specific paths rather than whole files, and never assume a file you edited
+contains only your edit.
+
+And a note on criteria of this shape: **requirements about commit packaging are
+fragile and rarely worth their cost.** "Both present at HEAD" states the real
+goal — the decision record must not contradict the code — without creating a
+condition that an operator's ordinary activity can destroy.
+

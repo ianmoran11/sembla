@@ -97,8 +97,7 @@ Check `observe_grouped_views` for exactly what is stored before assuming.
 
 ### 5. Remove the CUDA rejection, and amend the decision record
 
-Delete the rejections at `main.rs:2660` and `:2709`, and in the same commit
-amend:
+Delete the rejections at `main.rs:2660` and `:2709`, and amend:
 
 - **§K6**, which states "V1 is CPU-only and rejects grouped views
   deterministically on CUDA";
@@ -108,6 +107,17 @@ amend:
 State the new position: grouped observation is supported on CUDA where the key
 space is boundable, with the §1 limit and its deterministic failure. Leaving
 either section contradicting the code is not acceptable.
+
+**Amended 2026-07-28.** This originally required both in *one commit*. That is
+no longer satisfiable and the requirement is dropped: the operator's commit
+`696f439` accidentally included the §K6/§K9 amendments, which were sitting
+uncommitted in the working tree from an earlier attempt, alongside an unrelated
+`DECISIONS.md` change. The rejection removals then landed separately in
+`aeb3c28`.
+
+Atomicity was a means, not the end. What matters is that the decision record
+never contradicts the code, and at HEAD it does not. Rewriting pushed history to
+satisfy the packaging would be worse than recording why the packaging differs.
 
 Note that `grouped-observations` remains a §E8 runtime flag recorded in the
 manifest. This PRD changes which backends honour it, not whether it is recorded.
@@ -176,8 +186,8 @@ fragment. No IR or Lean changes. No new dependencies.
 2. Zero-count groups are not emitted; a test covers a model with empty groups.
 3. Output order matches the host `BTreeMap` order exactly; a test compares the
    full `GroupedViewValue` sequence, not just the counts.
-4. The CUDA rejections are removed and §K6 and §K9 are amended in the same
-   commit.
+4. The CUDA rejections are removed and §K6 and §K9 are amended, both present at
+   `HEAD`. They need not share a commit — see §5's 2026-07-28 amendment.
 5. The grouped demographic configuration is in the differential corpus.
 6. **Every golden is byte-identical**, including the manifest and
    `final_state_sha256`.
