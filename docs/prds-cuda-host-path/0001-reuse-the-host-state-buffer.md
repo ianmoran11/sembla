@@ -110,9 +110,34 @@ other than allocation changed and the result needs explaining.
 
 - `crates/sembla-cuda/src/backend.rs`
 - `crates/sembla-runtime/src/state.rs`
+- `crates/sembla-cli/src/main.rs` — **added 2026-07-27 by operator authorisation**,
+  see below
 - `crates/sembla-runtime/tests/**`, `crates/sembla-cuda/tests/**` (tests only)
 - `docs/evidence/**` (new evidence only)
 - `docs/prds-cuda-host-path/README.md` (status notes only)
+
+### Why the CLI is in scope (authorised 2026-07-27)
+
+The original list omitted the CLI, and that made this PRD unachievable as
+written. `CudaTickObservation.state` is an **owned** `StateStore`, and
+`main.rs` moves it out at each tick. Retaining one store across ticks therefore
+requires changing that contract, and the contract crosses into the CLI. Confined
+to `backend.rs` and `state.rs`, the only options were to clone the retained
+store every tick — which recreates the allocations this PRD exists to remove —
+or to break the CUDA build.
+
+The runner identified the conflict and asked rather than guessing, and declined
+to ship a cloning path dressed as reuse. That was correct.
+
+**The exception is limited to the ownership change**: the backend lends the
+refreshed state during a tick and yields it once at the end. Specifically it does
+not extend to redesigning the CUDA run loop, to the CPU path, or to the
+`--timing-json` phases beyond what the signature forces. `state_transfer` and
+`state_reconstruct` must still be measured where they are today, or the
+before/after comparison this PRD exists to produce becomes meaningless.
+
+Note the change is `#[cfg(feature = "cuda")]`, so it cannot be compiled on the
+development machine. Its first build is on the GPU host, per §J14.2.
 
 ## Non-goals
 
@@ -122,7 +147,9 @@ folder, and this PRD must not pre-empt it — see the README.
 No change to what is transferred from the device or when. No change to
 `download_hash`. No change to the CPU backend's tick loop. No evaluator changes
 — those are `prds-evaluator-throughput`. No kernel changes: they are 0.56% of
-wall time. No IR, Lean, or CLI changes. No new dependencies.
+wall time. No IR or Lean changes. **CLI changes are limited to the authorised
+ownership change above** — nothing else in `main.rs` is in scope. No new
+dependencies.
 
 ## Acceptance criteria
 

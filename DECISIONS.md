@@ -1554,3 +1554,23 @@ being made advisory. **An acceptance criterion that no in-run action can satisfy
 is a defect in the criterion**, and both the runner and the operator should treat
 repeated identical blockers as evidence of one.
 
+**Amended 2026-07-27, after a third failure of the same shape.** A run of
+`prds-cuda-host-path/0001` found that the PRD's allowed-file list made the PRD
+unachievable: the change required touching a file the list omitted. The runner
+asked, the operator authorised the exception, and the implementer acted on it —
+but the authorisation was never written into the PRD. Every subsequent review
+correctly found a prohibited file, and the run exhausted its attempts, because
+neither reverting authorised work nor editing the PRD was available to the
+implementer.
+
+So this decision's freeze has one carve-out. **An out-of-band authorisation must
+be written into the PRD before the run continues.** Recording an approved scope
+exception is not moving the baseline; it is the operator completing an
+authorisation they have already given, and deferring it guarantees the run
+fails. The operator makes that edit and only that edit.
+
+The pattern across all three is one thing: **a reviewer enforcing a written
+specification cannot be argued with by an implementer.** Where the specification
+is wrong, only the operator can fix it, and must do so promptly rather than at
+the end of the run.
+
