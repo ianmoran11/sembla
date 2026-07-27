@@ -1,0 +1,414 @@
+{
+  "schema": "sembla-evaluator-tiled-views-v1",
+  "recorded_at": "2026-07-27",
+  "baseline_commit": "cfdcd43",
+  "session": {
+    "machine": "Apple M2 Pro",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "os": "macOS 15.5 (24F74)",
+    "physical_cores": 10,
+    "logical_cores": 10,
+    "available_parallelism": 10
+  },
+  "case": {
+    "model": "fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+    "scale": 1000000,
+    "ticks": 24,
+    "seed": 9009,
+    "areas": 4,
+    "present_fraction": 0.8,
+    "streams": "birth:600,overseas:250,internal:150",
+    "backend": "cpu"
+  },
+  "protocol": {
+    "headline": "fastest uncontended of five by wall time; median alongside",
+    "load_bearing_metric": "wall_seconds",
+    "contention_rule": "wall - (user + sys) > 0.5 seconds",
+    "measurement_scope": "in-run",
+    "command": "/usr/bin/time -l -o <time-file> <binary> run <resized-no-grouped-model> --seed 9009 --population <shared-1m-state> --backend cpu --ticks 24 --out <run-output.csv>",
+    "single_worker_env": "SEMBLA_EVAL_THREADS=1"
+  },
+  "implementation": {
+    "tiled": [
+      "Count-view row-local filters, with associative usize partial counts combined after fixed tasks join",
+      "row-local numeric-view filters and value expressions"
+    ],
+    "canonical_sequential": [
+      "all f64 view accumulation, one value at a time in ascending tile-start and row order",
+      "conflict resolution and its sort",
+      "effect-column evaluation, write staging, and write application",
+      "aggregate/input-dependent or row-fallible view expressions",
+      "grouped views"
+    ],
+    "fixed_partition": "tasks derive only from stable box/table indices, row count, and SEMBLA_EVAL_TILE_ROWS; worker count changes assignment only",
+    "writes": "not tiled: effects depend on the declaration-ordered winners produced by sequential conflict resolution, and retaining the existing snapshot-evaluate/stage/checked-write path avoids introducing shared-cell races or changing double-write/error precedence"
+  },
+  "binaries": {
+    "before_sha256": "796763d5941eb6b011963f4036ba7c0b96bc134ac58625b2f39ad19a31dcdfe4",
+    "after_sha256": "0cc340f1db993f064c2220716486d2749c18a1999e5deee8378ba8521593e103"
+  },
+  "inputs": {
+    "resized_model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+    "initial_state_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+  },
+  "discarded_iteration": {
+    "description": "The first views implementation retained every Count filter tile until join. Five default-worker runs regressed fastest wall from 5.23 s to 5.59 s and user from 5.93 s to 6.46 s; it was not retained. Count tiles now return associative integer partials instead.",
+    "after_default": [
+      {
+        "run": 1,
+        "wall_seconds": 5.61,
+        "user_seconds": 6.39,
+        "sys_seconds": 1.42,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": -2.2
+      },
+      {
+        "run": 2,
+        "wall_seconds": 5.7,
+        "user_seconds": 6.56,
+        "sys_seconds": 1.56,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": -2.42
+      },
+      {
+        "run": 3,
+        "wall_seconds": 5.59,
+        "user_seconds": 6.46,
+        "sys_seconds": 1.53,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": -2.4
+      },
+      {
+        "run": 4,
+        "wall_seconds": 6.29,
+        "user_seconds": 6.59,
+        "sys_seconds": 1.72,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": -2.02
+      },
+      {
+        "run": 5,
+        "wall_seconds": 7.42,
+        "user_seconds": 6.91,
+        "sys_seconds": 1.85,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": -1.34
+      }
+    ],
+    "after_single": [
+      {
+        "run": 1,
+        "wall_seconds": 9.93,
+        "user_seconds": 6.13,
+        "sys_seconds": 1.97,
+        "contended": true,
+        "wall_minus_user_and_sys_seconds": 1.83
+      },
+      {
+        "run": 2,
+        "wall_seconds": 8.16,
+        "user_seconds": 6.02,
+        "sys_seconds": 1.64,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": 0.5
+      },
+      {
+        "run": 3,
+        "wall_seconds": 7.57,
+        "user_seconds": 5.91,
+        "sys_seconds": 1.45,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": 0.21
+      },
+      {
+        "run": 4,
+        "wall_seconds": 7.51,
+        "user_seconds": 5.8,
+        "sys_seconds": 1.51,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": 0.2
+      },
+      {
+        "run": 5,
+        "wall_seconds": 6.9,
+        "user_seconds": 5.63,
+        "sys_seconds": 1.26,
+        "contended": false,
+        "wall_minus_user_and_sys_seconds": 0.01
+      }
+    ]
+  },
+  "official_24_tick_five_run": {
+    "before_default": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 5.57,
+          "user_seconds": 6.02,
+          "sys_seconds": 1.36,
+          "wall_minus_user_and_sys_seconds": -1.81,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 5.51,
+          "user_seconds": 5.94,
+          "sys_seconds": 1.38,
+          "wall_minus_user_and_sys_seconds": -1.81,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 5.32,
+          "user_seconds": 5.93,
+          "sys_seconds": 1.22,
+          "wall_minus_user_and_sys_seconds": -1.83,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 5.54,
+          "user_seconds": 6.0,
+          "sys_seconds": 1.39,
+          "wall_minus_user_and_sys_seconds": -1.85,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 5.23,
+          "user_seconds": 5.93,
+          "sys_seconds": 1.15,
+          "wall_minus_user_and_sys_seconds": -1.85,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 5,
+        "wall_seconds": 5.23,
+        "user_seconds": 5.93,
+        "sys_seconds": 1.15,
+        "wall_minus_user_and_sys_seconds": -1.85,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 5.51,
+        "user_seconds": 5.94,
+        "sys_seconds": 1.36
+      }
+    },
+    "before_single": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 6.81,
+          "user_seconds": 5.5,
+          "sys_seconds": 1.27,
+          "wall_minus_user_and_sys_seconds": 0.04,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 6.95,
+          "user_seconds": 5.56,
+          "sys_seconds": 1.3,
+          "wall_minus_user_and_sys_seconds": 0.09,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 6.88,
+          "user_seconds": 5.53,
+          "sys_seconds": 1.3,
+          "wall_minus_user_and_sys_seconds": 0.05,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 7.42,
+          "user_seconds": 5.73,
+          "sys_seconds": 1.56,
+          "wall_minus_user_and_sys_seconds": 0.13,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 7.13,
+          "user_seconds": 5.64,
+          "sys_seconds": 1.4,
+          "wall_minus_user_and_sys_seconds": 0.09,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 1,
+        "wall_seconds": 6.81,
+        "user_seconds": 5.5,
+        "sys_seconds": 1.27,
+        "wall_minus_user_and_sys_seconds": 0.04,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 6.95,
+        "user_seconds": 5.56,
+        "sys_seconds": 1.3
+      }
+    },
+    "after_default": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 5.4,
+          "user_seconds": 6.25,
+          "sys_seconds": 1.37,
+          "wall_minus_user_and_sys_seconds": -2.22,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 5.1,
+          "user_seconds": 6.21,
+          "sys_seconds": 1.39,
+          "wall_minus_user_and_sys_seconds": -2.5,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 4.93,
+          "user_seconds": 6.11,
+          "sys_seconds": 1.33,
+          "wall_minus_user_and_sys_seconds": -2.51,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 5.27,
+          "user_seconds": 6.22,
+          "sys_seconds": 1.46,
+          "wall_minus_user_and_sys_seconds": -2.41,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 4.81,
+          "user_seconds": 6.1,
+          "sys_seconds": 1.2,
+          "wall_minus_user_and_sys_seconds": -2.49,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 5,
+        "wall_seconds": 4.81,
+        "user_seconds": 6.1,
+        "sys_seconds": 1.2,
+        "wall_minus_user_and_sys_seconds": -2.49,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 5.1,
+        "user_seconds": 6.21,
+        "sys_seconds": 1.37
+      }
+    },
+    "after_single": {
+      "runs": [
+        {
+          "run": 1,
+          "wall_seconds": 7.07,
+          "user_seconds": 5.61,
+          "sys_seconds": 1.38,
+          "wall_minus_user_and_sys_seconds": 0.08,
+          "contended": false
+        },
+        {
+          "run": 2,
+          "wall_seconds": 6.71,
+          "user_seconds": 5.51,
+          "sys_seconds": 1.17,
+          "wall_minus_user_and_sys_seconds": 0.03,
+          "contended": false
+        },
+        {
+          "run": 3,
+          "wall_seconds": 6.75,
+          "user_seconds": 5.52,
+          "sys_seconds": 1.19,
+          "wall_minus_user_and_sys_seconds": 0.04,
+          "contended": false
+        },
+        {
+          "run": 4,
+          "wall_seconds": 6.69,
+          "user_seconds": 5.51,
+          "sys_seconds": 1.16,
+          "wall_minus_user_and_sys_seconds": 0.02,
+          "contended": false
+        },
+        {
+          "run": 5,
+          "wall_seconds": 6.7,
+          "user_seconds": 5.51,
+          "sys_seconds": 1.15,
+          "wall_minus_user_and_sys_seconds": 0.04,
+          "contended": false
+        }
+      ],
+      "fastest_uncontended": {
+        "run": 4,
+        "wall_seconds": 6.69,
+        "user_seconds": 5.51,
+        "sys_seconds": 1.16,
+        "wall_minus_user_and_sys_seconds": 0.02,
+        "contended": false
+      },
+      "median": {
+        "wall_seconds": 6.71,
+        "user_seconds": 5.51,
+        "sys_seconds": 1.17
+      }
+    }
+  },
+  "comparison": {
+    "headline_wall_speedup": 1.0873180873180874,
+    "headline_wall_improvement_fraction": 0.08030592734225636,
+    "median_wall_speedup": 1.080392156862745,
+    "single_worker_wall_speedup": 1.0179372197309415,
+    "single_worker_user_change_fraction": 0.0018181818181817794,
+    "cpu_efficiency": {
+      "definition": "(user + sys) / (wall * 10 logical cores), fastest uncontended default run",
+      "before": 0.13537284894837476,
+      "after": 0.15176715176715178
+    },
+    "serial_fraction": {
+      "before": {
+        "single_to_parallel_speedup": 1.3021032504780112,
+        "estimated_serial_fraction": 0.742209169521945,
+        "method": "Amdahl inversion f=(1/S-1/N)/(1-1/N), using fastest uncontended single/default wall times and N=10; this is a coarse whole-run estimate"
+      },
+      "after": {
+        "single_to_parallel_speedup": 1.390852390852391,
+        "estimated_serial_fraction": 0.687759508387311,
+        "method": "Amdahl inversion f=(1/S-1/N)/(1-1/N), using fastest uncontended single/default wall times and N=10; this is a coarse whole-run estimate"
+      }
+    }
+  },
+  "outputs": {
+    "official_run_count": 20,
+    "all_primary_csv_identical": true,
+    "primary_csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+    "all_summaries_identical": true,
+    "summaries_csv_sha256": "329bc9e17af3032a81d4dd60263cd70c26fd734e33fce7cfcb8da66558bca6d3",
+    "all_manifests_identical": true,
+    "manifest_sha256": "dbeaa57719ef88945ac46336ad8033c5cdac91d8cd5b8bb21679437e0122aa1f",
+    "final_state_sha256": "2d509ead9aa506e71be155faaa5608542f7ca32cee203ee42b0d3179d670020c"
+  },
+  "checks": {
+    "focused_parallel_tests": "passed",
+    "cargo_test_locked": "passed",
+    "check_rust": "passed after a focused state_artifact retry confirmed the known transient failure and the complete gate rerun passed",
+    "markdown_links": "passed: 120 local links in 172 tracked Markdown files",
+    "git_diff_check": "passed",
+    "protected_artifacts": "unchanged"
+  }
+}

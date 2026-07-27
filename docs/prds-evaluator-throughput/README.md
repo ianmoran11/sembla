@@ -241,3 +241,34 @@ wall time, while all outputs and final-state hashes remained byte-identical.
 Full five-run measurements, per-transition fractions,
 structural argument, tests, and hashes are under
 [`docs/evidence/evaluator-guarded-racing-clock-20260727/`](../evidence/evaluator-guarded-racing-clock-20260727/).
+
+## PRD 0003 implementation status
+
+PRD 0003 lands the permitted measured partial scope for committed-state views.
+Fixed post-commit tasks now evaluate eligible `Count` filters and row-local
+numeric-view filters/value expressions. Count tasks return associative integer
+partials. Numeric task outputs join before reduction; every Real value is still
+accumulated one row at a time in ascending tile-start and row order, so no
+floating-point partial reduction exists.
+
+Aggregate/input-dependent and row-fallible views retain the whole-column path.
+Grouped views, effects, writes, aggregate construction, and conflict resolution
+remain column-wise or sequential. Writes were not tiled because effect values
+depend on declaration-ordered conflict winners; the existing snapshot, staged
+write, double-write check, and single-buffer application path preserves both
+cell ownership and observable error order without introducing shared mutation.
+
+Tests compare the whole-column fallback with workers 1, 2, and 4 and tile sizes
+257, 1,024, and 4,093. The corpus includes a filtered Real `Sum`, raw `to_bits`
+comparisons, a contested transition with a Real effect write, the complete
+post-tick Real state, racing clocks, and claim keys. A structural assertion pins
+Real accumulation to nested ascending tile/row loops.
+
+On the revised wall-primary protocol, fastest uncontended default-worker wall
+time improved from 5.23 to 4.81 seconds (1.087×); median wall improved from
+5.51 to 5.10 seconds (1.080×). Single-worker wall/user changed from 6.81/5.50
+to 6.69/5.51 seconds. Headline CPU efficiency rose from 13.54% to 15.18%, and
+the coarse Amdahl serial-fraction estimate fell from 74.22% to 68.78%. All 20
+official outputs, summaries, manifests, and final-state hashes are byte-identical.
+Full measurements and the structural argument are under
+[`docs/evidence/evaluator-tiled-views-20260727/`](../evidence/evaluator-tiled-views-20260727/).

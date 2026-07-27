@@ -1,5 +1,6 @@
 //! Deterministic, snapshot-isolated synchronous box composition.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -1068,20 +1069,156 @@ fn finish_tick(
     }
 }
 
-struct PreparedCountView<'state> {
+struct PreparedView<'state> {
     ordinal: usize,
     box_index: usize,
     view_index: usize,
     table_index: usize,
     row_count: usize,
+    reduce: ViewReduce,
     filter: Option<PreparedExpr<'state>>,
+    value: Option<PreparedExpr<'state>>,
 }
 
-/// Tiles observation-only count filters on the calling thread. This is a second
-/// row-wise phase but not a second parallel region: committed views cannot share
-/// the tick-start snapshot used by transition staging. Numeric views, including
-/// every `f64` reduction, retain the original column-wise ascending-row path.
-fn prepare_tiled_count_views(
+struct ViewTileOutput<'state> {
+    plan_index: usize,
+    start: usize,
+    count: Option<Result<usize, TickError>>,
+    filter: Option<Result<PreparedColumn<'state>, TickError>>,
+    value: Option<Result<PreparedColumn<'state>, TickError>>,
+}
+
+fn evaluate_view_tile_task<'state>(
+    task: &TileTask,
+    plans: &[PreparedView<'state>],
+) -> Vec<ViewTileOutput<'state>> {
+    task.plan_indices
+        .iter()
+        .map(|plan_index| {
+            let plan = &plans[*plan_index];
+            let filter = plan
+                .filter
+                .as_ref()
+                .map(|filter| filter.tile(task.start, task.end).map_err(Into::into));
+            if plan.reduce == ViewReduce::Count {
+                let count = match filter {
+                    Some(Ok(PreparedColumn::Bool(selected))) => {
+                        Ok(selected.iter().filter(|value| **value).count())
+                    }
+                    Some(Ok(other)) => Err(prepared_runtime_type("view filter", &other)),
+                    Some(Err(error)) => Err(error),
+                    None => Ok(task.end - task.start),
+                };
+                ViewTileOutput {
+                    plan_index: *plan_index,
+                    start: task.start,
+                    count: Some(count),
+                    filter: None,
+                    value: None,
+                }
+            } else {
+                ViewTileOutput {
+                    plan_index: *plan_index,
+                    start: task.start,
+                    count: None,
+                    filter,
+                    value: plan
+                        .value
+                        .as_ref()
+                        .map(|value| value.tile(task.start, task.end).map_err(Into::into)),
+                }
+            }
+        })
+        .collect()
+}
+
+fn reduce_prepared_view_tiles(
+    box_name: &str,
+    view_name: &str,
+    reduce: ViewReduce,
+    columns: Vec<PreparedColumn<'_>>,
+    filters: Vec<Option<Cow<'_, [bool]>>>,
+) -> Result<ObservationValue, TickError> {
+    match columns.first() {
+        Some(PreparedColumn::Int(_)) => {
+            let mut result = match reduce {
+                ViewReduce::Sum => 0_i64,
+                ViewReduce::Min => i64::MAX,
+                ViewReduce::Max => i64::MIN,
+                ViewReduce::Count => unreachable!("count does not evaluate a value"),
+            };
+            for (column, filter) in columns.into_iter().zip(filters) {
+                let PreparedColumn::Int(values) = column else {
+                    return Err(TickError::Evaluation(
+                        "view value changed type between tiles".to_owned(),
+                    ));
+                };
+                for (offset, value) in values.iter().copied().enumerate() {
+                    if filter.as_ref().is_some_and(|selected| !selected[offset]) {
+                        continue;
+                    }
+                    result = match reduce {
+                        ViewReduce::Sum => result.checked_add(value).ok_or_else(|| {
+                            TickError::Evaluation(format!(
+                                "view '{box_name}.{view_name}' integer sum overflowed"
+                            ))
+                        })?,
+                        ViewReduce::Min => result.min(value),
+                        ViewReduce::Max => result.max(value),
+                        ViewReduce::Count => unreachable!(),
+                    };
+                }
+            }
+            Ok(ObservationValue::Int(result))
+        }
+        Some(PreparedColumn::Real(_)) => {
+            let mut result = match reduce {
+                ViewReduce::Sum => 0.0,
+                ViewReduce::Min => f64::INFINITY,
+                ViewReduce::Max => f64::NEG_INFINITY,
+                ViewReduce::Count => unreachable!("count does not evaluate a value"),
+            };
+            // This is the canonical Level A reduction order: fixed tiles are
+            // consumed by ascending start row, and rows stay ascending inside
+            // each tile. Workers evaluate row-local values only; they never
+            // form floating-point partial sums.
+            for (column, filter) in columns.into_iter().zip(filters) {
+                let PreparedColumn::Real(values) = column else {
+                    return Err(TickError::Evaluation(
+                        "view value changed type between tiles".to_owned(),
+                    ));
+                };
+                for (offset, value) in values.iter().copied().enumerate() {
+                    if filter.as_ref().is_some_and(|selected| !selected[offset]) {
+                        continue;
+                    }
+                    result = match reduce {
+                        ViewReduce::Sum => result + value,
+                        ViewReduce::Min if value.total_cmp(&result) == Ordering::Less => value,
+                        ViewReduce::Max if value.total_cmp(&result) == Ordering::Greater => value,
+                        ViewReduce::Min | ViewReduce::Max => result,
+                        ViewReduce::Count => unreachable!(),
+                    };
+                }
+            }
+            Ok(ObservationValue::Real(result))
+        }
+        Some(_) => Err(TickError::InvalidRuntimeType {
+            context: "view value".to_owned(),
+            found: "non-numeric".to_owned(),
+        }),
+        None => unreachable!("tiled views always contain at least one row"),
+    }
+}
+
+/// Prepares eligible committed-state views and opens one fixed-task parallel
+/// region for observation. Count filters and row-local numeric expressions are
+/// evaluated per tile. Numeric reductions happen only after every tile has
+/// joined: integer operations combine in row order for identical overflow
+/// behaviour, while `f64` values are accumulated one row at a time in canonical
+/// ascending order. Aggregate/input-dependent or row-fallible expressions keep
+/// the original whole-column path.
+fn prepare_tiled_views(
     model: &ValidatedModel,
     snapshot: &Snapshot<'_>,
     params: &ParamEnv,
@@ -1099,10 +1236,6 @@ fn prepare_tiled_count_views(
     let mut ordinal = 0;
     for (box_index, model_box) in model.model().boxes.iter().enumerate() {
         for (view_index, view) in model_box.views.iter().enumerate() {
-            if view.reduce != ViewReduce::Count {
-                ordinal += 1;
-                continue;
-            }
             let table_index = model_box
                 .tables
                 .iter()
@@ -1143,16 +1276,42 @@ fn prepare_tiled_count_views(
                 },
                 None => None,
             };
-            plans.push(PreparedCountView {
+            let value = match view.reduce {
+                ViewReduce::Count => None,
+                ViewReduce::Sum | ViewReduce::Min | ViewReduce::Max => {
+                    let expression = view
+                        .value
+                        .as_ref()
+                        .expect("validated numeric view has a value");
+                    match prepare_row_expr(expression, table, snapshot, params) {
+                        Ok(Some(value)) => Some(value),
+                        Ok(None) => {
+                            ordinal += 1;
+                            continue;
+                        }
+                        Err(error) => {
+                            results[ordinal] = Some(Err(error.into()));
+                            ordinal += 1;
+                            continue;
+                        }
+                    }
+                }
+            };
+            plans.push(PreparedView {
                 ordinal,
                 box_index,
                 view_index,
                 table_index,
                 row_count,
+                reduce: view.reduce,
                 filter,
+                value,
             });
             ordinal += 1;
         }
+    }
+    if plans.is_empty() {
+        return results;
     }
 
     let mut groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
@@ -1172,49 +1331,148 @@ fn prepare_tiled_count_views(
             ));
         }
     }
-    let mut counts = vec![0_usize; plans.len()];
     let tile_rows = tick_tile_rows();
+    let mut tasks = Vec::new();
     for (_, _, row_count, plan_indices) in groups {
         for start in (0..row_count).step_by(tile_rows) {
-            let end = (start + tile_rows).min(row_count);
-            for plan_index in &plan_indices {
-                let plan = &plans[*plan_index];
-                if matches!(results[plan.ordinal], Some(Err(_))) {
-                    continue;
-                }
-                let selected = match &plan.filter {
-                    Some(filter) => match filter.tile(start, end) {
-                        Ok(PreparedColumn::Bool(selected)) => selected,
-                        Ok(_) => {
-                            results[plan.ordinal] = Some(Err(TickError::Evaluation(
-                                "view filter did not prepare as Bool".to_owned(),
-                            )));
-                            continue;
-                        }
-                        Err(error) => {
-                            results[plan.ordinal] = Some(Err(error.into()));
-                            continue;
-                        }
-                    },
-                    None => vec![true; end - start].into(),
-                };
-                counts[*plan_index] += selected.iter().filter(|value| **value).count();
-            }
+            tasks.push(TileTask {
+                plan_indices: plan_indices.clone(),
+                start,
+                end: (start + tile_rows).min(row_count),
+            });
+        }
+    }
+
+    let worker_count = tick_worker_count().max(1).min(tasks.len().max(1));
+    let mut task_outputs = std::iter::repeat_with(|| None)
+        .take(tasks.len())
+        .collect::<Vec<_>>();
+    if worker_count == 1 {
+        for (task_index, task) in tasks.iter().enumerate() {
+            task_outputs[task_index] = Some(evaluate_view_tile_task(task, &plans));
+        }
+    } else {
+        let mut worker_tasks = std::iter::repeat_with(Vec::new)
+            .take(worker_count)
+            .collect::<Vec<Vec<usize>>>();
+        for task_index in 0..tasks.len() {
+            worker_tasks[task_index % worker_count].push(task_index);
+        }
+        let worker_outputs = std::thread::scope(|scope| {
+            let handles = worker_tasks
+                .into_iter()
+                .map(|task_indices| {
+                    let tasks = &tasks;
+                    let plans = &plans;
+                    scope.spawn(move || {
+                        task_indices
+                            .into_iter()
+                            .map(|task_index| {
+                                (
+                                    task_index,
+                                    evaluate_view_tile_task(&tasks[task_index], plans),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .flat_map(|handle| handle.join().expect("view tile worker panicked"))
+                .collect::<Vec<_>>()
+        });
+        for (task_index, output) in worker_outputs {
+            task_outputs[task_index] = Some(output);
+        }
+    }
+
+    let mut plan_outputs = std::iter::repeat_with(Vec::new)
+        .take(plans.len())
+        .collect::<Vec<Vec<ViewTileOutput<'_>>>>();
+    for outputs in task_outputs.into_iter().map(Option::unwrap) {
+        for output in outputs {
+            plan_outputs[output.plan_index].push(output);
         }
     }
     for (plan_index, plan) in plans.iter().enumerate() {
-        if matches!(results[plan.ordinal], Some(Err(_))) {
-            continue;
-        }
+        let mut outputs = std::mem::take(&mut plan_outputs[plan_index]);
+        outputs.sort_by_key(|output| output.start);
         let model_box = &model.model().boxes[plan.box_index];
         let view = &model_box.views[plan.view_index];
-        let count = i64::try_from(counts[plan_index]).map_err(|_| {
-            TickError::Evaluation(format!(
-                "view '{}.{}' count exceeds i64",
-                model_box.name, view.name
-            ))
-        });
-        results[plan.ordinal] = Some(count.map(ObservationValue::Int));
+        if plan.reduce == ViewReduce::Count {
+            let count = outputs
+                .into_iter()
+                .map(|output| output.count.expect("count tile must contain a partial"))
+                .try_fold(0_usize, |total, count| count.map(|count| total + count))
+                .and_then(|count| {
+                    i64::try_from(count).map_err(|_| {
+                        TickError::Evaluation(format!(
+                            "view '{}.{}' count exceeds i64",
+                            model_box.name, view.name
+                        ))
+                    })
+                })
+                .map(ObservationValue::Int);
+            results[plan.ordinal] = Some(count);
+            continue;
+        }
+
+        let mut filters = Vec::with_capacity(outputs.len());
+        let mut values = Vec::with_capacity(outputs.len());
+        let mut error = None;
+        for output in outputs {
+            let filter = match output.filter {
+                Some(Ok(PreparedColumn::Bool(selected))) => Some(selected),
+                Some(Ok(other)) => {
+                    error = Some(prepared_runtime_type("view filter", &other));
+                    None
+                }
+                Some(Err(found)) => {
+                    error = Some(found);
+                    None
+                }
+                None => None,
+            };
+            filters.push(filter);
+            values.push(output.value);
+            if error.is_some() {
+                break;
+            }
+        }
+        if let Some(error) = error {
+            results[plan.ordinal] = Some(Err(error));
+            continue;
+        }
+
+        let value = match plan.reduce {
+            ViewReduce::Count => unreachable!("count views return above"),
+            ViewReduce::Sum | ViewReduce::Min | ViewReduce::Max => {
+                let mut columns = Vec::with_capacity(values.len());
+                let mut value_error = None;
+                for value in values {
+                    match value.expect("numeric view tile must evaluate a value") {
+                        Ok(column) => columns.push(column),
+                        Err(error) => {
+                            value_error = Some(error);
+                            break;
+                        }
+                    }
+                }
+                if let Some(error) = value_error {
+                    Err(error)
+                } else {
+                    reduce_prepared_view_tiles(
+                        &model_box.name,
+                        &view.name,
+                        plan.reduce,
+                        columns,
+                        filters,
+                    )
+                }
+            }
+        };
+        results[plan.ordinal] = Some(value);
     }
     results
 }
@@ -1230,13 +1488,13 @@ pub fn observe_views(
     params: &ParamEnv,
 ) -> Result<Vec<ViewValue>, TickError> {
     let snapshot = state.snapshot();
-    let mut tiled_counts = prepare_tiled_count_views(model, &snapshot, params);
+    let mut tiled_values = prepare_tiled_views(model, &snapshot, params);
     let mut cache = AggCache::new(model, &snapshot, params);
     let mut observations = Vec::new();
     let mut view_ordinal = 0;
     for model_box in &model.model().boxes {
         for view in &model_box.views {
-            let tiled_value = tiled_counts[view_ordinal].take();
+            let tiled_value = tiled_values[view_ordinal].take();
             view_ordinal += 1;
             let value = if let Some(value) = tiled_value {
                 value?
@@ -1832,6 +2090,20 @@ fn build_output(
     })
 }
 
+fn prepared_runtime_type(context: &str, column: &PreparedColumn<'_>) -> TickError {
+    let found = match column {
+        PreparedColumn::Real(_) => "Real",
+        PreparedColumn::Int(_) => "Int",
+        PreparedColumn::Bool(_) => "Bool",
+        PreparedColumn::Enum(_) => "Enum",
+        PreparedColumn::Ref(_) => "Ref",
+    };
+    TickError::InvalidRuntimeType {
+        context: context.to_owned(),
+        found: found.to_owned(),
+    }
+}
+
 fn runtime_type(context: &str, column: &ValueColumn) -> TickError {
     let found = match column {
         ValueColumn::Real(_) => "Real",
@@ -2185,7 +2457,15 @@ mod parallel_tests {
                         table: "Person".to_owned(),
                         guard: Expr::Bool { value: true },
                         hazard: Expr::Real { value: 0.001 },
-                        effects: Vec::new(),
+                        effects: vec![Effect::SetAttr {
+                            attr: "x".to_owned(),
+                            value: Expr::Add {
+                                lhs: Box::new(Expr::SelfAttr {
+                                    name: "x".to_owned(),
+                                }),
+                                rhs: Box::new(Expr::Real { value: 0.125 }),
+                            },
+                        }],
                         contests: vec![ResourceClaim {
                             resource: Expr::SelfAttr {
                                 name: "key_resource".to_owned(),
@@ -2200,24 +2480,46 @@ mod parallel_tests {
                 ],
                 inputs: Vec::new(),
                 outputs: Vec::new(),
-                views: vec![ViewDecl {
-                    name: "positive_x".to_owned(),
-                    table: "Person".to_owned(),
-                    filter: Some(Expr::Gt {
-                        lhs: Box::new(Expr::Div {
+                views: vec![
+                    ViewDecl {
+                        name: "positive_x".to_owned(),
+                        table: "Person".to_owned(),
+                        filter: Some(Expr::Gt {
+                            lhs: Box::new(Expr::Div {
+                                lhs: Box::new(Expr::Add {
+                                    lhs: Box::new(Expr::SelfAttr {
+                                        name: "x".to_owned(),
+                                    }),
+                                    rhs: Box::new(Expr::Real { value: 0.25 }),
+                                }),
+                                rhs: Box::new(Expr::Real { value: 3.0 }),
+                            }),
+                            rhs: Box::new(Expr::Real { value: 0.1 }),
+                        }),
+                        value: None,
+                        reduce: ViewReduce::Count,
+                    },
+                    ViewDecl {
+                        name: "weighted_x".to_owned(),
+                        table: "Person".to_owned(),
+                        filter: Some(Expr::Gt {
+                            lhs: Box::new(Expr::SelfAttr {
+                                name: "x".to_owned(),
+                            }),
+                            rhs: Box::new(Expr::Real { value: 0.2 }),
+                        }),
+                        value: Some(Expr::Div {
                             lhs: Box::new(Expr::Add {
                                 lhs: Box::new(Expr::SelfAttr {
                                     name: "x".to_owned(),
                                 }),
-                                rhs: Box::new(Expr::Real { value: 0.25 }),
+                                rhs: Box::new(Expr::Real { value: 0.375 }),
                             }),
-                            rhs: Box::new(Expr::Real { value: 3.0 }),
+                            rhs: Box::new(Expr::Real { value: 1.25 }),
                         }),
-                        rhs: Box::new(Expr::Real { value: 0.1 }),
-                    }),
-                    value: None,
-                    reduce: ViewReduce::Count,
-                }],
+                        reduce: ViewReduce::Sum,
+                    },
+                ],
                 grouped_views: Vec::new(),
             }],
             wires: Vec::new(),
@@ -2407,6 +2709,73 @@ mod parallel_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn numeric_view_sum_and_effect_state_are_bit_identical_across_workers_and_tiles() {
+        let row_count = 65_537;
+        let evaluate = |workers, tile_rows, threshold| {
+            let (model, mut state) = tiled_fixture(row_count);
+            let report = with_test_tick_tiles(workers, tile_rows, threshold, || {
+                let params = ParamEnv::defaults(&model);
+                run_tick(&model, &mut state, &params, 0xC0FFEE, 7).unwrap()
+            });
+            let sum_bits = report
+                .views
+                .iter()
+                .find(|view| view.name == "weighted_x")
+                .and_then(|view| match view.value {
+                    ObservationValue::Real(value) => Some(value.to_bits()),
+                    ObservationValue::Int(_) => None,
+                })
+                .expect("fixture must report the Real numeric view");
+            let snapshot = state.snapshot();
+            let state_bits = (0..row_count)
+                .map(|row| {
+                    snapshot
+                        .real("world", "Person", "x", row)
+                        .unwrap()
+                        .to_bits()
+                })
+                .collect::<Vec<_>>();
+            (sum_bits, state_bits)
+        };
+
+        let fallback = evaluate(1, 1_024, row_count + 1);
+        assert!(
+            fallback
+                .1
+                .iter()
+                .enumerate()
+                .any(|(row, bits)| { *bits != ((row % 997) as f64 / 997.0).to_bits() }),
+            "the fixture must execute at least one effect write"
+        );
+        for workers in [1, 2, 4] {
+            for tile_rows in [257, 1_024, 4_093] {
+                assert_eq!(
+                    evaluate(workers, tile_rows, 0),
+                    fallback,
+                    "numeric view or effect state changed at {workers} workers and {tile_rows} rows/tile"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tiled_real_view_reduction_keeps_canonical_row_order() {
+        let source = include_str!("executor.rs");
+        let reduction = source
+            .split_once("// This is the canonical Level A reduction order")
+            .expect("tiled Real view reduction must document its canonical order")
+            .1
+            .split_once("Ok(ObservationValue::Real(result))")
+            .expect("tiled Real reduction must return its ordered result")
+            .0;
+        assert!(reduction.contains("for (column, filter) in columns.into_iter().zip(filters)"));
+        assert!(reduction.contains("for (offset, value) in values.iter().copied().enumerate()"));
+        assert!(reduction.contains("ViewReduce::Sum => result + value"));
+        assert!(!reduction.contains("sum::<f64>"));
+        assert!(!reduction.contains("par_iter"));
     }
 
     #[test]
@@ -2615,7 +2984,8 @@ mod parallel_tests {
             production_executor
                 .matches("std::thread::scope(|scope|")
                 .count(),
-            1
+            2,
+            "one fixed-task region stages transitions and one observes committed views"
         );
         assert!(!production_eval.contains("std::thread::scope(|scope|"));
     }
