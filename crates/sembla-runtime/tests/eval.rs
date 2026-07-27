@@ -3,8 +3,8 @@ use sembla_ir::{
     ParamValue, PortDecl, Table,
 };
 use sembla_runtime::eval::{
-    eval_column, eval_ref_column, eval_typed_ref_column, AggCache, EvalTable, ParamEnv,
-    ParamOverride, ValueColumn,
+    eval_column, eval_gather, eval_ref_column, eval_typed_ref_column, eval_typed_ref_gather,
+    AggCache, EvalTable, ParamEnv, ParamOverride, ValueColumn,
 };
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
@@ -512,6 +512,134 @@ fn every_expression_form_and_parameter_resolution_are_evaluated() {
         ),
         ValueColumn::Int(vec![-4; 3])
     );
+}
+
+#[test]
+fn gathered_effect_values_match_full_columns_bitwise_for_every_effect_type() {
+    let model = validated_model(4, 3);
+    let store = state(
+        &model,
+        vec![1.0, -0.0, f64::from_bits(0x7ff8_0000_0000_0042), 4.5],
+        vec![-7, 8, 9, 10],
+        vec![0, 1, 1, 0],
+        vec![2, 1, 0, 2],
+        3,
+    );
+    let params = ParamEnv::defaults(&model);
+    let snapshot = store.snapshot();
+    let rows = [0, 2, 3];
+    let table = EvalTable::new(&model, "world", "Person").unwrap();
+
+    let real = Expr::Add {
+        lhs: boxed(self_attr("x")),
+        rhs: boxed(Expr::Real { value: -0.0 }),
+    };
+    let int = self_attr("age");
+    let enum_value = self_attr("health");
+    for (expr, expected_attr) in [(&real, "x"), (&int, "age"), (&enum_value, "health")] {
+        let mut full_cache = AggCache::new(&model, &snapshot, &params);
+        let full = eval_column(
+            expr,
+            table.with_expected_attr(expected_attr).unwrap(),
+            &snapshot,
+            &params,
+            &mut full_cache,
+        )
+        .unwrap();
+        let mut gather_cache = AggCache::new(&model, &snapshot, &params);
+        let gathered = eval_gather(
+            expr,
+            table.with_expected_attr(expected_attr).unwrap(),
+            &rows,
+            &snapshot,
+            &params,
+            &mut gather_cache,
+        )
+        .unwrap()
+        .expect("row-infallible effect must gather");
+        match (full, gathered) {
+            (ValueColumn::Real(full), ValueColumn::Real(gathered)) => assert_eq!(
+                gathered
+                    .iter()
+                    .map(|value| value.to_bits())
+                    .collect::<Vec<_>>(),
+                rows.iter()
+                    .map(|row| full[*row].to_bits())
+                    .collect::<Vec<_>>()
+            ),
+            (ValueColumn::Int(full), ValueColumn::Int(gathered)) => assert_eq!(
+                gathered,
+                rows.iter().map(|row| full[*row]).collect::<Vec<_>>()
+            ),
+            (ValueColumn::Enum(full), ValueColumn::Enum(gathered)) => assert_eq!(
+                gathered,
+                rows.iter().map(|row| full[*row]).collect::<Vec<_>>()
+            ),
+            other => panic!("full/gather type mismatch: {other:?}"),
+        }
+    }
+
+    let ref_expr = self_attr("employer");
+    let mut full_cache = AggCache::new(&model, &snapshot, &params);
+    let full =
+        eval_typed_ref_column(&ref_expr, table, &snapshot, &params, &mut full_cache).unwrap();
+    let mut gather_cache = AggCache::new(&model, &snapshot, &params);
+    let gathered = eval_typed_ref_gather(
+        &ref_expr,
+        table,
+        &rows,
+        &snapshot,
+        &params,
+        &mut gather_cache,
+    )
+    .unwrap()
+    .expect("row-local Ref effect must gather");
+    assert_eq!(gathered.target_table, full.target_table);
+    assert_eq!(
+        gathered.values,
+        rows.iter().map(|row| full.values[*row]).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn aggregate_and_input_effect_expressions_require_full_column_fallback() {
+    let model = validated_model(3, 2);
+    let store = state(
+        &model,
+        vec![1.0, 2.0, 4.0],
+        vec![1, 2, 3],
+        vec![0, 1, 1],
+        vec![0, 1, 0],
+        2,
+    );
+    let params = ParamEnv::defaults(&model);
+    let snapshot = store.snapshot();
+    let table = EvalTable::new(&model, "world", "Person").unwrap();
+    let rows = [0, 2];
+    let input = Expr::Input {
+        port: "events".into(),
+        agg: Aggregate {
+            op: AggOp::Count,
+            filter: None,
+        },
+    };
+
+    for (expr, expected_attr) in [(&count_infected_by_employer(), "age"), (&input, "age")] {
+        let mut cache = AggCache::new(&model, &snapshot, &params);
+        assert!(
+            eval_gather(
+                expr,
+                table.with_expected_attr(expected_attr).unwrap(),
+                &rows,
+                &snapshot,
+                &params,
+                &mut cache,
+            )
+            .unwrap()
+            .is_none(),
+            "aggregate/input expressions must select the full-column path"
+        );
+    }
 }
 
 #[test]

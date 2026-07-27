@@ -41,7 +41,7 @@ fn write_application_does_not_regress_to_per_write_name_resolution() {
     let stage = section(
         EXECUTOR_SOURCE,
         "let mut effect_columns = Vec::with_capacity(transition.effects.len());",
-        "\n        for candidate_index in winner_indices",
+        "\n        for (winner_offset, candidate_index) in winner_indices.into_iter().enumerate()",
     );
     let resolution = section(
         stage,

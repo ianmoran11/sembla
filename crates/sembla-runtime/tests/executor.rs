@@ -788,6 +788,69 @@ fn later_effect_evaluation_error_precedes_earlier_destination_error() {
 }
 
 #[test]
+fn non_winner_integer_overflow_still_fails_on_the_full_column_path() {
+    let execution_model = model(
+        vec![table(
+            "Item",
+            vec![
+                attr("value", AttrType::Int),
+                attr(
+                    "active",
+                    AttrType::Enum {
+                        variants: vec!["Yes".into(), "No".into()],
+                    },
+                ),
+            ],
+        )],
+        vec![transition(
+            "write",
+            "Item",
+            Expr::EnumIs {
+                attr: "active".into(),
+                variant: "Yes".into(),
+            },
+            Expr::Real { value: ALWAYS },
+            vec![set(
+                "value",
+                Expr::Add {
+                    lhs: Box::new(self_attr("value")),
+                    rhs: Box::new(Expr::Int { value: 1 }),
+                },
+            )],
+            Vec::new(),
+        )],
+        1.0,
+    );
+    let mut state = StateStore::new(
+        &execution_model,
+        vec![TableInit::new(
+            "world",
+            "Item",
+            2,
+            vec![
+                ColumnInit::new("value", ColumnData::Int(vec![0, i64::MAX])),
+                ColumnInit::new("active", ColumnData::Enum(vec![0, 1])),
+            ],
+        )],
+    )
+    .unwrap();
+
+    let error = run_tick(
+        &execution_model,
+        &mut state,
+        &ParamEnv::defaults(&execution_model),
+        1,
+        0,
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        TickError::Evaluation("integer arithmetic overflow at row 1".to_owned()),
+        "the non-winning row must remain observable through full-column evaluation"
+    );
+}
+
+#[test]
 fn deferred_destination_error_keeps_its_original_message_and_discards_writes() {
     let execution_model = model(
         vec![table("Item", vec![attr("value", AttrType::Int)])],

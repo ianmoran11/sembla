@@ -845,7 +845,11 @@ impl<'state> PreparedExpr<'state> {
         start: usize,
         end: usize,
     ) -> Result<PreparedColumn<'state>, EvalError> {
-        eval_prepared_tile(&self.node, start, end)
+        eval_prepared_rows(&self.node, PreparedRows::Range { start, end })
+    }
+
+    fn gather(&self, rows: &[usize]) -> Result<PreparedColumn<'state>, EvalError> {
+        eval_prepared_rows(&self.node, PreparedRows::Gather(rows))
     }
 
     pub(crate) fn ref_target(&self) -> Option<&str> {
@@ -868,32 +872,52 @@ fn prepared_column_as_real(column: PreparedColumn<'_>) -> Result<Cow<'_, [f64]>,
     }
 }
 
-fn eval_prepared_tile<'state>(
+#[derive(Clone, Copy)]
+enum PreparedRows<'rows> {
+    Range { start: usize, end: usize },
+    Gather(&'rows [usize]),
+}
+
+impl PreparedRows<'_> {
+    fn len(self) -> usize {
+        match self {
+            Self::Range { start, end } => end - start,
+            Self::Gather(rows) => rows.len(),
+        }
+    }
+
+    fn absolute_row(self, offset: usize) -> usize {
+        match self {
+            Self::Range { start, .. } => start + offset,
+            Self::Gather(rows) => rows[offset],
+        }
+    }
+
+    fn select<T: Copy>(self, values: &[T]) -> Cow<'_, [T]> {
+        match self {
+            Self::Range { start, end } => Cow::Borrowed(&values[start..end]),
+            Self::Gather(rows) => Cow::Owned(rows.iter().map(|row| values[*row]).collect()),
+        }
+    }
+}
+
+fn eval_prepared_rows<'state>(
     node: &PreparedNode<'state>,
-    start: usize,
-    end: usize,
+    rows: PreparedRows<'_>,
 ) -> Result<PreparedColumn<'state>, EvalError> {
-    let row_count = end - start;
+    let row_count = rows.len();
     match node {
         PreparedNode::Real(value) => Ok(PreparedColumn::Real(Cow::Owned(vec![*value; row_count]))),
         PreparedNode::Int(value) => Ok(PreparedColumn::Int(Cow::Owned(vec![*value; row_count]))),
         PreparedNode::Bool(value) => Ok(PreparedColumn::Bool(Cow::Owned(vec![*value; row_count]))),
         PreparedNode::Enum(value) => Ok(PreparedColumn::Enum(Cow::Owned(vec![*value; row_count]))),
-        PreparedNode::RealAttr(values) => {
-            Ok(PreparedColumn::Real(Cow::Borrowed(&values[start..end])))
-        }
-        PreparedNode::IntAttr(values) => {
-            Ok(PreparedColumn::Int(Cow::Borrowed(&values[start..end])))
-        }
-        PreparedNode::EnumAttr(values) => {
-            Ok(PreparedColumn::Enum(Cow::Borrowed(&values[start..end])))
-        }
-        PreparedNode::RefAttr(values) => {
-            Ok(PreparedColumn::Ref(Cow::Borrowed(&values[start..end])))
-        }
+        PreparedNode::RealAttr(values) => Ok(PreparedColumn::Real(rows.select(values))),
+        PreparedNode::IntAttr(values) => Ok(PreparedColumn::Int(rows.select(values))),
+        PreparedNode::EnumAttr(values) => Ok(PreparedColumn::Enum(rows.select(values))),
+        PreparedNode::RefAttr(values) => Ok(PreparedColumn::Ref(rows.select(values))),
         PreparedNode::Add(lhs, rhs) | PreparedNode::Sub(lhs, rhs) | PreparedNode::Mul(lhs, rhs) => {
-            let lhs = eval_prepared_tile(lhs, start, end)?;
-            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let lhs = eval_prepared_rows(lhs, rows)?;
+            let rhs = eval_prepared_rows(rhs, rows)?;
             if matches!(lhs, PreparedColumn::Real(_)) || matches!(rhs, PreparedColumn::Real(_)) {
                 let lhs = prepared_column_as_real(lhs)?;
                 let rhs = prepared_column_as_real(rhs)?;
@@ -930,7 +954,7 @@ fn eval_prepared_tile<'state>(
                     value.ok_or_else(|| {
                         EvalError::new(format!(
                             "integer arithmetic overflow at row {}",
-                            start + offset
+                            rows.absolute_row(offset)
                         ))
                     })
                 })
@@ -938,8 +962,8 @@ fn eval_prepared_tile<'state>(
             Ok(PreparedColumn::Int(Cow::Owned(values)))
         }
         PreparedNode::Div(lhs, rhs) => {
-            let lhs = prepared_column_as_real(eval_prepared_tile(lhs, start, end)?)?;
-            let rhs = prepared_column_as_real(eval_prepared_tile(rhs, start, end)?)?;
+            let lhs = prepared_column_as_real(eval_prepared_rows(lhs, rows)?)?;
+            let rhs = prepared_column_as_real(eval_prepared_rows(rhs, rows)?)?;
             Ok(PreparedColumn::Real(Cow::Owned(
                 lhs.iter()
                     .copied()
@@ -949,8 +973,8 @@ fn eval_prepared_tile<'state>(
             )))
         }
         PreparedNode::Eq(lhs, rhs) | PreparedNode::Ne(lhs, rhs) => {
-            let lhs = eval_prepared_tile(lhs, start, end)?;
-            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let lhs = eval_prepared_rows(lhs, rows)?;
+            let rhs = eval_prepared_rows(rhs, rows)?;
             let equal: Vec<bool> = match (lhs, rhs) {
                 (PreparedColumn::Real(lhs), PreparedColumn::Real(rhs)) => lhs
                     .iter()
@@ -1005,8 +1029,8 @@ fn eval_prepared_tile<'state>(
         | PreparedNode::Le(lhs, rhs)
         | PreparedNode::Gt(lhs, rhs)
         | PreparedNode::Ge(lhs, rhs) => {
-            let lhs = eval_prepared_tile(lhs, start, end)?;
-            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let lhs = eval_prepared_rows(lhs, rows)?;
+            let rhs = eval_prepared_rows(rhs, rows)?;
             let values = if let (PreparedColumn::Int(lhs), PreparedColumn::Int(rhs)) = (&lhs, &rhs)
             {
                 lhs.iter()
@@ -1037,8 +1061,8 @@ fn eval_prepared_tile<'state>(
             Ok(PreparedColumn::Bool(Cow::Owned(values)))
         }
         PreparedNode::And(lhs, rhs) | PreparedNode::Or(lhs, rhs) => {
-            let lhs = eval_prepared_tile(lhs, start, end)?;
-            let rhs = eval_prepared_tile(rhs, start, end)?;
+            let lhs = eval_prepared_rows(lhs, rows)?;
+            let rhs = eval_prepared_rows(rhs, rows)?;
             let (PreparedColumn::Bool(lhs), PreparedColumn::Bool(rhs)) = (lhs, rhs) else {
                 return Err(EvalError::new("prepared boolean operands are not Bool"));
             };
@@ -1056,14 +1080,14 @@ fn eval_prepared_tile<'state>(
                     .collect(),
             )))
         }
-        PreparedNode::Not(expr) => match eval_prepared_tile(expr, start, end)? {
+        PreparedNode::Not(expr) => match eval_prepared_rows(expr, rows)? {
             PreparedColumn::Bool(values) => Ok(PreparedColumn::Bool(Cow::Owned(
                 values.iter().map(|value| !*value).collect(),
             ))),
             _ => Err(EvalError::new("prepared Not operand is not Bool")),
         },
         PreparedNode::EnumIs(values, expected) => Ok(PreparedColumn::Bool(Cow::Owned(
-            values[start..end]
+            rows.select(values)
                 .iter()
                 .map(|value| *value == *expected)
                 .collect(),
@@ -1081,6 +1105,16 @@ pub(crate) fn prepare_row_expr<'state>(
     params: &ParamEnv,
 ) -> Result<Option<PreparedExpr<'state>>, EvalError> {
     let inferred = infer_root_type(expr, table)?;
+    prepare_row_expr_with_type(expr, table, snapshot, params, inferred)
+}
+
+fn prepare_row_expr_with_type<'state>(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    snapshot: &'state Snapshot<'_>,
+    params: &ParamEnv,
+    inferred: RuntimeType,
+) -> Result<Option<PreparedExpr<'state>>, EvalError> {
     if !expr_is_row_infallible(expr, table, &table.schema().attrs)? {
         return Ok(None);
     }
@@ -1093,6 +1127,14 @@ pub(crate) fn prepare_row_expr<'state>(
         Some(&inferred),
     )?;
     Ok(Some(PreparedExpr { node, ty: inferred }))
+}
+
+pub(crate) fn expr_is_gather_eligible(
+    expr: &Expr,
+    table: EvalTable<'_>,
+) -> Result<bool, EvalError> {
+    infer_root_type(expr, table)?;
+    expr_is_row_infallible(expr, table, &table.schema().attrs)
 }
 
 fn expr_is_row_infallible(
@@ -1276,6 +1318,91 @@ pub fn eval_column(
         agg_cache,
         Some(&inferred),
     )?)
+}
+
+/// Evaluates an eligible expression at explicit, strictly ascending rows.
+///
+/// `None` selects the canonical full-column fallback. Aggregate/input-dependent
+/// expressions and row-fallible integer arithmetic deliberately return `None`
+/// so skipped rows cannot hide their observable errors.
+pub fn eval_gather(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    rows: &[usize],
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+    agg_cache: &mut AggCache<'_, '_>,
+) -> Result<Option<ValueColumn>, EvalError> {
+    let Some(prepared) = prepare_gather(expr, table, rows, snapshot, params, agg_cache)? else {
+        return Ok(None);
+    };
+    let values = match prepared.gather(rows)? {
+        PreparedColumn::Real(values) => ValueColumn::Real(values.into_owned()),
+        PreparedColumn::Int(values) => ValueColumn::Int(values.into_owned()),
+        PreparedColumn::Bool(values) => ValueColumn::Bool(values.into_owned()),
+        PreparedColumn::Enum(values) => ValueColumn::Enum(values.into_owned()),
+        PreparedColumn::Ref(_) => {
+            return Err(EvalError::new(
+                "Ref-typed gathers require eval_typed_ref_gather",
+            ))
+        }
+    };
+    Ok(Some(values))
+}
+
+/// Evaluates an eligible Ref expression at explicit, strictly ascending rows.
+pub fn eval_typed_ref_gather(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    rows: &[usize],
+    snapshot: &Snapshot<'_>,
+    params: &ParamEnv,
+    agg_cache: &mut AggCache<'_, '_>,
+) -> Result<Option<RefColumn>, EvalError> {
+    let Some(prepared) = prepare_gather(expr, table, rows, snapshot, params, agg_cache)? else {
+        return Ok(None);
+    };
+    let target_table = prepared
+        .ref_target()
+        .ok_or_else(|| EvalError::new("expected Ref expression for eval_typed_ref_gather"))?;
+    match prepared.gather(rows)? {
+        PreparedColumn::Ref(values) => Ok(Some(RefColumn {
+            target_table: target_table.to_owned(),
+            values: values.into_owned(),
+        })),
+        _ => Err(EvalError::new(
+            "Ref-typed expression did not evaluate to Ref values",
+        )),
+    }
+}
+
+fn prepare_gather<'state>(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    rows: &[usize],
+    snapshot: &'state Snapshot<'_>,
+    params: &ParamEnv,
+    agg_cache: &mut AggCache<'_, '_>,
+) -> Result<Option<PreparedExpr<'state>>, EvalError> {
+    agg_cache.validate_scope(table, snapshot, params)?;
+    let inferred = infer_root_type(expr, table)?;
+    let row_count = snapshot.row_count(table.box_name(), table.table_name())?;
+    validate_gather_rows(rows, row_count)?;
+    prepare_row_expr_with_type(expr, table, snapshot, params, inferred)
+}
+
+fn validate_gather_rows(rows: &[usize], row_count: usize) -> Result<(), EvalError> {
+    if let Some(row) = rows.iter().copied().find(|row| *row >= row_count) {
+        return Err(EvalError::new(format!(
+            "gather row {row} is out of bounds for {row_count} rows"
+        )));
+    }
+    if rows.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(EvalError::new(
+            "gather rows must be strictly ascending without duplicates",
+        ));
+    }
+    Ok(())
 }
 
 /// Evaluates a Ref-typed root expression without extending [`ValueColumn`].

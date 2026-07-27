@@ -12,7 +12,8 @@ use sembla_ir::{
 };
 
 use crate::eval::{
-    eval_column, eval_typed_ref_column, prepare_row_expr, tick_tile_rows, tick_tiling_enabled,
+    eval_column, eval_gather, eval_typed_ref_column, eval_typed_ref_gather,
+    expr_is_gather_eligible, prepare_row_expr, tick_tile_rows, tick_tiling_enabled,
     tick_worker_count, AggCache, EvalError, EvalTable, ParamEnv, PreparedColumn, PreparedExpr,
     PreparedValue, ValueColumn,
 };
@@ -1997,6 +1998,7 @@ fn stage_box(
         let table = EvalTable::new(model, &model_box.name, &transition.table)?;
         let table_index = candidates[winner_indices[0]].table_index;
         let schema = &model_box.tables[table_index];
+        let mut winner_rows = None;
         let mut effect_columns = Vec::with_capacity(transition.effects.len());
         for effect in &transition.effects {
             let Effect::SetAttr { attr, value } = effect;
@@ -2006,17 +2008,61 @@ fn stage_box(
                 .position(|declaration| declaration.name == *attr)
                 .expect("validated effect attribute disappeared");
             let destination = &schema.attrs[attr_index];
-            let value = match &destination.ty {
-                AttrType::Ref { .. } => PendingColumn::Ref(
-                    eval_typed_ref_column(value, table, snapshot, params, &mut cache)?.values,
+            let effect_table = match &destination.ty {
+                AttrType::Ref { .. } => table,
+                _ => table.with_expected_attr(attr)?,
+            };
+            let gather = expr_is_gather_eligible(value, effect_table)?;
+            let rows = gather.then(|| {
+                winner_rows.get_or_insert_with(|| {
+                    let rows = winner_indices
+                        .iter()
+                        .map(|index| candidates[*index].row)
+                        .collect::<Vec<_>>();
+                    debug_assert!(rows.windows(2).all(|pair| pair[0] < pair[1]));
+                    rows
+                })
+            });
+            let (values, gathered) = match (&destination.ty, rows) {
+                (AttrType::Ref { .. }, Some(rows)) => (
+                    PendingColumn::Ref(
+                        eval_typed_ref_gather(
+                            value,
+                            effect_table,
+                            rows,
+                            snapshot,
+                            params,
+                            &mut cache,
+                        )?
+                        .expect("gather eligibility and preparation must agree")
+                        .values,
+                    ),
+                    true,
                 ),
-                _ => PendingColumn::Value(eval_column(
-                    value,
-                    table.with_expected_attr(attr)?,
-                    snapshot,
-                    params,
-                    &mut cache,
-                )?),
+                (AttrType::Ref { .. }, None) => (
+                    PendingColumn::Ref(
+                        eval_typed_ref_column(value, effect_table, snapshot, params, &mut cache)?
+                            .values,
+                    ),
+                    false,
+                ),
+                (_, Some(rows)) => (
+                    PendingColumn::Value(
+                        eval_gather(value, effect_table, rows, snapshot, params, &mut cache)?
+                            .expect("gather eligibility and preparation must agree"),
+                    ),
+                    true,
+                ),
+                (_, None) => (
+                    PendingColumn::Value(eval_column(
+                        value,
+                        effect_table,
+                        snapshot,
+                        params,
+                        &mut cache,
+                    )?),
+                    false,
+                ),
             };
             // Resolve once now, but publish a failure only at this effect's
             // first pending write. That retains later effect-evaluation,
@@ -2033,15 +2079,24 @@ fn stage_box(
                     &destination.name,
                 ),
             });
-            effect_columns.push((destination_index, value));
+            effect_columns.push(EffectColumn {
+                destination_index,
+                values,
+                gathered,
+            });
         }
-        for candidate_index in winner_indices {
+        for (winner_offset, candidate_index) in winner_indices.into_iter().enumerate() {
             let candidate = &candidates[candidate_index];
-            for (destination_index, values) in &effect_columns {
+            for effect in &effect_columns {
+                let value_index = if effect.gathered {
+                    winner_offset
+                } else {
+                    candidate.row
+                };
                 pending.push(PendingWrite {
-                    destination_index: *destination_index,
+                    destination_index: effect.destination_index,
                     row: candidate.row,
-                    value: values.at(candidate.row)?,
+                    value: effect.values.at(value_index)?,
                     rule_id: candidate.rule_id,
                 });
             }
@@ -2386,6 +2441,12 @@ fn enum_domains_match(
         ) => lhs_variants == rhs_variants,
         _ => false,
     }
+}
+
+struct EffectColumn {
+    destination_index: usize,
+    values: PendingColumn,
+    gathered: bool,
 }
 
 enum PendingColumn {

@@ -347,3 +347,28 @@ All 20 before/after outputs, summaries, manifests, stdout, and final-state hashe
 remain byte-identical. Full reasoning, measurements, formulas, tests, and hashes
 are under
 [`docs/evidence/evaluator-write-identity-once-20260727/`](../evidence/evaluator-write-identity-once-20260727/).
+
+## PRD 0006 implementation status
+
+PRD 0006 adds explicit ascending-row gathers for effect values. Contiguous tile
+and gathered evaluation share one prepared node implementation. `stage_box`
+lazily gathers the already ordered winner rows for structurally row-local,
+row-infallible effects and retains absolute-row full-column evaluation for
+aggregates, inputs, and checked integer arithmetic. Candidate, conflict, write,
+and application order are unchanged.
+
+The preserve-semantics route keeps non-winner errors observable. A regression
+with an overflowing checked-Int effect on a non-winning row retains the exact
+row-1 diagnostic. Tests also pin aggregate/input fallback and bitwise equality
+between full and gathered Real, Int, Enum, and Ref values. Enum/Ref preparation
+and winner-write validation remain unchanged.
+
+Across the frozen run, effect-value evaluations fell from 767,000,000 to
+97,274,365 while 19,943,080 values were used. Fastest default wall improved from
+4.74 to 4.25 seconds (**1.115×**, 10.34%); median wall improved from 4.97 to
+4.30 seconds. Single-worker wall/user improved from 6.30/5.20 to 5.92/5.05
+seconds. CPU efficiency changed from 14.68% to 15.41%, and PRD 0003's Amdahl
+inversion estimates that the serial fraction fell from 72.49% to 68.66%. All 20
+outputs, summaries, manifests, stdout, and final-state hashes remain
+byte-identical. Full counts, measurements, formulas, tests, and hashes are under
+[`docs/evidence/evaluator-effect-gather-20260727/`](../evidence/evaluator-effect-gather-20260727/).
