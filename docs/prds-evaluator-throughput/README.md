@@ -415,3 +415,26 @@ The map outcome and its correction are the measurement process working as
 intended: the accepted implementation met its semantic criteria, the next
 profile exposed an unexpected serial cost, and this separately measured PRD
 removes it without reopening unrelated work.
+
+## PRD 0008 implementation status
+
+PRD 0008 replaces the fixed 1,024-row tile and one-million-row gate with typed
+IR-derived decisions. The evaluator computes left-to-right concurrent width,
+retained roots, and tiled node count. A fixed 32 KiB cache budget yields a
+64-aligned 64–4,096-row tile; 1.5 million node-rows, calibrated between
+`threading_spike`'s 131,072- and 262,144-row guard results, enables tiling.
+`SEMBLA_EVAL_TILE_ROWS` remains an exact override.
+
+The demographic model derives 960 rows for transitions (33 bytes per row) and
+1,600 for its view phase (20 bytes per row); the load-bearing transition result
+is within 6.25% of the known-good 1,024. A new 262,144-row performance canary has
+40 balanced, deliberately wide view filters and derives 768 rows from a
+41-byte-per-row peak, where the old tile would exceed the budget.
+
+Five-run before/after measurement kept the fixed demographic case flat or
+better: default wall minimum/median changed 3.09/3.16 to 3.10/3.12 seconds and
+user minimum/median 4.64/4.65 to 4.62/4.64. The canary improved default wall
+2.44/2.47 to 0.31/0.32 seconds and single-worker wall/user 2.41/1.85 to
+1.56/1.54. Every paired output remained byte-identical. Full profiles,
+threshold decisions, 40 runs, and hashes are under
+[`docs/evidence/generalised-tiling-constants-20260728/`](../evidence/generalised-tiling-constants-20260728/).

@@ -1620,7 +1620,9 @@ percentages alone. A candidate change must first be measured directly — a
 hand-written arm computing the same result by the proposed method, asserted
 equal to the current one — and it is that measurement, not a profile share, that
 justifies a PRD. Profiles remain the right tool for *finding* candidates and the
-wrong one for *sizing* them.
+wrong one for *sizing* them. Measurement on one model shape is not sufficient
+evidence for a constant applied to every model: such constants require at least
+two materially different shapes, reported separately rather than averaged.
 
 **Alternatives.** Continuing to scope from profile shares, which is cheaper and
 needs no throwaway code, is rejected. Requiring a full implementation before

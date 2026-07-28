@@ -110,7 +110,15 @@ copy changes what pooling would be sized for.
 
 ## Measurement protocol
 
-Fixed case for before/after comparison, on one machine in one session:
+Performance work must measure **at least two materially different model
+shapes** before and after on one machine in one session. Report each shape
+separately: an improvement on one shape does not offset a regression on the
+other, and results must not be averaged across shapes. The fixed demographic
+case below remains one required shape; each PRD adds a second shape that stresses
+the mechanism it changes.
+
+Fixed demographic case for before/after comparison, on one machine in one
+session:
 
 ```text
 model:  fixtures/demographic/benchmark/demographic_slots.no-grouped.json

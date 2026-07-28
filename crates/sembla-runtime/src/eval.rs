@@ -11,22 +11,26 @@ use std::error::Error;
 use std::fmt;
 use std::sync::OnceLock;
 
-/// Default row tile chosen by the PRD 0001 sweep recorded under `docs/evidence`.
-/// At 1,024 rows the benchmark's deepest guard peaks at about 20 KiB: an
-/// 8 KiB borrowed Int attribute, an 8 KiB literal, Bool results, and enclosing
-/// Bool operands. Final guard, hazard, and Ref claim roots occupy at most 13 KiB.
-/// Both bounds fit the M2 Pro's 32 KiB L1 data cache.
-pub(crate) const TICK_TILE_ROWS: usize = 1_024;
-/// Smaller measured cases consumed 3–6% more single-worker user time. The 1M
-/// binding case is the first measured size where that primary metric is flat.
-pub(crate) const TICK_TILE_THRESHOLD: usize = 1_000_000;
+/// Fixed model-independent cache budget used to derive a model-dependent tile.
+/// PRD 0001 measured against a 32 KiB L1 data cache. Keeping that assumption
+/// fixed makes partitioning comparable between hosts; runtime cache detection
+/// would make the row partition depend on the machine rather than the model.
+pub(crate) const TICK_TILE_CACHE_BUDGET_BYTES: usize = 32_768;
+pub(crate) const TICK_TILE_MIN_ROWS: usize = 64;
+pub(crate) const TICK_TILE_MAX_ROWS: usize = 4_096;
+/// `threading_spike` put its roughly seven-node guard crossover between 131,072
+/// and 262,144 rows (about 0.9M and 1.8M node-rows). This conservative point in
+/// that measured interval replaces the benchmark-specific one-million-row gate.
+pub(crate) const TICK_TILE_WORK_THRESHOLD: usize = 1_500_000;
+#[cfg(test)]
+const TEST_DEFAULT_TILE_ROWS: usize = 1_024;
 const EVALUATOR_THREADS_ENV: &str = "SEMBLA_EVAL_THREADS";
 const EVALUATOR_TILE_ROWS_ENV: &str = "SEMBLA_EVAL_TILE_ROWS";
 const EVALUATOR_TILE_THRESHOLD_ENV: &str = "SEMBLA_EVAL_TILE_THRESHOLD";
 
 static TICK_WORKERS: OnceLock<usize> = OnceLock::new();
-static CONFIGURED_TILE_ROWS: OnceLock<usize> = OnceLock::new();
-static CONFIGURED_TILE_THRESHOLD: OnceLock<usize> = OnceLock::new();
+static CONFIGURED_TILE_ROWS: OnceLock<Option<usize>> = OnceLock::new();
+static CONFIGURED_TILE_WORK_THRESHOLD: OnceLock<usize> = OnceLock::new();
 
 #[inline]
 pub(crate) fn tick_worker_count() -> usize {
@@ -45,10 +49,10 @@ pub(crate) fn tick_worker_count() -> usize {
 }
 
 #[inline]
-pub(crate) fn tick_tile_rows() -> usize {
+fn configured_tick_tile_rows() -> Option<usize> {
     #[cfg(test)]
     if let Some(rows) = TEST_TICK_TILE_ROWS.with(std::cell::Cell::get) {
-        return rows;
+        return Some(rows);
     }
 
     *CONFIGURED_TILE_ROWS.get_or_init(|| {
@@ -56,28 +60,50 @@ pub(crate) fn tick_tile_rows() -> usize {
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .filter(|rows| *rows > 0)
-            .unwrap_or(TICK_TILE_ROWS)
     })
 }
 
+/// Derives a cache-fitting row tile from the model's conservative live set.
+/// Rounding down to a multiple of 64 avoids the 992 -> 512 collapse that a
+/// power-of-two floor would cause for the known-good demographic shape.
 #[inline]
-pub(crate) fn tick_tile_threshold() -> usize {
-    #[cfg(test)]
-    if let Some(rows) = TEST_TICK_TILE_THRESHOLD.with(std::cell::Cell::get) {
+pub(crate) fn tick_tile_rows_for_live_set(live_set_bytes_per_row: usize) -> usize {
+    if let Some(rows) = configured_tick_tile_rows() {
         return rows;
     }
+    let raw = TICK_TILE_CACHE_BUDGET_BYTES / live_set_bytes_per_row.max(1);
+    let clamped = raw.clamp(TICK_TILE_MIN_ROWS, TICK_TILE_MAX_ROWS);
+    (clamped / 64 * 64).max(TICK_TILE_MIN_ROWS)
+}
 
-    *CONFIGURED_TILE_THRESHOLD.get_or_init(|| {
+/// Retained for the unchanged PRD 0001 determinism tests, whose explicit tile
+/// override is the partition under test rather than the model-derived default.
+#[cfg(test)]
+#[inline]
+pub(crate) fn tick_tile_rows() -> usize {
+    configured_tick_tile_rows().unwrap_or(TEST_DEFAULT_TILE_ROWS)
+}
+
+#[inline]
+fn tick_tile_work_threshold() -> usize {
+    *CONFIGURED_TILE_WORK_THRESHOLD.get_or_init(|| {
         std::env::var(EVALUATOR_TILE_THRESHOLD_ENV)
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
-            .unwrap_or(TICK_TILE_THRESHOLD)
+            .unwrap_or(TICK_TILE_WORK_THRESHOLD)
     })
 }
 
 #[inline]
-pub(crate) fn tick_tiling_enabled(row_count: usize) -> bool {
-    row_count >= tick_tile_threshold() && row_count > tick_tile_rows()
+pub(crate) fn tick_tiling_enabled(row_count: usize, tiled_node_count: usize) -> bool {
+    // Existing determinism tests use this scoped row threshold to force the
+    // tiled and fallback paths. Production uses model-work units below.
+    #[cfg(test)]
+    if let Some(rows) = TEST_TICK_TILE_THRESHOLD.with(std::cell::Cell::get) {
+        return row_count >= rows;
+    }
+
+    row_count.saturating_mul(tiled_node_count) >= tick_tile_work_threshold()
 }
 
 /// Legacy whole-column maps are deliberately serial. PRD 0001 moved the only
@@ -769,6 +795,38 @@ impl RuntimeType {
     fn is_numeric(&self) -> bool {
         matches!(self, Self::Real | Self::Int)
     }
+
+    fn width_bytes(&self) -> usize {
+        match self {
+            Self::Real | Self::Int => 8,
+            Self::Bool => 1,
+            Self::Enum(_) => 2,
+            Self::Ref(_) => 4,
+        }
+    }
+}
+
+/// Conservative per-row footprint of one expression accepted by row tiling.
+/// `peak_bytes_per_row` follows the evaluator's left-to-right tree walk; it is
+/// deliberately not a node-count-times-width bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TiledExprFootprint {
+    pub(crate) root_bytes_per_row: usize,
+    pub(crate) peak_bytes_per_row: usize,
+    pub(crate) node_count: usize,
+    is_int: bool,
+}
+
+impl TiledExprFootprint {
+    fn leaf(ty: &RuntimeType) -> Self {
+        let width = ty.width_bytes();
+        Self {
+            root_bytes_per_row: width,
+            peak_bytes_per_row: width,
+            node_count: 1,
+            is_int: matches!(ty, RuntimeType::Int),
+        }
+    }
 }
 
 impl From<&AttrType> for RuntimeType {
@@ -1181,6 +1239,115 @@ fn expr_is_row_infallible(
         Expr::Not { expr } => expr_is_row_infallible(expr, table, row_attrs)?,
         Expr::Input { .. } | Expr::Agg { .. } => false,
     })
+}
+
+/// Returns the typed, evaluator-order footprint only for expressions that the
+/// existing row-local eligibility predicate admits.
+pub(crate) fn tiled_expr_footprint(
+    expr: &Expr,
+    table: EvalTable<'_>,
+) -> Result<Option<TiledExprFootprint>, EvalError> {
+    let ty = infer_root_type(expr, table)?;
+    if !expr_is_row_infallible(expr, table, &table.schema().attrs)? {
+        return Ok(None);
+    }
+    tiled_expr_footprint_inner(expr, table, &table.schema().attrs, Some(&ty)).map(Some)
+}
+
+fn tiled_expr_footprint_inner(
+    expr: &Expr,
+    table: EvalTable<'_>,
+    row_attrs: &[Attr],
+    expected: Option<&RuntimeType>,
+) -> Result<TiledExprFootprint, EvalError> {
+    let ty = infer_expr_type(expr, table, row_attrs, expected)?;
+    match expr {
+        Expr::Real { .. }
+        | Expr::Int { .. }
+        | Expr::Bool { .. }
+        | Expr::Enum { .. }
+        | Expr::Param { .. }
+        | Expr::SelfAttr { .. } => Ok(TiledExprFootprint::leaf(&ty)),
+        Expr::EnumIs { attr, .. } => {
+            let source = RuntimeType::from(&find_attr(row_attrs, attr)?.ty);
+            let mut footprint = TiledExprFootprint::leaf(&ty);
+            footprint.peak_bytes_per_row += source.width_bytes();
+            Ok(footprint)
+        }
+        Expr::Not { expr } => {
+            let child =
+                tiled_expr_footprint_inner(expr, table, row_attrs, Some(&RuntimeType::Bool))?;
+            let root = ty.width_bytes();
+            Ok(TiledExprFootprint {
+                root_bytes_per_row: root,
+                peak_bytes_per_row: child
+                    .peak_bytes_per_row
+                    .max(child.root_bytes_per_row + root),
+                node_count: child.node_count + 1,
+                is_int: false,
+            })
+        }
+        Expr::Input { .. } | Expr::Agg { .. } => {
+            unreachable!("ineligible expressions return before footprint derivation")
+        }
+        Expr::Add { lhs, rhs }
+        | Expr::Sub { lhs, rhs }
+        | Expr::Mul { lhs, rhs }
+        | Expr::Div { lhs, rhs }
+        | Expr::Eq { lhs, rhs }
+        | Expr::Ne { lhs, rhs }
+        | Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs }
+        | Expr::And { lhs, rhs }
+        | Expr::Or { lhs, rhs } => {
+            let (lhs_expected, rhs_expected) = match expr {
+                Expr::Eq { .. } | Expr::Ne { .. } if matches!(lhs.as_ref(), Expr::Enum { .. }) => {
+                    let rhs_ty = infer_expr_type(rhs, table, row_attrs, None)?;
+                    (Some(rhs_ty.clone()), None)
+                }
+                Expr::Eq { .. } | Expr::Ne { .. } => {
+                    let lhs_ty = infer_expr_type(lhs, table, row_attrs, None)?;
+                    (None, Some(lhs_ty))
+                }
+                Expr::And { .. } | Expr::Or { .. } => {
+                    (Some(RuntimeType::Bool), Some(RuntimeType::Bool))
+                }
+                _ => (None, None),
+            };
+            let lhs = tiled_expr_footprint_inner(lhs, table, row_attrs, lhs_expected.as_ref())?;
+            let rhs = tiled_expr_footprint_inner(rhs, table, row_attrs, rhs_expected.as_ref())?;
+            let root = ty.width_bytes();
+            let converts_numeric_ints = matches!(
+                expr,
+                Expr::Add { .. }
+                    | Expr::Sub { .. }
+                    | Expr::Mul { .. }
+                    | Expr::Div { .. }
+                    | Expr::Lt { .. }
+                    | Expr::Le { .. }
+                    | Expr::Gt { .. }
+                    | Expr::Ge { .. }
+            ) && (matches!(expr, Expr::Div { .. })
+                || matches!(ty, RuntimeType::Real)
+                || root == RuntimeType::Bool.width_bytes() && !(lhs.is_int && rhs.is_int));
+            let coercion = if converts_numeric_ints {
+                usize::from(lhs.is_int) * 8 + usize::from(rhs.is_int) * 8
+            } else {
+                0
+            };
+            Ok(TiledExprFootprint {
+                root_bytes_per_row: root,
+                peak_bytes_per_row: lhs
+                    .peak_bytes_per_row
+                    .max(lhs.root_bytes_per_row + rhs.peak_bytes_per_row)
+                    .max(lhs.root_bytes_per_row + rhs.root_bytes_per_row + root + coercion),
+                node_count: lhs.node_count + rhs.node_count + 1,
+                is_int: matches!(ty, RuntimeType::Int),
+            })
+        }
+    }
 }
 
 fn prepare_node<'state>(
@@ -2918,5 +3085,71 @@ mod tests {
             !reduction.contains("element_wise_map"),
             "the canonical f64 reduction must remain sequential"
         );
+    }
+
+    #[test]
+    fn tiled_expression_footprints_follow_evaluator_liveness_not_node_width() {
+        let (model, _) = parallel_fixture(1);
+        let table = EvalTable::new(&model, "world", "Person").unwrap();
+        let leaf = Expr::SelfAttr {
+            name: "x".to_owned(),
+        };
+        assert_eq!(
+            tiled_expr_footprint(&leaf, table).unwrap().unwrap(),
+            TiledExprFootprint {
+                root_bytes_per_row: 8,
+                peak_bytes_per_row: 8,
+                node_count: 1,
+                is_int: false,
+            }
+        );
+
+        let arithmetic = Expr::Add {
+            lhs: Box::new(leaf.clone()),
+            rhs: Box::new(Expr::Real { value: 1.0 }),
+        };
+        assert_eq!(
+            tiled_expr_footprint(&arithmetic, table).unwrap().unwrap(),
+            TiledExprFootprint {
+                root_bytes_per_row: 8,
+                peak_bytes_per_row: 24,
+                node_count: 3,
+                is_int: false,
+            }
+        );
+
+        let compare = |value| Expr::Gt {
+            lhs: Box::new(leaf.clone()),
+            rhs: Box::new(Expr::Real { value }),
+        };
+        let deep_guard = Expr::And {
+            lhs: Box::new(compare(0.0)),
+            rhs: Box::new(Expr::And {
+                lhs: Box::new(compare(1.0)),
+                rhs: Box::new(compare(2.0)),
+            }),
+        };
+        assert_eq!(
+            tiled_expr_footprint(&deep_guard, table).unwrap().unwrap(),
+            TiledExprFootprint {
+                root_bytes_per_row: 1,
+                peak_bytes_per_row: 19,
+                node_count: 11,
+                is_int: false,
+            }
+        );
+    }
+
+    #[test]
+    fn cache_budget_derives_hand_checked_tiles_for_three_model_shapes() {
+        assert_eq!(tick_tile_rows_for_live_set(8), 4_096);
+        assert_eq!(tick_tile_rows_for_live_set(33), 960);
+        assert_eq!(tick_tile_rows_for_live_set(64), 512);
+    }
+
+    #[test]
+    fn work_threshold_tracks_the_threading_spike_crossover() {
+        assert!(!tick_tiling_enabled(131_072, 7));
+        assert!(tick_tiling_enabled(262_144, 7));
     }
 }

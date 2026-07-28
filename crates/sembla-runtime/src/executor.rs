@@ -13,9 +13,10 @@ use sembla_ir::{
 
 use crate::eval::{
     eval_column, eval_gather, eval_typed_ref_column, eval_typed_ref_gather,
-    expr_is_gather_eligible, expr_is_gather_eligible_int, prepare_row_expr, tick_tile_rows,
-    tick_tiling_enabled, tick_worker_count, AggCache, EvalError, EvalTable, ParamEnv,
-    PreparedColumn, PreparedExpr, PreparedValue, ValueColumn,
+    expr_is_gather_eligible, expr_is_gather_eligible_int, prepare_row_expr,
+    tick_tile_rows_for_live_set, tick_tiling_enabled, tick_worker_count, tiled_expr_footprint,
+    AggCache, EvalError, EvalTable, ParamEnv, PreparedColumn, PreparedExpr, PreparedValue,
+    TiledExprFootprint, ValueColumn,
 };
 use crate::rng::{exp_f64, exp_f64_from_uniform, uniform_f64};
 use crate::state::{ColumnData, InputTable, ResolvedWriteColumn, Snapshot, StateError, StateStore};
@@ -602,6 +603,37 @@ struct Resolution {
     fired_per_resource_table: Vec<usize>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct TiledPlanProfile {
+    retained_root_bytes_per_row: usize,
+    peak_bytes_per_row: usize,
+    node_count: usize,
+}
+
+impl TiledPlanProfile {
+    fn include(&mut self, footprint: TiledExprFootprint) {
+        self.retained_root_bytes_per_row = self
+            .retained_root_bytes_per_row
+            .saturating_add(footprint.root_bytes_per_row);
+        self.peak_bytes_per_row = self.peak_bytes_per_row.max(footprint.peak_bytes_per_row);
+        self.node_count = self.node_count.saturating_add(footprint.node_count);
+    }
+
+    fn live_set_bytes_per_row(self) -> usize {
+        self.retained_root_bytes_per_row
+            .saturating_add(self.peak_bytes_per_row)
+            .max(1)
+    }
+}
+
+struct TransitionTilingCandidate {
+    box_index: usize,
+    transition_index: usize,
+    table_index: usize,
+    row_count: usize,
+    profile: TiledPlanProfile,
+}
+
 struct PreparedTransition<'state> {
     box_index: usize,
     transition_index: usize,
@@ -609,6 +641,7 @@ struct PreparedTransition<'state> {
     rule_word: u32,
     table_index: usize,
     row_count: usize,
+    tile_rows: usize,
     guard: PreparedExpr<'state>,
     hazard: PreparedExpr<'state>,
     race_strategy: RacingClockStrategy,
@@ -787,10 +820,41 @@ fn execute_tick(
     Ok(finish_tick(model, tick, box_outcomes, views, grouped_views))
 }
 
+fn transition_tiling_profile(
+    model: &ValidatedModel,
+    box_index: usize,
+    transition_index: usize,
+) -> Result<Option<TiledPlanProfile>, TickError> {
+    let model_box = &model.model().boxes[box_index];
+    let transition = &model_box.transitions[transition_index];
+    let table = EvalTable::new(model, &model_box.name, &transition.table)?;
+    let mut profile = TiledPlanProfile::default();
+    for expression in [&transition.guard, &transition.hazard] {
+        let Some(footprint) = tiled_expr_footprint(expression, table)? else {
+            return Ok(None);
+        };
+        profile.include(footprint);
+    }
+    for claim in &transition.contests {
+        let Some(footprint) = tiled_expr_footprint(&claim.resource, table)? else {
+            return Ok(None);
+        };
+        profile.include(footprint);
+        if let ClaimOrdering::Key { expr } = &claim.ordering {
+            let Some(footprint) = tiled_expr_footprint(expr, table)? else {
+                return Ok(None);
+            };
+            profile.include(footprint);
+        }
+    }
+    Ok(Some(profile))
+}
+
 fn prepare_tiled_transition<'state>(
     model: &ValidatedModel,
     box_index: usize,
     transition_index: usize,
+    tile_rows: usize,
     snapshot: &'state Snapshot<'_>,
     params: &ParamEnv,
 ) -> Result<Option<PreparedTransition<'state>>, TickError> {
@@ -809,9 +873,6 @@ fn prepare_tiled_transition<'state>(
         .position(|table| table.name == transition.table)
         .expect("validated transition table disappeared");
     let row_count = snapshot.row_count(&model_box.name, &transition.table)?;
-    if !tick_tiling_enabled(row_count) {
-        return Ok(None);
-    }
     let table = EvalTable::new(model, &model_box.name, &transition.table)?;
     let Some(guard) = prepare_row_expr(&transition.guard, table, snapshot, params)? else {
         return Ok(None);
@@ -888,6 +949,7 @@ fn prepare_tiled_transition<'state>(
         rule_word: validated.rule_word,
         table_index,
         row_count,
+        tile_rows,
         guard,
         hazard,
         race_strategy,
@@ -1076,13 +1138,84 @@ fn prepare_tiled_candidates(
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
-    let mut plans = Vec::new();
+    let mut candidates = Vec::new();
     for (box_index, model_box) in model.model().boxes.iter().enumerate() {
-        for transition_index in 0..model_box.transitions.len() {
-            match prepare_tiled_transition(model, box_index, transition_index, snapshot, params) {
-                Ok(Some(plan)) => plans.push(plan),
+        for (transition_index, transition) in model_box.transitions.iter().enumerate() {
+            let table_index = model_box
+                .tables
+                .iter()
+                .position(|table| table.name == transition.table)
+                .expect("validated transition table disappeared");
+            let row_count = match snapshot.row_count(&model_box.name, &transition.table) {
+                Ok(row_count) => row_count,
+                Err(error) => {
+                    results[box_index][transition_index] = Some(Err(error.into()));
+                    continue;
+                }
+            };
+            match transition_tiling_profile(model, box_index, transition_index) {
+                Ok(Some(profile)) => candidates.push(TransitionTilingCandidate {
+                    box_index,
+                    transition_index,
+                    table_index,
+                    row_count,
+                    profile,
+                }),
                 Ok(None) => {}
                 Err(error) => results[box_index][transition_index] = Some(Err(error)),
+            }
+        }
+    }
+
+    let mut candidate_groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
+    for (candidate_index, candidate) in candidates.iter().enumerate() {
+        if let Some((_, _, _, indices)) =
+            candidate_groups
+                .iter_mut()
+                .find(|(box_index, table_index, _, _)| {
+                    (*box_index, *table_index) == (candidate.box_index, candidate.table_index)
+                })
+        {
+            indices.push(candidate_index);
+        } else {
+            candidate_groups.push((
+                candidate.box_index,
+                candidate.table_index,
+                candidate.row_count,
+                vec![candidate_index],
+            ));
+        }
+    }
+
+    let mut plans = Vec::new();
+    for (_, _, row_count, candidate_indices) in candidate_groups {
+        let node_count = candidate_indices.iter().fold(0_usize, |total, index| {
+            total.saturating_add(candidates[*index].profile.node_count)
+        });
+        let live_set_bytes_per_row = candidate_indices
+            .iter()
+            .map(|index| candidates[*index].profile.live_set_bytes_per_row())
+            .max()
+            .unwrap_or(1);
+        let tile_rows = tick_tile_rows_for_live_set(live_set_bytes_per_row);
+        if !tick_tiling_enabled(row_count, node_count) || row_count <= tile_rows {
+            continue;
+        }
+        for candidate_index in candidate_indices {
+            let candidate = &candidates[candidate_index];
+            match prepare_tiled_transition(
+                model,
+                candidate.box_index,
+                candidate.transition_index,
+                tile_rows,
+                snapshot,
+                params,
+            ) {
+                Ok(Some(plan)) => plans.push(plan),
+                Ok(None) => {}
+                Err(error) => {
+                    results[candidate.box_index][candidate.transition_index] = Some(Err(error));
+                }
             }
         }
     }
@@ -1090,26 +1223,29 @@ fn prepare_tiled_candidates(
         return results;
     }
 
-    let mut groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
+    let mut groups: Vec<(usize, usize, usize, usize, Vec<usize>)> = Vec::new();
     for (plan_index, plan) in plans.iter().enumerate() {
-        if let Some((_, _, _, indices)) =
-            groups.iter_mut().find(|(box_index, table_index, _, _)| {
-                (*box_index, *table_index) == (plan.box_index, plan.table_index)
-            })
+        if let Some((_, _, _, _, indices)) =
+            groups
+                .iter_mut()
+                .find(|(box_index, table_index, tile_rows, _, _)| {
+                    (*box_index, *table_index, *tile_rows)
+                        == (plan.box_index, plan.table_index, plan.tile_rows)
+                })
         {
             indices.push(plan_index);
         } else {
             groups.push((
                 plan.box_index,
                 plan.table_index,
+                plan.tile_rows,
                 plan.row_count,
                 vec![plan_index],
             ));
         }
     }
-    let tile_rows = tick_tile_rows();
     let mut tasks = Vec::new();
-    for (_, _, row_count, plan_indices) in groups {
+    for (_, _, tile_rows, row_count, plan_indices) in groups {
         for start in (0..row_count).step_by(tile_rows) {
             tasks.push(TileTask {
                 plan_indices: plan_indices.clone(),
@@ -1334,12 +1470,22 @@ fn finish_tick(
     }
 }
 
+struct ViewTilingCandidate {
+    ordinal: usize,
+    box_index: usize,
+    view_index: usize,
+    table_index: usize,
+    row_count: usize,
+    profile: TiledPlanProfile,
+}
+
 struct PreparedView<'state> {
     ordinal: usize,
     box_index: usize,
     view_index: usize,
     table_index: usize,
     row_count: usize,
+    tile_rows: usize,
     reduce: ViewReduce,
     filter: Option<PreparedExpr<'state>>,
     value: Option<PreparedExpr<'state>>,
@@ -1497,7 +1643,7 @@ fn prepare_tiled_views(
     let mut results = std::iter::repeat_with(|| None)
         .take(view_count)
         .collect::<Vec<_>>();
-    let mut plans = Vec::new();
+    let mut candidates = Vec::new();
     let mut ordinal = 0;
     for (box_index, model_box) in model.model().boxes.iter().enumerate() {
         for (view_index, view) in model_box.views.iter().enumerate() {
@@ -1514,10 +1660,6 @@ fn prepare_tiled_views(
                     continue;
                 }
             };
-            if !tick_tiling_enabled(row_count) {
-                ordinal += 1;
-                continue;
-            }
             let table = match EvalTable::new(model, &model_box.name, &view.table) {
                 Ok(table) => table,
                 Err(error) => {
@@ -1526,16 +1668,118 @@ fn prepare_tiled_views(
                     continue;
                 }
             };
+            let mut profile = TiledPlanProfile::default();
+            let filter_eligible = match &view.filter {
+                Some(filter) => match tiled_expr_footprint(filter, table) {
+                    Ok(Some(footprint)) => {
+                        profile.include(footprint);
+                        true
+                    }
+                    Ok(None) => false,
+                    Err(error) => {
+                        results[ordinal] = Some(Err(error.into()));
+                        false
+                    }
+                },
+                None => true,
+            };
+            let value_eligible = match view.reduce {
+                ViewReduce::Count => true,
+                ViewReduce::Sum | ViewReduce::Min | ViewReduce::Max => {
+                    let expression = view
+                        .value
+                        .as_ref()
+                        .expect("validated numeric view has a value");
+                    match tiled_expr_footprint(expression, table) {
+                        Ok(Some(footprint)) => {
+                            profile.include(footprint);
+                            true
+                        }
+                        Ok(None) => false,
+                        Err(error) => {
+                            results[ordinal] = Some(Err(error.into()));
+                            false
+                        }
+                    }
+                }
+            };
+            if filter_eligible && value_eligible {
+                candidates.push(ViewTilingCandidate {
+                    ordinal,
+                    box_index,
+                    view_index,
+                    table_index,
+                    row_count,
+                    profile,
+                });
+            }
+            ordinal += 1;
+        }
+    }
+
+    let mut candidate_groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
+    for (candidate_index, candidate) in candidates.iter().enumerate() {
+        if let Some((_, _, _, indices)) =
+            candidate_groups
+                .iter_mut()
+                .find(|(box_index, table_index, _, _)| {
+                    (*box_index, *table_index) == (candidate.box_index, candidate.table_index)
+                })
+        {
+            indices.push(candidate_index);
+        } else {
+            candidate_groups.push((
+                candidate.box_index,
+                candidate.table_index,
+                candidate.row_count,
+                vec![candidate_index],
+            ));
+        }
+    }
+
+    let mut plans = Vec::new();
+    for (_, _, row_count, candidate_indices) in candidate_groups {
+        // A Count plan reduces and drops its filter before the next plan.
+        // Numeric filter/value roots stay in the task output until canonical
+        // ordered reduction, so account for those retained roots while walking
+        // plans in declaration order. Work always accumulates across plans.
+        let mut node_count = 0_usize;
+        let mut retained_numeric_roots = 0_usize;
+        let mut live_set_bytes_per_row = 1_usize;
+        for candidate_index in &candidate_indices {
+            let candidate = &candidates[*candidate_index];
+            node_count = node_count.saturating_add(candidate.profile.node_count);
+            live_set_bytes_per_row = live_set_bytes_per_row.max(
+                retained_numeric_roots.saturating_add(candidate.profile.live_set_bytes_per_row()),
+            );
+            if model.model().boxes[candidate.box_index].views[candidate.view_index].reduce
+                != ViewReduce::Count
+            {
+                retained_numeric_roots = retained_numeric_roots
+                    .saturating_add(candidate.profile.retained_root_bytes_per_row);
+            }
+        }
+        let tile_rows = tick_tile_rows_for_live_set(live_set_bytes_per_row);
+        if !tick_tiling_enabled(row_count, node_count) || row_count <= tile_rows {
+            continue;
+        }
+        for candidate_index in candidate_indices {
+            let candidate = &candidates[candidate_index];
+            let model_box = &model.model().boxes[candidate.box_index];
+            let view = &model_box.views[candidate.view_index];
+            let table = match EvalTable::new(model, &model_box.name, &view.table) {
+                Ok(table) => table,
+                Err(error) => {
+                    results[candidate.ordinal] = Some(Err(error.into()));
+                    continue;
+                }
+            };
             let filter = match &view.filter {
                 Some(filter) => match prepare_row_expr(filter, table, snapshot, params) {
                     Ok(Some(filter)) => Some(filter),
-                    Ok(None) => {
-                        ordinal += 1;
-                        continue;
-                    }
+                    Ok(None) => continue,
                     Err(error) => {
-                        results[ordinal] = Some(Err(error.into()));
-                        ordinal += 1;
+                        results[candidate.ordinal] = Some(Err(error.into()));
                         continue;
                     }
                 },
@@ -1550,55 +1794,54 @@ fn prepare_tiled_views(
                         .expect("validated numeric view has a value");
                     match prepare_row_expr(expression, table, snapshot, params) {
                         Ok(Some(value)) => Some(value),
-                        Ok(None) => {
-                            ordinal += 1;
-                            continue;
-                        }
+                        Ok(None) => continue,
                         Err(error) => {
-                            results[ordinal] = Some(Err(error.into()));
-                            ordinal += 1;
+                            results[candidate.ordinal] = Some(Err(error.into()));
                             continue;
                         }
                     }
                 }
             };
             plans.push(PreparedView {
-                ordinal,
-                box_index,
-                view_index,
-                table_index,
-                row_count,
+                ordinal: candidate.ordinal,
+                box_index: candidate.box_index,
+                view_index: candidate.view_index,
+                table_index: candidate.table_index,
+                row_count: candidate.row_count,
+                tile_rows,
                 reduce: view.reduce,
                 filter,
                 value,
             });
-            ordinal += 1;
         }
     }
     if plans.is_empty() {
         return results;
     }
 
-    let mut groups: Vec<(usize, usize, usize, Vec<usize>)> = Vec::new();
+    let mut groups: Vec<(usize, usize, usize, usize, Vec<usize>)> = Vec::new();
     for (plan_index, plan) in plans.iter().enumerate() {
-        if let Some((_, _, _, indices)) =
-            groups.iter_mut().find(|(box_index, table_index, _, _)| {
-                (*box_index, *table_index) == (plan.box_index, plan.table_index)
-            })
+        if let Some((_, _, _, _, indices)) =
+            groups
+                .iter_mut()
+                .find(|(box_index, table_index, tile_rows, _, _)| {
+                    (*box_index, *table_index, *tile_rows)
+                        == (plan.box_index, plan.table_index, plan.tile_rows)
+                })
         {
             indices.push(plan_index);
         } else {
             groups.push((
                 plan.box_index,
                 plan.table_index,
+                plan.tile_rows,
                 plan.row_count,
                 vec![plan_index],
             ));
         }
     }
-    let tile_rows = tick_tile_rows();
     let mut tasks = Vec::new();
-    for (_, _, row_count, plan_indices) in groups {
+    for (_, _, tile_rows, row_count, plan_indices) in groups {
         for start in (0..row_count).step_by(tile_rows) {
             tasks.push(TileTask {
                 plan_indices: plan_indices.clone(),
@@ -2859,8 +3102,8 @@ mod parallel_tests {
     use crate::eval::with_test_tick_tiles;
     use crate::state::{ColumnInit, StateStore, TableInit};
     use sembla_ir::{
-        validate, Attr, Box as ModelBox, Model, ParamDecl, ParamType, ParamValue, ResourceClaim,
-        Table, Transition, ViewDecl,
+        parse_json, validate, Attr, Box as ModelBox, Model, ParamDecl, ParamType, ParamValue,
+        ResourceClaim, Table, Transition, ViewDecl,
     };
 
     fn tiled_fixture(row_count: usize) -> (ValidatedModel, StateStore) {
@@ -3034,6 +3277,130 @@ mod parallel_tests {
         )
         .unwrap();
         (model, state)
+    }
+
+    fn static_view_profiles(
+        model: &ValidatedModel,
+        box_index: usize,
+        table_name: &str,
+    ) -> Vec<TiledPlanProfile> {
+        let model_box = &model.model().boxes[box_index];
+        let table = EvalTable::new(model, &model_box.name, table_name).unwrap();
+        model_box
+            .views
+            .iter()
+            .filter(|view| view.table == table_name)
+            .map(|view| {
+                let mut profile = TiledPlanProfile::default();
+                if let Some(filter) = &view.filter {
+                    profile.include(tiled_expr_footprint(filter, table).unwrap().unwrap());
+                }
+                if let Some(value) = &view.value {
+                    profile.include(tiled_expr_footprint(value, table).unwrap().unwrap());
+                }
+                profile
+            })
+            .collect()
+    }
+
+    #[test]
+    fn benchmark_shapes_derive_hand_checked_tiles_and_work_decisions() {
+        let (mixed_transition_model, _) = tiled_fixture(1);
+        let mixed_profiles = mixed_transition_model.model().boxes[0]
+            .transitions
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                transition_tiling_profile(&mixed_transition_model, 0, index)
+                    .unwrap()
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            mixed_profiles
+                .iter()
+                .map(|profile| profile.node_count)
+                .sum::<usize>(),
+            15
+        );
+        let mixed_live_set = mixed_profiles
+            .iter()
+            .map(|profile| profile.live_set_bytes_per_row())
+            .max()
+            .unwrap();
+        assert_eq!(mixed_live_set, 37);
+        assert_eq!(tick_tile_rows_for_live_set(mixed_live_set), 832);
+
+        let demographic = validate(
+            parse_json(include_str!(
+                "../../../fixtures/demographic/benchmark/demographic_slots.no-grouped.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let transition_profiles = demographic.model().boxes[0]
+            .transitions
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                transition_tiling_profile(&demographic, 0, index)
+                    .unwrap()
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let transition_nodes = transition_profiles
+            .iter()
+            .map(|profile| profile.node_count)
+            .sum::<usize>();
+        let transition_live_set = transition_profiles
+            .iter()
+            .map(|profile| profile.live_set_bytes_per_row())
+            .max()
+            .unwrap();
+        assert_eq!(transition_nodes, 65);
+        assert_eq!(transition_live_set, 33);
+        assert_eq!(tick_tile_rows_for_live_set(transition_live_set), 960);
+        assert!(tick_tiling_enabled(1_000_000, transition_nodes));
+
+        let demographic_views = static_view_profiles(&demographic, 0, "person_slot");
+        let demographic_view_nodes = demographic_views
+            .iter()
+            .map(|profile| profile.node_count)
+            .sum::<usize>();
+        let demographic_view_live_set = demographic_views
+            .iter()
+            .map(|profile| profile.live_set_bytes_per_row())
+            .max()
+            .unwrap();
+        assert_eq!(demographic_view_nodes, 67);
+        assert_eq!(demographic_view_live_set, 20);
+        assert_eq!(
+            tick_tile_rows_for_live_set(demographic_view_live_set),
+            1_600
+        );
+        assert!(tick_tiling_enabled(1_000_000, demographic_view_nodes));
+
+        let canary = validate(
+            parse_json(include_str!(
+                "../../../fixtures/performance/many_views_tiling_canary.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let canary_views = static_view_profiles(&canary, 0, "row");
+        let canary_view_nodes = canary_views
+            .iter()
+            .map(|profile| profile.node_count)
+            .sum::<usize>();
+        let canary_view_live_set = canary_views
+            .iter()
+            .map(|profile| profile.live_set_bytes_per_row())
+            .max()
+            .unwrap();
+        assert_eq!(canary_view_nodes, 680);
+        assert_eq!(canary_view_live_set, 41);
+        assert_eq!(tick_tile_rows_for_live_set(canary_view_live_set), 768);
+        assert!(tick_tiling_enabled(262_144, canary_view_nodes));
     }
 
     fn parameter_type_fixture(

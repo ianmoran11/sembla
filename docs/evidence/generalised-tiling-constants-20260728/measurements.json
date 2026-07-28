@@ -1,0 +1,479 @@
+{
+  "schema": "sembla-generalised-tiling-constants-v1",
+  "session": {
+    "date": "2026-07-28",
+    "baseline_commit": "f86c9e4e0f23cd83f2869fd458be8dfabebfe891",
+    "machine": "Apple M2 Pro",
+    "architecture": "arm64",
+    "available_parallelism": 10
+  },
+  "binaries": {
+    "before_sha256": "bee6cb2ad2efe2bfd9d96aac31ded0d73cc6c76ede314f0f66523e6cce3738c4",
+    "after_sha256": "3b7bf73c05a330ef42b570dd24bb92ff072be29245cd4c852b610d1738a3b1ca"
+  },
+  "implementation": {
+    "cache_budget_bytes": 32768,
+    "minimum_tile_rows": 64,
+    "maximum_tile_rows": 4096,
+    "work_threshold_node_rows": 1500000,
+    "rounding": "down to a multiple of 64",
+    "demographic_transition": {
+      "retained_root_bytes_per_row": 13,
+      "peak_bytes_per_row": 20,
+      "live_set_bytes_per_row": 33,
+      "derived_tile_rows": 960,
+      "tiled_node_count": 65,
+      "row_count": 1000000,
+      "work": 65000000,
+      "qualifies": true
+    },
+    "demographic_views": {
+      "largest_live_set_bytes_per_row": 20,
+      "derived_tile_rows": 1600,
+      "tiled_node_count": 67,
+      "row_count": 1000000,
+      "work": 67000000,
+      "qualifies": true
+    },
+    "many_views_canary": {
+      "view_count": 40,
+      "largest_live_set_bytes_per_row": 41,
+      "derived_tile_rows": 768,
+      "tiled_node_count": 680,
+      "row_count": 262144,
+      "work": 178257920,
+      "qualifies": true
+    },
+    "threading_spike_calibration": {
+      "guard_nodes": 7,
+      "rows_negative_side": 131072,
+      "work_negative_side": 917504,
+      "rows_positive_side": 262144,
+      "work_positive_side": 1835008
+    }
+  },
+  "cases": {
+    "demographic": {
+      "model": "generated companion of fixtures/demographic/benchmark/demographic_slots.no-grouped.json",
+      "population": "generated 1M state",
+      "ticks": 24,
+      "seed": 9009,
+      "backend": "cpu",
+      "areas": 4,
+      "present_fraction": 0.8,
+      "streams": "birth:600,overseas:250,internal:150",
+      "model_sha256": "601766d8c11443cb05da2500b00bb78fade375b8df2d0323bae35b7d8a17a130",
+      "population_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b"
+    },
+    "many_views_canary": {
+      "model": "fixtures/performance/many_views_tiling_canary.json",
+      "population": 262144,
+      "ticks": 24,
+      "seed": 9009,
+      "backend": "cpu",
+      "views": 40
+    }
+  },
+  "runs": [
+    {
+      "build": "before",
+      "mode": "default",
+      "run": 1,
+      "wall_seconds": 3.18,
+      "user_seconds": 4.68,
+      "sys_seconds": 0.78,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "default",
+      "run": 2,
+      "wall_seconds": 3.22,
+      "user_seconds": 4.64,
+      "sys_seconds": 0.84,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "default",
+      "run": 3,
+      "wall_seconds": 3.09,
+      "user_seconds": 4.64,
+      "sys_seconds": 0.74,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "default",
+      "run": 4,
+      "wall_seconds": 3.16,
+      "user_seconds": 4.69,
+      "sys_seconds": 0.77,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "default",
+      "run": 5,
+      "wall_seconds": 3.14,
+      "user_seconds": 4.65,
+      "sys_seconds": 0.76,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "single",
+      "run": 1,
+      "wall_seconds": 4.97,
+      "user_seconds": 4.07,
+      "sys_seconds": 0.87,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "single",
+      "run": 2,
+      "wall_seconds": 4.95,
+      "user_seconds": 4.11,
+      "sys_seconds": 0.78,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "single",
+      "run": 3,
+      "wall_seconds": 5.14,
+      "user_seconds": 4.22,
+      "sys_seconds": 0.85,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "single",
+      "run": 4,
+      "wall_seconds": 4.9,
+      "user_seconds": 4.09,
+      "sys_seconds": 0.78,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "before",
+      "mode": "single",
+      "run": 5,
+      "wall_seconds": 4.97,
+      "user_seconds": 4.1,
+      "sys_seconds": 0.82,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "default",
+      "run": 1,
+      "wall_seconds": 3.16,
+      "user_seconds": 4.64,
+      "sys_seconds": 0.78,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "default",
+      "run": 2,
+      "wall_seconds": 3.1,
+      "user_seconds": 4.62,
+      "sys_seconds": 0.75,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "default",
+      "run": 3,
+      "wall_seconds": 3.12,
+      "user_seconds": 4.65,
+      "sys_seconds": 0.76,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "default",
+      "run": 4,
+      "wall_seconds": 3.12,
+      "user_seconds": 4.64,
+      "sys_seconds": 0.76,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "default",
+      "run": 5,
+      "wall_seconds": 3.15,
+      "user_seconds": 4.63,
+      "sys_seconds": 0.77,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "single",
+      "run": 1,
+      "wall_seconds": 4.97,
+      "user_seconds": 4.09,
+      "sys_seconds": 0.83,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "single",
+      "run": 2,
+      "wall_seconds": 4.9,
+      "user_seconds": 4.06,
+      "sys_seconds": 0.81,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "single",
+      "run": 3,
+      "wall_seconds": 4.87,
+      "user_seconds": 4.08,
+      "sys_seconds": 0.77,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "single",
+      "run": 4,
+      "wall_seconds": 4.9,
+      "user_seconds": 4.08,
+      "sys_seconds": 0.75,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "build": "after",
+      "mode": "single",
+      "run": 5,
+      "wall_seconds": 4.86,
+      "user_seconds": 4.06,
+      "sys_seconds": 0.76,
+      "csv_sha256": "eb6d095740127bbf41576d6b05f1470656dbb5f85372ef2ff5f1751576303e37",
+      "case": "demographic"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "default",
+      "run": 1,
+      "wall_seconds": 2.47,
+      "user_seconds": 1.87,
+      "sys_seconds": 0.57,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "default",
+      "run": 2,
+      "wall_seconds": 2.44,
+      "user_seconds": 1.87,
+      "sys_seconds": 0.56,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "default",
+      "run": 3,
+      "wall_seconds": 2.49,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.58,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "default",
+      "run": 4,
+      "wall_seconds": 2.48,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.57,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "default",
+      "run": 5,
+      "wall_seconds": 2.45,
+      "user_seconds": 1.87,
+      "sys_seconds": 0.57,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "single",
+      "run": 1,
+      "wall_seconds": 2.48,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.58,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "single",
+      "run": 2,
+      "wall_seconds": 2.42,
+      "user_seconds": 1.86,
+      "sys_seconds": 0.55,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "single",
+      "run": 3,
+      "wall_seconds": 2.42,
+      "user_seconds": 1.86,
+      "sys_seconds": 0.56,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "single",
+      "run": 4,
+      "wall_seconds": 2.41,
+      "user_seconds": 1.86,
+      "sys_seconds": 0.55,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "before",
+      "mode": "single",
+      "run": 5,
+      "wall_seconds": 2.41,
+      "user_seconds": 1.85,
+      "sys_seconds": 0.55,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "default",
+      "run": 1,
+      "wall_seconds": 0.32,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.02,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "default",
+      "run": 2,
+      "wall_seconds": 0.31,
+      "user_seconds": 1.89,
+      "sys_seconds": 0.02,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "default",
+      "run": 3,
+      "wall_seconds": 0.32,
+      "user_seconds": 1.86,
+      "sys_seconds": 0.02,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "default",
+      "run": 4,
+      "wall_seconds": 0.33,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.02,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "default",
+      "run": 5,
+      "wall_seconds": 0.31,
+      "user_seconds": 1.88,
+      "sys_seconds": 0.02,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "single",
+      "run": 1,
+      "wall_seconds": 1.56,
+      "user_seconds": 1.55,
+      "sys_seconds": 0.01,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "single",
+      "run": 2,
+      "wall_seconds": 1.56,
+      "user_seconds": 1.54,
+      "sys_seconds": 0.01,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "single",
+      "run": 3,
+      "wall_seconds": 1.56,
+      "user_seconds": 1.55,
+      "sys_seconds": 0.01,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "single",
+      "run": 4,
+      "wall_seconds": 1.56,
+      "user_seconds": 1.54,
+      "sys_seconds": 0.01,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    },
+    {
+      "case": "many_views_canary",
+      "build": "after",
+      "mode": "single",
+      "run": 5,
+      "wall_seconds": 1.56,
+      "user_seconds": 1.54,
+      "sys_seconds": 0.01,
+      "csv_sha256": "7e8654bae6f4619e3faee12c32a72085aeb2f22e8d1de4d7cb34b48dd7d36368"
+    }
+  ]
+}
