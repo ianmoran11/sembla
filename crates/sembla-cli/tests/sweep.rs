@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
+use sembla_runtime::state_artifact::write;
 use sha2::{Digest, Sha256};
 
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
@@ -268,11 +270,183 @@ fn output_files(path: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
         .collect()
 }
 
+fn retained_backend_fixture(
+    model_name: &str,
+) -> (PathBuf, sembla_ir::ValidatedModel, Vec<TableInit>) {
+    let model_path = repository_path(format!(
+        "crates/sembla-cli/tests/fixtures/{model_name}.json"
+    ));
+    let source = std::fs::read_to_string(&model_path).unwrap();
+    let features = if model_name == "grouped_observation" {
+        sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()])
+    } else {
+        sembla_ir::FeatureSet::new()
+    };
+    let model =
+        sembla_ir::validate_with_features(sembla_ir::parse_json(&source).unwrap(), &features)
+            .unwrap();
+    let tables = if model_name == "contest_competing_exits" {
+        vec![
+            TableInit::new("World", "slot_resource", 100, Vec::new()),
+            TableInit::new(
+                "World",
+                "slot",
+                100,
+                vec![
+                    ColumnInit::new("occupancy", ColumnData::Enum(vec![0; 100])),
+                    ColumnInit::new("cause", ColumnData::Enum(vec![0; 100])),
+                    ColumnInit::new("slot_resource", ColumnData::Ref((0_u32..100).collect())),
+                ],
+            ),
+        ]
+    } else {
+        vec![
+            TableInit::new("world", "area", 12, Vec::new()),
+            TableInit::new(
+                "world",
+                "person_slot",
+                5,
+                vec![
+                    ColumnInit::new("sex", ColumnData::Enum(vec![0, 0, 1, 1, 0])),
+                    ColumnInit::new("area", ColumnData::Ref(vec![10, 2, 10, 2, 2])),
+                    ColumnInit::new("age_months", ColumnData::Int(vec![-1, 0, 59, 60, 120])),
+                    ColumnInit::new("occupancy", ColumnData::Enum(vec![0; 5])),
+                ],
+            ),
+        ]
+    };
+    (model_path, model, tables)
+}
+
+#[test]
+fn retained_draw_matches_fresh_backend_for_contests_and_grouped_under_both_noise_modes() {
+    let temp = temp_dir("retained-draw-independence");
+    for model_name in ["contest_competing_exits", "grouped_observation"] {
+        let (model_path, model, tables) = retained_backend_fixture(model_name);
+        let state = temp.join(format!("{model_name}.state"));
+        write(&state, &model, &tables).unwrap();
+        for noise in ["crn", "independent"] {
+            let sweep_out = temp.join(format!("{model_name}-{noise}-sweep"));
+            let mut sweep = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            sweep
+                .arg("sweep")
+                .arg(&model_path)
+                .args([
+                    "--seed", "9182", "--draws", "4", "--ticks", "5", "--noise", noise,
+                ])
+                .arg("--population")
+                .arg(&state)
+                .arg("--out")
+                .arg(&sweep_out);
+            if model_name == "grouped_observation" {
+                sweep.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
+            }
+            assert_success(&sweep.output().unwrap());
+
+            let sweep_manifest = run_manifest(&sweep_out);
+            let execution = &sweep_manifest["executions"][3];
+            let seed = execution["seed"].as_u64().unwrap().to_string();
+            let fresh_csv = temp.join(format!("{model_name}-{noise}-fresh.csv"));
+            let mut fresh = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            fresh
+                .arg("run")
+                .arg(&model_path)
+                .arg("--population")
+                .arg(&state)
+                .args(["--seed", &seed, "--ticks", "5", "--out"])
+                .arg(&fresh_csv);
+            if model_name == "grouped_observation" {
+                fresh.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
+            }
+            assert_success(&fresh.output().unwrap());
+            assert_eq!(
+                file(&sweep_out, "draw_3.csv"),
+                std::fs::read(&fresh_csv).unwrap(),
+                "main output for {model_name}/{noise}"
+            );
+            if model_name == "grouped_observation" {
+                assert_eq!(
+                    file(&sweep_out, "draw_3.grouped.population_cells.csv"),
+                    std::fs::read(temp.join(format!(
+                        "{model_name}-{noise}-fresh.grouped.population_cells.csv"
+                    )))
+                    .unwrap(),
+                    "grouped output for {noise}"
+                );
+            }
+            let fresh_manifest: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(temp.join(format!("{model_name}-{noise}-fresh.csv.manifest.json")))
+                    .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(execution["resolved_theta"], serde_json::json!({}));
+            for field in [
+                "results_sha256",
+                "final_state_sha256",
+                "observation_sha256",
+                "grouped_outputs",
+            ] {
+                assert_eq!(execution[field], fresh_manifest[field], "{field}");
+            }
+        }
+    }
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
 fn source_artifact_digest(path: &Path) -> String {
     let mut hasher = Sha256::new();
     hasher.update(b"sembla.source-artifact/v1\0");
     hasher.update(std::fs::read(path).unwrap());
     format!("{:x}", hasher.finalize())
+}
+
+#[test]
+fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
+    let temp = temp_dir("sweep-timing");
+    let population = temp.join("population.bin");
+    synth(&population, 200, 10, 3);
+    let timed = temp.join("timed");
+    let plain = temp.join("plain");
+    let timing = temp.join("timing.json");
+
+    let mut timed_command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    timed_command
+        .arg("sweep")
+        .arg(repository_path("examples/sir.json"))
+        .arg("--population")
+        .arg(&population)
+        .args([
+            "--seed",
+            "19",
+            "--draws",
+            "3",
+            "--ticks",
+            "4",
+            "--timing-json",
+        ])
+        .arg(&timing)
+        .arg("--out")
+        .arg(&timed);
+    assert_success(&timed_command.output().unwrap());
+    sweep(&population, &plain, 19, 3, 4, None);
+    assert_eq!(output_files(&timed), output_files(&plain));
+
+    let document: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(timing).unwrap()).unwrap();
+    assert_eq!(document["schema"], "sembla-sweep-timing-v1");
+    assert_eq!(document["draws"], 3);
+    assert_eq!(document["draw_timings"].as_array().unwrap().len(), 3);
+    assert!(document["whole_sweep_wall_time_ms"].as_f64().unwrap() > 0.0);
+    assert!(
+        document["draw_zero_including_setup_wall_time_ms"]
+            .as_f64()
+            .unwrap()
+            >= document["draw_timings"][0]["wall_time_ms"]
+                .as_f64()
+                .unwrap()
+    );
+    assert!(!plain.join("timing.json").exists());
+    std::fs::remove_dir_all(temp).unwrap();
 }
 
 #[test]

@@ -367,6 +367,23 @@ impl StateStore {
         Ok(())
     }
 
+    /// Resets a retained execution backend for a new draw without replacing any
+    /// state or input column allocation.
+    ///
+    /// Constructor-equivalent validation and shape checks complete before any
+    /// mutation. Both state buffers are restored and every delivered input is
+    /// returned to its model-derived empty shape.
+    #[doc(hidden)]
+    pub fn reset_backend_draw(
+        &mut self,
+        model: &ValidatedModel,
+        tables: &[TableInit],
+    ) -> Result<(), StateError> {
+        self.validate_backend_state_refresh(model, tables)?;
+        self.apply_backend_draw_reset(model, tables);
+        Ok(())
+    }
+
     /// Atomically refreshes state and input tables from one backend snapshot.
     #[doc(hidden)]
     pub fn refresh_backend_snapshot(
@@ -406,20 +423,19 @@ impl StateStore {
     }
 
     fn apply_backend_state_refresh(&mut self, model: &ValidatedModel, tables: &[TableInit]) {
-        let mut table_index = 0;
-        for model_box in &model.model().boxes {
-            for table in &model_box.tables {
-                let current = &mut self.current.tables[table_index];
-                let initial = find_table_init(tables, &model_box.name, &table.name)
-                    .expect("validated backend table disappeared");
-                for (column, attr) in current.columns.iter_mut().zip(&table.attrs) {
-                    let incoming = find_column_init(&initial.columns, &attr.name)
-                        .expect("validated backend column disappeared");
-                    overwrite_validated_column(column, &incoming.data);
-                }
-                table_index += 1;
+        overwrite_state_values(&mut self.current, model, tables);
+    }
+
+    fn apply_backend_draw_reset(&mut self, model: &ValidatedModel, tables: &[TableInit]) {
+        overwrite_state_values(&mut self.current, model, tables);
+        overwrite_state_values(&mut self.next, model, tables);
+        for input in &mut self.inputs {
+            input.row_count = 0;
+            for column in &mut input.columns {
+                clear_column_data(column);
             }
         }
+        self.write_prepared = false;
     }
 
     fn validate_backend_inputs(&self, inputs: &[InputTable]) -> Result<(), StateError> {
@@ -1221,6 +1237,32 @@ fn copy_state_values(destination: &mut StateData, source: &StateData) {
     }
 }
 
+fn overwrite_state_values(state: &mut StateData, model: &ValidatedModel, tables: &[TableInit]) {
+    let mut table_index = 0;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let destination = &mut state.tables[table_index];
+            let initial = find_table_init(tables, &model_box.name, &table.name)
+                .expect("validated backend table disappeared");
+            for (column, attr) in destination.columns.iter_mut().zip(&table.attrs) {
+                let incoming = find_column_init(&initial.columns, &attr.name)
+                    .expect("validated backend column disappeared");
+                overwrite_validated_column(column, &incoming.data);
+            }
+            table_index += 1;
+        }
+    }
+}
+
+fn clear_column_data(column: &mut ColumnData) {
+    match column {
+        ColumnData::Real(values) => values.clear(),
+        ColumnData::Int(values) => values.clear(),
+        ColumnData::Enum(values) => values.clear(),
+        ColumnData::Ref(values) => values.clear(),
+    }
+}
+
 fn overwrite_validated_column(column: &mut ColumnState, incoming: &ColumnData) {
     match (column, incoming) {
         (ColumnState::Real { values, .. }, ColumnData::Real(incoming)) => {
@@ -1557,7 +1599,10 @@ mod resolved_write_tests {
               ]}
             ],
             "transitions": [],
-            "inputs": [],
+            "inputs": [{
+              "name": "incoming",
+              "schema": [{"name": "value", "ty": {"kind": "int"}}]
+            }],
             "outputs": []
           }],
           "wires": []
@@ -1601,6 +1646,19 @@ mod resolved_write_tests {
             .collect()
     }
 
+    fn input_allocation_signature(inputs: &[InputTable]) -> Vec<(usize, usize)> {
+        inputs
+            .iter()
+            .flat_map(|input| &input.columns)
+            .map(|column| match column {
+                ColumnData::Real(values) => (values.as_ptr() as usize, values.capacity()),
+                ColumnData::Int(values) => (values.as_ptr() as usize, values.capacity()),
+                ColumnData::Enum(values) => (values.as_ptr() as usize, values.capacity()),
+                ColumnData::Ref(values) => (values.as_ptr() as usize, values.capacity()),
+            })
+            .collect()
+    }
+
     #[test]
     fn backend_refresh_retains_current_and_next_column_allocations() {
         let model = refresh_model();
@@ -1624,5 +1682,61 @@ mod resolved_write_tests {
             let _writes = store.write_buffer().unwrap();
         }
         assert_eq!(allocation_signature(&store.next), next_before);
+    }
+
+    #[test]
+    fn draw_reset_restores_both_buffers_and_empty_inputs_without_reallocation() {
+        let model = refresh_model();
+        let initial = refresh_initial(0);
+        let mut store = StateStore::new(&model, initial.clone()).unwrap();
+        let current_before = allocation_signature(&store.current);
+        let next_before = allocation_signature(&store.next);
+
+        store.inputs[0].row_count = 3;
+        store.inputs[0].columns[0] = ColumnData::Int(Vec::with_capacity(8));
+        let ColumnData::Int(values) = &mut store.inputs[0].columns[0] else {
+            unreachable!()
+        };
+        values.extend([4, 5, 6]);
+        let inputs_before = input_allocation_signature(&store.inputs);
+
+        for offset in [10, 20, 0] {
+            store
+                .reset_backend_draw(&model, &refresh_initial(offset))
+                .unwrap();
+            assert_eq!(allocation_signature(&store.current), current_before);
+            assert_eq!(allocation_signature(&store.next), next_before);
+            assert_eq!(input_allocation_signature(&store.inputs), inputs_before);
+            assert_eq!(store.inputs[0].row_count, 0);
+            assert_eq!(store.inputs[0].columns[0].len(), 0);
+            assert_eq!(store.snapshot().int("world", "Node", "int", 0), Ok(offset));
+            assert_eq!(store.current, store.next);
+        }
+        assert_eq!(
+            store.current,
+            StateStore::new(&model, initial).unwrap().current
+        );
+    }
+
+    #[test]
+    fn draw_reset_validation_is_constructor_equivalent_and_atomic() {
+        let model = refresh_model();
+        let mut store = StateStore::new(&model, refresh_initial(7)).unwrap();
+        store.inputs[0].row_count = 1;
+        store.inputs[0].columns[0] = ColumnData::Int(vec![99]);
+        let before = store.clone();
+        let mut malformed = refresh_initial(0);
+        malformed[0].columns[2].data = ColumnData::Enum(vec![0, 2, 0]);
+
+        let reset_error = store
+            .reset_backend_draw(&model, &malformed)
+            .unwrap_err()
+            .to_string();
+        let constructor_error = StateStore::new(&model, malformed).unwrap_err().to_string();
+        assert_eq!(reset_error, constructor_error);
+        assert_eq!(store.current, before.current);
+        assert_eq!(store.next, before.next);
+        assert_eq!(store.inputs, before.inputs);
+        assert_eq!(store.write_prepared, before.write_prepared);
     }
 }

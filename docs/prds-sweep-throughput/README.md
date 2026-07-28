@@ -118,8 +118,11 @@ under a second.
 
 ## PRDs
 
-- `0001-reuse-the-backend-across-draws` — construct the backend once per sweep
-  and reset device state per draw, instead of rebuilding both every draw.
+- `0001-reuse-the-backend-across-draws` — implemented locally 2026-07-28:
+  construct one retained CPU/CUDA backend, reset and reseed it per draw, and
+  capture identity once. Local correctness and 1M CPU evidence are recorded in
+  [`../evidence/sweep-backend-reuse-20260728.md`](../evidence/sweep-backend-reuse-20260728.md);
+  10M and GPU collector results remain hardware-pending.
 
 Later PRDs are **deliberately unwritten** and re-scoped from what 0001 measures,
 per §M1. The obvious candidate is running several draws concurrently on one

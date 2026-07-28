@@ -1,0 +1,31 @@
+{
+  "schema": "sembla-external-sweep-timing-v1",
+  "case": "10M slots, 20 draws, 0 ticks, summaries removed; state-reset/clone isolation",
+  "method": "external 3 ms polling for completed draw_N.csv files; identical to baseline boundary",
+  "whole_sweep_wall_time_ms": 34167.714958,
+  "draw0_ms": 5568.405291,
+  "median_later_ms": 1421.2017500000002,
+  "draw_wall_time_ms": [
+    5568.405291,
+    1802.4247919999998,
+    1817.6580829999994,
+    1810.5853340000012,
+    1660.2232910000002,
+    1412.689291999999,
+    1390.740667,
+    1397.1368329999987,
+    1402.8947920000028,
+    1440.9761249999974,
+    1483.0203330000004,
+    1407.3841670000002,
+    1400.2656659999993,
+    1436.2003750000003,
+    1421.2017500000002,
+    1410.0695840000008,
+    1407.1073749999996,
+    1474.344250000002,
+    1538.9052499999998,
+    1418.572833000002
+  ],
+  "binary_sha256": "f75f28a1017f93a0e26eb35fde15211d9ca174dc89dbe50ee961fef82d24ee5a"
+}

@@ -155,6 +155,7 @@ impl ConflictLaunchGeometry {
 pub struct CudaBackend {
     model: ValidatedModel,
     host_state: StateStore,
+    pristine_host_tables: Vec<TableInit>,
     host_tables: Vec<TableInit>,
     generated: GeneratedCuda,
     layout: Layout,
@@ -199,6 +200,7 @@ pub struct CudaBackend {
     mark_effect_active: CudaFunction,
     state: CudaSlice<u8>,
     next_state: CudaSlice<u8>,
+    pristine_state: CudaSlice<u8>,
     column_offsets: CudaSlice<u64>,
     row_counts: CudaSlice<u64>,
     resource_offsets: CudaSlice<u64>,
@@ -387,6 +389,7 @@ impl CudaBackend {
         let params_bytes = pack_params(model, params)?;
         let state = stream.memcpy_stod(&state_bytes).map_err(driver_error)?;
         let next_state = stream.clone_dtod(&state).map_err(driver_error)?;
+        let pristine_state = stream.clone_dtod(&state).map_err(driver_error)?;
         let column_offsets = stream
             .memcpy_stod(&nonempty(&layout.column_offsets))
             .map_err(driver_error)?;
@@ -541,6 +544,7 @@ impl CudaBackend {
         Ok(Self {
             model: model.clone(),
             host_state,
+            pristine_host_tables: initial_tables.clone(),
             host_tables: initial_tables,
             generated,
             layout,
@@ -585,6 +589,7 @@ impl CudaBackend {
             mark_effect_active,
             state,
             next_state,
+            pristine_state,
             column_offsets,
             row_counts,
             resource_offsets,
@@ -646,6 +651,83 @@ impl CudaBackend {
 
     pub fn device_identity(&self) -> &CudaDeviceIdentity {
         &self.device_identity
+    }
+
+    /// Restores every draw-mutable buffer in place and explicitly installs the
+    /// draw's parameters and random seed. Device allocations, compiled code,
+    /// layout metadata, and device identity are retained.
+    pub fn reset_draw(&mut self, params: &ParamEnv, seed: u64) -> Result<(), CudaError> {
+        // Parameter validation/packing is fallible and therefore happens before
+        // any retained state is changed.
+        let params_bytes = pack_params(&self.model, params)?;
+        self.host_state
+            .reset_backend_draw(&self.model, &self.pristine_host_tables)
+            .map_err(|error| CudaError::InvalidInput(error.to_string()))?;
+
+        self.stream
+            .memcpy_dtod(&self.pristine_state, &mut self.state)
+            .map_err(driver_error)?;
+        self.stream
+            .memcpy_dtod(&self.pristine_state, &mut self.next_state)
+            .map_err(driver_error)?;
+        self.stream
+            .memcpy_htod(&params_bytes, &mut self.params)
+            .map_err(driver_error)?;
+
+        macro_rules! zero {
+            ($($buffer:ident),+ $(,)?) => {
+                $(self.stream.memset_zeros(&mut self.$buffer).map_err(driver_error)?;)+
+            };
+        }
+        zero!(
+            inputs,
+            next_inputs,
+            input_counts,
+            next_input_counts,
+            aggregates,
+            aggregate_partials,
+            aggregate_errors,
+            aggregate_facts,
+            aggregate_active,
+            enabled,
+            times,
+            candidate_errors,
+            wins,
+            deferred,
+            instance_resources,
+            instance_keys,
+            instance_rules,
+            instance_entities,
+            winner_keys,
+            winner_rules,
+            winner_entities,
+            winner_instances,
+            owners,
+            owner_values,
+            output_partials,
+            output_errors,
+            observation_values,
+            grouped_extrema,
+            grouped_axis_mins,
+            grouped_axis_cardinalities,
+            grouped_histogram,
+            generic_enum_counts,
+            effect_active,
+            status,
+        );
+        self.stream.synchronize().map_err(driver_error)?;
+        self.seed = seed;
+        self.next_tick = 0;
+        self.host_state_current = true;
+        Ok(())
+    }
+
+    /// Returns a current final host snapshot without consuming the retained
+    /// backend. This is the sweep lifecycle's final-state/hash seam.
+    #[doc(hidden)]
+    pub fn ensure_observed_state(&mut self) -> Result<&StateStore, CudaError> {
+        self.ensure_host_state()?;
+        Ok(&self.host_state)
     }
 
     /// Returns the once-per-run IR eligibility decision used by this backend.

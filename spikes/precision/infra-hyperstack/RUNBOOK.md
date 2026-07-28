@@ -424,6 +424,53 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
+## Retained-backend sweep stage
+
+Set `BENCH_SWEEP=1` only when collecting PRD sweep-throughput evidence. The
+stage is additive, runs before the frozen gate, and is expected to be expensive:
+it performs baseline and current CPU/CUDA sweeps at both 1M and 10M slots, each
+with 20 sequential draws and 24 ticks. Budget the paid session accordingly.
+
+A full baseline commit is mandatory. The collector creates a detached worktree
+at that commit and builds its own release CUDA binary; it never switches or
+dirties the evidence checkout.
+
+```bash
+BENCH_SWEEP=1 \
+BENCH_SWEEP_BASELINE_COMMIT=c0acc2c03d0676750178686c029ffc0ecdadc0ea \
+  bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
+```
+
+Artifacts are under `sweep/<scale>/`, with shared state/model hashes, complete
+output directories, whole-process `/usr/bin/time` records, externally observed
+draw-timing JSON for every arm, and supplementary current `sweep-timing-v1`
+JSON. The external format uses the same completed-file boundary for before and
+after and contains draw 0, every later draw, and total wall time; the native
+current format also records backend setup explicitly. Root-level
+baseline/current binary hashes and the resolved baseline commit make the
+comparison reproducible.
+
+For each scale, `cpu-cuda-parity.txt` is written only after requiring identical
+file sets and comparing every file: draw CSVs, grouped sidecars, summaries,
+`summary.csv`, `manifest.csv`, and `run-manifest.json`. The manifest's existing
+backend identity is the sole normalized field; all scientifically meaningful
+bytes remain exact. The same whole-tree comparison is required for the baseline
+CPU/CUDA pair. Before trusting the comparator, the stage makes a byte-identical
+copy of the 1M current-CPU tree, perturbs only one grouped sidecar, and requires
+comparison with its unmodified source to fail. `negative-control.txt` records
+that isolated result. A missing sidecar or a comparator that accepts the
+perturbation aborts the stage.
+
+Interpret whole-sweep wall time as the headline. Compare draw 0 with the median
+later draw in both arms to verify that setup moves from every baseline draw to
+draw zero only. Because the baseline binary predates `--timing-json`, one Python
+wrapper observes each completed `draw_N.csv` at 3 ms intervals for **all four
+arms** and writes `{baseline,current}-{cpu,cuda}-<scale>.draw-timing.json`. This
+keeps before/after timing boundaries identical, does not alter the baseline
+binary, and does not infer draw boundaries from an average. Native current
+`*-native-timing.json` remains useful for separating setup from draw execution
+but is not compared directly with the external baseline timings.
+
 ## Evidence push: collect through GitHub, not SSH
 
 **Implemented 2026-07-26.** Previously the design needed a live SSH session at

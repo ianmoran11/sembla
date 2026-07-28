@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] [--enable grouped-observations] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--timing-json timing.json] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] [--enable grouped-observations] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -211,6 +211,7 @@ struct SweepOptions {
     out: String,
     params: Option<String>,
     export_pairs: Option<String>,
+    timing_json: Option<String>,
     backend: BackendSelection,
     enabled_features: FeatureSet,
 }
@@ -225,6 +226,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
     let mut theta_file = None;
     let mut noise_mode = None;
     let mut export_pairs = None;
+    let mut timing_json = None;
     let mut backend = None;
     let mut enabled_features = FeatureSet::new();
     let mut index = 0;
@@ -261,6 +263,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
             "--out" => set_once(&mut out, value.clone(), flag)?,
             "--params" => set_once(&mut params, value.clone(), flag)?,
             "--export-pairs" => set_once(&mut export_pairs, value.clone(), flag)?,
+            "--timing-json" => set_once(&mut timing_json, value.clone(), flag)?,
             "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
             "--enable" => {
                 enabled_features.insert(parse_feature(value)?);
@@ -288,6 +291,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         out: out.ok_or_else(|| "missing required flag '--out'".to_owned())?,
         params,
         export_pairs,
+        timing_json,
         backend: backend.unwrap_or_default(),
         enabled_features,
     })
@@ -1666,6 +1670,7 @@ fn params_from_theta_assignment(
 }
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
+    let sweep_started = Instant::now();
     let RunInput { model, plan } = read_executable_input(path, None, &options.enabled_features)?;
     if options.export_pairs.is_some() && model.model().summaries.is_empty() {
         return Err(format!(
@@ -1735,6 +1740,27 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let initial_tables = initialized.tables;
     let out = Path::new(&options.out);
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
+    if let Some(timing_path) = options.timing_json.as_deref().map(Path::new) {
+        let output_directory = out
+            .canonicalize()
+            .map_err(|error| format!("{}: {error}", out.display()))?;
+        if canonical_parent_with_final_component(timing_path)
+            .is_some_and(|path| path.starts_with(&output_directory))
+        {
+            return Err(format!(
+                "--timing-json path '{}' must be outside the sweep output directory '{}'",
+                timing_path.display(),
+                out.display()
+            ));
+        }
+        if options
+            .export_pairs
+            .as_deref()
+            .is_some_and(|path| paths_resolve_to_same_file(timing_path, Path::new(path)))
+        {
+            return Err("--timing-json path conflicts with --export-pairs output".to_owned());
+        }
+    }
     remove_previous_sweep_outputs(out)?;
     if let Some(export_path) = options.export_pairs.as_deref().map(Path::new) {
         if let Some(parent) = export_path
@@ -1805,6 +1831,22 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
 
     let mut all_series = Vec::with_capacity(draw_count as usize);
     let mut reported_columns: Option<Vec<String>> = None;
+    // Construction values are placeholders only: draw zero also follows the
+    // same explicit reset and reseed path as every later draw.
+    let construction_params = ParamEnv::defaults(&model);
+    let setup_started = Instant::now();
+    let mut backend = SweepBackend::new(
+        &model,
+        initial_tables,
+        &construction_params,
+        options.seed,
+        options.backend,
+    )?;
+    let setup_elapsed = setup_started.elapsed();
+    // This sole retained object cannot span devices. Capture identity once at
+    // construction in the unchanged manifest field/schema.
+    run_manifest.backend_identity = Some(backend.identity());
+    let mut draw_durations = Vec::with_capacity(draw_count as usize);
     // Deliberately sequential: declaration order within each k, then k order.
     for draw in 0..draw_count {
         let params = match &theta_file {
@@ -1825,25 +1867,19 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         }
         csv_manifest.push('\n');
 
-        let initial = initial_tables.clone();
         let execution_seed = match options.noise_mode {
             manifest::NoiseMode::Crn => options.seed,
             manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
         };
-        let execution = execute_backend_output_with_features(
+        let draw_started = Instant::now();
+        let execution = backend.run_draw(
             &model,
-            initial,
             &params,
             execution_seed,
             options.ticks,
-            BackendRunMode::final_only(options.backend),
             &options.enabled_features,
         )?;
-        if draw == 0 {
-            run_manifest.backend_identity = Some(execution.identity.clone());
-        } else if run_manifest.backend_identity.as_ref() != Some(&execution.identity) {
-            return Err("backend device identity changed during sweep".to_owned());
-        }
+        draw_durations.push(draw_started.elapsed());
         let output = execution.output;
         if let Some(columns) = &reported_columns {
             if columns != &output.series.columns {
@@ -1864,7 +1900,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 &summary_columns,
             )?;
         }
-        let hashes = execution_hashes(&output, &execution.state);
+        let hashes = execution_hashes_with_state_hash(&output, execution.final_state_hash);
         let grouped_outputs = grouped_output_records(&output.grouped);
         run_manifest.executions.push(manifest::ManifestExecution {
             k: draw,
@@ -1922,6 +1958,34 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             pairs_sha256,
         )?;
         manifest::write_pairs_metadata(&manifest::pairs_sidecar_path(export_path), &metadata)?;
+    }
+    if let Some(path) = &options.timing_json {
+        let timing = SweepTimingDocument {
+            schema: "sembla-sweep-timing-v1",
+            backend: match options.backend {
+                BackendSelection::Cpu => "cpu",
+                BackendSelection::Cuda => "cuda",
+            },
+            draws: draw_count,
+            ticks_per_draw: options.ticks,
+            setup_wall_time_ms: duration_ms(setup_elapsed),
+            draw_zero_including_setup_wall_time_ms: duration_ms(setup_elapsed + draw_durations[0]),
+            draw_timings: draw_durations
+                .into_iter()
+                .enumerate()
+                .map(|(k, elapsed)| SweepTimingDraw {
+                    k: u32::try_from(k).expect("draw count is u32"),
+                    wall_time_ms: duration_ms(elapsed),
+                })
+                .collect(),
+            whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
+            repository_commit: repository_commit()?,
+            binary_sha256: current_binary_sha256()?,
+        };
+        let mut json = serde_json::to_string_pretty(&timing)
+            .map_err(|error| format!("could not serialize sweep timing JSON: {error}"))?;
+        json.push('\n');
+        std::fs::write(path, json).map_err(|error| format!("{path}: {error}"))?;
     }
     let manifest_hash = hex(&Sha256::digest(csv_manifest.as_bytes()));
     let summary_hash = hex(&Sha256::digest(summary.as_bytes()));
@@ -2287,6 +2351,162 @@ fn same_file_identity(_left: &Path, _right: &Path) -> bool {
     false
 }
 
+#[cfg(test)]
+static SWEEP_BACKEND_CONSTRUCTIONS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+enum SweepBackend {
+    Cpu {
+        state: StateStore,
+        initial: Vec<TableInit>,
+    },
+    #[cfg(feature = "cuda")]
+    Cuda(CudaBackend),
+}
+
+struct SweepDrawOutput {
+    output: RunOutput,
+    final_state_hash: [u8; 32],
+}
+
+impl SweepBackend {
+    fn new(
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        initial_params: &ParamEnv,
+        seed: u64,
+        backend: BackendSelection,
+    ) -> Result<Self, String> {
+        #[cfg(test)]
+        SWEEP_BACKEND_CONSTRUCTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        match backend {
+            BackendSelection::Cpu => {
+                let state =
+                    StateStore::new(model, initial.clone()).map_err(|error| error.to_string())?;
+                Ok(Self::Cpu { state, initial })
+            }
+            BackendSelection::Cuda => {
+                #[cfg(feature = "cuda")]
+                {
+                    let backend =
+                        CudaBackend::new(model, initial, initial_params, seed, HashMode::FinalOnly)
+                            .map_err(|error| error.to_string())?;
+                    report_cuda_observation_eligibility(backend.observation_eligibility());
+                    Ok(Self::Cuda(backend))
+                }
+                #[cfg(not(feature = "cuda"))]
+                {
+                    let _ = (model, initial, initial_params, seed);
+                    Err(
+                        "cuda backend unavailable: crate built without the 'cuda' feature"
+                            .to_owned(),
+                    )
+                }
+            }
+        }
+    }
+
+    fn identity(&self) -> manifest::BackendIdentity {
+        match self {
+            Self::Cpu { .. } => manifest::BackendIdentity::cpu_oracle(),
+            #[cfg(feature = "cuda")]
+            Self::Cuda(backend) => {
+                let device = backend.device_identity();
+                manifest::BackendIdentity::cuda_native_f64(
+                    device.gpu_model.clone(),
+                    device.driver_version.clone(),
+                )
+            }
+        }
+    }
+
+    fn run_draw(
+        &mut self,
+        model: &sembla_ir::ValidatedModel,
+        params: &ParamEnv,
+        seed: u64,
+        ticks: u32,
+        enabled_features: &FeatureSet,
+    ) -> Result<SweepDrawOutput, String> {
+        match self {
+            Self::Cpu { state, initial } => {
+                state
+                    .reset_backend_draw(model, initial)
+                    .map_err(|error| error.to_string())?;
+                let output = run_results_output_with_features(
+                    model,
+                    state,
+                    params,
+                    seed,
+                    ticks,
+                    HashMode::FinalOnly,
+                    enabled_features,
+                )?;
+                Ok(SweepDrawOutput {
+                    output,
+                    final_state_hash: state.state_hash(),
+                })
+            }
+            #[cfg(feature = "cuda")]
+            Self::Cuda(backend) => {
+                backend
+                    .reset_draw(params, seed)
+                    .map_err(|error| error.to_string())?;
+                let mut output = RunOutputAccumulator::new(model, params, ticks)?;
+                for tick in 0..ticks {
+                    let (observed_tick, fired_per_box, deferred_per_resource_table, device_views) =
+                        backend
+                            .run_tick_observed_reused()
+                            .map_err(|error| format!("tick {tick}: {error}"))?;
+                    debug_assert_eq!(observed_tick, tick);
+                    let (views, grouped_views, generic_enum_counts) = match device_views {
+                        Some(observation) => (
+                            observation.views,
+                            observation.grouped_views,
+                            observation.generic_enum_counts,
+                        ),
+                        None => {
+                            let views =
+                                executor::observe_views(model, backend.observed_state(), params)
+                                    .map_err(|error| format!("tick {tick}: {error}"))?;
+                            let grouped_views = executor::observe_grouped_views(
+                                model,
+                                backend.observed_state(),
+                                params,
+                            )
+                            .map_err(|error| format!("tick {tick}: {error}"))?;
+                            (views, grouped_views, None)
+                        }
+                    };
+                    let report = cuda_tick_report(
+                        model,
+                        tick,
+                        fired_per_box,
+                        deferred_per_resource_table,
+                        views,
+                        grouped_views,
+                    );
+                    output.push_tick_with_enum_counts(
+                        backend.observed_state(),
+                        tick,
+                        report,
+                        generic_enum_counts.as_deref(),
+                    )?;
+                }
+                let output = output.finish(model, None)?;
+                let final_state_hash = backend
+                    .ensure_observed_state()
+                    .map_err(|error| error.to_string())?
+                    .state_hash();
+                Ok(SweepDrawOutput {
+                    output,
+                    final_state_hash,
+                })
+            }
+        }
+    }
+}
+
 struct BackendRunOutput {
     output: RunOutput,
     state: StateStore,
@@ -2405,6 +2625,26 @@ fn finish_tick_timing(
         wall_time,
         phases,
     })
+}
+
+#[derive(Serialize)]
+struct SweepTimingDraw {
+    k: u32,
+    wall_time_ms: f64,
+}
+
+#[derive(Serialize)]
+struct SweepTimingDocument {
+    schema: &'static str,
+    backend: &'static str,
+    draws: u32,
+    ticks_per_draw: u32,
+    setup_wall_time_ms: f64,
+    draw_zero_including_setup_wall_time_ms: f64,
+    draw_timings: Vec<SweepTimingDraw>,
+    whole_sweep_wall_time_ms: f64,
+    repository_commit: String,
+    binary_sha256: String,
 }
 
 #[derive(Serialize)]
@@ -2722,9 +2962,16 @@ fn execute_backend_output_timed_with_features(
 }
 
 fn execution_hashes(output: &RunOutput, state: &StateStore) -> ExecutionHashes {
+    execution_hashes_with_state_hash(output, state.state_hash())
+}
+
+fn execution_hashes_with_state_hash(
+    output: &RunOutput,
+    final_state_hash: [u8; 32],
+) -> ExecutionHashes {
     ExecutionHashes {
         results_sha256: hex(&Sha256::digest(output.csv.as_bytes())),
-        final_state_sha256: hex(&state.state_hash()),
+        final_state_sha256: hex(&final_state_hash),
         observation_sha256: hex(&Sha256::digest(output.summaries_csv.as_bytes())),
     }
 }
@@ -4656,7 +4903,8 @@ mod tests {
     use super::{
         collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, initialize_population,
         parse_backend, parse_diff_options, run, run_file_result, run_results_output,
-        run_results_output_with_features, BackendSelection, HashMode, RunOptions, VERSION,
+        run_results_output_with_features, sweep_file_result, BackendSelection, HashMode,
+        RunOptions, SweepOptions, SWEEP_BACKEND_CONSTRUCTIONS, VERSION,
     };
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
@@ -4666,6 +4914,47 @@ mod tests {
 
     fn initialized(model: &sembla_ir::ValidatedModel, rows: usize) -> StateStore {
         StateStore::new(model, initialize_population(model, rows)).unwrap()
+    }
+
+    #[test]
+    fn sweep_constructs_one_backend_for_multiple_draws() {
+        use std::sync::atomic::Ordering;
+
+        let out = std::env::temp_dir().join(format!(
+            "sembla-sweep-construction-count-{}-{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("unnamed")
+        ));
+        let _ = std::fs::remove_dir_all(&out);
+        let model = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/reversible_ctmc.json");
+        let options = SweepOptions {
+            seed: 71,
+            draws: Some(4),
+            theta_file: None,
+            noise_mode: super::manifest::NoiseMode::Independent,
+            ticks: 3,
+            population: "32".to_owned(),
+            out: out.display().to_string(),
+            params: None,
+            export_pairs: None,
+            timing_json: None,
+            backend: BackendSelection::Cpu,
+            enabled_features: sembla_ir::FeatureSet::new(),
+        };
+
+        SWEEP_BACKEND_CONSTRUCTIONS.store(0, Ordering::SeqCst);
+        sweep_file_result(model.to_str().unwrap(), options).unwrap();
+        assert_eq!(SWEEP_BACKEND_CONSTRUCTIONS.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            std::fs::read_dir(&out)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with("draw_"))
+                .count(),
+            4
+        );
+        std::fs::remove_dir_all(out).unwrap();
     }
 
     #[test]

@@ -10,6 +10,50 @@ fn claim_overflow_model() -> sembla_ir::ValidatedModel {
     sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
 }
 
+fn retained_reset_model() -> sembla_ir::ValidatedModel {
+    let source = r#"{"name":"retained_reset","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Resource","size_hint":8,"attrs":[]},{"name":"Agent","size_hint":8,"attrs":[{"name":"resource","ty":{"kind":"ref","table":"Resource"}},{"name":"state","ty":{"kind":"enum","variants":["waiting","a","b"]}}]}],"transitions":[{"name":"a","table":"Agent","guard":{"kind":"enum_is","attr":"state","variant":"waiting"},"hazard":{"kind":"real","value":0.6},"effects":[{"kind":"set_attr","attr":"state","value":{"kind":"enum","variant":"a"}}],"contests":[{"resource":{"kind":"self_attr","name":"resource"},"ordering":{"kind":"race_time"}}]},{"name":"b","table":"Agent","guard":{"kind":"enum_is","attr":"state","variant":"waiting"},"hazard":{"kind":"real","value":0.7},"effects":[{"kind":"set_attr","attr":"state","value":{"kind":"enum","variant":"b"}}],"contests":[{"resource":{"kind":"self_attr","name":"resource"},"ordering":{"kind":"race_time"}}]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+}
+
+fn retained_reset_state() -> Vec<TableInit> {
+    vec![
+        TableInit::new("world", "Resource", 8, Vec::new()),
+        TableInit::new(
+            "world",
+            "Agent",
+            8,
+            vec![
+                ColumnInit::new("resource", ColumnData::Ref((0_u32..8).collect())),
+                ColumnInit::new("state", ColumnData::Enum(vec![0; 8])),
+            ],
+        ),
+    ]
+}
+
+#[test]
+fn reset_and_reseed_matches_a_fresh_backend_after_prior_draws() {
+    let model = retained_reset_model();
+    let initial = retained_reset_state();
+    let params = ParamEnv::defaults(&model);
+    let mut retained =
+        CudaBackend::new(&model, initial.clone(), &params, 17, HashMode::FinalOnly).unwrap();
+    for _ in 0..2 {
+        retained.run_tick_observed_reused().unwrap();
+    }
+    retained.reset_draw(&params, 91).unwrap();
+    for _ in 0..3 {
+        retained.run_tick_observed_reused().unwrap();
+    }
+    let retained_hash = retained.ensure_observed_state().unwrap().state_hash();
+
+    let mut fresh = CudaBackend::new(&model, initial, &params, 91, HashMode::FinalOnly).unwrap();
+    for _ in 0..3 {
+        fresh.run_tick_observed_reused().unwrap();
+    }
+    let fresh_hash = fresh.ensure_observed_state().unwrap().state_hash();
+    assert_eq!(retained_hash, fresh_hash);
+}
+
 fn claim_overflow_state() -> Vec<TableInit> {
     vec![
         TableInit::new("world", "Worker", 1, Vec::new()),

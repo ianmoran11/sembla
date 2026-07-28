@@ -25,6 +25,10 @@
 #                                 the no-grouped and grouped configurations,
 #                                 --timing-json plus nsys). Additive: the frozen
 #                                 §L4 protocol is unchanged either way.
+#   BENCH_SWEEP=1               - additionally collect retained-backend sweep
+#                                 evidence at 1M and 10M rows, 24 ticks, 20
+#                                 draws; requires BENCH_SWEEP_BASELINE_COMMIT
+#   BENCH_SWEEP_BASELINE_COMMIT - exact clean baseline commit for before/after
 #   BENCH_CORPUS=1              - additionally run the CPU/CUDA differential
 #                                 corpus, including the grouped demographic
 #                                 configuration. Runs BEFORE the frozen gate and
@@ -34,7 +38,8 @@
 #   SSH_FAILURE_LIMIT           - default 5 consecutive poll failures before the
 #                                 collector gives up and says why
 #
-# Both BENCH_PROFILE and BENCH_CORPUS are baked into the content-addressed
+# BENCH_PROFILE, BENCH_CORPUS, BENCH_SWEEP, and its baseline commit are baked
+# into the content-addressed
 # payload hash, so a run with them set will not silently rejoin a plain gate run
 # already in progress -- it is correctly treated as a different payload.
 #
@@ -386,6 +391,8 @@ REMOTE_SCRIPT="$(mktemp)"
 # treated as different payloads instead of one rejoining the other.
 printf 'export BENCH_PROFILE=%q\n' "${BENCH_PROFILE:-0}" > "$REMOTE_SCRIPT"
 printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
 # shellcheck disable=SC1091
@@ -669,6 +676,200 @@ if [[ "${BENCH_CORPUS:-0}" == "1" ]]; then
     echo "Full log: $CORPUS_DIR/run.log" >&2
     exit 6
   fi
+fi
+
+# --- optional retained-backend sweep evidence --------------------------------
+# Runs before the frozen gate and is fully additive. It uses a detached baseline
+# worktree so neither the evidence checkout nor its binary changes in place.
+if [[ "${BENCH_SWEEP:-0}" == "1" ]]; then
+  : "${BENCH_SWEEP_BASELINE_COMMIT:?BENCH_SWEEP=1 requires an exact BENCH_SWEEP_BASELINE_COMMIT}"
+  echo '=== retained-backend sweep evidence (1M and 10M, 24x20) ==='
+  SWEEP_DIR="$OUT_ROOT/sweep"
+  SWEEP_BASELINE_WORKTREE="$OUT_ROOT/baseline-worktree"
+  mkdir -p "$SWEEP_DIR"
+  git rev-parse --verify "${BENCH_SWEEP_BASELINE_COMMIT}^{commit}" \
+    > "$SWEEP_DIR/baseline-commit.txt"
+  git worktree add --detach "$SWEEP_BASELINE_WORKTREE" "$BENCH_SWEEP_BASELINE_COMMIT"
+  (
+    cd "$SWEEP_BASELINE_WORKTREE"
+    cargo build --locked --release -p sembla-cli --features cuda
+  )
+  BASELINE_BIN="$SWEEP_BASELINE_WORKTREE/target/release/sembla"
+  sha256sum "$BASELINE_BIN" > "$SWEEP_DIR/baseline-binary.sha256"
+  sha256sum "$BIN" > "$SWEEP_DIR/current-binary.sha256"
+
+  sweep_measure() {
+    local label="$1"; shift
+    /usr/bin/time -f '{"wall_seconds":%e,"peak_rss_kib":%M}' \
+      -o "$SWEEP_DIR/$label.time.json" \
+      "$@" > "$SWEEP_DIR/$label.stdout" 2> "$SWEEP_DIR/$label.stderr"
+  }
+
+  # Old binaries have no --timing-json. Observe their completed draw files so
+  # before/after evidence still includes draw zero and the median later draw.
+  sweep_measure_observed() {
+    local label="$1" output_dir="$2" draw_count="$3"; shift 3
+    /usr/bin/time -f '{"wall_seconds":%e,"peak_rss_kib":%M}' \
+      -o "$SWEEP_DIR/$label.time.json" \
+      python3 - "$SWEEP_DIR/$label.draw-timing.json" \
+        "$SWEEP_DIR/$label.stdout" "$SWEEP_DIR/$label.stderr" \
+        "$output_dir" "$draw_count" "$@" <<'PY'
+import json, pathlib, shutil, statistics, subprocess, sys, time
+
+timing_path, stdout_path, stderr_path, output_path, draws_s, *command = sys.argv[1:]
+draws = int(draws_s)
+output = pathlib.Path(output_path)
+shutil.rmtree(output, ignore_errors=True)
+started = time.monotonic_ns()
+with open(stdout_path, "wb") as stdout, open(stderr_path, "wb") as stderr:
+    process = subprocess.Popen(command, stdout=stdout, stderr=stderr)
+    observed = {}
+    while process.poll() is None:
+        if output.exists():
+            for draw in range(draws):
+                if draw not in observed and (output / f"draw_{draw}.csv").exists():
+                    observed[draw] = time.monotonic_ns()
+        time.sleep(0.003)
+    return_code = process.wait()
+finished = time.monotonic_ns()
+if return_code:
+    raise SystemExit(return_code)
+for draw in range(draws):
+    if draw not in observed and (output / f"draw_{draw}.csv").exists():
+        observed[draw] = finished
+if len(observed) != draws:
+    raise SystemExit(f"observed {len(observed)} of {draws} draw outputs")
+completion = [(observed[draw] - started) / 1_000_000 for draw in range(draws)]
+durations = [completion[0]] + [
+    completion[draw] - completion[draw - 1] for draw in range(1, draws)
+]
+document = {
+    "schema": "sembla-external-sweep-timing-v1",
+    "method": "3 ms polling for completed draw_N.csv files",
+    "whole_sweep_wall_time_ms": (finished - started) / 1_000_000,
+    "draw_zero_including_setup_wall_time_ms": durations[0],
+    "median_later_draw_wall_time_ms": statistics.median(durations[1:]),
+    "draw_timings": [
+        {"k": draw, "wall_time_ms": duration}
+        for draw, duration in enumerate(durations)
+    ],
+}
+pathlib.Path(timing_path).write_text(json.dumps(document, indent=2) + "\n")
+PY
+  }
+
+  normalize_sweep_tree() {
+    local source="$1" destination="$2"
+    rm -rf "$destination"
+    mkdir -p "$(dirname "$destination")"
+    cp -a "$source" "$destination"
+    python3 - "$destination/run-manifest.json" <<'PY'
+import json, pathlib, sys
+p = pathlib.Path(sys.argv[1])
+doc = json.loads(p.read_text())
+# Backend identity is the one intentionally backend-specific manifest value.
+# Preserve the file and normalize only that established identity field.
+doc["backend_identity"] = {"kind": "normalized-for-cpu-cuda-parity"}
+p.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n")
+PY
+  }
+
+  compare_sweep_trees() {
+    local cpu="$1" cuda="$2" report="$3"
+    local normalized="$SWEEP_DIR/normalized"
+    normalize_sweep_tree "$cpu" "$normalized/cpu"
+    normalize_sweep_tree "$cuda" "$normalized/cuda"
+    local cpu_files cuda_files mismatch=0 compared=0
+    cpu_files="$(cd "$normalized/cpu" && find . -type f -print | LC_ALL=C sort)"
+    cuda_files="$(cd "$normalized/cuda" && find . -type f -print | LC_ALL=C sort)"
+    if [[ "$cpu_files" != "$cuda_files" ]]; then
+      echo 'file-set mismatch' > "$report"
+      return 1
+    fi
+    while IFS= read -r relative; do
+      [[ -z "$relative" ]] && continue
+      compared=$((compared + 1))
+      if ! cmp -s "$normalized/cpu/$relative" "$normalized/cuda/$relative"; then
+        echo "mismatch: $relative" >> "$report"
+        mismatch=1
+      fi
+    done <<<"$cpu_files"
+    if (( mismatch != 0 )); then return 1; fi
+    echo "PASS: $compared files; backend_identity normalized, all other bytes exact" > "$report"
+  }
+
+  negative_checked=false
+  for sweep_scale in 1000000 10000000; do
+    scale_dir="$SWEEP_DIR/$sweep_scale"
+    mkdir -p "$scale_dir"
+    sweep_state="$scale_dir/initial.state"
+    "$BIN" synth-state \
+      --model fixtures/demographic/benchmark/demographic_slots.full.json \
+      --slots "$sweep_scale" --areas "$AREAS" --present-fraction "$PRESENT_FRACTION" \
+      --streams "$STREAMS" --seed "$SEED" --out "$sweep_state" \
+      > "$scale_dir/synth.stdout" 2> "$scale_dir/synth.stderr"
+    sha256sum "$sweep_state" > "$scale_dir/state.sha256"
+    sweep_model="$sweep_state.model.json"
+    sha256sum "$sweep_model" > "$scale_dir/model.sha256"
+
+    sweep_measure_observed "baseline-cpu-$sweep_scale" \
+      "$scale_dir/baseline-cpu" 20 \
+      "$BASELINE_BIN" sweep "$sweep_model" \
+      --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+      --noise independent --backend cpu --enable grouped-observations \
+      --export-pairs "$scale_dir/baseline-cpu-pairs.csv" \
+      --out "$scale_dir/baseline-cpu"
+    sweep_measure_observed "baseline-cuda-$sweep_scale" \
+      "$scale_dir/baseline-cuda" 20 \
+      "$BASELINE_BIN" sweep "$sweep_model" \
+      --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+      --noise independent --backend cuda --enable grouped-observations \
+      --export-pairs "$scale_dir/baseline-cuda-pairs.csv" \
+      --out "$scale_dir/baseline-cuda"
+    sweep_measure_observed "current-cpu-$sweep_scale" \
+      "$scale_dir/current-cpu" 20 \
+      "$BIN" sweep "$sweep_model" \
+      --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+      --noise independent --backend cpu --enable grouped-observations \
+      --export-pairs "$scale_dir/current-cpu-pairs.csv" \
+      --timing-json "$scale_dir/current-cpu-native-timing.json" \
+      --out "$scale_dir/current-cpu"
+    sweep_measure_observed "current-cuda-$sweep_scale" \
+      "$scale_dir/current-cuda" 20 \
+      "$BIN" sweep "$sweep_model" \
+      --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+      --noise independent --backend cuda --enable grouped-observations \
+      --export-pairs "$scale_dir/current-cuda-pairs.csv" \
+      --timing-json "$scale_dir/current-cuda-native-timing.json" \
+      --out "$scale_dir/current-cuda"
+
+    compare_sweep_trees "$scale_dir/current-cpu" "$scale_dir/current-cuda" \
+      "$scale_dir/cpu-cuda-parity.txt"
+    cmp "$scale_dir/current-cpu-pairs.csv" "$scale_dir/current-cuda-pairs.csv"
+    compare_sweep_trees "$scale_dir/baseline-cpu" "$scale_dir/baseline-cuda" \
+      "$scale_dir/baseline-cpu-cuda-parity.txt"
+    cmp "$scale_dir/baseline-cpu-pairs.csv" "$scale_dir/baseline-cuda-pairs.csv"
+
+    if [[ "$negative_checked" != true ]]; then
+      # Start from a byte-identical copy of one arm. The only mismatch is the
+      # deliberate grouped sidecar edit, so rejection proves that exact class
+      # is covered rather than succeeding because of an unrelated backend diff.
+      cp -a "$scale_dir/current-cpu" "$scale_dir/perturbed-cpu"
+      grouped_file="$(find "$scale_dir/perturbed-cpu" -name '*.grouped.*.csv' -print -quit)"
+      [[ -n "$grouped_file" ]] || { echo 'no grouped sidecar for negative control' >&2; exit 8; }
+      printf '# deliberate comparator perturbation\n' >> "$grouped_file"
+      if compare_sweep_trees "$scale_dir/current-cpu" "$scale_dir/perturbed-cpu" \
+          "$scale_dir/negative-control.txt"; then
+        echo 'sweep comparator accepted a perturbed grouped sidecar' >&2
+        exit 8
+      fi
+      echo 'PASS: comparator rejected the sole grouped-sidecar perturbation' \
+        > "$scale_dir/negative-control.txt"
+      negative_checked=true
+    fi
+  done
+  git worktree remove --force "$SWEEP_BASELINE_WORKTREE"
+  echo '=== retained-backend sweep evidence complete ==='
 fi
 
 STATE="$WORK/initial.state"
