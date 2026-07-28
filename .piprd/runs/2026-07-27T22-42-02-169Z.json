@@ -1,7 +1,7 @@
 {
-  "runId": "2026-07-28T00-03-02-244Z",
-  "startedAt": "2026-07-28T00:03:02.244Z",
-  "updatedAt": "2026-07-28T00:38:22.123Z",
+  "runId": "2026-07-27T22-42-02-169Z",
+  "startedAt": "2026-07-27T22:42:02.169Z",
+  "updatedAt": "2026-07-27T23:01:53.709Z",
   "cwd": "/Users/ian/projects/sembla",
   "runner": "piprd",
   "runDir": "/Users/ian/projects/sembla/docs/prds-run-queue",
@@ -10,16 +10,13 @@
     "/Users/ian/projects/sembla/docs/prds-run-queue/0002-device-observation-grouped.md",
     "/Users/ian/projects/sembla/docs/prds-run-queue/0003-generalise-tiling-constants.md"
   ],
-  "currentIndex": 3,
-  "approved": [
-    "docs/prds-run-queue/0003-generalise-tiling-constants.md"
-  ],
-  "commits": [
-    "f77841d"
-  ],
+  "currentIndex": 1,
+  "approved": [],
+  "commits": [],
   "total": 3,
-  "status": "complete",
+  "status": "stopped",
   "stage": "review",
-  "attempt": 1,
-  "adviseEnabled": true
+  "attempt": 5,
+  "adviseEnabled": true,
+  "stoppedReason": "still needs revision after 5 attempt(s)"
 }

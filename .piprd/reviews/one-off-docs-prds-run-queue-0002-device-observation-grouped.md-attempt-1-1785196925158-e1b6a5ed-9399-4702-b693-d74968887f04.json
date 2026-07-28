@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-28T00:02:05.158Z",
+  "runId": "one-off",
+  "prdPath": "docs/prds-run-queue/0002-device-observation-grouped.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-run-queue/0002-device-observation-grouped.md",
+  "attempt": 1,
+  "text": "## Review result\n\n**Assessment: APPROVED**\n\n- Criteria **1–8 pass**.\n- Exact bounds, deterministic limits, zero suppression, ordered `i128` decoding, and full-value tests are present.\n- CUDA rejection guards are removed; §K6 and §K9 match the implementation.\n- The current PRD explicitly permits the changes to reside in separate commits.\n- Grouped demographic differential coverage is present.\n- Goldens and forbidden paths remain unchanged.\n- Required Rust and Markdown gates pass.\n- Criteria **9–12** are properly hardware-pending under §J14.2.\n- Only managed `.piprd/**` state is dirty.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All required local acceptance criteria pass under the amended PRD, authorized scope is respected, goldens remain unchanged, required gates are green, and hardware-only criteria 9–12 are properly documented as pending.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All required local acceptance criteria pass under the amended PRD, authorized scope is respected, goldens remain unchanged, required gates are green, and hardware-only criteria 9–12 are properly documented as pending.",
+    "raw": "## Review result\n\n**Assessment: APPROVED**\n\n- Criteria **1–8 pass**.\n- Exact bounds, deterministic limits, zero suppression, ordered `i128` decoding, and full-value tests are present.\n- CUDA rejection guards are removed; §K6 and §K9 match the implementation.\n- The current PRD explicitly permits the changes to reside in separate commits.\n- Grouped demographic differential coverage is present.\n- Goldens and forbidden paths remain unchanged.\n- Required Rust and Markdown gates pass.\n- Criteria **9–12** are properly hardware-pending under §J14.2.\n- Only managed `.piprd/**` state is dirty.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All required local acceptance criteria pass under the amended PRD, authorized scope is respected, goldens remain unchanged, required gates are green, and hardware-only criteria 9–12 are properly documented as pending.\"}\n```",
+    "source": "json"
+  }
+}

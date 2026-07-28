@@ -4,7 +4,7 @@ Move observation onto the GPU so the CUDA path stops downloading and rebuilding
 the whole state every tick. Run from the Sembla repository with:
 
 ```text
-/piprd run docs/prds-run-queue
+/piprd run docs/prds-device-observation
 ```
 
 `README.md` is ignored by `/piprd run`. Every numbered PRD must read this file
@@ -106,15 +106,16 @@ Hyperstack session. Presenting an unbuilt CUDA path as verified is rejected.
 
 ## PRDs
 
-Both PRDs currently live in [`docs/prds-run-queue/`](../prds-run-queue/), which
-orders the pending work across folders so one `/piprd run` covers it. **This
-README still binds them** — they name it in their first line. When they land,
-they move back here.
+Both **landed 2026-07-28**, approved on local criteria with hardware criteria
+pending under §J14.2. Neither has been compiled with `--features cuda`; that
+happens on the next GPU host.
 
-- `0001-device-observation-ungrouped` — evaluate eligible ungrouped views on the
-  device and skip the per-tick state download when the whole model qualifies.
-- `0002-device-observation-grouped` — the same for grouped views, which is what
-  the real workflow actually uses.
+- `0001-device-side-ungrouped-observation` — evaluate eligible ungrouped views on
+  the device and skip the per-tick state download when the whole model qualifies.
+- `0002-device-side-grouped-observation` — the same for grouped views, which is
+  what the real workflow actually uses. Removed the CUDA rejections, amended §K6
+  and §K9, and added the grouped demographic configuration to the differential
+  corpus — a configuration the corpus had never covered.
 
 **0002 is required, not optional.** The demographic model's calibration and
 validation outputs *are* grouped views — `population_cells` (sex × area ×
