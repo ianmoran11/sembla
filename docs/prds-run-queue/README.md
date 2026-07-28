@@ -1,13 +1,23 @@
 # Run queue
 
-**One PRD queued**, 2026-07-28:
+**Empty.** Nothing is pending.
 
-- `0001-reduce-control-counts-on-device` — belongs to
-  [`docs/prds-cuda-host-path`](../prds-cuda-host-path/README.md), whose README
-  binds it. Queued here because that folder's `0001` has already landed, and
-  running the folder directly risks the runner re-attempting completed work.
+## Last cleared 2026-07-29
 
-Move it back to `prds-cuda-host-path/0002-…` when it is approved.
+`0001-reduce-control-counts-on-device` ran from here and landed as
+[`prds-cuda-host-path/0002`](../prds-cuda-host-path/0002-reduce-control-counts-on-device.md).
+
+**It stalled five attempts first, and the PRD was at fault.** Criterion 7 ran
+`check-prd-allowlist.py` against `docs/prds-cuda-host-path/0002-*.md` — correct
+when written, wrong the moment the PRD was moved here. The glob matched nothing,
+the command exited 2, and no in-run action could fix it.
+
+**So: a criterion must never hard-code the PRD's own path.** Files move between
+their folder and this queue by design, which makes any such path unsatisfiable
+from the other location. Refer to "this PRD at its current path", and run
+`python3 scripts/check-prd-allowlist.py <the PRD>` before queueing — it now
+reports paths passed to a command that do not resolve, which is exactly this
+defect. See `DECISIONS.md` §M5.
 
 This folder exists to gather pending PRDs from several folders under sortable
 names, so one command runs them in the right order:

@@ -804,6 +804,39 @@ PY
     echo "PASS: $compared files; backend_identity normalized, all other bytes exact" > "$report"
   }
 
+  # Records when each arm actually ran. On 2026-07-28 the CPU comparison at 10M
+  # could not distinguish a real 9.9% regression from host drift, because the
+  # two arms being compared ran ~31 minutes apart while the 1M pair ran ~3
+  # minutes apart and differed by 0.8%. The discrepancy tracked the gap as
+  # closely as it tracked the scale, and the design could not separate them.
+  # Ordering below now pairs compared arms adjacently; this file makes the
+  # remaining gap auditable rather than assumed.
+  sweep_stamp() {
+    printf '{"label":"%s","started_utc":"%s","monotonic_s":%s}\n' \
+      "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SECONDS" \
+      >> "$SWEEP_DIR/arm-schedule.jsonl"
+  }
+
+  # Optional NUMA probe. The leading hypothesis for the 10M CPU result is
+  # first-touch placement: the benchmark host is 2 NUMA nodes of 14 cores, the
+  # baseline allocates its state fresh every draw, and the retained backend
+  # keeps whatever placement it got at construction. Interleaving placement
+  # across nodes tests that directly -- if the difference disappears under
+  # `numactl --interleave=all`, it is placement and not the code change.
+  #
+  # Off by default: it adds two more CPU arms per scale, which roughly doubles
+  # the CPU sweep time (~55 minutes at 10M).
+  NUMA_PREFIX=()
+  if [[ "${BENCH_SWEEP_NUMA:-0}" == "1" ]]; then
+    if command -v numactl >/dev/null; then
+      NUMA_PREFIX=(numactl --interleave=all)
+      echo 'BENCH_SWEEP_NUMA=1: adding interleaved-placement CPU arms'
+      numactl --hardware > "$SWEEP_DIR/numa-topology.txt" 2>&1 || true
+    else
+      echo 'BENCH_SWEEP_NUMA=1 but numactl is absent; skipping the NUMA probe' >&2
+    fi
+  fi
+
   negative_checked=false
   for sweep_scale in 1000000 10000000; do
     scale_dir="$SWEEP_DIR/$sweep_scale"
@@ -818,6 +851,12 @@ PY
     sweep_model="$sweep_state.model.json"
     sha256sum "$sweep_model" > "$scale_dir/model.sha256"
 
+    # ORDER MATTERS AND IS DELIBERATE. Each baseline/current pair runs back to
+    # back so the two arms being compared see the closest possible host
+    # conditions. The previous order ran both baselines, then both currents,
+    # which put ~31 minutes between the compared CPU arms at 10M and made drift
+    # indistinguishable from a code effect. Do not regroup by binary.
+    sweep_stamp "baseline-cpu-$sweep_scale"
     sweep_measure_observed "baseline-cpu-$sweep_scale" \
       "$scale_dir/baseline-cpu" 20 \
       "$BASELINE_BIN" sweep "$sweep_model" \
@@ -825,13 +864,7 @@ PY
       --noise independent --backend cpu --enable grouped-observations \
       --export-pairs "$scale_dir/baseline-cpu-pairs.csv" \
       --out "$scale_dir/baseline-cpu"
-    sweep_measure_observed "baseline-cuda-$sweep_scale" \
-      "$scale_dir/baseline-cuda" 20 \
-      "$BASELINE_BIN" sweep "$sweep_model" \
-      --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
-      --noise independent --backend cuda --enable grouped-observations \
-      --export-pairs "$scale_dir/baseline-cuda-pairs.csv" \
-      --out "$scale_dir/baseline-cuda"
+    sweep_stamp "current-cpu-$sweep_scale"
     sweep_measure_observed "current-cpu-$sweep_scale" \
       "$scale_dir/current-cpu" 20 \
       "$BIN" sweep "$sweep_model" \
@@ -840,6 +873,15 @@ PY
       --export-pairs "$scale_dir/current-cpu-pairs.csv" \
       --timing-json "$scale_dir/current-cpu-native-timing.json" \
       --out "$scale_dir/current-cpu"
+    sweep_stamp "baseline-cuda-$sweep_scale"
+    sweep_measure_observed "baseline-cuda-$sweep_scale" \
+      "$scale_dir/baseline-cuda" 20 \
+      "$BASELINE_BIN" sweep "$sweep_model" \
+      --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+      --noise independent --backend cuda --enable grouped-observations \
+      --export-pairs "$scale_dir/baseline-cuda-pairs.csv" \
+      --out "$scale_dir/baseline-cuda"
+    sweep_stamp "current-cuda-$sweep_scale"
     sweep_measure_observed "current-cuda-$sweep_scale" \
       "$scale_dir/current-cuda" 20 \
       "$BIN" sweep "$sweep_model" \
@@ -848,6 +890,27 @@ PY
       --export-pairs "$scale_dir/current-cuda-pairs.csv" \
       --timing-json "$scale_dir/current-cuda-native-timing.json" \
       --out "$scale_dir/current-cuda"
+
+    # NUMA probe: the same CPU pair, adjacent, under interleaved placement.
+    # Compare the baseline/current ratio here against the ratio above. If the
+    # regression is present without interleaving and absent with it, the cause
+    # is first-touch placement rather than the retained backend.
+    if (( ${#NUMA_PREFIX[@]} )); then
+      sweep_stamp "baseline-cpu-numa-$sweep_scale"
+      sweep_measure_observed "baseline-cpu-numa-$sweep_scale" \
+        "$scale_dir/baseline-cpu-numa" 20 \
+        "${NUMA_PREFIX[@]}" "$BASELINE_BIN" sweep "$sweep_model" \
+        --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+        --noise independent --backend cpu --enable grouped-observations \
+        --out "$scale_dir/baseline-cpu-numa"
+      sweep_stamp "current-cpu-numa-$sweep_scale"
+      sweep_measure_observed "current-cpu-numa-$sweep_scale" \
+        "$scale_dir/current-cpu-numa" 20 \
+        "${NUMA_PREFIX[@]}" "$BIN" sweep "$sweep_model" \
+        --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+        --noise independent --backend cpu --enable grouped-observations \
+        --out "$scale_dir/current-cpu-numa"
+    fi
 
     compare_sweep_trees "$scale_dir/current-cpu" "$scale_dir/current-cuda" \
       "$scale_dir/cpu-cuda-parity.txt"
@@ -873,6 +936,14 @@ PY
         > "$scale_dir/negative-control.txt"
       negative_checked=true
     fi
+
+    # The synthesized state must live until every arm at this scale has used it,
+    # but it must not reach the evidence bundle. At 10M it is 458 MB, which is
+    # both larger than the entire rest of the bundle and over GitHub's 100 MB
+    # per-file limit -- the 2026-07-28 evidence could not be pushed until it was
+    # removed by hand. It is a deterministic synth-state output whose digest is
+    # already recorded in state.sha256, so deleting it loses nothing.
+    rm -f "$sweep_state"
   done
   git worktree remove --force "$SWEEP_BASELINE_WORKTREE"
   echo '=== retained-backend sweep evidence complete ==='

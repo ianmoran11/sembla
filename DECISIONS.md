@@ -1970,3 +1970,65 @@ the work is not. In the second case, implement everything else and report the
 single blocked criterion. Five attempts producing nothing is a worse outcome
 than one attempt producing a complete implementation and a named blocker the
 operator can fix in a minute.
+
+### L13. The GPU is no longer the constraint anywhere in the batch path (2026-07-29)
+
+**Decision.** The session of 2026-07-28 verified three things on one H100 PCIe
+host at commit `ca235b0`, and retired the last open correctness question in the
+CUDA path. Evidence:
+`docs/evidence/demographic-bench/hyperstack-l4-20260728T123026Z/`.
+
+**§L12's deadlock is fixed.** `negative_corpus_matches_cpu_status_under_four_geometries`
+passes in **0.10s**, including the new `(4, 128)` multi-warp multi-block
+geometry that PRD 0008 added. The same test consumed 2h31m at 100% GPU before
+the fix. `differential-corpus/exit-code.txt` is **0**, so the corpus is green on
+hardware for the first time since it was automated, and the safety net for
+device-side work is restored.
+
+**Retained sweep backends deliver on CUDA and not on CPU**, which is the
+expected shape — there is no JIT to amortise on the host:
+
+| arm | baseline | current | |
+|---|---:|---:|---|
+| CUDA 1M | 28.68s | **11.63s** | **2.47x** |
+| CUDA 10M | 237.63s | 208.78s | 1.14x |
+| CPU 1M | 152.50s | 153.67s | 0.99x |
+
+Per draw at 1M, the median later draw fell `1406ms -> 497ms` (**2.83x**) while
+draw zero was unchanged at ~1.9s. That separation is the result: setup is now
+paid once per sweep rather than once per draw. The saving is roughly constant
+in absolute terms (0.91s at 1M, 1.55s at 10M) while simulation scales with rows,
+so the benefit is large where startup dominates and shrinks with scale.
+
+**A projection is corrected.** `prds-sweep-throughput/README.md` projected ~28x
+for batch work from an assumed ~2.2s of per-draw startup. Measured startup is
+~0.9s, and the delivered figure is 2.47x. The error was decomposing the 10M run
+into "tick loop" and "startup" and then carrying the remainder to 1M as if it
+were fixed — most of it is state load and upload, which scales with rows. **This
+is the second time an extrapolated decomposition has been wrong** (see §L11),
+and the lesson is the same as §M1: measure the thing, do not subtract for it.
+
+**The CPU result at 10M is inconclusive and is recorded as such.** The retained
+arm measured 1765.20s against 1605.87s, 9.9% slower. It is not reported as a
+regression, because the experiment cannot support that claim: compared arms ran
+sequentially, so `current-cpu` began ~31 minutes after `baseline-cpu` at 10M
+against ~3 minutes at 1M, and the discrepancy tracks that gap (9.9% vs 0.8%) as
+closely as it tracks scale. Drift and a scale-dependent effect are perfectly
+confounded in that design.
+
+What is ruled out: memory bloat (peak RSS is *lower*, 3.65GB vs 3.85GB) and the
+reset itself (the local 10M zero-tick isolation measured the retained path
+**20% faster**). The leading hypothesis is NUMA first-touch placement — the host
+is 2 nodes of 14 cores, the baseline allocates state fresh per draw while the
+retained backend keeps whatever placement it got at construction — but that is a
+hypothesis and the hardware is gone.
+
+**Consequent.** The collector now runs compared arms **adjacently** rather than
+grouped by binary, records an arm schedule, and offers `BENCH_SWEEP_NUMA=1` to
+run the same CPU pair under `numactl --interleave=all`. If the difference is
+present without interleaving and absent with it, the cause is placement. Until
+that runs, no CPU claim is made for `prds-sweep-throughput/0001` at 10M.
+
+**§L4 reads MET at 3.435x and remains retired**, per §L9 and §L11. CUDA median
+14.630s, CPU 50.250s, all six collector assertions passing. Ageing share 40.65%
+median, a fifth consecutive reading near 40% against §K2's 10% threshold.
