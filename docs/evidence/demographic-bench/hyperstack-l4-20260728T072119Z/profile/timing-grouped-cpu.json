@@ -1,0 +1,61 @@
+{
+  "schema": "sembla-execution-timing-v1",
+  "session": {
+    "backend": "cpu",
+    "scale": 5000000,
+    "ticks": 2,
+    "seed": 9009,
+    "repository_commit": "04ada45cb2c8e0b365bae4d4d3c1415b111ed7eb",
+    "binary_sha256": "80ffa27998c4946edf43fc091c42e218c7ba6fc5ba3fe0cce718c728d07ed41c"
+  },
+  "kernel_sync_inserted": false,
+  "timer": {
+    "clock": "std::time::Instant",
+    "resolution": "nanoseconds",
+    "reported_unit": "milliseconds"
+  },
+  "ticks": [
+    {
+      "tick": 0,
+      "wall_time_ms": 1667.755304,
+      "phases_ms": {
+        "execute_tick": 1015.534097,
+        "state_hash": 0.0,
+        "observe_views": 652.201146,
+        "report": 0.007332,
+        "other": 0.012728999999999999
+      },
+      "phase_sum_ms": 1667.755304,
+      "within_tolerance": true
+    },
+    {
+      "tick": 1,
+      "wall_time_ms": 1632.0404310000001,
+      "phases_ms": {
+        "execute_tick": 948.827166,
+        "state_hash": 0.0,
+        "observe_views": 683.202999,
+        "report": 0.007982000000000001,
+        "other": 0.002284
+      },
+      "phase_sum_ms": 1632.0404310000001,
+      "within_tolerance": true
+    }
+  ],
+  "totals": {
+    "wall_time_ms": 3299.795735,
+    "phases_ms": {
+      "execute_tick": 1964.361263,
+      "state_hash": 0.0,
+      "observe_views": 1335.404145,
+      "report": 0.015314,
+      "other": 0.015013
+    },
+    "phase_sum_ms": 3299.795735
+  },
+  "self_check": {
+    "tolerance_ms": 0.001,
+    "all_ticks_reconciled": true,
+    "other_non_negative": true
+  }
+}

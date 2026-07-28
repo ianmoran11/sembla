@@ -1,0 +1,7 @@
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+    Finished `release` profile [optimized] target(s) in 2.78s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-0721523fd52b24b5)
+
+running 1 test
+diagnostic_case=claim-key-overflow geometry=1x1 status=[10, 2, 0, 0]
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_three_geometries has been running for over 60 seconds

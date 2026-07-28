@@ -1,0 +1,13 @@
+commit=04ada45cb2c8e0b365bae4d4d3c1415b111ed7eb
+utc=2026-07-28T04-12-40Z
+driver=570.195.03
+gpu=NVIDIA H100 PCIe
+correctness_hardware=any CUDA-capable NVIDIA GPU
+performance_hardware=verified full-rate FP64 required
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+    Finished `release` profile [optimized] target(s) in 2.78s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-0721523fd52b24b5)
+
+running 1 test
+diagnostic_case=claim-key-overflow geometry=1x1 status=[10, 2, 0, 0]
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_three_geometries has been running for over 60 seconds

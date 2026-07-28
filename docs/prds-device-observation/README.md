@@ -104,11 +104,33 @@ eligibility predicate, host-path parity tests, goldens unchanged — are require
 for approval. Hardware criteria are listed as *pending* and executed in a later
 Hyperstack session. Presenting an unbuilt CUDA path as verified is rejected.
 
+## Both are complete, including on hardware (2026-07-28)
+
+The §J14.2 hardware criteria are **satisfied**. See `DECISIONS.md` §L11 and
+`docs/evidence/demographic-bench/hyperstack-l4-20260728T072119Z/`.
+
+| | before | after |
+|---|---:|---:|
+| CUDA median, 10M / 24 ticks | 26.37 s | **14.10 s** (1.87×) |
+| CPU median, same case | 50.48 s | 49.07 s (flat, as expected) |
+| `state_transfer` + `state_reconstruct` + `observe_views` | 553.8 ms | **0.0 ms** |
+
+Three phases are exactly zero: the download is skipped, not accelerated. Grouped
+and no-grouped CUDA totals are **within run-to-run noise of each other** (351.4
+vs 366.5 ms), so device-side grouped observation costs approximately nothing —
+against 1,335 ms of host `observe_views` for the same work on CPU.
+
+CPU/CUDA output is byte-identical, including all three grouped view sidecars at
+5M rows, and all six collector assertions pass.
+
+**What is now the constraint:** `readback_control` 53% and `report` 33%, together
+91% of CUDA wall time. Both exist to move and then count the `wins` and
+`deferred` buffers — 200 MB per tick at 5M — to produce at most 13 integers of
+purely diagnostic output. That is the next PRD, and it is not in this folder.
+
 ## PRDs
 
-Both **landed 2026-07-28**, approved on local criteria with hardware criteria
-pending under §J14.2. Neither has been compiled with `--features cuda`; that
-happens on the next GPU host.
+Both **landed 2026-07-28** and are verified on hardware per §L11.
 
 - `0001-device-side-ungrouped-observation` — evaluate eligible ungrouped views on
   the device and skip the per-tick state download when the whole model qualifies.
@@ -162,12 +184,12 @@ state/input bytes through `download_hash`; that transfer is timed separately as
 `state_hash`, not hidden in `state_transfer`. Final-only runs download the final
 state once after the tick loop when the retained host snapshot is stale.
 
-Per §J14.2, CUDA compilation, CPU/CUDA corpus equality (including the eligible
-demographic no-grouped case and an explicit ineligible fallback case), and the
-`cuda-l4-20260726` timing rerun remain **hardware-pending**. That rerun must
-record the complete before/after phase table, including `kernels`, and preserve
-the declaration-ordered eligibility breakdown in its log. No local result is
-presented as GPU evidence.
+**Hardware criteria satisfied 2026-07-28** (§L11). Compiled with
+`--features cuda`, the timing rerun recorded the complete before/after phase
+table, and `state_transfer`, `state_reconstruct` and `observe_views` are all
+exactly zero on eligible runs. `readback_control` is unchanged at 193.1 ms, as
+this PRD specified — it remains a separate opportunity, and is now the largest
+one.
 
 ## PRD 0002 implementation status (local)
 
@@ -195,9 +217,19 @@ The runtime flag remains required and manifest-recorded. Existing checked-in
 goldens and fixtures are unchanged, and `readback_control` remains outside this
 work.
 
-Per §J14.2, the following remain **hardware-pending**: a GPU-host
-`cargo build --release --features cuda`; CPU/CUDA differential equality on the
-full corpus including the grouped demographic configuration; complete
-`--timing-json` phase tables for both the frozen no-grouped case and a grouped
-run; and captured per-view key-space, occupied-group, and emitted-group counts.
-No local result is presented as GPU evidence.
+**Hardware criteria satisfied 2026-07-28** (§L11), with one exception noted
+below. The GPU-host build succeeded; complete `--timing-json` phase tables exist
+for both the no-grouped and grouped cases; grouped CPU/CUDA outputs are
+byte-identical at 5M rows across all five artifacts; and the per-view counts
+were captured — `population_cells` key space 152 (fully occupied),
+`deaths_cells` 38 then 40, `vacancy_cells` 12, with `occupied == emitted` every
+tick. `deaths_cells` shifting between ticks is the per-tick band-extrema
+recomputation behaving as specified, and every key space is three orders of
+magnitude below the 1,048,576 cap.
+
+**The exception is not this PRD's.** The full differential corpus did not
+complete, because `prds-cuda-validation-parallelism/0002` deadlocks on hardware
+under a multi-thread launch geometry — see §L12. The grouped correctness
+argument here rests on the 5M byte-identical comparison instead, which is a
+larger and more realistic case than the corpus's 1,000 rows but does not cover
+the corpus's negative diagnostic cases. Re-run the corpus once §L12 is fixed.

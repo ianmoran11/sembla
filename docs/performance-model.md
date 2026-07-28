@@ -40,6 +40,36 @@ workload is RNG-bound**, and quoting the bandwidth floor becomes misleading.
 
 ### CUDA path, 5M rows over 2 ticks
 
+**Superseded twice. Current split, 2026-07-28** (`hyperstack-l4-20260728T072119Z/profile/`,
+after `prds-device-observation/0001` and `0002`, §L11), 5M rows over 2 ticks:
+
+| phase | no-grouped | grouped | share (grouped) |
+|---|---:|---:|---:|
+| `readback_control` | 193.1 | 197.0 | **56.1%** |
+| `report` | 141.8 | 119.5 | 34.0% |
+| `other` | 21.2 | 21.4 | 6.1% |
+| `kernels` | 10.4 | 13.6 | 3.9% |
+| `state_transfer` | **0.0** | **0.0** | 0% |
+| `state_reconstruct` | **0.0** | **0.0** | 0% |
+| `observe_views` | **0.0** | **0.0** | 0% |
+| **wall** | **366.5** | **351.4** | |
+
+`readback_control` and `report` together are **90%** of CUDA wall time, and both
+serve one thing: moving the `wins` and `deferred` buffers to the host (200 MB
+per tick at 5M) and counting them, to produce at most 13 integers of purely
+diagnostic output. `readback_control` is the transfer alone; `report` is the
+host-side scan. Neither touches simulation state.
+
+Grouped and no-grouped totals are within run-to-run noise, so **device-side
+grouped observation is approximately free** — against 1,335 ms of host
+`observe_views` for the same work on CPU.
+
+**Extrapolation warning.** Linear scaling from this 5M/2-tick profile predicted
+12.7 s for the 10M/24-tick case; the measurement was 14.10 s, 11% low. The two
+dominant phases allocate a fresh multi-hundred-megabyte host buffer per tick
+(400 MB/tick at 10M), so they scale worse than linearly. **Projections above 10M
+are optimistic**, and increasingly so with scale.
+
 **Superseded 2026-07-27** by `hyperstack-l4-20260727T120050Z/profile/`, after
 `prds-cuda-host-path/0001`: wall `1674.4ms → 936.1ms` (1.79×),
 `state_reconstruct` `766.8 → 220.7ms`, `observe_views` `338.9 → 93.5ms`,
@@ -178,6 +208,23 @@ so run them from here rather than folder by folder.
 | 5 | re-scope | no | **done 2026-07-27**: `docs/evidence/host-profile-20260727/` |
 | 6 | `prds-evaluator-throughput/0005` write identity | no | the serial remainder is the write path; three of its four costs share one cause |
 | 7 | `prds-evaluator-throughput/0006` effect gathering | no | effect values computed for every row, used for the ~2% that fire |
+| 8 | `prds-device-observation/0001` + `0002` | yes | **landed, hardware-verified §L11**: CUDA 26.37 s → 14.10 s (1.87×); `state_transfer`, `state_reconstruct` and `observe_views` all exactly zero |
+| 9 | **fix the §L12 validation deadlock** | yes | *do this first.* It blocks the differential corpus, which is the safety net for every further device-side change — including item 10. 23-second reproduction |
+| 10 | **device-side `wins`/`deferred` reduction** | yes | now **91%** of CUDA wall time (`readback_control` 53% + `report` 33%), moving and counting 200 MB/tick at 5M to produce ≤13 diagnostic integers |
+| 11 | **amortise startup across sweep draws** | no | largest win for batch work: after item 10 a 1M draw is ~2.3 s of which ~2.2 s is JIT and state load, paid once per draw |
+
+**Why 9 before 10.** Item 10 is a device-side change to a reduction, which is
+exactly the shape the differential corpus exists to check. Landing it while the
+corpus cannot run would mean shipping the riskiest available change with the
+safety net down. The deadlock's reproduction is 23 seconds, so the cost of
+fixing it first is negligible.
+
+**Why 11 is not last in value.** It is last in dependency order only. For batch
+runs — the actual goal — it beats item 10: a hundred 1M draws as separate
+processes cost ~230 s after item 10, of which ~220 s is startup repeated a
+hundred times; sharing one process makes it ~11 s. The two compound, because
+item 10 is what makes the per-draw simulation cost small enough for startup to
+dominate.
 
 The write path was earlier described here as needing "a design idea, not an
 optimisation". That was wrong, and it was wrong for the reason §M1 warns about:

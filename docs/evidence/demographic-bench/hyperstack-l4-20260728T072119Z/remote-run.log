@@ -1,0 +1,26 @@
+=== building one sembla-cli binary with CUDA ===
+    Finished `release` profile [optimized] target(s) in 0.02s
+=== phase-attribution profile (5M rows, 2 ticks) ===
+grouped profile (cuda) complete
+grouped profile (cpu) complete
+grouped CPU/CUDA outputs identical at 5M rows across 5 file(s):
+  profile-grouped-*.csv
+  profile-grouped-*.csv.summaries.csv
+  profile-grouped-*.grouped.deaths_cells.csv
+  profile-grouped-*.grouped.population_cells.csv
+  profile-grouped-*.grouped.vacancy_cells.csv
+=== phase-attribution profile complete ===
+=== synthesizing one shared 10M state artifact ===
+=== measurement cuda-1 ===
+=== measurement cpu-1 ===
+=== measurement ageing-full-1 ===
+=== measurement ageing-no-ageing-1 ===
+=== measurement cuda-2 ===
+=== measurement cpu-2 ===
+=== measurement ageing-full-2 ===
+=== measurement ageing-no-ageing-2 ===
+=== measurement cuda-3 ===
+=== measurement cpu-3 ===
+=== measurement ageing-full-3 ===
+=== measurement ageing-no-ageing-3 ===
+SEMBLA_BENCH_COMPLETE

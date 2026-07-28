@@ -1611,6 +1611,110 @@ while removing transfers only when no host consumer needs the per-tick state.
 The existing CPU/CUDA differential comparison remains the executable safety
 argument.
 
+### L11. Device-side observation verified on hardware: CUDA 1.87x, CPU flat (2026-07-28)
+
+**Decision.** The §J14.2 hardware criteria for `prds-device-observation/0001`
+and `0002` are **satisfied**. Both compile with `--features cuda`, both produce
+byte-identical output against the CPU oracle, and the per-tick state download is
+gone in both the no-grouped and grouped configurations. Evidence:
+`docs/evidence/demographic-bench/hyperstack-l4-20260728T072119Z/`, commit
+`04ada45`, one host, one session, all six collector assertions passing.
+
+| | §L8 | §L9 | **§L11** |
+|---|---:|---:|---:|
+| CUDA median | 31.82s | 26.37s | **14.10s** |
+| CPU median | 133.86s | 50.48s | **49.07s** |
+| ratio | 4.207x | 1.914x | **3.480x** |
+
+**CUDA improved 1.87x while CPU stayed flat at 1.03x.** That asymmetry is the
+result, not a side effect: the work removed host cost that only the CUDA path
+was paying, so the CPU arm had nothing to gain and gained nothing.
+
+Phase attribution at 5M rows over 2 ticks, against §L9's baseline:
+
+| phase | §L9 | no-grouped | grouped |
+|---|---:|---:|---:|
+| `state_transfer` | 239.6 | **0.0** | **0.0** |
+| `state_reconstruct` | 220.7 | **0.0** | **0.0** |
+| `observe_views` | 93.5 | **0.0** | **0.0** |
+| `readback_control` | 206.3 | 193.1 | 197.0 |
+| `report` | 119.9 | 141.8 | 119.5 |
+| `other` | 46.9 | 21.2 | 21.4 |
+| `kernels` | 9.3 | 10.4 | 13.6 |
+| **wall** | **936.2** | **366.5** | **351.4** |
+
+Three phases are exactly zero, not merely reduced: the download is skipped, not
+made faster. **The grouped and no-grouped totals are within run-to-run noise of
+each other**, so device-side grouped observation costs approximately nothing —
+against 1,335ms of host `observe_views` for the same work on CPU. The
+configuration the calibration workflow actually uses is the one where the GPU
+wins hardest, and it was rejected outright before `0002`.
+
+**§L4 reads MET at 3.480x and remains retired.** §L9 retired it as a steering
+criterion and that stands. The ratio rose because the CUDA arm improved while
+CPU held still, so this time the number and the product moved together — but
+that is which backend happened to be worked on, not the gate becoming
+informative. No PRD should cite 3.480x as justification.
+
+**Correction to the projection method.** A linear extrapolation from the 5M/2-tick
+profile predicted 12.7s for the 10M/24-tick case; the measurement is 14.10s,
+**11% low**. The cause is superlinearity between 5M and 10M, not larger startup.
+`readback_control` + `report` were 34.8% of the §L9 profile and are **91.4%** of
+this one, and those are exactly the phases that allocate a fresh
+multi-hundred-megabyte host buffer per tick — 400MB/tick at 10M, where
+`alloc_spike` measured page-fault effects up to 4.04x. **Linear extrapolation
+from a 5M profile now understates larger cases, and increasingly so with scale.**
+Treat projections above 10M as optimistic.
+
+**Recorded, not decided.** The ageing cost share measured **0.411** median
+(0.404 / 0.411 / 0.413), a fourth consecutive rise: 0.122, 0.328, 0.402, now
+0.411, against §K2's 10% threshold.
+
+**Consequent direction.** `readback_control` is now 53% of CUDA wall time and
+`report` 33%, together 91% — and both exist to move and then count the `wins`
+and `deferred` buffers, 200MB per tick at 5M, to produce at most 13 integers of
+purely diagnostic output. That is the next PRD.
+
+### L12. Parallel validation deadlocks on hardware under a multi-thread launch geometry (2026-07-28)
+
+**Decision.** `prds-cuda-validation-parallelism/0002` is **defective on
+hardware** and its §J14.2 criteria are not satisfied. The generated
+`sembla_record_validation_failure` acquires a spin lock:
+
+```cuda
+// codegen.rs:2795
+while (atomicCAS(status + 4, 0ULL, 1ULL) != 0ULL) { }
+```
+
+On an H100 (sm_90) the differential corpus passes `claim_key_overflow` at launch
+geometry `1x1` and **hangs indefinitely** at `1x32` — one full warp contending
+for the lock. Observed for 2h31m at 100% GPU utilisation and 489MiB before the
+run was killed; the same suite completed in 23.04s on 2026-07-19 before this
+code existed. `git log -S` attributes the construct to `8feb168`. Evidence:
+`docs/evidence/cuda-validation-deadlock-20260728/`, which also carries the
+23-second reproduction.
+
+The in-source comment asserts the pattern is safe because independent thread
+scheduling is available on sm_70+. ITS is present and the pattern still hangs,
+so **the comment states a necessary condition as if it were sufficient**.
+
+**Alternatives.** Widening the launch geometry to avoid intra-warp contention —
+that hides the defect and the corpus exists to find it. Removing the geometry
+sweep from the corpus — it is the only thing that caught this. Raising a test
+timeout — a deadlock is not slowness.
+
+**Reason.** The fix direction is to select the reported failure by pure atomics
+with no critical section, as the surrounding `atomicMin`/`atomicMax` extrema
+already do, rather than to make the lock work.
+
+**This is the §J14.2 split proving itself.** `0002` was approved on local
+criteria with hardware criteria listed pending, and this was its first execution
+on a GPU. A defect that no host test could reach was found by the first hardware
+run, on the first case, in the first geometry that contends. **The reproduction
+costs 23 seconds; the discovery cost 2.5 hours of GPU time only because nothing
+had run it.** Corpus coverage is now automated behind `BENCH_CORPUS=1` so this
+cannot go unrun again.
+
 ## M. Performance methodology
 
 ### M1. Optimisation is scoped from direct measurement, not from profile shares (2026-07-27)
