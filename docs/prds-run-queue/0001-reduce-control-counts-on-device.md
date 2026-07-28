@@ -175,8 +175,21 @@ file and made a criterion unsatisfiable.
 
 **If a required gate fails on files outside this list, stop and report it
 immediately** — `DECISIONS.md` §M2, and report it on attempt one, not attempt
-five. Five managed runs have stalled on an allowed-file list that made a PRD
-unachievable; in every case the runner was right and the list was wrong.
+five. Six managed runs have now stalled on a PRD that made itself unachievable;
+in every case the runner was right and the PRD was wrong.
+
+### If a criterion is impossible but the work is not
+
+Distinguish two cases, because they deserve different responses:
+
+- **The allowed-file list blocks the work.** Stop. Implementing would require a
+  scope violation, and there is nothing useful to produce.
+- **A criterion is unsatisfiable but does not block the implementation** — a
+  command naming a path that does not exist, say. **Implement everything else,
+  then report the single blocked criterion.** A run that produces a complete
+  implementation and one clearly-named blocker is worth far more than five
+  attempts that produce nothing, and the operator can fix the criterion in a
+  minute.
 
 ## Non-goals
 
@@ -206,8 +219,13 @@ or draw-lifecycle changes — that is `prds-sweep-throughput`. No new dependenci
 5. `cargo test --locked` and `scripts/check-rust.sh` green; CUDA-feature
    `cargo check`/`clippy` green without claiming GPU execution.
 6. `python3 scripts/check-markdown-links.py` passes.
-7. `python3 scripts/check-prd-allowlist.py docs/prds-cuda-host-path/0002-*.md`
-   prints `OK`.
+7. `python3 scripts/check-prd-allowlist.py` run against **this PRD at whatever
+   path it currently occupies** prints `OK`.
+
+   **Do not hard-code that path.** This file lives in `docs/prds-run-queue/`
+   while queued and moves to `docs/prds-cuda-host-path/0002-…` on approval, so a
+   criterion naming either one is unsatisfiable from the other. An earlier
+   version of this criterion did exactly that and cost five attempts.
 
 **Criteria 1–7 are sufficient for approval.** Everything below is §J14.2
 hardware-pending, executed in a later GPU session. Do not block on lacking a

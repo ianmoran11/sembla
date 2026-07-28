@@ -1941,3 +1941,32 @@ be run against that bug.**
 
 **Consequent.** Historical PRDs flag findings; they are complete and are not
 retrofitted. The check is for PRDs about to run.
+
+**Extended 2026-07-29, after a sixth stall of the same family.** The check had a
+blind spot precisely where it was needed: it only considered paths that *exist*,
+and a broken reference never does. `prds-run-queue/0001` carried
+
+```text
+python3 scripts/check-prd-allowlist.py docs/prds-cuda-host-path/0002-*.md
+```
+
+as criterion 7, written before the PRD was moved into the run queue. The glob
+matched nothing, the command exited 2, and the criterion was unsatisfiable by
+any in-run action. Five attempts produced no implementation.
+
+Two consequences:
+
+- **A criterion must never hard-code the PRD's own path.** PRDs move between
+  their folder and `docs/prds-run-queue/` by design, so a path naming one is
+  unsatisfiable from the other. Refer to "this PRD at its current path".
+- The checker now reports a second finding class: **paths passed to a runnable
+  command that do not resolve**, globs included. Verified against the broken
+  PRD retrieved with `git show`, per §M4.
+
+**And a note on how the runner should respond.** Distinguish an allowed-file
+list that blocks the work — where stopping is right, because implementing
+requires a scope violation — from a criterion that is merely unsatisfiable while
+the work is not. In the second case, implement everything else and report the
+single blocked criterion. Five attempts producing nothing is a worse outcome
+than one attempt producing a complete implementation and a named blocker the
+operator can fix in a minute.

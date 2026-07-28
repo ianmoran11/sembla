@@ -65,6 +65,46 @@ def basename_index(files: list[str]) -> dict[str, list[str]]:
     return index
 
 
+# Commands an acceptance criterion actually runs. A path argument to one of
+# these that does not exist is fatal: the command exits non-zero and no in-run
+# action can fix it.
+COMMAND_VERBS = ("python3", "bash", "sh", "cargo", "git", "./scripts/")
+
+
+def missing_command_paths(body: str) -> dict[str, str]:
+    """Paths passed to runnable commands that do not resolve.
+
+    This is the defect that stalled prds-run-queue/0001 for five attempts: a
+    criterion ran `check-prd-allowlist.py docs/prds-cuda-host-path/0002-*.md`
+    after the PRD had been moved to the run queue, so the glob matched nothing
+    and the command exited 2. The allowlist half of this script could not see it
+    -- it only considers paths that exist, and a broken reference never does.
+    """
+    findings: dict[str, str] = {}
+    spans: list[tuple[int, str]] = [
+        (m.start(), m.group(1)) for m in TOKEN.finditer(body)
+    ]
+    for m in re.finditer(r"^```[^\n]*\n(.*?)^```", body, re.M | re.S):
+        for line in m.group(1).splitlines():
+            spans.append((m.start(), line))
+
+    for start, span in spans:
+        span = span.strip()
+        if not span.startswith(COMMAND_VERBS):
+            continue
+        for token in span.split():
+            token = normalise(token)
+            if not looks_like_path(token) or "/" not in token:
+                continue
+            if any(ch in token for ch in "*?["):
+                if list(REPO.glob(token)):
+                    continue
+            elif (REPO / token).exists():
+                continue
+            findings.setdefault(token, section_of(body, start) or "(preamble)")
+    return findings
+
+
 def extract_allowlist(body: str) -> list[str]:
     """Return the glob patterns under the '## Allowed files' heading."""
     match = re.search(
@@ -92,6 +132,10 @@ def normalise(token: str) -> str:
 
 def looks_like_path(token: str) -> bool:
     if not token or " " in token or token.startswith(("http", "$", "-")):
+        return False
+    # Fragments of an inlined one-liner (`python3 -c "..."`) split into tokens
+    # that contain slashes and look path-shaped. Code, not paths.
+    if any(ch in token for ch in "()'\"\\;{}"):
         return False
     return "/" in token or token.endswith(SUFFIXES)
 
@@ -168,15 +212,28 @@ def check(prd: pathlib.Path, index: dict[str, list[str]]) -> int:
         name = prd.relative_to(REPO)
     except ValueError:  # a file outside the repo, e.g. a `git show` snapshot
         name = prd
-    if not findings:
+
+    missing = missing_command_paths(body)
+
+    if not findings and not missing:
         print(f"{name}: OK — every path named outside context sections is allowed")
         return 0
 
-    print(f"{name}: {len(findings)} path(s) named but not in Allowed files")
-    for path, heading in sorted(findings.items()):
-        print(f"    {path}   (under: {heading})")
-    print("    Confirm each is read-only context. If the PRD requires changing")
-    print("    one, add it to Allowed files now — see DECISIONS.md §I7 and §M2.")
+    if missing:
+        print(f"{name}: {len(missing)} path(s) passed to a command do NOT exist")
+        for path, heading in sorted(missing.items()):
+            print(f"    {path}   (under: {heading})")
+        print("    A criterion that runs one of these can never pass, and no")
+        print("    in-run action can fix it. Correct the path or the criterion.")
+        print("    Common cause: the PRD moved between its folder and the run")
+        print("    queue after the criterion was written.")
+
+    if findings:
+        print(f"{name}: {len(findings)} path(s) named but not in Allowed files")
+        for path, heading in sorted(findings.items()):
+            print(f"    {path}   (under: {heading})")
+        print("    Confirm each is read-only context. If the PRD requires changing")
+        print("    one, add it to Allowed files now — see DECISIONS.md §I7 and §M2.")
     return 0
 
 
