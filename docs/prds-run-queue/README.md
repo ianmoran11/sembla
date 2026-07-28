@@ -1,6 +1,13 @@
 # Run queue
 
-**Empty.** Nothing is pending.
+**One PRD queued**, 2026-07-28:
+
+- `0001-reduce-control-counts-on-device` — belongs to
+  [`docs/prds-cuda-host-path`](../prds-cuda-host-path/README.md), whose README
+  binds it. Queued here because that folder's `0001` has already landed, and
+  running the folder directly risks the runner re-attempting completed work.
+
+Move it back to `prds-cuda-host-path/0002-…` when it is approved.
 
 This folder exists to gather pending PRDs from several folders under sortable
 names, so one command runs them in the right order:

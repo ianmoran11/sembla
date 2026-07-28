@@ -101,11 +101,29 @@ correctness argument can and should be made locally.
 ## PRDs
 
 - `0001-reuse-the-host-state-buffer` — stop rebuilding the host `StateStore`
-  every tick.
+  every tick. **Landed and hardware-verified** (§L9).
+- `0002-reduce-control-counts-on-device` — count fired and deferred candidates
+  on the device instead of moving 200 MB per tick to the host to be scanned.
 
-Later PRDs are **deliberately unwritten** and re-scoped from the phase split
-measured after 0001 lands. Candidates, with their current shares:
-`observe_views` 20.2%, `readback_control` 7.8%, `report` 7.4%.
+### How 0002 was scoped
+
+0001's note above said later PRDs would be re-scoped from the split measured
+after it landed. That happened. Of the three candidates it named,
+`observe_views` went to **zero** — `prds-device-observation` removed it entirely
+— and the other two grew into almost the whole cost:
+
+| phase | after 0001 | after device observation (§L11) |
+|---|---:|---:|
+| `observe_views` | 20.2% | **0%** |
+| `readback_control` | 7.8% | **55.9%** |
+| `report` | 7.4% | **32.9%** |
+
+They did not get slower. Everything around them was removed. Together they are
+now **88.8%** of CUDA wall time, and they exist to produce at most 13 integers
+of diagnostic output.
+
+That is §M1 working as intended: each re-scope was driven by a fresh
+measurement, and the ranking inverted twice along the way.
 
 ## Measurement protocol
 
