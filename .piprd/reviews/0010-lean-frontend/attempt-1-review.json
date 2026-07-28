@@ -1,0 +1,7 @@
+{
+  "assessment": "REVISE",
+  "blockingIssues": [
+    "frontend/Sembla/DSL.lean validates references, attributes, inputs, and parameters against caller-supplied targets/attrs/inputs/params allow-lists rather than actual system and model declarations. Bogus reference targets or undeclared parameters compile when added to those lists, so the current negative tests do not establish contextual declaration checking required by the PRD."
+  ],
+  "summary": "Build, export, validation, normalized parity for both fixtures, fixed-seed hash parity, exact JSON serialization, documentation, and conditional checks pass. Revision is required because surface elaboration is not tied to actual system/model declarations."
+}

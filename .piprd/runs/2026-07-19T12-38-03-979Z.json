@@ -1,0 +1,26 @@
+{
+  "runId": "2026-07-19T12-38-03-979Z",
+  "startedAt": "2026-07-19T12:38:03.979Z",
+  "updatedAt": "2026-07-19T13:59:51.398Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-portable-sampler",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-portable-sampler/0001-libm-pinned-sampler.md",
+    "/Users/ian/projects/sembla/docs/prds-portable-sampler/0002-fixture-regeneration-proof.md"
+  ],
+  "currentIndex": 2,
+  "approved": [
+    "docs/prds-portable-sampler/0001-libm-pinned-sampler.md",
+    "docs/prds-portable-sampler/0002-fixture-regeneration-proof.md"
+  ],
+  "commits": [
+    "daca248",
+    "6e2dccf"
+  ],
+  "total": 2,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

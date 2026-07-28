@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-15T15:05:13.850Z",
+  "runId": "2026-07-15T13-41-37-334Z",
+  "prdPath": "docs/prds-precision-spike/0002-portable-precision-kernels.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-precision-spike/0002-portable-precision-kernels.md",
+  "attempt": 1,
+  "text": "## Review\n\nNo blocking issues found.\n\n### Acceptance criteria\n\n1. **PASS** — Debug tests: 9/9 passed. Root workspace build passes and metadata excludes the precision spike.\n2. **PASS** — Four copied CPU-derived WGSL Philox vectors pass.\n3. **PASS** — Both strategies execute one 1M-row tick and print reduction and winner-mismatch metrics.\n4. **PASS** — f32 reports max error `1.394316e-7` and `1/50,000` mismatches; df64 reports `9.292057e-15` and `0/50,000`.\n5. **PASS** — The vendored Metal compiler path disables fast math at `vendor/wgpu-hal/src/metal/device.rs:139`. Debug and release probes report contraction and reassociation as false, residuals preserved, and df64 trustworthy.\n\nRequired df64 primitives, deterministic two-pass reductions, corrected logarithm, exact tie-breaking, dispatch hooks, dependency provenance, formatting, and strict Clippy were also verified.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All specification items and all five acceptance criteria pass, including strict Metal compilation, debug/release contraction probes, GPU accuracy thresholds, Philox validation, and workspace exclusion.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All specification items and all five acceptance criteria pass, including strict Metal compilation, debug/release contraction probes, GPU accuracy thresholds, Philox validation, and workspace exclusion.",
+    "raw": "## Review\n\nNo blocking issues found.\n\n### Acceptance criteria\n\n1. **PASS** — Debug tests: 9/9 passed. Root workspace build passes and metadata excludes the precision spike.\n2. **PASS** — Four copied CPU-derived WGSL Philox vectors pass.\n3. **PASS** — Both strategies execute one 1M-row tick and print reduction and winner-mismatch metrics.\n4. **PASS** — f32 reports max error `1.394316e-7` and `1/50,000` mismatches; df64 reports `9.292057e-15` and `0/50,000`.\n5. **PASS** — The vendored Metal compiler path disables fast math at `vendor/wgpu-hal/src/metal/device.rs:139`. Debug and release probes report contraction and reassociation as false, residuals preserved, and df64 trustworthy.\n\nRequired df64 primitives, deterministic two-pass reductions, corrected logarithm, exact tie-breaking, dispatch hooks, dependency provenance, formatting, and strict Clippy were also verified.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All specification items and all five acceptance criteria pass, including strict Metal compilation, debug/release contraction probes, GPU accuracy thresholds, Philox validation, and workspace exclusion.\"}\n```",
+    "source": "json"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-23T07:05:46.904Z",
+  "runId": "2026-07-23T06-27-55-642Z",
+  "prdPath": "docs/prds-project-hygiene/0001-generated-artifacts-and-portability.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-project-hygiene/0001-generated-artifacts-and-portability.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n- **AC1:** Zero indexed `.pi-subagents` files; `/.pi-subagents/` is root-anchored and the ignore probe passes.\n- **AC2:** `ltmain.sh` is absent from the index and working tree; no operational callers remain.\n- **AC3:** No protected scientific/evidence paths changed. Other changes are managed `.piprd` run state.\n- **AC4:** Current HEAD matches recorded baseline `476a04962b63051e97b083ca4d1523d7f822812d`. All staged implementation paths are allowed; no history-rewrite tooling was added.\n- **AC5:** Repository checks, frontend parity, acceptance smoke, and all diff checks passed.\n- Verified removal: 142 generated files totaling 20,667,657 bytes, plus `ltmain.sh`.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All five acceptance criteria pass: generated artifacts and ltmain.sh are removed, the ignore rule works, protected paths remain unchanged, scope and HEAD are correct, and all required checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All five acceptance criteria pass: generated artifacts and ltmain.sh are removed, the ignore rule works, protected paths remain unchanged, scope and HEAD are correct, and all required checks pass.",
+    "raw": "## Assessment: APPROVED\n\n- **AC1:** Zero indexed `.pi-subagents` files; `/.pi-subagents/` is root-anchored and the ignore probe passes.\n- **AC2:** `ltmain.sh` is absent from the index and working tree; no operational callers remain.\n- **AC3:** No protected scientific/evidence paths changed. Other changes are managed `.piprd` run state.\n- **AC4:** Current HEAD matches recorded baseline `476a04962b63051e97b083ca4d1523d7f822812d`. All staged implementation paths are allowed; no history-rewrite tooling was added.\n- **AC5:** Repository checks, frontend parity, acceptance smoke, and all diff checks passed.\n- Verified removal: 142 generated files totaling 20,667,657 bytes, plus `ltmain.sh`.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All five acceptance criteria pass: generated artifacts and ltmain.sh are removed, the ignore rule works, protected paths remain unchanged, scope and HEAD are correct, and all required checks pass.\"}\n```",
+    "source": "json"
+  }
+}

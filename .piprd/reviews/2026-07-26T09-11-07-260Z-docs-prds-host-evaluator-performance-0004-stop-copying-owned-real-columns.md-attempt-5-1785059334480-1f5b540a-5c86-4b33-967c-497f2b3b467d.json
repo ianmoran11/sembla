@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-26T09:48:54.480Z",
+  "runId": "2026-07-26T09-11-07-260Z",
+  "prdPath": "docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "attempt": 5,
+  "text": "## Final review\n\nThe source implementation is correct:\n\n- Owned `Real` buffers are moved without cloning.\n- No borrowed coercion calls remain.\n- Regression coverage exists.\n- Protected artifacts remain unchanged.\n- Required correctness gates previously passed.\n\nHowever, all five evidence-gate files remain missing and no PRD 0004 evidence exists in the repository. Attempt 5 therefore did not address acceptance criteria 2, 4, or 5.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: all five attempts completed without the required external five-run quiesced corpus, recorded-output/manifest/final_state_sha256 comparison, or full-duration post-change sample profile.\"],\"summary\":\"The source change and regression guard are correct and all local correctness gates pass, but the managed run exhausted its attempts after repeatedly ignoring the required pause for external evidence collection; PRD 0004 remains operationally blocked and incomplete.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: all five attempts completed without the required external five-run quiesced corpus, recorded-output/manifest/final_state_sha256 comparison, or full-duration post-change sample profile."
+    ],
+    "summary": "The source change and regression guard are correct and all local correctness gates pass, but the managed run exhausted its attempts after repeatedly ignoring the required pause for external evidence collection; PRD 0004 remains operationally blocked and incomplete.",
+    "raw": "## Final review\n\nThe source implementation is correct:\n\n- Owned `Real` buffers are moved without cloning.\n- No borrowed coercion calls remain.\n- Regression coverage exists.\n- Protected artifacts remain unchanged.\n- Required correctness gates previously passed.\n\nHowever, all five evidence-gate files remain missing and no PRD 0004 evidence exists in the repository. Attempt 5 therefore did not address acceptance criteria 2, 4, or 5.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: all five attempts completed without the required external five-run quiesced corpus, recorded-output/manifest/final_state_sha256 comparison, or full-duration post-change sample profile.\"],\"summary\":\"The source change and regression guard are correct and all local correctness gates pass, but the managed run exhausted its attempts after repeatedly ignoring the required pause for external evidence collection; PRD 0004 remains operationally blocked and incomplete.\"}\n```",
+    "source": "json"
+  }
+}

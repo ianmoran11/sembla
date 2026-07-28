@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-26T09:36:28.595Z",
+  "runId": "2026-07-26T09-11-07-260Z",
+  "prdPath": "docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance/0004-stop-copying-owned-real-columns.md",
+  "attempt": 2,
+  "text": "## Review\n\nThe source implementation remains correct and unchanged:\n\n- `numeric_as_real` consumes its column and moves the `Real` buffer.\n- All six callers pass ownership; no borrowed coercion calls remain.\n- The regression guard is present.\n- No protected artifacts or out-of-scope files changed.\n- Previously completed full tests, Rust checks, focused tests, Markdown links, and diff checks passed.\n\n## Blocking issue\n\nNo compliant evidence has appeared since the previous review:\n\n```text\nrepo_evidence: []\nraw_evidence: []\n```\n\nTherefore there are still no five-run measurements, recorded-output comparisons, contention classifications, minima/medians, or full-duration profile.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: neither the repository nor the prepared /tmp workspace contains the required five-run quiesced measurements, output/manifest/final_state_sha256 comparisons, or full-duration post-change sample profile.\"],\"summary\":\"The evaluator implementation and regression coverage are correct and scoped, but attempt 2 added no benchmark or profile evidence, so approval remains blocked.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: neither the repository nor the prepared /tmp workspace contains the required five-run quiesced measurements, output/manifest/final_state_sha256 comparisons, or full-duration post-change sample profile."
+    ],
+    "summary": "The evaluator implementation and regression coverage are correct and scoped, but attempt 2 added no benchmark or profile evidence, so approval remains blocked.",
+    "raw": "## Review\n\nThe source implementation remains correct and unchanged:\n\n- `numeric_as_real` consumes its column and moves the `Real` buffer.\n- All six callers pass ownership; no borrowed coercion calls remain.\n- The regression guard is present.\n- No protected artifacts or out-of-scope files changed.\n- Previously completed full tests, Rust checks, focused tests, Markdown links, and diff checks passed.\n\n## Blocking issue\n\nNo compliant evidence has appeared since the previous review:\n\n```text\nrepo_evidence: []\nraw_evidence: []\n```\n\nTherefore there are still no five-run measurements, recorded-output comparisons, contention classifications, minima/medians, or full-duration profile.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0004 acceptance criteria 2, 4, and 5 remain unmet as one evidence-completion issue: neither the repository nor the prepared /tmp workspace contains the required five-run quiesced measurements, output/manifest/final_state_sha256 comparisons, or full-duration post-change sample profile.\"],\"summary\":\"The evaluator implementation and regression coverage are correct and scoped, but attempt 2 added no benchmark or profile evidence, so approval remains blocked.\"}\n```",
+    "source": "json"
+  }
+}

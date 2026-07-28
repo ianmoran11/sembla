@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-23T07:50:04.967Z",
+  "runId": "2026-07-23T06-27-55-642Z",
+  "prdPath": "docs/prds-project-hygiene/0002-reproducible-check-contract.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-project-hygiene/0002-reproducible-check-contract.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n- **AC1:** All 12 audited dependency-resolving validation commands use `--locked`; `Cargo.lock` remains byte-identical to HEAD.\n- **AC2:** Rust-only checks pass without Lake. The complete check fails actionably when Lake is missing and otherwise runs Rust, proof hygiene, and parity.\n- **AC3:** CI retains all required coverage without duplicate Rust build/test steps.\n- **AC4:** Both READMEs and `docs/ci.md` accurately describe the five check contracts.\n- **AC5:** Rust-only, complete, parity, determinism, workflow, syntax, lock, and diff checks passed. No protected artifacts changed.\n- No scope violations or blockers found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All acceptance criteria pass: validation is lock-strict, Rust-only and complete contracts behave correctly, CI coverage is non-duplicative, documentation is accurate, Cargo.lock and protected artifacts are unchanged, and all required checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All acceptance criteria pass: validation is lock-strict, Rust-only and complete contracts behave correctly, CI coverage is non-duplicative, documentation is accurate, Cargo.lock and protected artifacts are unchanged, and all required checks pass.",
+    "raw": "## Assessment: APPROVED\n\n- **AC1:** All 12 audited dependency-resolving validation commands use `--locked`; `Cargo.lock` remains byte-identical to HEAD.\n- **AC2:** Rust-only checks pass without Lake. The complete check fails actionably when Lake is missing and otherwise runs Rust, proof hygiene, and parity.\n- **AC3:** CI retains all required coverage without duplicate Rust build/test steps.\n- **AC4:** Both READMEs and `docs/ci.md` accurately describe the five check contracts.\n- **AC5:** Rust-only, complete, parity, determinism, workflow, syntax, lock, and diff checks passed. No protected artifacts changed.\n- No scope violations or blockers found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All acceptance criteria pass: validation is lock-strict, Rust-only and complete contracts behave correctly, CI coverage is non-duplicative, documentation is accurate, Cargo.lock and protected artifacts are unchanged, and all required checks pass.\"}\n```",
+    "source": "json"
+  }
+}

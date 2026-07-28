@@ -1,0 +1,7 @@
+{
+  "assessment": "REVISE",
+  "blockingIssues": [
+    "The spike measures hazard and exponential-race arithmetic with f32 in src/lib.rs and src/kernels.wgsl, violating the binding all-PRD f64 hazard-arithmetic convention in docs/prds/README.md. A compliant f64 measurement or explicit authority-approved exception is required."
+  ],
+  "summary": "Standalone workspace isolation, GPU Philox KATs, 10k CPU/GPU correctness, full 26M workload, timing, scaling, and RESULTS fields pass, but the measured f32 workload does not satisfy the binding f64 numeric convention."
+}

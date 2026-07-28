@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-27T00:49:41.871Z",
+  "runId": "2026-07-26T23-40-26-313Z",
+  "prdPath": "docs/prds-evaluator-throughput/0001-parallel-element-wise-evaluation.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0001-parallel-element-wise-evaluation.md",
+  "attempt": 4,
+  "text": "## Acceptance review\n\n- **AC1:** Pass — fixed chunks, threshold, scoped threads, and threshold coverage remain present.\n- **AC2:** **Fail** — eight example files remain mixed into the implementation commit.\n- **AC3:** Pass — bitwise determinism across 1, 2, and 4 workers.\n- **AC4:** Pass — `f64` reductions and conflict resolution remain sequential.\n- **AC5:** Pass — Rust gates passed on this unchanged HEAD in the immediately preceding review.\n- **AC6:** Pass — required five-run, single-worker, core-count, contention, and identity evidence exists.\n- **AC7:** Pass — 118 Markdown links checked successfully.\n\nAttempt 4 produced no non-managed revision. HEAD remains `529f1a2`, directly based on `b8c3cb1`, and no scope-separation commit exists.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"The sole scope-isolation blocker remains unchanged: implementation commit 529f1a2 includes eight crates/sembla-runtime/examples/*_spike.rs changes outside the allowed files and contrary to acceptance criterion 2, with no later baseline-separation commit or PRD-only working diff. Reproduce with `git diff --name-only b8c3cb1..529f1a2 -- crates/sembla-runtime/examples`.\"],\"summary\":\"Criteria 1 and 3–7 pass, but attempt 4 made no repository revision and therefore did not address the confirmed mixed-commit scope violation.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "The sole scope-isolation blocker remains unchanged: implementation commit 529f1a2 includes eight crates/sembla-runtime/examples/*_spike.rs changes outside the allowed files and contrary to acceptance criterion 2, with no later baseline-separation commit or PRD-only working diff. Reproduce with `git diff --name-only b8c3cb1..529f1a2 -- crates/sembla-runtime/examples`."
+    ],
+    "summary": "Criteria 1 and 3–7 pass, but attempt 4 made no repository revision and therefore did not address the confirmed mixed-commit scope violation.",
+    "raw": "## Acceptance review\n\n- **AC1:** Pass — fixed chunks, threshold, scoped threads, and threshold coverage remain present.\n- **AC2:** **Fail** — eight example files remain mixed into the implementation commit.\n- **AC3:** Pass — bitwise determinism across 1, 2, and 4 workers.\n- **AC4:** Pass — `f64` reductions and conflict resolution remain sequential.\n- **AC5:** Pass — Rust gates passed on this unchanged HEAD in the immediately preceding review.\n- **AC6:** Pass — required five-run, single-worker, core-count, contention, and identity evidence exists.\n- **AC7:** Pass — 118 Markdown links checked successfully.\n\nAttempt 4 produced no non-managed revision. HEAD remains `529f1a2`, directly based on `b8c3cb1`, and no scope-separation commit exists.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"The sole scope-isolation blocker remains unchanged: implementation commit 529f1a2 includes eight crates/sembla-runtime/examples/*_spike.rs changes outside the allowed files and contrary to acceptance criterion 2, with no later baseline-separation commit or PRD-only working diff. Reproduce with `git diff --name-only b8c3cb1..529f1a2 -- crates/sembla-runtime/examples`.\"],\"summary\":\"Criteria 1 and 3–7 pass, but attempt 4 made no repository revision and therefore did not address the confirmed mixed-commit scope violation.\"}\n```",
+    "source": "json"
+  }
+}

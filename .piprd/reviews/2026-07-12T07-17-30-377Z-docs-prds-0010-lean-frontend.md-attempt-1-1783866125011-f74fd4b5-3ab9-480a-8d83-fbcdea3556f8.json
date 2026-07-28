@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T14:22:05.011Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0010-lean-frontend.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0010-lean-frontend.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nAll eight acceptance criteria pass.\n\nThe attempt-1 blocker is resolved: the enclosing two-pass `model%` elaborator derives attributes, parameters, inputs, reference targets, outputs, and wires exclusively from actual declarations. No caller-supplied pseudo-context allow-lists remain.\n\nVerified evidence includes:\n\n- Pinned, dependency-free Lean 4.13 package builds.\n- Both models export and pass Rust validation.\n- Both canonical parity comparisons succeed.\n- Exported and fixture SIR runs have identical hashes and CSV bytes.\n- Required failures produce exact positioned diagnostics.\n- Beta/gamma remain symbolic with priors.\n- Documentation covers setup, DSL, export, and parity.\n- Repository checks pass with and without Lake.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0010 criteria pass. The revised declaration-backed two-pass Lean elaborator removes pseudo-context allow-lists, preserves positioned diagnostics and symbolic parameters, exports both fixtures with canonical parity, and passes fixed-seed runtime parity plus repository checks with and without Lake.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0010 criteria pass. The revised declaration-backed two-pass Lean elaborator removes pseudo-context allow-lists, preserves positioned diagnostics and symbolic parameters, exports both fixtures with canonical parity, and passes fixed-seed runtime parity plus repository checks with and without Lake.",
+    "raw": "## Assessment: APPROVED\n\nAll eight acceptance criteria pass.\n\nThe attempt-1 blocker is resolved: the enclosing two-pass `model%` elaborator derives attributes, parameters, inputs, reference targets, outputs, and wires exclusively from actual declarations. No caller-supplied pseudo-context allow-lists remain.\n\nVerified evidence includes:\n\n- Pinned, dependency-free Lean 4.13 package builds.\n- Both models export and pass Rust validation.\n- Both canonical parity comparisons succeed.\n- Exported and fixture SIR runs have identical hashes and CSV bytes.\n- Required failures produce exact positioned diagnostics.\n- Beta/gamma remain symbolic with priors.\n- Documentation covers setup, DSL, export, and parity.\n- Repository checks pass with and without Lake.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0010 criteria pass. The revised declaration-backed two-pass Lean elaborator removes pseudo-context allow-lists, preserves positioned diagnostics and symbolic parameters, exports both fixtures with canonical parity, and passes fixed-seed runtime parity plus repository checks with and without Lake.\"}\n```",
+    "source": "json"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "runId": "2026-07-23T14-33-44-297Z",
+  "startedAt": "2026-07-23T14:33:44.297Z",
+  "updatedAt": "2026-07-24T00:47:47.662Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-demographic-slots",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0001-decision-record.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0002-state-format-and-loader.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0003-state-export-and-chained-runs.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0004-surface-arithmetic-and-int-params.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0005-contest-syntax.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0006-grouped-observations.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0007-birth-death-slot-model.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0008-migration-flows-and-calibration.md",
+    "/Users/ian/projects/sembla/docs/prds-demographic-slots/0009-benchmark-50m.md"
+  ],
+  "currentIndex": 9,
+  "approved": [
+    "docs/prds-demographic-slots/0001-decision-record.md",
+    "docs/prds-demographic-slots/0002-state-format-and-loader.md",
+    "docs/prds-demographic-slots/0003-state-export-and-chained-runs.md",
+    "docs/prds-demographic-slots/0004-surface-arithmetic-and-int-params.md",
+    "docs/prds-demographic-slots/0005-contest-syntax.md",
+    "docs/prds-demographic-slots/0006-grouped-observations.md",
+    "docs/prds-demographic-slots/0007-birth-death-slot-model.md",
+    "docs/prds-demographic-slots/0008-migration-flows-and-calibration.md",
+    "docs/prds-demographic-slots/0009-benchmark-50m.md"
+  ],
+  "commits": [
+    "6806bea",
+    "327ce98",
+    "716f13e",
+    "c2ced28",
+    "48dbc48",
+    "cc2605c",
+    "1d09c8d",
+    "c4a8520",
+    "7bf8bb0"
+  ],
+  "total": 9,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

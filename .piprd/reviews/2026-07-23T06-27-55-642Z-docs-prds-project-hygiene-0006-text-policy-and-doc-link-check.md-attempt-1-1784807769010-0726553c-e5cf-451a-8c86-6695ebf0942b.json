@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-23T11:56:09.010Z",
+  "runId": "2026-07-23T06-27-55-642Z",
+  "prdPath": "docs/prds-project-hygiene/0006-text-policy-and-doc-link-check.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-project-hygiene/0006-text-policy-and-doc-link-check.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n- **AC1:** LF/editor policies are correct. All three detected binary entries are `-text`; JSON and CSV remain text.\n- **AC2:** Temporary renormalization produced an identical candidate tree. All 50 protected files remain byte-identical.\n- **AC3:** Repository scan and focused tests pass. Independent missing-target and strict-fence fixtures produced correct deterministic diagnostics.\n- **AC4:** `scripts/check.sh` and CI execute the dependency-free checker and tests; documentation describes both paths.\n- **AC5:** Complete repository, direct parity, workflow-policy, EOL, and diff checks pass.\n- **Scope:** The temporary candidate contains exactly eight allowed files. The real index is empty and unrelated work remains excluded.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0006 acceptance criteria pass: text/binary policies are effective, no normalization occurred, protected artifacts are unchanged, the tested standard-library link checker behaves correctly, canonical local/CI integration is present, and all required checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0006 acceptance criteria pass: text/binary policies are effective, no normalization occurred, protected artifacts are unchanged, the tested standard-library link checker behaves correctly, canonical local/CI integration is present, and all required checks pass.",
+    "raw": "## Assessment: APPROVED\n\n- **AC1:** LF/editor policies are correct. All three detected binary entries are `-text`; JSON and CSV remain text.\n- **AC2:** Temporary renormalization produced an identical candidate tree. All 50 protected files remain byte-identical.\n- **AC3:** Repository scan and focused tests pass. Independent missing-target and strict-fence fixtures produced correct deterministic diagnostics.\n- **AC4:** `scripts/check.sh` and CI execute the dependency-free checker and tests; documentation describes both paths.\n- **AC5:** Complete repository, direct parity, workflow-policy, EOL, and diff checks pass.\n- **Scope:** The temporary candidate contains exactly eight allowed files. The real index is empty and unrelated work remains excluded.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0006 acceptance criteria pass: text/binary policies are effective, no normalization occurred, protected artifacts are unchanged, the tested standard-library link checker behaves correctly, canonical local/CI integration is present, and all required checks pass.\"}\n```",
+    "source": "json"
+  }
+}

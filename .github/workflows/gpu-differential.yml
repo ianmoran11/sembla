@@ -1,0 +1,27 @@
+name: GPU differential
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runbook:
+    name: Manual GPU runbook
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Point to the PRD-0009 remote runbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]]; then
+            echo "error: gpu-differential has no GPU runner and must remain workflow_dispatch-only" >&2
+            exit 1
+          fi
+          runbook="crates/sembla-cuda/scripts/run-differential-corpus.sh"
+          test -x "$runbook"
+          echo "PRD-0009 remote GPU runbook: $runbook"
+          echo "This dispatch-only stub does not claim that a GPU corpus run occurred."

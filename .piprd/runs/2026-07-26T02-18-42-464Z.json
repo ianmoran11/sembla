@@ -1,0 +1,31 @@
+{
+  "runId": "2026-07-26T02-18-42-464Z",
+  "startedAt": "2026-07-26T02:18:42.464Z",
+  "updatedAt": "2026-07-26T03:51:52.335Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0001-decision-record-and-baseline.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0002-parallel-validation-kernels.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0003-diagnostic-equality-tests.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0004-differential-corpus-membership.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0005-measure-and-publish.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0006-segmented-argmin-conflict-resolution.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0007-linear-serial-kernels.md"
+  ],
+  "currentIndex": 7,
+  "approved": [
+    "docs/prds-cuda-validation-parallelism/0006-segmented-argmin-conflict-resolution.md",
+    "docs/prds-cuda-validation-parallelism/0007-linear-serial-kernels.md"
+  ],
+  "commits": [
+    "42a38f2",
+    "8cf5523"
+  ],
+  "total": 7,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

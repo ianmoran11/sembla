@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-27T09:55:30.988Z",
+  "runId": "2026-07-27T09-50-17-310Z",
+  "prdPath": "docs/prds-cuda-host-path/0001-reuse-the-host-state-buffer.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-cuda-host-path/0001-reuse-the-host-state-buffer.md",
+  "attempt": 1,
+  "text": "## Assessment\n\nThe committed implementation and amended PRD are now aligned.\n\n1. **PASS:** In-place refresh reuses `current` and `next` column allocations with focused retention coverage.\n2. **PASS:** Constructor and refresh share validation, with identical row-count, enum, and Ref errors.\n3. **PASS:** Refresh rejects prepared writes without discarding them; behavior is tested and documented.\n4. **PASS:** Fixtures, goldens, manifests, dependencies, generated CUDA fixtures, and existing evidence are unchanged.\n5. **PASS:** `cargo test --locked` and `scripts/check-rust.sh`.\n6. **PASS:** Markdown-link validation.\n7–10. **Pending as explicitly permitted by §J14.2.**\n\nThe authorized CLI changes are limited to normal/timed CUDA ownership plumbing. Both paths borrow backend-owned state per tick and move it once at completion. CUDA-feature checks, tests, clippy, formatting, focused tests, and `git diff --check` pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All required local criteria pass; the previously blocking CLI ownership change is now explicitly authorized and remains limited to that scope. Hardware criteria 7–10 are correctly documented as pending under §J14.2.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All required local criteria pass; the previously blocking CLI ownership change is now explicitly authorized and remains limited to that scope. Hardware criteria 7–10 are correctly documented as pending under §J14.2.",
+    "raw": "## Assessment\n\nThe committed implementation and amended PRD are now aligned.\n\n1. **PASS:** In-place refresh reuses `current` and `next` column allocations with focused retention coverage.\n2. **PASS:** Constructor and refresh share validation, with identical row-count, enum, and Ref errors.\n3. **PASS:** Refresh rejects prepared writes without discarding them; behavior is tested and documented.\n4. **PASS:** Fixtures, goldens, manifests, dependencies, generated CUDA fixtures, and existing evidence are unchanged.\n5. **PASS:** `cargo test --locked` and `scripts/check-rust.sh`.\n6. **PASS:** Markdown-link validation.\n7–10. **Pending as explicitly permitted by §J14.2.**\n\nThe authorized CLI changes are limited to normal/timed CUDA ownership plumbing. Both paths borrow backend-owned state per tick and move it once at completion. CUDA-feature checks, tests, clippy, formatting, focused tests, and `git diff --check` pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All required local criteria pass; the previously blocking CLI ownership change is now explicitly authorized and remains limited to that scope. Hardware criteria 7–10 are correctly documented as pending under §J14.2.\"}\n```",
+    "source": "json"
+  }
+}

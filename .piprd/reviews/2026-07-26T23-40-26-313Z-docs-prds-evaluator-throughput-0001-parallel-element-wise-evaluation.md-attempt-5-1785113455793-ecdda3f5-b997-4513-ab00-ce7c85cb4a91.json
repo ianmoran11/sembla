@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-27T00:50:55.794Z",
+  "runId": "2026-07-26T23-40-26-313Z",
+  "prdPath": "docs/prds-evaluator-throughput/0001-parallel-element-wise-evaluation.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0001-parallel-element-wise-evaluation.md",
+  "attempt": 5,
+  "text": "## Final acceptance review\n\n- **AC1:** Pass.\n- **AC2:** **Fail** — eight example files remain mixed into the implementation commit.\n- **AC3–AC4:** Pass.\n- **AC5:** Pass on unchanged HEAD.\n- **AC6–AC7:** Pass.\n\nAttempt 5 made no non-managed revision. HEAD remains `529f1a2`, directly parented by `b8c3cb1`, with no baseline-separation commit.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Acceptance criterion 2 and the allowed-file restriction remain violated: commit 529f1a2 still combines the PRD implementation with eight crates/sembla-runtime/examples/*_spike.rs changes, and no later baseline-separation commit or PRD-only working diff exists. Reproduce with `git diff --name-only b8c3cb1..529f1a2 -- crates/sembla-runtime/examples`.\"],\"summary\":\"Functional criteria 1 and 3–7 pass, but the fifth and final attempt made no repository revision, leaving the sole mixed-commit scope blocker unresolved.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "Acceptance criterion 2 and the allowed-file restriction remain violated: commit 529f1a2 still combines the PRD implementation with eight crates/sembla-runtime/examples/*_spike.rs changes, and no later baseline-separation commit or PRD-only working diff exists. Reproduce with `git diff --name-only b8c3cb1..529f1a2 -- crates/sembla-runtime/examples`."
+    ],
+    "summary": "Functional criteria 1 and 3–7 pass, but the fifth and final attempt made no repository revision, leaving the sole mixed-commit scope blocker unresolved.",
+    "raw": "## Final acceptance review\n\n- **AC1:** Pass.\n- **AC2:** **Fail** — eight example files remain mixed into the implementation commit.\n- **AC3–AC4:** Pass.\n- **AC5:** Pass on unchanged HEAD.\n- **AC6–AC7:** Pass.\n\nAttempt 5 made no non-managed revision. HEAD remains `529f1a2`, directly parented by `b8c3cb1`, with no baseline-separation commit.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Acceptance criterion 2 and the allowed-file restriction remain violated: commit 529f1a2 still combines the PRD implementation with eight crates/sembla-runtime/examples/*_spike.rs changes, and no later baseline-separation commit or PRD-only working diff exists. Reproduce with `git diff --name-only b8c3cb1..529f1a2 -- crates/sembla-runtime/examples`.\"],\"summary\":\"Functional criteria 1 and 3–7 pass, but the fifth and final attempt made no repository revision, leaving the sole mixed-commit scope blocker unresolved.\"}\n```",
+    "source": "json"
+  }
+}

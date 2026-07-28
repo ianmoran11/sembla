@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T16:43:47.235Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0012-gpu-spike.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0012-gpu-spike.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n- Standalone workspace isolation is correct.\n- GPU Philox passes four known-answer vectors.\n- The 10k CPU/GPU correctness test passes.\n- The full 26M-row benchmark and results artifact are complete.\n- Adapter capability and precision are recorded honestly.\n- The authorized exception remains limited to this throwaway spike and preserves the production `f64` contract.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"The standalone wgpu spike, Philox KATs, 10k CPU/GPU smoke test, full-scale workload, timing, scaling, and RESULTS artifact satisfy PRD 0012; the authorized precision exception is narrow, capability-backed, and preserves the production f64 contract.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "The standalone wgpu spike, Philox KATs, 10k CPU/GPU smoke test, full-scale workload, timing, scaling, and RESULTS artifact satisfy PRD 0012; the authorized precision exception is narrow, capability-backed, and preserves the production f64 contract.",
+    "raw": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n- Standalone workspace isolation is correct.\n- GPU Philox passes four known-answer vectors.\n- The 10k CPU/GPU correctness test passes.\n- The full 26M-row benchmark and results artifact are complete.\n- Adapter capability and precision are recorded honestly.\n- The authorized exception remains limited to this throwaway spike and preserves the production `f64` contract.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"The standalone wgpu spike, Philox KATs, 10k CPU/GPU smoke test, full-scale workload, timing, scaling, and RESULTS artifact satisfy PRD 0012; the authorized precision exception is narrow, capability-backed, and preserves the production f64 contract.\"}\n```",
+    "source": "json"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "runId": "2026-07-28T00-03-02-244Z",
+  "startedAt": "2026-07-28T00:03:02.244Z",
+  "updatedAt": "2026-07-28T00:38:22.123Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-run-queue",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-run-queue/0001-device-observation-ungrouped.md",
+    "/Users/ian/projects/sembla/docs/prds-run-queue/0002-device-observation-grouped.md",
+    "/Users/ian/projects/sembla/docs/prds-run-queue/0003-generalise-tiling-constants.md"
+  ],
+  "currentIndex": 3,
+  "approved": [
+    "docs/prds-run-queue/0003-generalise-tiling-constants.md"
+  ],
+  "commits": [
+    "f77841d"
+  ],
+  "total": 3,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

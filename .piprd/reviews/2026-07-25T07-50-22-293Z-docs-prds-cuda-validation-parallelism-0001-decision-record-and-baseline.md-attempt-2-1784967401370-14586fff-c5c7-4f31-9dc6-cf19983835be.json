@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-25T08:16:41.370Z",
+  "runId": "2026-07-25T07-50-22-293Z",
+  "prdPath": "docs/prds-cuda-validation-parallelism/0001-decision-record-and-baseline.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0001-decision-record-and-baseline.md",
+  "attempt": 2,
+  "text": "## Assessment: APPROVED\n\n1. **PASS:** §L1–§L5 each include Decision, Alternatives, and Reason (`DECISIONS.md:1272-1336`).\n2. **PASS:** Frozen case, three replicates, and median rule are verbatim (`DECISIONS.md:1338-1354`).\n3. **PASS:** The benchmark records 12.3×, both evidence directories, provenance limitations, §L1 cause, and affected model class (`docs/demographic-benchmark.md:163-198`).\n4. **PASS:** The roadmap explicitly marks its CUDA assumption superseded by §L1 and corrects stale evidence status (`docs/forward-roadmap.md:169-191`).\n5. **PASS:** Markdown-link validation checked 113 links successfully.\n6. **PASS:** Implementation changes are limited to the four allowed documentation files. `.piprd/**` entries are managed metadata.\n\nNo blocking issues found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All six acceptance criteria pass: decisions and frozen gate are recorded, benchmark evidence is documented with accurate provenance limitations, the roadmap is superseded with §L1 pointers, checks pass, and implementation scope is documentation-only.\"}",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All six acceptance criteria pass: decisions and frozen gate are recorded, benchmark evidence is documented with accurate provenance limitations, the roadmap is superseded with §L1 pointers, checks pass, and implementation scope is documentation-only.",
+    "raw": "## Assessment: APPROVED\n\n1. **PASS:** §L1–§L5 each include Decision, Alternatives, and Reason (`DECISIONS.md:1272-1336`).\n2. **PASS:** Frozen case, three replicates, and median rule are verbatim (`DECISIONS.md:1338-1354`).\n3. **PASS:** The benchmark records 12.3×, both evidence directories, provenance limitations, §L1 cause, and affected model class (`docs/demographic-benchmark.md:163-198`).\n4. **PASS:** The roadmap explicitly marks its CUDA assumption superseded by §L1 and corrects stale evidence status (`docs/forward-roadmap.md:169-191`).\n5. **PASS:** Markdown-link validation checked 113 links successfully.\n6. **PASS:** Implementation changes are limited to the four allowed documentation files. `.piprd/**` entries are managed metadata.\n\nNo blocking issues found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All six acceptance criteria pass: decisions and frozen gate are recorded, benchmark evidence is documented with accurate provenance limitations, the roadmap is superseded with §L1 pointers, checks pass, and implementation scope is documentation-only.\"}",
+    "source": "json"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-23T16:59:26.254Z",
+  "runId": "2026-07-23T14-33-44-297Z",
+  "prdPath": "docs/prds-demographic-slots/0002-state-format-and-loader.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-demographic-slots/0002-state-format-and-loader.md",
+  "attempt": 1,
+  "text": "## Review: APPROVED\n\n- **AC1:** Full repository, frontend build, and parity checks passed. Existing examples, plan fixtures, population parser, and legacy goldens are unchanged.\n- **AC2:** `refs_small.state` begins with `SEMBLA_STATE`, LE header length `344`, and the expected canonical JSON header.\n- **AC3:** Every required invalid fixture has a specific passing error test. Reader and writer now globally validate row counts before Ref values and use artifact/input target counts.\n- **AC4:** Round-trip, repeated-write determinism, fixture regeneration comparison, and twice-reproduced CLI golden tests pass.\n- **AC5:** Exact `state-hash` output and `.state` loading through legacy models, plan envelopes, and all five population-consuming commands pass.\n- **AC6:** Generic loading contains no model-specific literals, no dependencies or lockfile changed, and temporary-index `git diff --check` passed.\n- No blocking issues remain.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"PRD 0002 is fully implemented: the frozen format, validation, hashing, CLI dispatch, fixtures, deterministic tests, documentation, and legacy compatibility all pass. The prior source-before-target Ref validation blocker is fixed for both reader and writer.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "PRD 0002 is fully implemented: the frozen format, validation, hashing, CLI dispatch, fixtures, deterministic tests, documentation, and legacy compatibility all pass. The prior source-before-target Ref validation blocker is fixed for both reader and writer.",
+    "raw": "## Review: APPROVED\n\n- **AC1:** Full repository, frontend build, and parity checks passed. Existing examples, plan fixtures, population parser, and legacy goldens are unchanged.\n- **AC2:** `refs_small.state` begins with `SEMBLA_STATE`, LE header length `344`, and the expected canonical JSON header.\n- **AC3:** Every required invalid fixture has a specific passing error test. Reader and writer now globally validate row counts before Ref values and use artifact/input target counts.\n- **AC4:** Round-trip, repeated-write determinism, fixture regeneration comparison, and twice-reproduced CLI golden tests pass.\n- **AC5:** Exact `state-hash` output and `.state` loading through legacy models, plan envelopes, and all five population-consuming commands pass.\n- **AC6:** Generic loading contains no model-specific literals, no dependencies or lockfile changed, and temporary-index `git diff --check` passed.\n- No blocking issues remain.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"PRD 0002 is fully implemented: the frozen format, validation, hashing, CLI dispatch, fixtures, deterministic tests, documentation, and legacy compatibility all pass. The prior source-before-target Ref validation blocker is fixed for both reader and writer.\"}\n```",
+    "source": "json"
+  }
+}

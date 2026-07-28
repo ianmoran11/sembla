@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-21T14:29:08.222Z",
+  "runId": "2026-07-21T13-34-23-344Z",
+  "prdPath": "docs/prds-composition/0002-lean-sha256.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-composition/0002-lean-sha256.md",
+  "attempt": 1,
+  "text": "## Review\n\nNo blocking issues found.\n\n1. **PASS:** `cd frontend && lake build` passes with `Sembla.Hash` and `Sembla.HashTests` imported at `frontend/Sembla.lean:3-4`; all required guards elaborate.\n2. **PASS:** Compiler checks confirm every required `Sembla.Hash` signature exactly. Helpers are private, and implementation uses `ByteArray`/`Array UInt32` loops without `List`.\n3. **PASS:** `fixtures/hash/vectors.json` contains all five identities with nonzero values. Independent Python recomputation matches both the fixture and Lean guards.\n4. **PASS:** `frontend/Sembla/Hash.lean:170-171` accepts exactly `0xFFFFFFFE` and `0xFFFFFFFF`; guards pin both plus the false boundary.\n5. **PASS:** `./scripts/check.sh`, standalone `lake build`, parity, and `git diff --check` pass. Only the four allowed implementation files changed; `examples/` and Rust crates are unchanged. Managed `.piprd/` metadata is separate.\n\nThe preceding implementation notes also record the required Python commands and outputs.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"The pure-Lean SHA-256 implementation, exact public API, required guards, frozen cross-language vectors, registration, scope, and all mandated checks satisfy PRD 0002.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "The pure-Lean SHA-256 implementation, exact public API, required guards, frozen cross-language vectors, registration, scope, and all mandated checks satisfy PRD 0002.",
+    "raw": "## Review\n\nNo blocking issues found.\n\n1. **PASS:** `cd frontend && lake build` passes with `Sembla.Hash` and `Sembla.HashTests` imported at `frontend/Sembla.lean:3-4`; all required guards elaborate.\n2. **PASS:** Compiler checks confirm every required `Sembla.Hash` signature exactly. Helpers are private, and implementation uses `ByteArray`/`Array UInt32` loops without `List`.\n3. **PASS:** `fixtures/hash/vectors.json` contains all five identities with nonzero values. Independent Python recomputation matches both the fixture and Lean guards.\n4. **PASS:** `frontend/Sembla/Hash.lean:170-171` accepts exactly `0xFFFFFFFE` and `0xFFFFFFFF`; guards pin both plus the false boundary.\n5. **PASS:** `./scripts/check.sh`, standalone `lake build`, parity, and `git diff --check` pass. Only the four allowed implementation files changed; `examples/` and Rust crates are unchanged. Managed `.piprd/` metadata is separate.\n\nThe preceding implementation notes also record the required Python commands and outputs.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"The pure-Lean SHA-256 implementation, exact public API, required guards, frozen cross-language vectors, registration, scope, and all mandated checks satisfy PRD 0002.\"}\n```",
+    "source": "json"
+  }
+}

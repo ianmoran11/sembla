@@ -1,0 +1,19 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T15:10:35.456Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0011-widgets.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0011-widgets.md",
+  "attempt": 1,
+  "text": "## Assessment: REVISE\n\n### Blocking issues\n\n1. **Arrowheads are obscured** — `frontend/Sembla/WidgetDisplay.lean:52-77` places edge endpoints at node centers, then renders radius-25 circles over them. The resulting graph does not visibly show direction.\n2. **Contradictory dependency documentation** — `frontend/README.md:17-18` says there are no external Lake dependencies, despite ProofWidgets being added in `frontend/lakefile.toml:5-8`.\n\nOther criteria pass: pinned build, PRD-0010 parity, exact props JSON, probability/prior tests, pure architecture, cursor registration, and manual instructions.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"frontend/Sembla/WidgetDisplay.lean renders edge endpoints and markers at node centers, then draws radius-25 node circles over them, obscuring arrowheads and violating the directed-graph requirement.\",\"frontend/README.md still claims there are no external Lake dependencies despite the new pinned ProofWidgets dependency.\"],\"summary\":\"Build, parity, pure-props architecture, cursor registration, exact graph JSON tests, probability/prior tests, and manual instructions pass, but the directed SVG arrows are visually obscured and README dependency setup is contradictory.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "frontend/Sembla/WidgetDisplay.lean renders edge endpoints and markers at node centers, then draws radius-25 node circles over them, obscuring arrowheads and violating the directed-graph requirement.",
+      "frontend/README.md still claims there are no external Lake dependencies despite the new pinned ProofWidgets dependency."
+    ],
+    "summary": "Build, parity, pure-props architecture, cursor registration, exact graph JSON tests, probability/prior tests, and manual instructions pass, but the directed SVG arrows are visually obscured and README dependency setup is contradictory.",
+    "raw": "## Assessment: REVISE\n\n### Blocking issues\n\n1. **Arrowheads are obscured** — `frontend/Sembla/WidgetDisplay.lean:52-77` places edge endpoints at node centers, then renders radius-25 circles over them. The resulting graph does not visibly show direction.\n2. **Contradictory dependency documentation** — `frontend/README.md:17-18` says there are no external Lake dependencies, despite ProofWidgets being added in `frontend/lakefile.toml:5-8`.\n\nOther criteria pass: pinned build, PRD-0010 parity, exact props JSON, probability/prior tests, pure architecture, cursor registration, and manual instructions.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"frontend/Sembla/WidgetDisplay.lean renders edge endpoints and markers at node centers, then draws radius-25 node circles over them, obscuring arrowheads and violating the directed-graph requirement.\",\"frontend/README.md still claims there are no external Lake dependencies despite the new pinned ProofWidgets dependency.\"],\"summary\":\"Build, parity, pure-props architecture, cursor registration, exact graph JSON tests, probability/prior tests, and manual instructions pass, but the directed SVG arrows are visually obscured and README dependency setup is contradictory.\"}\n```",
+    "source": "json"
+  }
+}

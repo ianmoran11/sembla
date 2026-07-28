@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-23T12:24:46.340Z",
+  "runId": "2026-07-23T06-27-55-642Z",
+  "prdPath": "docs/prds-project-hygiene/0007-cargo-package-policy.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-project-hygiene/0007-cargo-package-policy.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n- **AC1:** Cargo 1.79 resolves all four crates to `publish: []`, repository `https://github.com/ianmoran11/sembla`, Rust `1.79.0`, dual licensing, and useful descriptions.\n- **AC2:** `scripts/check-cargo-metadata.py` passes normally and rejects temporary missing-field metadata with exit 1 and package-specific diagnostics.\n- **AC3:** Names, versions, editions, features, dependencies, and targets match `HEAD`; `Cargo.lock` is byte-identical.\n- **AC4:** `CONTRIBUTING.md` states publishing is disabled and enumerates all required future release-PRD topics.\n- **AC5:** Complete checks, direct parity, workflow parsing, lock verification, and diff checks pass.\n- The candidate contains exactly nine allowed implementation files; the real index is empty.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0007 acceptance criteria are satisfied: publication is disabled with complete resolved metadata, the dependency-free assertion passes and detects missing fields, package and lock contracts are unchanged, release-policy documentation is complete, scope is clean, and all required checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0007 acceptance criteria are satisfied: publication is disabled with complete resolved metadata, the dependency-free assertion passes and detects missing fields, package and lock contracts are unchanged, release-policy documentation is complete, scope is clean, and all required checks pass.",
+    "raw": "## Assessment: APPROVED\n\n- **AC1:** Cargo 1.79 resolves all four crates to `publish: []`, repository `https://github.com/ianmoran11/sembla`, Rust `1.79.0`, dual licensing, and useful descriptions.\n- **AC2:** `scripts/check-cargo-metadata.py` passes normally and rejects temporary missing-field metadata with exit 1 and package-specific diagnostics.\n- **AC3:** Names, versions, editions, features, dependencies, and targets match `HEAD`; `Cargo.lock` is byte-identical.\n- **AC4:** `CONTRIBUTING.md` states publishing is disabled and enumerates all required future release-PRD topics.\n- **AC5:** Complete checks, direct parity, workflow parsing, lock verification, and diff checks pass.\n- The candidate contains exactly nine allowed implementation files; the real index is empty.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0007 acceptance criteria are satisfied: publication is disabled with complete resolved metadata, the dependency-free assertion passes and detects missing fields, package and lock contracts are unchanged, release-policy documentation is complete, scope is clean, and all required checks pass.\"}\n```",
+    "source": "json"
+  }
+}

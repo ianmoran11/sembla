@@ -1,0 +1,29 @@
+{
+  "runId": "2026-07-27T07-08-53-617Z",
+  "startedAt": "2026-07-27T07:08:53.617Z",
+  "updatedAt": "2026-07-27T07:33:38.067Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-evaluator-throughput",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0001-tile-the-tick.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0002-guarded-racing-clock.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0003-tile-the-remainder.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0004-degenerate-hazard-fast-path.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0005-resolve-write-identity-once.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0006-evaluate-effects-at-winner-rows.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0007-bitmap-double-write-detection.md"
+  ],
+  "currentIndex": 7,
+  "approved": [
+    "docs/prds-evaluator-throughput/0007-bitmap-double-write-detection.md"
+  ],
+  "commits": [
+    "8ea6a3e"
+  ],
+  "total": 7,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

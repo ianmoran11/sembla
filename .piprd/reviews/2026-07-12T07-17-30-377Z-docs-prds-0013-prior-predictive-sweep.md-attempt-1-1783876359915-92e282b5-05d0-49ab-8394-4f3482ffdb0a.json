@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T17:12:39.915Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0013-prior-predictive-sweep.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0013-prior-predictive-sweep.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nAll eight acceptance criteria pass. The revision adds hard-coded IEEE-754 vectors that freeze Uniform, Box–Muller branch/counter ordering, PRD-0003 coordinate mapping, and LogNormal transformation behavior.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0013 requirements pass; fixed to_bits vectors now freeze Uniform, Box-Muller coordinate/branch ordering, and LogNormal transformation behavior in addition to the statistical, CLI, reproducibility, CRN, pinning, scale, quantile, and documentation coverage.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0013 requirements pass; fixed to_bits vectors now freeze Uniform, Box-Muller coordinate/branch ordering, and LogNormal transformation behavior in addition to the statistical, CLI, reproducibility, CRN, pinning, scale, quantile, and documentation coverage.",
+    "raw": "## Assessment: APPROVED\n\nAll eight acceptance criteria pass. The revision adds hard-coded IEEE-754 vectors that freeze Uniform, Box–Muller branch/counter ordering, PRD-0003 coordinate mapping, and LogNormal transformation behavior.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0013 requirements pass; fixed to_bits vectors now freeze Uniform, Box-Muller coordinate/branch ordering, and LogNormal transformation behavior in addition to the statistical, CLI, reproducibility, CRN, pinning, scale, quantile, and documentation coverage.\"}\n```",
+    "source": "json"
+  }
+}

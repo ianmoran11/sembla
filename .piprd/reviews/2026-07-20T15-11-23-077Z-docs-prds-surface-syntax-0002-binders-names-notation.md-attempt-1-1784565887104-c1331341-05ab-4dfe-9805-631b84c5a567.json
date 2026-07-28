@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-20T16:44:47.104Z",
+  "runId": "2026-07-20T15-11-23-077Z",
+  "prdPath": "docs/prds-surface-syntax/0002-binders-names-notation.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-surface-syntax/0002-binders-names-notation.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nNo blocking issues remain.\n\n1. **Option-B and legacy syntax:** Pass through the shared semantic kernel.\n2. **Model and JSON twins:** Equal parameter lists, models, and exact JSON are pinned.\n3. **Bare parameters:** Derived `Expr.param` lowering, metadata, widgets, and ambiguity behavior pass.\n4. **Name derivation:** Required mappings, overrides, collisions, grammar failures, cross-box names, and forward references are covered.\n5. **Aliases:** Only the five permitted aliases exist and preserve existing IR/type rules.\n6. **Frozen scope:** No canonical, IR/JSON, Rust, dependency, CI, or documentation drift.\n7. **Checks and diagnostics:** All 21 new negatives use complete ordered diagnostic-set comparison. Build, parity, full suite, whitespace, and frozen-path checks pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All seven acceptance criteria pass: option-B and legacy forms share one kernel; twins, bare parameters, names, aliases, widgets, ordering, and exact diagnostics are pinned; all 21 new negatives use complete ordered diagnostic-set comparison; required build, parity, full-suite, whitespace, and frozen-scope checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All seven acceptance criteria pass: option-B and legacy forms share one kernel; twins, bare parameters, names, aliases, widgets, ordering, and exact diagnostics are pinned; all 21 new negatives use complete ordered diagnostic-set comparison; required build, parity, full-suite, whitespace, and frozen-scope checks pass.",
+    "raw": "## Assessment: APPROVED\n\nNo blocking issues remain.\n\n1. **Option-B and legacy syntax:** Pass through the shared semantic kernel.\n2. **Model and JSON twins:** Equal parameter lists, models, and exact JSON are pinned.\n3. **Bare parameters:** Derived `Expr.param` lowering, metadata, widgets, and ambiguity behavior pass.\n4. **Name derivation:** Required mappings, overrides, collisions, grammar failures, cross-box names, and forward references are covered.\n5. **Aliases:** Only the five permitted aliases exist and preserve existing IR/type rules.\n6. **Frozen scope:** No canonical, IR/JSON, Rust, dependency, CI, or documentation drift.\n7. **Checks and diagnostics:** All 21 new negatives use complete ordered diagnostic-set comparison. Build, parity, full suite, whitespace, and frozen-path checks pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All seven acceptance criteria pass: option-B and legacy forms share one kernel; twins, bare parameters, names, aliases, widgets, ordering, and exact diagnostics are pinned; all 21 new negatives use complete ordered diagnostic-set comparison; required build, parity, full-suite, whitespace, and frozen-scope checks pass.\"}\n```",
+    "source": "json"
+  }
+}

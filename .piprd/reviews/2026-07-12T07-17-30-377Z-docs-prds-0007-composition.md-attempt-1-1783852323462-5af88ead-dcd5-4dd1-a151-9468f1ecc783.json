@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T10:32:03.462Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0007-composition.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0007-composition.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n1. **Workspace compatibility:** All 49 tests pass, including PRD 0006 single-box tests.\n2. **Two-box feedback:** The fixture implements population/controller feedback and passes deterministic 50-tick report and hash comparisons.\n3. **One-tick delay:** Tests prove the tick-0 controller change affects population firing at tick 1, not tick 0.\n4. **Boundary invariance:** The merged fixture is wire-free, uses internal snapshot aggregates, preserves RNG coordinates, and matches both state-bearing table hashes for 50 ticks.\n5. **Tick-0 semantics:** Inputs are documented and tested as schema-carrying empty tables.\n6. **CLI:** Multi-box runs print box-qualified fired counts.\n\nNo blocking issues were found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All six PRD 0007 criteria pass: multi-box snapshot execution, one-tick copied wire delivery, Input Count/Sum evaluation, composed hashing, deterministic two-box feedback, wire-free 50-tick boundary invariance, explicit tick-0 inputs, and per-box CLI reporting are implemented and tested.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All six PRD 0007 criteria pass: multi-box snapshot execution, one-tick copied wire delivery, Input Count/Sum evaluation, composed hashing, deterministic two-box feedback, wire-free 50-tick boundary invariance, explicit tick-0 inputs, and per-box CLI reporting are implemented and tested.",
+    "raw": "## Assessment: APPROVED\n\n1. **Workspace compatibility:** All 49 tests pass, including PRD 0006 single-box tests.\n2. **Two-box feedback:** The fixture implements population/controller feedback and passes deterministic 50-tick report and hash comparisons.\n3. **One-tick delay:** Tests prove the tick-0 controller change affects population firing at tick 1, not tick 0.\n4. **Boundary invariance:** The merged fixture is wire-free, uses internal snapshot aggregates, preserves RNG coordinates, and matches both state-bearing table hashes for 50 ticks.\n5. **Tick-0 semantics:** Inputs are documented and tested as schema-carrying empty tables.\n6. **CLI:** Multi-box runs print box-qualified fired counts.\n\nNo blocking issues were found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All six PRD 0007 criteria pass: multi-box snapshot execution, one-tick copied wire delivery, Input Count/Sum evaluation, composed hashing, deterministic two-box feedback, wire-free 50-tick boundary invariance, explicit tick-0 inputs, and per-box CLI reporting are implemented and tested.\"}\n```",
+    "source": "json"
+  }
+}

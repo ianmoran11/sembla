@@ -1,0 +1,19 @@
+{
+  "runId": "2026-07-27T12-49-22-139Z",
+  "startedAt": "2026-07-27T12:49:22.139Z",
+  "updatedAt": "2026-07-27T12:53:11.849Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-run-queue",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-run-queue/0001-device-observation-ungrouped.md"
+  ],
+  "currentIndex": 0,
+  "approved": [],
+  "commits": [],
+  "total": 1,
+  "status": "running",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

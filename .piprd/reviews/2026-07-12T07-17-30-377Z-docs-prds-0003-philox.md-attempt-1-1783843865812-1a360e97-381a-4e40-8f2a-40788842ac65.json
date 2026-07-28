@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T08:11:05.812Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0003-philox.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0003-philox.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n1. Random123 all-zero/all-ones vectors and asymmetric packing vector pass.\n2. Public-function purity and 1,000-set coordinate collision tests pass.\n3. Million-draw uniform interval, mean, and histogram tests pass.\n4. Million-draw exponential mean and non-positive-rate semantics pass.\n5. Cargo-resolved guard confirms `sembla-runtime` is dependency-free across all features, targets, and dependency kinds.\n6. Exact packing and CRN behavior are documented.\n\n`./scripts/check.sh`, warnings-denied rustdoc, and `git diff --check` pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0003 criteria pass: Philox matches Random123 vectors, coordinate packing is frozen and documented, purity/collision and million-sample statistical tests pass, exponential edge semantics are correct, and the Cargo-resolved guard enforces a dependency-free runtime.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0003 criteria pass: Philox matches Random123 vectors, coordinate packing is frozen and documented, purity/collision and million-sample statistical tests pass, exponential edge semantics are correct, and the Cargo-resolved guard enforces a dependency-free runtime.",
+    "raw": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n1. Random123 all-zero/all-ones vectors and asymmetric packing vector pass.\n2. Public-function purity and 1,000-set coordinate collision tests pass.\n3. Million-draw uniform interval, mean, and histogram tests pass.\n4. Million-draw exponential mean and non-positive-rate semantics pass.\n5. Cargo-resolved guard confirms `sembla-runtime` is dependency-free across all features, targets, and dependency kinds.\n6. Exact packing and CRN behavior are documented.\n\n`./scripts/check.sh`, warnings-denied rustdoc, and `git diff --check` pass.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0003 criteria pass: Philox matches Random123 vectors, coordinate packing is frozen and documented, purity/collision and million-sample statistical tests pass, exponential edge semantics are correct, and the Cargo-resolved guard enforces a dependency-free runtime.\"}\n```",
+    "source": "json"
+  }
+}
