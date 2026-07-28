@@ -104,6 +104,9 @@ correctness argument can and should be made locally.
   every tick. **Landed and hardware-verified** (§L9).
 - `0002-reduce-control-counts-on-device` — count fired and deferred candidates
   on the device instead of moving 200 MB per tick to the host to be scanned.
+  **Currently queued in [`docs/prds-run-queue`](../prds-run-queue/README.md)** as
+  `0001-…`, because running this folder directly would re-attempt the landed
+  `0001`. This README still binds it. It moves back here on approval.
 
 ### How 0002 was scoped
 
