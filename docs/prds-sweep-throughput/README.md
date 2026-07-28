@@ -103,6 +103,19 @@ setup the others should not.
 not aggregate usefully over a sweep, say so rather than reporting a per-tick
 table that hides the setup being removed.
 
+## Before running a PRD from here
+
+```sh
+python3 scripts/check-prd-allowlist.py docs/prds-sweep-throughput/0001-*.md
+```
+
+It lists every repo path the PRD names that its allowed-file list does not
+cover. Most will be read-only context; the point is that the list is short
+enough to eyeball. `0001` stalled a managed run for five attempts on exactly
+this defect — it required a sweep stage in the collector while omitting the
+collector from its own allowed files — and this check reproduces that finding in
+under a second.
+
 ## PRDs
 
 - `0001-reuse-the-backend-across-draws` — construct the backend once per sweep

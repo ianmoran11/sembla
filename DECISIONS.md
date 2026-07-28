@@ -1903,3 +1903,41 @@ precisely the failure mode.
 this says do not infer a *check's validity* from its passing. Both are the same
 error at different levels: accepting a number without establishing what would
 have changed it.
+
+### M5. Allowed-file lists are checked mechanically before a run starts (2026-07-28)
+
+**Decision.** Before a PRD is handed to a managed run, its allowed-file list is
+cross-checked against the paths its own body names:
+
+```sh
+python3 scripts/check-prd-allowlist.py docs/prds-<folder>/<n>-<name>.md
+```
+
+The check is **advisory**. It cannot distinguish a file a PRD will edit from one
+it merely cites, and PRDs cite a great deal. It prints a short list to eyeball,
+which is sufficient, because every failure of this shape so far has been a path
+named in an imperative sentence and absent from the list.
+
+**Reason.** This has now stalled five managed runs, and §I7 and §M2 did not stop
+it. §I7 says derive the list from the acceptance criteria; §M2 says the runner
+should stop and report. Both are correct and neither is a check, and the
+omission is invisible to the author *precisely because* they were thinking about
+the file when they wrote the criterion that needs it.
+
+The fifth was `prds-sweep-throughput/0001`. Its §5 said building a sweep stage
+in `run-demographic-benchmark.sh` was in scope, criterion 11 required the
+resulting timings, and the collector was not in its allowed files. The PRD
+demanded work it forbade. The runner stopped correctly on all five attempts and
+none of them could have succeeded.
+
+**Note on the check itself, per §M4.** Its first version missed the very defect
+it was written for. The PRD named the collector by bare filename —
+`` `run-demographic-benchmark.sh` `` — and the check only resolved paths
+containing a slash, so it reported the file clean while flagging a false
+positive. It was fixed by resolving bare basenames against the tracked tree, and
+verified by running it against the pre-fix PRD retrieved with `git show` and
+requiring it to report the omission. **A check written to catch a known bug must
+be run against that bug.**
+
+**Consequent.** Historical PRDs flag findings; they are complete and are not
+retrofitted. The check is for PRDs about to run.

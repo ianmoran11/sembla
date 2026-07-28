@@ -111,13 +111,45 @@ shows up distinctly from the removed JIT.
 - `crates/sembla-runtime/src/executor.rs`
 - `crates/sembla-cli/tests/**`, `crates/sembla-runtime/tests/**`,
   `crates/sembla-cuda/tests/**` (tests only)
+- `spikes/precision/infra-hyperstack/run-demographic-benchmark.sh` — **added
+  2026-07-28 by operator authorisation**, see below
+- `spikes/precision/infra-hyperstack/RUNBOOK.md` — same authorisation; a new
+  collector stage that is not documented is a stage nobody will run, which is
+  the §M3 failure this PRD is partly a response to
 - `docs/evidence/**` (new evidence only)
 - `docs/prds-sweep-throughput/README.md` (status notes only)
 
+### Why the collector is in scope (authorised 2026-07-28)
+
+**The original list omitted it and that made this PRD unachievable as written.**
+Criterion 11 requires whole-sweep CUDA timings, §5 of this section says building
+the collector stage is in scope, and §M3 forbids deferring a criterion nothing
+can execute — yet the only file that could carry that stage,
+`spikes/precision/infra-hyperstack/run-demographic-benchmark.sh`, was not
+listed. The PRD therefore demanded work it forbade, and the runner was right to
+stop rather than guess. Five attempts were spent on it.
+
+**The exception is limited to adding a sweep stage** — a new opt-in block
+guarded by its own environment variable, in the shape of the existing
+`BENCH_PROFILE` and `BENCH_CORPUS` stages, plus its documentation. It does
+**not** extend to changing the frozen §L4 gate protocol, the existing profile or
+corpus stages, teardown, or anything in the collector's Terraform handling. The
+frozen collection must remain byte-for-byte the same protocol it is today, and
+`BENCH_PROFILE`/`BENCH_CORPUS` behaviour must be unchanged.
+
+### Deliberately excluded
+
+`crates/sembla-cli/src/manifest.rs` is **not** in scope. Criterion 6 requires
+every manifest byte-identical, so the serialised schema must not move.
+`BackendIdentity` capture may relocate within `main.rs`; the manifest field it
+populates stays as it is.
+
 **If a required gate fails on files outside this list, stop and report it** —
-`DECISIONS.md` §M2. If the list turns out to make the PRD unachievable, say so
-and stop rather than working around it; §M2's amendment exists because that has
-happened three times.
+`DECISIONS.md` §M2. If the list still makes the PRD unachievable, say so and
+stop rather than working around it. **This has now happened five times**, and
+each time the runner stopping was correct and the operator's list was wrong.
+Report it immediately rather than at attempt five: the operator can amend in
+minutes, and four of those attempts bought nothing.
 
 ## Non-goals
 
@@ -156,11 +188,27 @@ what the ownership change forces. No evaluator optimisation — that is
 
 10. `cargo build --release --features cuda` on a GPU host.
 11. Whole-sweep CUDA before/after at 1M and 10M, draw 0 against median draw.
-12. CPU/CUDA sweep outputs byte-identical.
+12. CPU/CUDA sweep outputs byte-identical, compared **within the new collector
+    stage** — run the same sweep on both backends and compare the whole output
+    directory, including the `.grouped.<view>.csv` sidecars and the summaries,
+    not only the top-level results CSV.
 
-Criterion 11 needs a sweep stage in `run-demographic-benchmark.sh`; **adding it
-is in scope for this PRD**, because §M3 forbids deferring a criterion that
-nothing can execute.
+**Local criteria 1–9 are sufficient for approval.** Criteria 10–12 are §J14.2
+hardware criteria and are listed as pending, executed in a later GPU session.
+Do not present a local result as GPU evidence, and do not block approval on
+lacking a GPU.
+
+**What §M3 requires here, precisely.** The *stage* that will run criteria 10–12
+must be built and committed by this PRD — that is why the collector is in the
+allowed files. **Running it needs a paid GPU host and is not part of this PRD.**
+So the deliverable is a working, documented, opt-in collector stage plus the
+criteria marked pending; it is not a set of GPU numbers.
+
+Criterion 12's file-set comparison is written the way it is because of §M4: the
+first version of the grouped parity check compared two files that contain no
+grouped data and would have passed unconditionally. Compare the whole directory
+and require the file *sets* to match, then demonstrate the check failing on a
+perturbed copy before trusting it.
 
 ## Note on expectations
 
