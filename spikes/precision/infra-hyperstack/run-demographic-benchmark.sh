@@ -689,6 +689,12 @@ if [[ "${BENCH_SWEEP:-0}" == "1" ]]; then
   mkdir -p "$SWEEP_DIR"
   git rev-parse --verify "${BENCH_SWEEP_BASELINE_COMMIT}^{commit}" \
     > "$SWEEP_DIR/baseline-commit.txt"
+  # `rm -rf "$OUT_ROOT"` at the top of this payload deletes the worktree
+  # DIRECTORY but not git's registration of it under .git/worktrees. So a second
+  # payload run on the same VM -- which the detached/rejoin design explicitly
+  # allows -- would fail here with "already registered", and the message points
+  # at a path that no longer exists, which is a confusing way to lose an hour.
+  git worktree prune
   git worktree add --detach "$SWEEP_BASELINE_WORKTREE" "$BENCH_SWEEP_BASELINE_COMMIT"
   (
     cd "$SWEEP_BASELINE_WORKTREE"
