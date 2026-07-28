@@ -21,9 +21,22 @@
 #   BOOTSTRAP_TIMEOUT_SECONDS   - default 1800
 #   BENCH_TIMEOUT_SECONDS       - default 43200 (12h) for the whole remote run
 #   BENCH_PROFILE=1             - additionally collect the phase-attribution
-#                                 profile (5M rows, 2 ticks, both backends,
+#                                 profile (5M rows, 2 ticks, both backends, both
+#                                 the no-grouped and grouped configurations,
 #                                 --timing-json plus nsys). Additive: the frozen
 #                                 §L4 protocol is unchanged either way.
+#   BENCH_CORPUS=1              - additionally run the CPU/CUDA differential
+#                                 corpus, including the grouped demographic
+#                                 configuration. Runs BEFORE the frozen gate and
+#                                 aborts it on disagreement: timing an arm that
+#                                 disagrees with the CPU oracle is worse than
+#                                 collecting no timing at all.
+#   SSH_FAILURE_LIMIT           - default 5 consecutive poll failures before the
+#                                 collector gives up and says why
+#
+# Both BENCH_PROFILE and BENCH_CORPUS are baked into the content-addressed
+# payload hash, so a run with them set will not silently rejoin a plain gate run
+# already in progress -- it is correctly treated as a different payload.
 #
 # The remote run is detached, so a dropped connection loses nothing: re-running
 # this script rejoins the run in progress rather than starting a second one.
@@ -42,9 +55,11 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-$REPO_ROOT/docs/evidence/demographic-bench/hyperst
 
 DESTROYED=false
 REMOTE_SCRIPT=""
+POLL_ERR=""
 finish() {
   local status=$?
   [[ -n "$REMOTE_SCRIPT" ]] && rm -f "$REMOTE_SCRIPT"
+  [[ -n "$POLL_ERR" ]] && rm -f "$POLL_ERR"
   if [[ "$DESTROYED" != true ]]; then
     printf '\n%s\n' "IMPORTANT: a Hyperstack VM may still exist. Billing continues in SHUTOFF as well as ACTIVE." >&2
     printf '%s\n' "Destroy it now:  cd $MODULE_DIR && terraform destroy -var-file=$TFVARS_FILE" >&2
@@ -208,7 +223,29 @@ if [[ -z "$PUBLIC_IP" ]] || ! is_usable_ssh_target "$PUBLIC_IP"; then
   echo "and re-run with PUBLIC_IP_OVERRIDE=<ip>, or destroy it now." >&2
   exit 2
 fi
-echo "Public IP: $PUBLIC_IP"
+if is_tailnet_ipv4 "$PUBLIC_IP"; then
+  echo "Transport: tailnet ($PUBLIC_IP). Survives an egress-IP change."
+else
+  # Say this before hours of compute are committed to a path that is known to
+  # break. On 2026-07-27 the operator's egress IP rotated mid-run and locked a
+  # healthy VM out for the rest of the evening.
+  echo "Transport: public IP ($PUBLIC_IP)." >&2
+  echo "WARNING: this path is pinned to one /32 in TWO places -- the Hyperstack" >&2
+  echo "security group AND the guest's own iptables rule. If your egress IP" >&2
+  echo "rotates mid-run you lose access to a healthy, billing machine, and you" >&2
+  echo "cannot fix it by re-applying, because ssh_cidr is ForceNew." >&2
+  if [[ -z "${TF_VAR_tailscale_auth_key:-}" ]]; then
+    echo "TF_VAR_tailscale_auth_key was not set, so the guest never joined a" >&2
+    echo "tailnet. Setting it (ephemeral, pre-authorized, tagged) before the" >&2
+    echo "apply is the fix; see RUNBOOK.md 'Reaching the VM over Tailscale'." >&2
+  else
+    echo "TF_VAR_tailscale_auth_key IS set, so the guest was meant to join the" >&2
+    echo "tailnet and has not appeared. Check 'tailscale status' and the guest's" >&2
+    echo "bootstrap log before committing hours of compute to this path." >&2
+  fi
+  echo "Current egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo unknown)" >&2
+  grep -n 'ssh_cidr' "$TFVARS_FILE" >&2 || true
+fi
 SSH_USER="$(terraform output -raw ssh_user)"
 
 # --- host-key verification: pinned fingerprint only, never trust-on-first-use ---
@@ -306,6 +343,7 @@ REMOTE_SCRIPT="$(mktemp)"
 # payload hash reflects it: a profile run and a plain gate run are then correctly
 # treated as different payloads instead of one rejoining the other.
 printf 'export BENCH_PROFILE=%q\n' "${BENCH_PROFILE:-0}" > "$REMOTE_SCRIPT"
+printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
 # shellcheck disable=SC1091
@@ -395,18 +433,38 @@ for box in model["boxes"]:
     for table in box["tables"]:
         if table["name"] in {"person_slot", "slot_resource"}:
             table["size_hint"] = scale
-src = pathlib.Path.cwd() / "fixtures/demographic/benchmark/demographic_slots.no-grouped.json"
-tmpl = json.loads(src.read_text())
-for box in tmpl["boxes"]:
-    for table in box["tables"]:
-        if table["name"] in {"person_slot", "slot_resource"}:
-            table["size_hint"] = scale
-(pathlib.Path(sys.argv[3]) / "profile-no-grouped.json").write_text(
-    json.dumps(tmpl, separators=(",", ":")) + "\n"
-)
+work = pathlib.Path(sys.argv[3])
+for src_name, out_name in (
+    ("demographic_slots.no-grouped.json", "profile-no-grouped.json"),
+    # The grouped variant is the configuration the real calibration workflow
+    # uses, and until prds-device-observation/0002 the CUDA backend rejected it
+    # outright, so it has never been profiled on a GPU.
+    ("demographic_slots.full.json", "profile-grouped.json"),
+):
+    src = pathlib.Path.cwd() / "fixtures/demographic/benchmark" / src_name
+    tmpl = json.loads(src.read_text())
+    for box in tmpl["boxes"]:
+        for table in box["tables"]:
+            if table["name"] in {"person_slot", "slot_resource"}:
+                table["size_hint"] = scale
+    (work / out_name).write_text(json.dumps(tmpl, separators=(",", ":")) + "\n")
 PY
 
   # Both backends, so the shared host phases can be read side by side.
+  #
+  # Two configurations, because they answer different questions. The no-grouped
+  # case is the one the earlier profiles measured, so it is what makes the
+  # before/after phase table comparable. The grouped case is what the driver
+  # model actually runs, and 0001's eligibility is all-or-nothing per run: a
+  # model with grouped views downloaded the whole state regardless of how many
+  # ungrouped views qualified. If 0002 worked, `state_transfer` and
+  # `state_reconstruct` collapse in the grouped table too; if only the
+  # no-grouped table improves, 0002 delivered nothing for the real workflow.
+  #
+  # The CUDA grouped runs also emit one `cuda_device_grouped_observation` line
+  # per view per tick on stderr, carrying key_space_size, occupied_groups and
+  # emitted_groups. Those stderr files are the §J14.2 evidence for 0002's
+  # key-space criterion, so they are collected, not discarded.
   for backend in cuda cpu; do
     "$BIN" run "$WORK/profile-no-grouped.json" \
       --seed "$SEED" --population "$PROFILE_STATE" --backend "$backend" \
@@ -414,7 +472,75 @@ PY
       --timing-json "$PROFILE_DIR/timing-$backend.json" \
       --out "$PROFILE_DIR/profile-$backend.csv" \
       > "$PROFILE_DIR/profile-$backend.stdout" 2> "$PROFILE_DIR/profile-$backend.stderr"
+
+    # A grouped CUDA failure must not lose the no-grouped tables already
+    # written: those satisfy 0001's criteria on their own, and an abort here
+    # would throw away a result that cost the same GPU hour to produce.
+    if "$BIN" run "$WORK/profile-grouped.json" \
+      --seed "$SEED" --population "$PROFILE_STATE" --backend "$backend" \
+      --ticks "$PROFILE_TICKS" --enable grouped-observations \
+      --timing-json "$PROFILE_DIR/timing-grouped-$backend.json" \
+      --out "$PROFILE_DIR/profile-grouped-$backend.csv" \
+      > "$PROFILE_DIR/profile-grouped-$backend.stdout" \
+      2> "$PROFILE_DIR/profile-grouped-$backend.stderr"; then
+      echo "grouped profile ($backend) complete"
+    else
+      echo "GROUPED PROFILE FAILED ($backend); no-grouped results are unaffected" >&2
+      tail -20 "$PROFILE_DIR/profile-grouped-$backend.stderr" >&2 || true
+      touch "$PROFILE_DIR/profile-grouped-$backend.FAILED"
+    fi
   done
+
+  # The two backends must agree on the grouped observations, and this is the
+  # cheapest place to notice they do not -- the differential corpus runs at 1000
+  # rows, so this is the only grouped CPU/CUDA comparison at realistic scale.
+  #
+  # The grouped values are NOT in the main results CSV. Each view is written to
+  # its own `<stem>.grouped.<view>.csv` sidecar (main.rs:2202), and the scalar
+  # summaries to `<stem>.summaries.csv`. Comparing only the main CSV would
+  # compare two files that contain no grouped data at all and always pass --
+  # exactly the kind of check that looks like evidence and is not. So compare
+  # every artifact the run produced, and require the file SETS to match too.
+  if [[ ! -f "$PROFILE_DIR/profile-grouped-cuda.FAILED" \
+        && ! -f "$PROFILE_DIR/profile-grouped-cpu.FAILED" ]]; then
+    (
+      cd "$PROFILE_DIR"
+      cuda_files="$(ls profile-grouped-cuda.csv profile-grouped-cuda.*.csv 2>/dev/null \
+        | sed 's/^profile-grouped-cuda//' | sort)"
+      cpu_files="$(ls profile-grouped-cpu.csv profile-grouped-cpu.*.csv 2>/dev/null \
+        | sed 's/^profile-grouped-cpu//' | sort)"
+      if [[ -z "$cuda_files" ]]; then
+        echo 'GROUPED PARITY INCONCLUSIVE: no CUDA grouped output files found'
+        exit 0
+      fi
+      if [[ "$cuda_files" != "$cpu_files" ]]; then
+        echo 'GROUPED PARITY FAILED: backends produced different output file sets'
+        echo "cuda: $cuda_files"
+        echo "cpu:  $cpu_files"
+        exit 0
+      fi
+      mismatch=0
+      compared=0
+      while IFS= read -r suffix; do
+        [[ -z "$suffix" ]] && continue
+        compared=$((compared + 1))
+        if ! cmp -s "profile-grouped-cuda$suffix" "profile-grouped-cpu$suffix"; then
+          echo "GROUPED PARITY FAILED: profile-grouped-{cuda,cpu}$suffix differ"
+          mismatch=1
+        fi
+      done <<<"$cuda_files"
+      if (( mismatch == 0 )); then
+        echo "grouped CPU/CUDA outputs identical at 5M rows across $compared file(s):"
+        printf '  profile-grouped-*%s\n' $cuda_files
+      fi
+    ) | tee "$PROFILE_DIR/grouped-parity.txt"
+    # `|| true` matters: the payload runs under `set -e`, so a bare
+    # `grep -q ... && echo ...` would abort the whole benchmark on the HAPPY
+    # path, when grep finds no failure and returns 1.
+    if grep -q 'GROUPED PARITY FAILED' "$PROFILE_DIR/grouped-parity.txt"; then
+      echo 'grouped parity check FAILED; see profile/grouped-parity.txt' >&2
+    fi
+  fi
 
   # nsys still gives per-kernel detail the timers cannot. Failure here must not
   # lose the timing JSON, which is the primary artifact.
@@ -436,6 +562,46 @@ PY
 
   rm -f "$PROFILE_STATE" "$PROFILE_STATE.model.json"
   echo '=== phase-attribution profile complete ==='
+fi
+
+# --- optional CPU/CUDA differential corpus -------------------------------------
+# Nothing ran this before 2026-07-28. `crates/sembla-cuda/scripts/run-differential-corpus.sh`
+# has existed for some time and prds-device-observation/0002 added the grouped
+# demographic configuration to it, but no collector ever invoked it, so the
+# corpus was only ever run by hand -- which is why several PRDs still carry
+# "CPU/CUDA differential equality" as hardware-pending with no automation behind
+# it. It costs minutes against the gate's hours, so it runs before the gate.
+#
+# This is the correctness precondition for everything else in the session: the
+# gate below times the CUDA arm, and a fast wrong answer is worth nothing.
+# SEMBLA_REQUIRE_CUDA=1 turns the script's "no GPU, skip cleanly" behaviour into
+# a hard failure -- on a GPU host a skip means something is broken, not absent.
+if [[ "${BENCH_CORPUS:-0}" == "1" ]]; then
+  echo '=== CPU/CUDA differential corpus ==='
+  CORPUS_DIR="$OUT_ROOT/differential-corpus"
+  mkdir -p "$CORPUS_DIR"
+  (
+    cd "$SPIKE_DIR"
+    # The script refuses to run against a dirty tree, deliberately: differential
+    # evidence is only meaningful for an exact commit. Record what it saw.
+    git rev-parse HEAD > "$CORPUS_DIR/commit.txt"
+    git status --porcelain > "$CORPUS_DIR/worktree-status.txt"
+    SEMBLA_REQUIRE_CUDA=1 SEMBLA_CUDA_EVIDENCE_DIR="$CORPUS_DIR" \
+      bash crates/sembla-cuda/scripts/run-differential-corpus.sh
+  ) > "$CORPUS_DIR/run.log" 2>&1 && corpus_rc=0 || corpus_rc=$?
+  printf '%s\n' "$corpus_rc" > "$CORPUS_DIR/exit-code.txt"
+  if (( corpus_rc == 0 )); then
+    echo '=== differential corpus PASSED ==='
+  else
+    # Loud, and it stops the session here. Timing an arm that disagrees with the
+    # CPU oracle would produce numbers that look like evidence and are not; that
+    # is a worse outcome than no numbers, because it is harder to notice later.
+    echo "=== DIFFERENTIAL CORPUS FAILED (rc=$corpus_rc) ===" >&2
+    tail -40 "$CORPUS_DIR/run.log" >&2 || true
+    echo 'Refusing to run the frozen gate: CUDA disagrees with the CPU oracle.' >&2
+    echo "Full log: $CORPUS_DIR/run.log" >&2
+    exit 6
+  fi
 fi
 
 STATE="$WORK/initial.state"
@@ -847,15 +1013,74 @@ echo "Benchmark running detached on $REMOTE. Polling until it finishes."
 echo "A dropped connection is harmless: re-run this script to rejoin."
 bench_status=""
 poll_deadline=$((SECONDS + ${BENCH_TIMEOUT_SECONDS:-43200}))
+
+# SSH failures during the poll are REPORTED, never swallowed. Until 2026-07-27
+# both the status read and the progress read ended in `2>/dev/null || true`, so
+# an unreachable VM was indistinguishable from a healthy one mid-phase: the loop
+# printed nothing and spun for its full 12 hours while the machine billed. That
+# is precisely what happened when the operator's egress IP rotated mid-run --
+# both firewalls pin the /32, so every connection began timing out silently.
+#
+# A single failure is still not fatal. Transient refusals are normal while the
+# guest reboots or the tailnet re-handshakes, so the loop tolerates a run of
+# them and aborts only once the path looks genuinely gone.
+ssh_failures=0
+SSH_FAILURE_LIMIT="${SSH_FAILURE_LIMIT:-5}"
+# Cleaned up by `finish`, not a second EXIT trap: a second `trap ... EXIT` would
+# REPLACE the first and silently disable the "a VM may still be billing" warning.
+POLL_ERR="$(mktemp)"
+poll_err="$POLL_ERR"
+
 while (( SECONDS < poll_deadline )); do
-  bench_status="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/bench.status 2>/dev/null || true' 2>/dev/null || true)"
-  [[ -n "$bench_status" ]] && break
-  # Surface the current phase so a watcher can see progress without attaching.
-  ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'tail -1 ~/bench.log 2>/dev/null || true' 2>/dev/null || true
+  if bench_status="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
+      'cat ~/bench.status 2>/dev/null || true' 2>"$poll_err")"; then
+    if (( ssh_failures > 0 )); then
+      echo "SSH to $REMOTE recovered after $ssh_failures consecutive failure(s)." >&2
+    fi
+    ssh_failures=0
+    [[ -n "$bench_status" ]] && break
+    # Surface the current phase so a watcher can see progress without attaching.
+    ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'tail -1 ~/bench.log 2>/dev/null || true' \
+      2>>"$poll_err" || true
+  else
+    ssh_failures=$((ssh_failures + 1))
+    echo "SSH to $REMOTE failed ($ssh_failures/$SSH_FAILURE_LIMIT): $(tr '\n' ' ' <"$poll_err")" >&2
+    if (( ssh_failures >= SSH_FAILURE_LIMIT )); then
+      echo >&2
+      echo "Giving up on the SSH path after $ssh_failures consecutive failures." >&2
+      echo "THE VM IS STILL RUNNING AND STILL BILLING. The remote job is detached" >&2
+      echo "and unaffected, so nothing is lost -- but the path to it is gone." >&2
+      echo >&2
+      echo "Most likely cause, in order:" >&2
+      echo "  1. Your egress IP changed. Both the Hyperstack security group and" >&2
+      echo "     the guest iptables rule pin a /32, so a rotation locks you out" >&2
+      echo "     of a healthy machine. Compare:" >&2
+      echo "       curl -s https://api.ipify.org" >&2
+      echo "       grep ssh_cidr $TFVARS_FILE" >&2
+      echo "     Do NOT re-apply to fix it: ssh_cidr is ForceNew and re-applying" >&2
+      echo "     destroys the running benchmark. Add an API-side rule instead," >&2
+      echo "     and open the guest rule from the VNC console." >&2
+      echo "  2. The tailnet node dropped. Check 'tailscale status'." >&2
+      echo "  3. The guest hit emergency_poweroff_hours." >&2
+      echo >&2
+      echo "Evidence may still arrive without SSH: the payload pushes to an" >&2
+      echo "evidence/<UTC> branch, retrievable with 'git fetch' from anywhere." >&2
+      echo "Confirm billing is stopped either way: bash reconcile-orphans.sh" >&2
+      exit 1
+    fi
+  fi
   sleep 120
 done
-ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/bench.log' > "$ARTIFACT_DIR/remote-run.log" 2>/dev/null || true
-EVIDENCE_BRANCH="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/evidence-branch 2>/dev/null || true' 2>/dev/null || true)"
+
+if ! ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/bench.log' \
+    > "$ARTIFACT_DIR/remote-run.log" 2>"$poll_err"; then
+  echo "warning: could not retrieve ~/bench.log: $(tr '\n' ' ' <"$poll_err")" >&2
+fi
+EVIDENCE_BRANCH="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
+  'cat ~/evidence-branch 2>/dev/null || true' 2>"$poll_err" || true)"
+if [[ -z "$EVIDENCE_BRANCH" && -s "$poll_err" ]]; then
+  echo "warning: could not read the evidence branch name: $(tr '\n' ' ' <"$poll_err")" >&2
+fi
 if [[ -n "$EVIDENCE_BRANCH" ]]; then
   echo "Evidence was pushed to branch: $EVIDENCE_BRANCH"
   echo "It is retrievable with 'git fetch origin $EVIDENCE_BRANCH' from anywhere,"

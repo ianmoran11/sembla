@@ -19,9 +19,18 @@ Each item below has failed at least once in practice.
       shell running the collector inherits `SSH_AUTH_SOCK`.
 - [ ] **Check the network path can carry an SSH session.** See "The network
       requirement" below. This is the single most expensive failure mode.
+- [ ] **Set `TF_VAR_tailscale_auth_key`** (ephemeral, pre-authorized, tagged)
+      *before* the plan. This is the single highest-value item on the list: it
+      removes the entire class of failure where your egress IP rotates and locks
+      you out of a billing machine, which cannot be repaired by re-applying. The
+      collector warns at startup if it is about to use the public path instead.
 - [ ] **Confirm `ssh_cidr` matches your current egress IP**
       (`curl -s https://api.ipify.org`). A mismatch produces a TCP timeout, not
-      a useful error.
+      a useful error. Fix it **now**, before the apply — afterwards it is
+      `ForceNew` and correcting it destroys the run. Note the value is enforced
+      in two places; see "enforced in two places" below.
+- [ ] **Delete any leftover `hyperstack-paid.tfplan`.** An already-applied plan
+      file is one keystroke from a duplicate VM, and plans are cheap to remake.
 - [ ] **Secrets available**: `HYPERSTACK_API_KEY`,
       `TF_VAR_console_password_hash`, and — if using the pre-seeded host key —
       `TF_VAR_ssh_host_private_key`. If pushing evidence to GitHub, also
@@ -115,8 +124,54 @@ approve. That avoids typing a long key into a VNC console.
 - **`ssh_cidr` is part of the VM's identity.** It feeds the rendered bootstrap,
   whose hash forms the VM name, which is `ForceNew`. Changing `ssh_cidr` in
   `terraform.tfvars` and applying will **destroy and recreate the VM**, losing a
-  running benchmark. To grant access to a new IP mid-run, add a security-group
-  rule through the Hyperstack API and reconcile Terraform state at teardown.
+  running benchmark. To grant access to a new IP mid-run, see the section below
+  — a security-group rule alone is *not* enough.
+
+## `ssh_cidr` is enforced in two places, not one
+
+This cost most of an evening on 2026-07-27 and the fix was not obvious, because
+the first thing you try does not work.
+
+`ssh_cidr` is applied **twice**, by two independent enforcement points:
+
+1. the **Hyperstack security group**, created by Terraform; and
+2. the **guest's own iptables**, written by cloud-init
+   (`cloud-init.sh.tftpl:152-153`):
+
+   ```sh
+   iptables -I INPUT 3 -p tcp --dport 22 -s "$SSH_CIDR" -j ACCEPT
+   iptables -I INPUT 4 -p tcp --dport 22 -j DROP
+   ```
+
+So when your egress IP rotates mid-run, **opening a security-group rule through
+the API gets you as far as the guest, which then drops you**, with no packet
+back and therefore no error worth reading. The symptom is identical before and
+after the fix, which is what makes it expensive: it looks like the API rule did
+not take effect, when in fact it worked perfectly and a second wall is behind it.
+
+Both must be opened:
+
+```sh
+# 1. Security group, through the Hyperstack API (never by re-applying).
+# 2. Guest firewall, from the VNC console:
+sudo iptables -I INPUT 3 -p tcp --dport 22 -s <new-ip>/32 -j ACCEPT
+```
+
+The rule is inserted at position 3 so it precedes the `DROP` at 4. Appending it
+with `-A` puts it after the `DROP` and changes nothing — another way to conclude
+wrongly that the network is at fault.
+
+**Prevention is much cheaper than recovery.** Set `TF_VAR_tailscale_auth_key`
+before the apply and neither wall is in the path: WireGuard is UDP, needs no
+inbound rule, and does not care what your public IP is. The collector now warns
+loudly at startup when it is about to use the public path, so this is visible
+before hours of compute are committed rather than after.
+
+Note that an *established* session does not survive the rotation either. The
+`ESTABLISHED,RELATED` accept at rule 1 keeps existing flows alive, but a changed
+source IP is by definition a different flow. The remote job is detached and
+keeps running regardless — what you lose is the ability to watch it, collect
+from it, and tear it down.
 - **The plan file is sensitive.** It contains the console password hash. Keep
   `umask 077`; never commit it (the allowlist `.gitignore` already blocks it).
 - **Never delete host key files in cloud-init.** An explicit `HostKey` directive
@@ -265,7 +320,8 @@ usually unreachable on its public IP even once adopted.
 | `No global public IPv4 ... within the timeout` | IP not attached yet | collector now polls the provider API; or pass `PUBLIC_IP_OVERRIDE=<ip>` |
 | SSH: `Permission denied (publickey)` | key not in agent | `ssh-add`; verify `ssh-add -l` |
 | SSH: closes after exactly ~30s | path cannot carry a session | change network (hotspot); see above |
-| SSH: `Operation timed out` | `ssh_cidr` no longer matches your egress IP | check `curl https://api.ipify.org`; add an API-side rule, do **not** re-apply |
+| SSH: `Operation timed out` | `ssh_cidr` no longer matches your egress IP | check `curl https://api.ipify.org`; open **both** the security group and the guest iptables rule (see "enforced in two places"); do **not** re-apply |
+| Collector prints `SSH to ... failed (n/5)` | the path died mid-run | the message names the likely causes in order; the remote job is unaffected |
 | Remote: `could not convert string to float` | GNU-time parser bug | fixed in `f81fef9`; ensure the VM is on that commit or later |
 
 The remote payload is **detached** (`setsid nohup`, status in `~/bench.status`).
@@ -277,9 +333,12 @@ progress rather than starting a second one. Check state directly with
 
 ```bash
 cd spikes/precision/infra-hyperstack
+bash reconcile-orphans.sh                  # nothing should be billing yet
+rm -f hyperstack-paid.tfplan               # a consumed plan is a duplicate VM
 ssh-add ~/.ssh/sembla_hyperstack           # passphrase prompt
 eval "$(bash prepare-host-key.sh)"         # optional pre-seeded host key
 export HYPERSTACK_API_KEY=...
+export TF_VAR_tailscale_auth_key=...       # ephemeral, pre-authorized, tagged
 eval "$(bash prepare-console-password.sh)"
 umask 077
 # confirm ssh_cidr matches: curl -s https://api.ipify.org
@@ -293,6 +352,37 @@ bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
 # On success, verify the new hyperstack-l4-<UTC>/SHA256SUMS once more before
 # using bench-results.json to update the verdict documents.
 ```
+
+### Verifying a device-observation session
+
+Set both optional stages. They run before the frozen gate and finish in minutes,
+so the interesting answer is readable in `~/bench.log` long before the gate ends:
+
+```bash
+BENCH_CORPUS=1 BENCH_PROFILE=1 bash run-demographic-benchmark.sh 2>&1 \
+  | tee ~/bench-driver.log
+```
+
+Order matters and is deliberate. The corpus runs **first** and aborts the run on
+CPU/CUDA disagreement, because timing a wrong arm produces numbers that look
+like evidence. The profile then measures both the no-grouped configuration —
+comparable to every earlier phase table — and the grouped one, which is what the
+calibration workflow actually uses and which CUDA rejected outright until
+`prds-device-observation/0002`.
+
+Read in this order when it finishes:
+
+| file | question it answers |
+|---|---|
+| `differential-corpus/exit-code.txt` | does CUDA still agree with the CPU oracle? |
+| `profile/grouped-parity.txt` | do the backends agree on grouped views at 5M rows? |
+| `profile/timing-grouped-cuda.json` | did `state_transfer` + `state_reconstruct` collapse? |
+| `profile/timing-cuda.json` | the same for the comparable no-grouped case |
+| `profile/profile-grouped-cuda.stderr` | per-view key-space, occupied and emitted group counts |
+
+If only the no-grouped table improves, `0002` delivered nothing for the driver
+model: eligibility is all-or-nothing per run, so a model with any ineligible
+view downloads the whole state regardless.
 
 Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
