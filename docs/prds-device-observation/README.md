@@ -136,10 +136,17 @@ The `--timing-json` instrumentation is the instrument. Re-run the
 against the one above. `state_transfer`, `state_reconstruct` and
 `readback_control` are the headline; they should collapse together or not at all.
 
-`BENCH_PROFILE=1 bash run-demographic-benchmark.sh` collects it. Re-pin
-`repository_ref` first, and see `spikes/precision/infra-hyperstack/RUNBOOK.md`
-for the session hazards — including that a mid-run change of the operator's
-egress IP silently breaks SSH.
+`BENCH_CORPUS=1 BENCH_PROFILE=1 bash run-demographic-benchmark.sh` collects it.
+`BENCH_PROFILE` now measures the grouped configuration as well as the frozen
+no-grouped one, and `BENCH_CORPUS` runs the CPU/CUDA differential corpus before
+the gate — neither was automated before 2026-07-28, which is why these criteria
+sat hardware-pending with nothing to execute them.
+
+Re-pin `repository_ref` first, and see
+`spikes/precision/infra-hyperstack/RUNBOOK.md` for the session hazards —
+including that `ssh_cidr` is enforced by both the Hyperstack security group and
+the guest's own iptables, so a mid-run change of the operator's egress IP breaks
+SSH and opening only the API-side rule does not restore it.
 
 ## PRD 0001 implementation status (local)
 

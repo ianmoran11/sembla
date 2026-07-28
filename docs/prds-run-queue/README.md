@@ -47,7 +47,13 @@ A single Hyperstack session, which three things now wait on:
 - Re-measuring the CUDA phase split, where 71% of wall time is still spent
   moving state to the host — the cost `0001` and `0002` exist to remove.
 
+All three now have automation behind them, added 2026-07-28:
+`BENCH_CORPUS=1 BENCH_PROFILE=1 bash run-demographic-benchmark.sh`. Before that
+the corpus had no collector invoking it at all, and the profile stage only ever
+covered the no-grouped model.
+
 Re-pin `repository_ref` before that session, and read
 `spikes/precision/infra-hyperstack/RUNBOOK.md` — including that a mid-run change
 of the operator's egress IP silently breaks SSH, which cost most of an evening
-on 2026-07-27.
+on 2026-07-27, and that opening the security-group rule alone does not fix it
+because the guest firewall pins the same `/32`.
