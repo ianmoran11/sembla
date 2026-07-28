@@ -1955,6 +1955,13 @@ impl<'a> Generator<'a> {
             writeln!(out, "  if (observation_index == {observation_index}U) {{\n    for (unsigned long long row = worker; row < row_counts[{table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ unsigned long long value = (unsigned long long)({value}); atomicAdd(counts + {}ULL + value, 1ULL); }}\n    return;\n  }}", observation.offset).unwrap();
         }
         out.push_str("}\n");
+
+        // Control diagnostics are reduced after the simulation has finished
+        // writing wins/deferred. Each block contributes one integer partial;
+        // scheduling cannot affect the exact result.
+        out.push_str("\nextern \"C\" __global__ void sembla_init_control_counts(unsigned long long* fired_counts, unsigned long long rule_count, unsigned long long* deferred_counts, unsigned long long table_count) {\n  unsigned long long index = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long rule = index; rule < rule_count; rule += stride) fired_counts[rule] = 0ULL;\n  for (unsigned long long table = index; table < table_count; table += stride) deferred_counts[table] = 0ULL;\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_count_fired(const unsigned char* wins, const unsigned long long* candidate_offsets, unsigned long long candidate_count, unsigned long long rule_count, unsigned long long rule, unsigned long long* fired_counts) {\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long begin = candidate_offsets[rule];\n  unsigned long long end = rule + 1ULL < rule_count ? candidate_offsets[rule + 1ULL] : candidate_count;\n  unsigned long long local = 0ULL;\n  for (unsigned long long candidate = begin + worker; candidate < end; candidate += (unsigned long long)gridDim.x * blockDim.x) local += wins[candidate] != 0U;\n  extern __shared__ unsigned long long partials[];\n  partials[threadIdx.x] = local;\n  __syncthreads();\n  for (unsigned int stride = blockDim.x / 2U; stride != 0U; stride /= 2U) {\n    if (threadIdx.x < stride) partials[threadIdx.x] += partials[threadIdx.x + stride];\n    __syncthreads();\n  }\n  if (threadIdx.x == 0U) atomicAdd(fired_counts + rule, partials[0]);\n}\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_count_deferred(const unsigned char* deferred, unsigned long long candidate_count, unsigned long long table_count, unsigned long long table, unsigned long long* deferred_counts) {\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long local = 0ULL;\n  for (unsigned long long candidate = worker; candidate < candidate_count; candidate += (unsigned long long)gridDim.x * blockDim.x) local += deferred[candidate * table_count + table] != 0U;\n  extern __shared__ unsigned long long partials[];\n  partials[threadIdx.x] = local;\n  __syncthreads();\n  for (unsigned int stride = blockDim.x / 2U; stride != 0U; stride /= 2U) {\n    if (threadIdx.x < stride) partials[threadIdx.x] += partials[threadIdx.x + stride];\n    __syncthreads();\n  }\n  if (threadIdx.x == 0U) atomicAdd(deferred_counts + table, partials[0]);\n}\n");
         Ok(())
     }
 
@@ -3529,7 +3536,7 @@ mod tests {
         assert!(!resolver.contains("status[0] ="));
         assert!(!resolver.contains("status[1] ="));
         assert!(!resolver.contains("status[2] ="));
-        assert!(!generated.source.contains("atomicAdd"));
+        assert!(!resolver.contains("atomicAdd"));
         // The validation diagnostic reduction and prefix argmin passes may
         // use atomicMin; candidate finalization itself must not.
         assert!(!resolver.contains("atomicMin"));

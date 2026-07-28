@@ -74,6 +74,88 @@ type DownloadedStateParts = (Vec<u8>, Vec<u8>, Vec<u64>);
 /// mutex or retry loop in generated validation code.
 const VALIDATION_REDUCTION_PASSES: u64 = 4;
 
+fn control_count_launch_config(elements: u64) -> LaunchConfig {
+    const BLOCK: u32 = 256;
+    const MAX_BLOCKS: u64 = 65_535;
+    let blocks = elements.div_ceil(u64::from(BLOCK)).clamp(1, MAX_BLOCKS) as u32;
+    LaunchConfig {
+        grid_dim: (blocks, 1, 1),
+        block_dim: (BLOCK, 1, 1),
+        shared_mem_bytes: BLOCK * mem::size_of::<u64>() as u32,
+    }
+}
+
+fn control_reports_from_counts(
+    model: &ValidatedModel,
+    fired_counts: &[u64],
+    deferred_counts: &[u64],
+) -> Result<(CudaFiredPerBox, CudaDeferredPerResourceTable), CudaError> {
+    let expected_rules = model.transitions().len();
+    if fired_counts.len() != expected_rules {
+        return Err(CudaError::DeviceExecution(format!(
+            "CUDA fired-count readback returned {} values for {expected_rules} transitions",
+            fired_counts.len()
+        )));
+    }
+    let expected_tables = model
+        .model()
+        .boxes
+        .iter()
+        .map(|model_box| model_box.tables.len())
+        .sum::<usize>();
+    if deferred_counts.len() != expected_tables {
+        return Err(CudaError::DeviceExecution(format!(
+            "CUDA deferred-count readback returned {} values for {expected_tables} tables",
+            deferred_counts.len()
+        )));
+    }
+
+    let mut fired_per_box = Vec::with_capacity(model.model().boxes.len());
+    for (box_index, model_box) in model.model().boxes.iter().enumerate() {
+        let fired = model
+            .transitions()
+            .iter()
+            .filter(|transition| transition.box_index == box_index)
+            .map(|transition| {
+                let count = fired_counts[transition.rule_id as usize];
+                usize::try_from(count)
+                    .map(|count| (transition.rule_id, count))
+                    .map_err(|_| {
+                        CudaError::DeviceExecution(format!(
+                            "CUDA fired count for rule {} exceeds host usize",
+                            transition.rule_id
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        fired_per_box.push((model_box.name.clone(), fired));
+    }
+
+    let qualify = model.model().boxes.len() > 1;
+    let mut deferred_per_resource_table = Vec::new();
+    let mut global_table = 0;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            let count = deferred_counts[global_table];
+            if count != 0 {
+                let name = if qualify {
+                    format!("{}.{}", model_box.name, table.name)
+                } else {
+                    table.name.clone()
+                };
+                let count = usize::try_from(count).map_err(|_| {
+                    CudaError::DeviceExecution(format!(
+                        "CUDA deferred count for table '{name}' exceeds host usize"
+                    ))
+                })?;
+                deferred_per_resource_table.push((name, count));
+            }
+            global_table += 1;
+        }
+    }
+    Ok((fired_per_box, deferred_per_resource_table))
+}
+
 fn finish_validation_reduction_pass(
     stream: &std::sync::Arc<cudarc::driver::CudaStream>,
     advance: &CudaFunction,
@@ -193,6 +275,9 @@ pub struct CudaBackend {
     observe_grouped_view: CudaFunction,
     init_generic_enum_counts: CudaFunction,
     observe_generic_enum: CudaFunction,
+    init_control_counts: CudaFunction,
+    count_fired: CudaFunction,
+    count_deferred: CudaFunction,
     philox_vectors_kernel: CudaFunction,
     init_validation_scratch: CudaFunction,
     advance_validation_phase: CudaFunction,
@@ -223,6 +308,8 @@ pub struct CudaBackend {
     candidate_errors: CudaSlice<u8>,
     wins: CudaSlice<u8>,
     deferred: CudaSlice<u8>,
+    fired_counts: CudaSlice<u64>,
+    deferred_counts: CudaSlice<u64>,
     instance_resources: CudaSlice<u64>,
     instance_keys: CudaSlice<u64>,
     instance_rules: CudaSlice<u32>,
@@ -378,6 +465,9 @@ impl CudaBackend {
         let observe_grouped_view = load("sembla_observe_grouped_view")?;
         let init_generic_enum_counts = load("sembla_init_generic_enum_counts")?;
         let observe_generic_enum = load("sembla_observe_generic_enum")?;
+        let init_control_counts = load("sembla_init_control_counts")?;
+        let count_fired = load("sembla_count_fired")?;
+        let count_deferred = load("sembla_count_deferred")?;
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
         let init_validation_scratch = load("sembla_init_validation_scratch")?;
         let advance_validation_phase = load("sembla_advance_validation_phase")?;
@@ -458,6 +548,12 @@ impl CudaBackend {
             .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?;
         let deferred = stream
             .alloc_zeros::<u8>(deferred_len)
+            .map_err(driver_error)?;
+        let fired_counts = stream
+            .alloc_zeros::<u64>(layout.candidate_offsets.len().max(1))
+            .map_err(driver_error)?;
+        let deferred_counts = stream
+            .alloc_zeros::<u64>(layout.row_counts.len().max(1))
             .map_err(driver_error)?;
         let claim_instance_len = layout.claim_instance_count.max(1);
         let instance_resources = stream
@@ -582,6 +678,9 @@ impl CudaBackend {
             observe_grouped_view,
             init_generic_enum_counts,
             observe_generic_enum,
+            init_control_counts,
+            count_fired,
+            count_deferred,
             philox_vectors_kernel,
             init_validation_scratch,
             advance_validation_phase,
@@ -612,6 +711,8 @@ impl CudaBackend {
             candidate_errors,
             wins,
             deferred,
+            fired_counts,
+            deferred_counts,
             instance_resources,
             instance_keys,
             instance_rules,
@@ -694,6 +795,8 @@ impl CudaBackend {
             candidate_errors,
             wins,
             deferred,
+            fired_counts,
+            deferred_counts,
             instance_resources,
             instance_keys,
             instance_rules,
@@ -757,8 +860,9 @@ impl CudaBackend {
         let tick = self.next_tick;
         self.execute_tick()?;
         let views = self.observe_device_views(tick)?;
-        let (wins, deferred) = self.readback_control()?;
-        let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
+        let (fired_counts, deferred_counts) = self.readback_control()?;
+        let (fired_per_box, deferred_per_resource_table) =
+            control_reports_from_counts(&self.model, &fired_counts, &deferred_counts)?;
         host_observation_fallback(views.is_none(), || self.download_state_store())?;
         Ok((tick, fired_per_box, deferred_per_resource_table, views))
     }
@@ -801,11 +905,12 @@ impl CudaBackend {
         let kernels = started.elapsed();
 
         let started = std::time::Instant::now();
-        let (wins, deferred) = self.readback_control()?;
+        let (fired_counts, deferred_counts) = self.readback_control()?;
         let readback_control = started.elapsed();
 
         let started = std::time::Instant::now();
-        let (fired_per_box, deferred_per_resource_table) = self.control_reports(&wins, &deferred);
+        let (fired_per_box, deferred_per_resource_table) =
+            control_reports_from_counts(&self.model, &fired_counts, &deferred_counts)?;
         let report = started.elapsed();
 
         let (state_transfer, state_reconstruct) =
@@ -1126,66 +1231,18 @@ impl CudaBackend {
         Ok(())
     }
 
-    fn readback_control(&self) -> Result<(Vec<u8>, Vec<u8>), CudaError> {
-        let wins = self.stream.memcpy_dtov(&self.wins).map_err(driver_error)?;
-        let deferred = self
+    fn readback_control(&self) -> Result<(Vec<u64>, Vec<u64>), CudaError> {
+        let mut fired_counts = self
             .stream
-            .memcpy_dtov(&self.deferred)
+            .memcpy_dtov(&self.fired_counts)
             .map_err(driver_error)?;
-        Ok((wins, deferred))
-    }
-
-    fn control_reports(
-        &self,
-        wins: &[u8],
-        deferred: &[u8],
-    ) -> (CudaFiredPerBox, CudaDeferredPerResourceTable) {
-        let mut fired_per_box = Vec::with_capacity(self.model.model().boxes.len());
-        for (box_index, model_box) in self.model.model().boxes.iter().enumerate() {
-            let mut fired = Vec::with_capacity(model_box.transitions.len());
-            for transition in self
-                .model
-                .transitions()
-                .iter()
-                .filter(|transition| transition.box_index == box_index)
-            {
-                let rule = transition.rule_id as usize;
-                let begin = self.layout.candidate_offsets[rule] as usize;
-                let end = self
-                    .layout
-                    .candidate_offsets
-                    .get(rule + 1)
-                    .copied()
-                    .map(|value| value as usize)
-                    .unwrap_or(self.layout.candidate_count);
-                fired.push((
-                    transition.rule_id,
-                    wins[begin..end].iter().filter(|value| **value != 0).count(),
-                ));
-            }
-            fired_per_box.push((model_box.name.clone(), fired));
-        }
-        let table_count = self.layout.row_counts.len();
-        let qualify = self.model.model().boxes.len() > 1;
-        let mut deferred_per_resource_table = Vec::new();
-        let mut global_table = 0;
-        for model_box in &self.model.model().boxes {
-            for table in &model_box.tables {
-                let count = (0..self.layout.candidate_count)
-                    .filter(|candidate| deferred[candidate * table_count + global_table] != 0)
-                    .count();
-                if count != 0 {
-                    let name = if qualify {
-                        format!("{}.{}", model_box.name, table.name)
-                    } else {
-                        table.name.clone()
-                    };
-                    deferred_per_resource_table.push((name, count));
-                }
-                global_table += 1;
-            }
-        }
-        (fired_per_box, deferred_per_resource_table)
+        fired_counts.truncate(self.layout.candidate_offsets.len());
+        let mut deferred_counts = self
+            .stream
+            .memcpy_dtov(&self.deferred_counts)
+            .map_err(driver_error)?;
+        deferred_counts.truncate(self.layout.row_counts.len());
+        Ok((fired_counts, deferred_counts))
     }
 
     /// Evaluates checked coordinate Philox vectors on the device. This is a
@@ -1995,6 +2052,60 @@ impl CudaBackend {
                 .arg(&mut self.status);
             unsafe { args.launch(one) }.map_err(driver_error)?;
         }
+        // These diagnostics are consumed only by the host report. Reduce them
+        // while the raw control buffers remain device-resident; the terminal
+        // status readback below orders all three kernels before compact D2H.
+        let rule_count = u64::try_from(self.layout.candidate_offsets.len())
+            .map_err(|_| CudaError::InvalidInput("rule count exceeds u64".to_owned()))?;
+        let table_count = u64::try_from(self.layout.row_counts.len())
+            .map_err(|_| CudaError::InvalidInput("table count exceeds u64".to_owned()))?;
+        let candidate_count = u64::try_from(self.layout.candidate_count)
+            .map_err(|_| CudaError::InvalidInput("candidate count exceeds u64".to_owned()))?;
+        {
+            let mut args = self.stream.launch_builder(&self.init_control_counts);
+            args.arg(&mut self.fired_counts)
+                .arg(&rule_count)
+                .arg(&mut self.deferred_counts)
+                .arg(&table_count);
+            unsafe { args.launch(control_count_launch_config(rule_count.max(table_count))) }
+                .map_err(driver_error)?;
+        }
+        for rule_index in 0..self.layout.candidate_offsets.len() {
+            let begin = self.layout.candidate_offsets[rule_index];
+            let end = self
+                .layout
+                .candidate_offsets
+                .get(rule_index + 1)
+                .copied()
+                .unwrap_or(candidate_count);
+            if begin == end {
+                continue;
+            }
+            let rule = u64::try_from(rule_index)
+                .map_err(|_| CudaError::InvalidInput("rule index exceeds u64".to_owned()))?;
+            let mut args = self.stream.launch_builder(&self.count_fired);
+            args.arg(&self.wins)
+                .arg(&self.candidate_offsets)
+                .arg(&candidate_count)
+                .arg(&rule_count)
+                .arg(&rule)
+                .arg(&mut self.fired_counts);
+            unsafe { args.launch(control_count_launch_config(end - begin)) }
+                .map_err(driver_error)?;
+        }
+        if candidate_count != 0 {
+            let config = control_count_launch_config(candidate_count);
+            for table in 0..table_count {
+                let mut args = self.stream.launch_builder(&self.count_deferred);
+                args.arg(&self.deferred)
+                    .arg(&candidate_count)
+                    .arg(&table_count)
+                    .arg(&table)
+                    .arg(&mut self.deferred_counts);
+                unsafe { args.launch(config) }.map_err(driver_error)?;
+            }
+        }
+
         let status = self
             .stream
             .memcpy_dtov(&self.status)
@@ -2656,6 +2767,55 @@ fn type_size(ty: &AttrType) -> usize {
 
 fn align8(value: usize) -> usize {
     (value + 7) & !7
+}
+
+#[cfg(test)]
+mod control_reports_tests {
+    use super::control_reports_from_counts;
+
+    fn model(source: &str) -> sembla_ir::ValidatedModel {
+        sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn synthetic_counts_preserve_report_shape_order_and_qualification() {
+        let model = model(
+            r#"{"name":"control_reports","dt":1.0,"params":[],"boxes":[{"name":"left","tables":[{"name":"zero","size_hint":0,"attrs":[]},{"name":"kept","size_hint":0,"attrs":[]}],"transitions":[{"name":"first","table":"zero","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":0.0},"effects":[],"contests":[]},{"name":"second","table":"zero","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":0.0},"effects":[],"contests":[]}],"inputs":[],"outputs":[],"views":[]},{"name":"right","tables":[{"name":"also_kept","size_hint":0,"attrs":[]}],"transitions":[{"name":"third","table":"also_kept","guard":{"kind":"bool","value":true},"hazard":{"kind":"real","value":0.0},"effects":[],"contests":[]}],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#,
+        );
+        let (fired, deferred) =
+            control_reports_from_counts(&model, &[0, 7, 2], &[0, 5, 3]).unwrap();
+        assert_eq!(
+            fired,
+            vec![
+                ("left".to_owned(), vec![(0, 0), (1, 7)]),
+                ("right".to_owned(), vec![(2, 2)]),
+            ]
+        );
+        assert_eq!(
+            deferred,
+            vec![
+                ("left.kept".to_owned(), 5),
+                ("right.also_kept".to_owned(), 3)
+            ]
+        );
+    }
+
+    #[test]
+    fn synthetic_counts_preserve_single_box_names_and_empty_domains() {
+        let single = model(
+            r#"{"name":"single","dt":1.0,"params":[],"boxes":[{"name":"only","tables":[{"name":"zero","size_hint":0,"attrs":[]},{"name":"kept","size_hint":0,"attrs":[]}],"transitions":[],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#,
+        );
+        let (fired, deferred) = control_reports_from_counts(&single, &[], &[0, 4]).unwrap();
+        assert_eq!(fired, vec![("only".to_owned(), Vec::new())]);
+        assert_eq!(deferred, vec![("kept".to_owned(), 4)]);
+
+        let empty = model(
+            r#"{"name":"empty","dt":1.0,"params":[],"boxes":[{"name":"empty","tables":[],"transitions":[],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#,
+        );
+        let (fired, deferred) = control_reports_from_counts(&empty, &[], &[]).unwrap();
+        assert_eq!(fired, vec![("empty".to_owned(), Vec::new())]);
+        assert!(deferred.is_empty());
+    }
 }
 
 #[cfg(test)]
