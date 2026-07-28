@@ -1830,3 +1830,65 @@ fragile and rarely worth their cost.** "Both present at HEAD" states the real
 goal — the decision record must not contradict the code — without creating a
 condition that an operator's ordinary activity can destroy.
 
+
+### M3. A pending hardware criterion must name the command that runs it (2026-07-28)
+
+**Decision.** A PRD that defers a criterion under §J14.2 must name the exact
+command that will execute it, and that command must exist and be reachable from
+the session tooling. **If no automation exists, building it is in scope for the
+PRD that defers the criterion**, not for a later unnamed session.
+
+**Reason.** §J14.2 makes deferral honest but not bounded. It requires hardware
+criteria to be *listed* as pending; nothing required them to be *runnable*, and
+a criterion that is listed and unrunnable is indistinguishable, from the record,
+from one that passed.
+
+It happened. `crates/sembla-cuda/scripts/run-differential-corpus.sh` existed
+well before 2026-07-19, and `prds-device-observation/0002` extended it with the
+grouped configuration. **No collector ever invoked it.** Several PRDs carried
+"CPU/CUDA differential equality" as hardware-pending across three GPU sessions
+with nothing anywhere that would run it. It was finally run on 2026-07-28, only
+because the collector was taught to, and it found a deadlock (§L12) on the first
+case of the first geometry that contends.
+
+So the corpus had been unrun for long enough that a hang could be introduced,
+approved, and carried through three sessions without detection. The defect was
+not hard to find; nothing was looking.
+
+**Alternatives.** Relying on the operator to remember — three sessions did not.
+A runbook checklist item — the module README already described the corpus and it
+still never ran; documentation does not execute. Requiring hardware for approval
+— §J14.2 rejected that for good reasons that have not changed.
+
+**Consequent.** `BENCH_CORPUS=1` now runs the corpus from the collector, before
+the gate, aborting it on disagreement. Hardware criteria in this repository name
+a runnable command or they are not deferred.
+
+### M4. A check is not trusted until it has been made to fail (2026-07-28)
+
+**Decision.** A verification added to the collector, the payload, or a PRD's
+acceptance tooling must be demonstrated to fail on a deliberately perturbed
+input before its passing result is cited as evidence.
+
+**Reason.** A check that cannot fail is worse than no check, because it emits a
+passing result that is then quoted in a decision record.
+
+It nearly happened, in the same session and in the check written to verify §L11.
+The first version of the grouped CPU/CUDA parity comparison compared
+`profile-grouped-cuda.csv` against `profile-grouped-cpu.csv`. **Neither file
+contains any grouped data.** Grouped views are written to
+`<stem>.grouped.<view>.csv` sidecars (`main.rs:2202`), so the comparison would
+have passed unconditionally, on every run, and printed "grouped CPU/CUDA outputs
+identical" — the exact sentence the PRD needed and the one nobody would have
+re-derived. It was caught by running it against a byte-perturbed copy and
+requiring it to report a mismatch.
+
+**Alternatives.** Careful reading — that is how the bug was written in the first
+place, by someone who had just read the code that names the sidecars. Reviewing
+the check's output — it produces the correct-looking output either way, which is
+precisely the failure mode.
+
+**Note.** This generalises §M1. §M1 says do not infer a result from a proxy;
+this says do not infer a *check's validity* from its passing. Both are the same
+error at different levels: accepting a number without establishing what would
+have changed it.

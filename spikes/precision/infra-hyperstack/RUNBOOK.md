@@ -43,6 +43,13 @@ Each item below has failed at least once in practice.
       low. A guest poweroff mid-run loses the work *and* keeps billing.
 - [ ] **Arm the billing watchdog** (`destroy-deadline.sh arm <hours>`) before
       starting anything long.
+- [ ] **Decide about the evidence push.** `prepare-deploy-key.sh` makes artifact
+      delivery independent of this laptop. Unset, it is silently skipped — that
+      is what happened on 2026-07-28. The collector now says which mode it is in
+      at startup; read that line rather than assuming.
+- [ ] **Run `reconcile-orphans.sh` first, not last.** It is the only check that
+      nothing is already billing, and a `terraform destroy` that returned an
+      HTTP 500 is not proof it succeeded.
 
 ## The network requirement
 
@@ -177,6 +184,35 @@ from it, and tear it down.
 - **Never delete host key files in cloud-init.** An explicit `HostKey` directive
   already makes sshd serve only the listed key. Deleting the others risks
   sshd failing per-connection after the banner — unrecoverable remotely.
+- **`pkill -f <pattern>` over SSH will match its own shell.** The remote shell's
+  command line contains the whole script you sent, so `pkill -f sembla_cuda-`
+  kills the connection running it and you see the command truncate mid-output.
+  Kill by PID or process group (`kill -TERM -"$PID"`, the payload is a `setsid`
+  session leader), or exclude yourself with `pgrep -f ... | grep -v $$`. Done on
+  2026-07-28; the kill still landed, but the truncated output looked like a
+  dropped connection and cost a reconnect to interpret.
+- **A second `trap ... EXIT` replaces the first, it does not add to it.** This
+  script's `finish` trap prints the "a VM may still be billing" warning. A
+  second EXIT trap added for something as small as removing a temp file silently
+  disables it, and the only symptom is a warning that no longer appears — on the
+  path where you most need it. Add cleanup to `finish`.
+
+## Bounding a hang
+
+`BENCH_CORPUS` runs under `timeout` (`BENCH_CORPUS_TIMEOUT_SECONDS`, default
+1800) and exits **7** if it fires. This exists because on 2026-07-28 a GPU-side
+deadlock ran for **2h31m** before anyone looked — the ceiling was the
+collector's 12-hour poll, so the true exposure was about $24 of billing for a
+defect whose reproduction takes 23 seconds. See `DECISIONS.md` §L12.
+
+Two things made it invisible, and both are now fixed. The stage redirected to
+its own log instead of tee-ing, so `tail -1 ~/bench.log` — the only progress the
+collector shows — froze on the stage header, and a deadlock looked exactly like
+a long compile. And there was no timeout.
+
+**The general rule: any stage that can hang needs a bound and a heartbeat.**
+A stage that is silent while healthy cannot be distinguished from one that is
+silent while stuck, and the difference costs money by the hour.
 
 ## PRD 0005 frozen protocol
 
