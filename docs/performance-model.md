@@ -209,22 +209,23 @@ so run them from here rather than folder by folder.
 | 6 | `prds-evaluator-throughput/0005` write identity | no | the serial remainder is the write path; three of its four costs share one cause |
 | 7 | `prds-evaluator-throughput/0006` effect gathering | no | effect values computed for every row, used for the ~2% that fire |
 | 8 | `prds-device-observation/0001` + `0002` | yes | **landed, hardware-verified §L11**: CUDA 26.37 s → 14.10 s (1.87×); `state_transfer`, `state_reconstruct` and `observe_views` all exactly zero |
-| 9 | **fix the §L12 validation deadlock** | yes | *do this first.* It blocks the differential corpus, which is the safety net for every further device-side change — including item 10. 23-second reproduction |
-| 10 | **device-side `wins`/`deferred` reduction** | yes | now **91%** of CUDA wall time (`readback_control` 53% + `report` 33%), moving and counting 200 MB/tick at 5M to produce ≤13 diagnostic integers |
-| 11 | **amortise startup across sweep draws** | no | largest win for batch work: after item 10 a 1M draw is ~2.3 s of which ~2.2 s is JIT and state load, paid once per draw |
+| 9 | `prds-cuda-validation-parallelism/0008` remove the spin lock | yes | *do this first.* It blocks the differential corpus, which is the safety net for every further device-side change — including item 10. 23-second reproduction |
+| 10 | `prds-sweep-throughput/0001` reuse the backend across draws | no | largest win for batch work, and needs no GPU session: `sweep` NVRTC-recompiles the model and clones the full initial state **every draw** |
+| 11 | **device-side `wins`/`deferred` reduction** — unwritten | yes | now **91%** of CUDA wall time (`readback_control` 53% + `report` 33%), moving and counting 200 MB/tick at 5M to produce ≤13 diagnostic integers. Written once the corpus is green, so its criteria can *require* corpus equality rather than defer it (§M3) |
 
-**Why 9 before 10.** Item 10 is a device-side change to a reduction, which is
-exactly the shape the differential corpus exists to check. Landing it while the
-corpus cannot run would mean shipping the riskiest available change with the
-safety net down. The deadlock's reproduction is 23 seconds, so the cost of
-fixing it first is negligible.
+**Why 9 first.** Item 11 is a device-side change to a reduction, which is exactly
+the shape the differential corpus exists to check. Landing it while the corpus
+cannot run would mean shipping the riskiest available change with the safety net
+down. The deadlock's reproduction is 23 seconds, so fixing it first is nearly
+free — and once it is green, item 11 can *require* corpus equality instead of
+deferring it, which §M3 now expects.
 
-**Why 11 is not last in value.** It is last in dependency order only. For batch
-runs — the actual goal — it beats item 10: a hundred 1M draws as separate
-processes cost ~230 s after item 10, of which ~220 s is startup repeated a
-hundred times; sharing one process makes it ~11 s. The two compound, because
-item 10 is what makes the per-draw simulation cost small enough for startup to
-dominate.
+**Why 10 outranks 11 for the actual goal.** Item 11 is the bigger single-run
+win; item 10 is the bigger *workflow* win, and it needs no GPU session, so it
+can proceed in parallel with 9. A hundred 1M draws cost ~310 s today and ~230 s
+after item 11 — of which ~220 s is startup, paid a hundred times. Item 10 makes
+it ~11 s. The two compound: item 11 is what makes the per-draw simulation cost
+small enough for startup to dominate.
 
 The write path was earlier described here as needing "a design idea, not an
 optimisation". That was wrong, and it was wrong for the reason §M1 warns about:

@@ -153,6 +153,24 @@ order.
   byte-identical goldens are the guard.
 - `0007-linear-serial-kernels` — the two remaining single-threaded kernels,
   which scale linearly and are secondary. Runs after 0006.
+- `0008-remove-the-validation-spin-lock` — **corrects a defect in 0002.** Its
+  generated spin lock deadlocks on hardware at launch geometry `1x32`, one full
+  warp contending, while passing at `1x1`. Found 2026-07-28 on the first
+  hardware execution of code approved on local criteria three sessions earlier.
+  See `DECISIONS.md` §L12 and
+  [`docs/evidence/cuda-validation-deadlock-20260728/`](../evidence/cuda-validation-deadlock-20260728/).
+
+## A note this folder should carry
+
+0002 was correct by every criterion available when it was approved. Hosted CI
+has no GPU, §J14.2 permitted approval on local criteria, and its hardware
+criteria were properly listed as pending. What was missing was any *mechanism*
+that would later execute them — `run-differential-corpus.sh` existed but no
+collector invoked it — so the defect survived three GPU sessions before anything
+ran it, and then failed on the first case of the first contending geometry.
+
+`DECISIONS.md` §M3 now requires a deferred hardware criterion to name a runnable
+command, and `BENCH_CORPUS=1` is that command for this folder.
 
 ## Acceptance notes
 
