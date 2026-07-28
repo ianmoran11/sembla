@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
 
 pub const FAILING_ROWS: [usize; 3] = [2, 5, 7];
-pub const GEOMETRIES: [(u32, u32); 3] = [(1, 1), (1, 32), (3, 4)];
+pub const GEOMETRIES: [(u32, u32); 4] = [(1, 1), (1, 32), (3, 4), (4, 128)];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaseKind {

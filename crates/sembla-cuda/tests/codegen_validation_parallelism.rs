@@ -58,7 +58,7 @@ const PARALLEL_KERNELS: [&str; 4] = [
 
 /// The remaining deliberately single-threaded kernels. PRD 0007 removes
 /// `sembla_check_candidate_errors` and `sembla_prepare_effects` from this list.
-const SERIAL_KERNELS: [&str; 8] = [
+const SERIAL_KERNELS: [&str; 9] = [
     "sembla_reset_status",
     "sembla_record_aggregate_errors",
     "sembla_check_output_errors",
@@ -66,6 +66,7 @@ const SERIAL_KERNELS: [&str; 8] = [
     "sembla_prepare_outputs",
     "sembla_validate_claim_compatibility",
     "sembla_init_validation_scratch",
+    "sembla_advance_validation_phase",
     "sembla_commit_validation_status",
 ];
 
@@ -112,9 +113,46 @@ fn parallel_validation_kernels_report_only_through_the_reduction() {
         .find("extern \"C\" __global__ void")
         .unwrap()];
     assert!(
-        prelude.contains("atomicMin(status + 6, order_identity)"),
-        "the reduction accumulates the minimum ordering identity with atomicMin"
+        prelude.contains("atomicMin(status + 5, scan)"),
+        "the first pass reduces the minimum scan with atomicMin"
     );
+    assert!(
+        prelude.contains("atomicMin(status + 6, order_identity)"),
+        "the second pass reduces identity only within the winning scan"
+    );
+    assert!(
+        prelude.contains("atomicMin(status + 8, branch)"),
+        "the third pass reduces branch only within the winning prefix"
+    );
+}
+
+#[test]
+fn generated_validation_argmin_contains_no_mutex_or_retry_loop() {
+    let generated = generate(&parallel_validation_model()).unwrap();
+    let prelude = &generated.source[..generated
+        .source
+        .find("extern \"C\" __global__ void")
+        .unwrap()];
+    assert!(!generated.source.contains("atomicCAS(status + 4"));
+    assert!(!prelude.contains("spin lock"));
+    assert!(!prelude.contains("Requires independent thread scheduling"));
+    assert!(prelude.contains("unsigned long long phase = status[4];"));
+    assert!(prelude.contains("phase == 0ULL"));
+    assert!(prelude.contains("phase == 1ULL"));
+    assert!(prelude.contains("phase == 2ULL"));
+    assert!(prelude.contains("branch == status[8]"));
+    for paired_store in [
+        "status[7] = code;",
+        "status[9] = reported_identity;",
+        "status[10] = detail_2;",
+        "status[11] = detail_3;",
+    ] {
+        assert!(prelude.contains(paired_store), "missing {paired_store}");
+    }
+
+    // The unrelated monotone i64 extrema reductions remain ordinary
+    // lock-free CAS loops and are intentionally outside this PRD.
+    assert!(prelude.contains("atomicCAS(bits, observed"));
 }
 
 #[test]
@@ -142,6 +180,9 @@ fn candidate_errors_and_effect_preparation_are_grid_strided_reductions() {
     assert!(effects.contains("row < row_counts["));
     assert!(effects.contains("row += stride"));
     assert!(effects.contains("sembla_record_validation_failure(status,"));
+    assert!(effects.contains("unsigned long long validation_phase = status[4];"));
+    assert!(effects.contains("if (validation_phase == 0ULL)"));
+    assert!(effects.contains("else if (owners[owner] != -1"));
     assert!(!effects.contains("status[0] ="));
     assert!(!effects.contains("status[1] ="));
 }
@@ -268,9 +309,12 @@ fn commit_publishes_candidate_before_code_and_scratch_is_initialised() {
         "the complete diagnostic payload must be published before the code"
     );
     assert!(
-        commit.contains("if (status[0] != 0ULL || status[5] == 0xffffffffffffffffULL) return;"),
-        "commit defers to a prior launch's failure and to empty scratch"
+        commit.contains("if (status[0] == 0ULL && status[5] != 0xffffffffffffffffULL)"),
+        "commit publishes only the first non-empty logical launch"
     );
+    assert!(commit.contains("status[4] = 0ULL;"));
+    assert!(commit.contains("status[5] = 0xffffffffffffffffULL;"));
+    assert!(commit.contains("status[8] = 0xffffffffffffffffULL;"));
     let init = kernel_body(&generated.source, "sembla_init_validation_scratch");
     assert!(init.contains("status[5] = 0xffffffffffffffffULL;"));
     assert!(init.contains("status[6] = 0xffffffffffffffffULL;"));
@@ -315,8 +359,8 @@ fn ordered_output_fold_stays_on_one_worker() {
 const EMPTY: u64 = u64::MAX;
 
 /// Mirrors the ordering portion of scratch slots status[4..=11]:
-/// (scan, order identity, code, branch). The lock and diagnostic payload are
-/// elided because this mirror tests ordering rather than payload publication.
+/// (phase, scan, order identity, code, branch). Diagnostic details are elided,
+/// but code remains paired with the exact key selected in the payload pass.
 #[derive(Default)]
 struct Scratch {
     scan: u64,
@@ -335,26 +379,18 @@ impl Scratch {
         }
     }
 
-    /// Faithful port of `sembla_record_validation_failure`.
-    fn record(&mut self, code: u64, candidate: u64, scan: u64, branch: u64) {
-        match scan.cmp(&self.scan) {
-            std::cmp::Ordering::Less => {
-                self.scan = scan;
+    /// Faithful port of one phase of `sembla_record_validation_failure`.
+    fn record(&mut self, phase: u64, code: u64, candidate: u64, scan: u64, branch: u64) {
+        match phase {
+            0 => self.scan = self.scan.min(scan),
+            1 if scan == self.scan => self.candidate = self.candidate.min(candidate),
+            2 if scan == self.scan && candidate == self.candidate => {
+                self.branch = self.branch.min(branch);
+            }
+            3 if scan == self.scan && candidate == self.candidate && branch == self.branch => {
                 self.code = code;
-                self.branch = branch;
-                self.candidate = candidate; // atomicExch reset for the new scan
             }
-            std::cmp::Ordering::Equal => {
-                let previous = self.candidate.min(candidate); // atomicMin
-                if candidate < self.candidate
-                    || (candidate == self.candidate && branch < self.branch)
-                {
-                    self.code = code;
-                    self.branch = branch;
-                }
-                self.candidate = previous;
-            }
-            std::cmp::Ordering::Greater => {}
+            _ => {}
         }
     }
 
@@ -369,9 +405,19 @@ type Failure = (u64, u64, u64, u64);
 
 /// Reduces `failures` in the given interleaving, as device workers would.
 fn reduce_in_order(failures: impl IntoIterator<Item = Failure>) -> Option<(u64, u64)> {
+    let failures = failures.into_iter().collect::<Vec<_>>();
     let mut scratch = Scratch::new();
-    for (code, candidate, scan, branch) in failures {
-        scratch.record(code, candidate, scan, branch);
+    for phase in 0..4 {
+        // Deliberately change the observation order between passes: kernel
+        // scheduling need not repeat even though the failure set does.
+        let ordered = if phase % 2 == 0 {
+            failures.clone()
+        } else {
+            failures.iter().rev().copied().collect()
+        };
+        for (code, candidate, scan, branch) in ordered {
+            scratch.record(phase, code, candidate, scan, branch);
+        }
     }
     scratch.commit()
 }

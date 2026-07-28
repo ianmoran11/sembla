@@ -1715,6 +1715,17 @@ costs 23 seconds; the discovery cost 2.5 hours of GPU time only because nothing
 had run it.** Corpus coverage is now automated behind `BENCH_CORPUS=1` so this
 cannot go unrun again.
 
+**Local correction verdict (2026-07-28).** The mutex word is now a reduction
+phase, and every logical validator runs four stream-ordered passes: minimum
+scan, minimum ordering identity within that scan, minimum branch within that
+prefix, then payload recovery by the exact winning key. The generated source
+contains no `atomicCAS(status + 4, ...)` loop or critical section; the unrelated
+monotone i64 extrema CAS reductions remain unchanged. Multi-block, multi-warp
+`4x128` joins the diagnostic geometry corpus, whose ignored lib test is bounded
+by a killable child-process deadline. Local gates establish code generation and
+CPU-oracle invariants only. The §J14.2 hardware verdict remains pending the
+runnable `BENCH_CORPUS=1 bash run-demographic-benchmark.sh` command.
+
 ## M. Performance methodology
 
 ### M1. Optimisation is scoped from direct measurement, not from profile shares (2026-07-27)

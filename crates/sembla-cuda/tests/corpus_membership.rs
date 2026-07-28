@@ -4,6 +4,10 @@ use std::process::Command;
 use sembla_ir::AttrType;
 use sembla_runtime::executor::device_observation_eligibility;
 
+#[allow(dead_code)]
+#[path = "support/diagnostic_cases.rs"]
+mod diagnostic_cases;
+
 const DEMOGRAPHIC_MODEL: &str = "fixtures/demographic/benchmark/demographic_slots.no-grouped.json";
 const DEMOGRAPHIC_LISTING: &str = "corpus_model=fixtures/demographic/benchmark/demographic_slots.no-grouped.json configuration=no-grouped population=1000 seed=7 ticks=20";
 const GROUPED_DEMOGRAPHIC_MODEL: &str = "fixtures/demographic/demographic_slots.json";
@@ -101,4 +105,15 @@ fn differential_runner_lists_the_demographic_corpus_contract() {
     assert!(stdout
         .lines()
         .any(|line| line == GROUPED_DEMOGRAPHIC_LISTING));
+
+    let listed_geometries = stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix("launch_geometry="))
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let expected_geometries = diagnostic_cases::GEOMETRIES
+        .iter()
+        .map(|(grid, block)| format!("{grid}x{block}"))
+        .collect::<Vec<_>>();
+    assert_eq!(listed_geometries, expected_geometries);
 }

@@ -15,6 +15,7 @@ corpus_model=fixtures/demographic/demographic_slots.json configuration=grouped p
 launch_geometry=1x1
 launch_geometry=1x32
 launch_geometry=3x4
+launch_geometry=4x128
 EOF
   exit 0
 fi
@@ -71,7 +72,7 @@ mkdir -p "$out"
 
 set +e
 cargo test --locked --release -p sembla-cuda --features cuda --lib \
-  negative_corpus_matches_cpu_status_under_three_geometries -- --ignored --nocapture \
+  negative_corpus_matches_cpu_status_under_four_geometries -- --ignored --nocapture \
   2>&1 | tee "$out/diagnostic-corpus.log"
 status=${PIPESTATUS[0]}
 if [[ $status -eq 0 ]]; then

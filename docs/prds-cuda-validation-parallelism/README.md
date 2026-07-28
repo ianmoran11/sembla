@@ -334,3 +334,23 @@ single-worker guard and names every retained exception with its reason. The
 canonical generated CUDA source fixture changes, while examples, CSV/hash
 goldens, and tracked differential evidence remain byte-identical. Hardware
 criterion 6 remains **pending** per §J14.2.
+
+### 2026-07-28 — PRD 0008 local correctness implementation
+
+Removed the validation mutex and replaced it with four stream-ordered passes:
+`atomicMin` of scan, identity within the winning scan, branch within the winning
+prefix, then exact-key payload recovery. The kernel boundary between passes is
+the global synchronization point; the final single-thread kernel publishes the
+paired payload and resets scratch. `sembla_prepare_effects` writes owners only
+on the first pass and replays genuine double-write facts without serializing the
+PRD 0007 kernel.
+
+The negative corpus now includes multi-block, multi-warp geometry `4x128`, and
+the runner's `--list` output is tested directly against the shared geometry
+constant. The ignored GPU lib test executes in a killable child with a
+120-second internal deadline. The checked-in generated SIR fixture and every
+existing CSV/hash, manifest, state, and differential evidence file remain
+byte-identical. Local evidence and the exact equivalence argument are in
+[`cuda-validation-lock-free-20260728`](../evidence/cuda-validation-lock-free-20260728/).
+Hardware criteria 8–10 remain **pending** under §J14.2 and are runnable through
+`BENCH_CORPUS=1 bash run-demographic-benchmark.sh`.

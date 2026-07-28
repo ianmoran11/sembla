@@ -69,6 +69,31 @@ pub type TimedReusedCudaTickObservation = (
 );
 type DownloadedStateParts = (Vec<u8>, Vec<u8>, Vec<u64>);
 
+/// Scan, order identity, branch, then exact-key payload recovery. Kernel
+/// boundaries between these passes provide device-wide ordering without a
+/// mutex or retry loop in generated validation code.
+const VALIDATION_REDUCTION_PASSES: u64 = 4;
+
+fn finish_validation_reduction_pass(
+    stream: &std::sync::Arc<cudarc::driver::CudaStream>,
+    advance: &CudaFunction,
+    commit: &CudaFunction,
+    status: &mut CudaSlice<u64>,
+    phase: u64,
+    one: LaunchConfig,
+) -> Result<(), CudaError> {
+    let function = if phase + 1 < VALIDATION_REDUCTION_PASSES {
+        advance
+    } else {
+        commit
+    };
+    let mut args = stream.launch_builder(function);
+    args.arg(status);
+    unsafe { args.launch(one) }
+        .map(|_| ())
+        .map_err(driver_error)
+}
+
 #[derive(Debug)]
 struct Layout {
     row_counts: Vec<u64>,
@@ -169,6 +194,7 @@ pub struct CudaBackend {
     observe_generic_enum: CudaFunction,
     philox_vectors_kernel: CudaFunction,
     init_validation_scratch: CudaFunction,
+    advance_validation_phase: CudaFunction,
     commit_validation_status: CudaFunction,
     mark_effect_active: CudaFunction,
     state: CudaSlice<u8>,
@@ -352,6 +378,7 @@ impl CudaBackend {
         let observe_generic_enum = load("sembla_observe_generic_enum")?;
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
         let init_validation_scratch = load("sembla_init_validation_scratch")?;
+        let advance_validation_phase = load("sembla_advance_validation_phase")?;
         let commit_validation_status = load("sembla_commit_validation_status")?;
         let mark_effect_active = load("sembla_mark_effect_active")?;
 
@@ -504,8 +531,8 @@ impl CudaBackend {
             .alloc_zeros::<u64>(generated.generic_enum_count.max(1))
             .map_err(driver_error)?;
         // status[0..=3] is the committed diagnostic; status[4..=11] is the
-        // per-tick validation-reduction scratch (lock, scan, ordering identity,
-        // code, branch, and selected payload) prepared by the scratch kernel.
+        // per-launch validation-reduction scratch (phase, scan, ordering
+        // identity, code, branch, and selected payload).
         let status = stream.alloc_zeros::<u64>(12).map_err(driver_error)?;
         let effect_active = stream
             .alloc_zeros::<u32>(layout.candidate_offsets.len().max(1))
@@ -553,6 +580,7 @@ impl CudaBackend {
             observe_generic_enum,
             philox_vectors_kernel,
             init_validation_scratch,
+            advance_validation_phase,
             commit_validation_status,
             mark_effect_active,
             state,
@@ -1289,27 +1317,32 @@ impl CudaBackend {
                 // one worker when the table is empty, so zero rows keeps a
                 // single-thread launch instead of a zero-block one.
                 let validation_config = self.validation_launch_config(rows, one);
-                {
-                    let mut args = self.stream.launch_builder(&self.validate_transition);
-                    args.arg(&self.state)
-                        .arg(&self.column_offsets)
-                        .arg(&self.row_counts)
-                        .arg(&self.inputs)
-                        .arg(&self.input_offsets)
-                        .arg(&self.input_counts)
-                        .arg(&self.params)
-                        .arg(&self.aggregates)
-                        .arg(&self.aggregate_facts)
-                        .arg(&self.aggregate_offsets)
-                        .arg(&self.candidate_offsets)
-                        .arg(&rule_id)
-                        .arg(&mut self.status);
-                    unsafe { args.launch(validation_config) }.map_err(driver_error)?;
-                }
-                {
-                    let mut args = self.stream.launch_builder(&self.commit_validation_status);
-                    args.arg(&mut self.status);
-                    unsafe { args.launch(one) }.map_err(driver_error)?;
+                for phase in 0..VALIDATION_REDUCTION_PASSES {
+                    {
+                        let mut args = self.stream.launch_builder(&self.validate_transition);
+                        args.arg(&self.state)
+                            .arg(&self.column_offsets)
+                            .arg(&self.row_counts)
+                            .arg(&self.inputs)
+                            .arg(&self.input_offsets)
+                            .arg(&self.input_counts)
+                            .arg(&self.params)
+                            .arg(&self.aggregates)
+                            .arg(&self.aggregate_facts)
+                            .arg(&self.aggregate_offsets)
+                            .arg(&self.candidate_offsets)
+                            .arg(&rule_id)
+                            .arg(&mut self.status);
+                        unsafe { args.launch(validation_config) }.map_err(driver_error)?;
+                    }
+                    finish_validation_reduction_pass(
+                        &self.stream,
+                        &self.advance_validation_phase,
+                        &self.commit_validation_status,
+                        &mut self.status,
+                        phase,
+                        one,
+                    )?;
                 }
 
                 if rows == 0 {
@@ -1344,35 +1377,53 @@ impl CudaBackend {
                 })?;
                 let candidate_begin = self.layout.candidate_offsets[rule_index];
                 let candidate_count = u64::from(rows);
-                let mut args = self.stream.launch_builder(&self.check_errors);
-                args.arg(&self.candidate_errors)
-                    .arg(&candidate_begin)
-                    .arg(&candidate_count)
-                    .arg(&mut self.status);
-                unsafe { args.launch(validation_config) }.map_err(driver_error)?;
-                let mut args = self.stream.launch_builder(&self.commit_validation_status);
-                args.arg(&mut self.status);
-                unsafe { args.launch(one) }.map_err(driver_error)?;
+                for phase in 0..VALIDATION_REDUCTION_PASSES {
+                    {
+                        let mut args = self.stream.launch_builder(&self.check_errors);
+                        args.arg(&self.candidate_errors)
+                            .arg(&candidate_begin)
+                            .arg(&candidate_count)
+                            .arg(&mut self.status);
+                        unsafe { args.launch(validation_config) }.map_err(driver_error)?;
+                    }
+                    finish_validation_reduction_pass(
+                        &self.stream,
+                        &self.advance_validation_phase,
+                        &self.commit_validation_status,
+                        &mut self.status,
+                        phase,
+                        one,
+                    )?;
+                }
 
                 let claims_config = self.validation_launch_config(rows, one);
-                let mut args = self.stream.launch_builder(&self.validate_claims);
-                args.arg(&self.state)
-                    .arg(&self.column_offsets)
-                    .arg(&self.row_counts)
-                    .arg(&self.inputs)
-                    .arg(&self.input_offsets)
-                    .arg(&self.input_counts)
-                    .arg(&self.params)
-                    .arg(&self.aggregates)
-                    .arg(&self.aggregate_offsets)
-                    .arg(&self.candidate_offsets)
-                    .arg(&rule_id)
-                    .arg(&self.enabled)
-                    .arg(&mut self.status);
-                unsafe { args.launch(claims_config) }.map_err(driver_error)?;
-                let mut args = self.stream.launch_builder(&self.commit_validation_status);
-                args.arg(&mut self.status);
-                unsafe { args.launch(one) }.map_err(driver_error)?;
+                for phase in 0..VALIDATION_REDUCTION_PASSES {
+                    {
+                        let mut args = self.stream.launch_builder(&self.validate_claims);
+                        args.arg(&self.state)
+                            .arg(&self.column_offsets)
+                            .arg(&self.row_counts)
+                            .arg(&self.inputs)
+                            .arg(&self.input_offsets)
+                            .arg(&self.input_counts)
+                            .arg(&self.params)
+                            .arg(&self.aggregates)
+                            .arg(&self.aggregate_offsets)
+                            .arg(&self.candidate_offsets)
+                            .arg(&rule_id)
+                            .arg(&self.enabled)
+                            .arg(&mut self.status);
+                        unsafe { args.launch(claims_config) }.map_err(driver_error)?;
+                    }
+                    finish_validation_reduction_pass(
+                        &self.stream,
+                        &self.advance_validation_phase,
+                        &self.commit_validation_status,
+                        &mut self.status,
+                        phase,
+                        one,
+                    )?;
+                }
             }
 
             let box_index_u32 = u32::try_from(box_index)
@@ -1592,26 +1643,35 @@ impl CudaBackend {
                 unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
             }
             let effects_config = self.validation_launch_config(effects_rows, one);
-            let mut args = self.stream.launch_builder(&self.validate_effects);
-            args.arg(&self.state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&self.aggregates)
-                .arg(&self.aggregate_facts)
-                .arg(&self.aggregate_offsets)
-                .arg(&self.candidate_offsets)
-                .arg(&self.wins)
-                .arg(&self.effect_active)
-                .arg(&box_index_u32)
-                .arg(&mut self.status);
-            unsafe { args.launch(effects_config) }.map_err(driver_error)?;
-            let mut args = self.stream.launch_builder(&self.commit_validation_status);
-            args.arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            for phase in 0..VALIDATION_REDUCTION_PASSES {
+                {
+                    let mut args = self.stream.launch_builder(&self.validate_effects);
+                    args.arg(&self.state)
+                        .arg(&self.column_offsets)
+                        .arg(&self.row_counts)
+                        .arg(&self.inputs)
+                        .arg(&self.input_offsets)
+                        .arg(&self.input_counts)
+                        .arg(&self.params)
+                        .arg(&self.aggregates)
+                        .arg(&self.aggregate_facts)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&self.candidate_offsets)
+                        .arg(&self.wins)
+                        .arg(&self.effect_active)
+                        .arg(&box_index_u32)
+                        .arg(&mut self.status);
+                    unsafe { args.launch(effects_config) }.map_err(driver_error)?;
+                }
+                finish_validation_reduction_pass(
+                    &self.stream,
+                    &self.advance_validation_phase,
+                    &self.commit_validation_status,
+                    &mut self.status,
+                    phase,
+                    one,
+                )?;
+            }
         }
         self.stream
             .memcpy_dtod(&self.state, &mut self.next_state)
@@ -1648,27 +1708,37 @@ impl CudaBackend {
                 continue;
             }
             let rule_id = transition.rule_id;
-            let mut args = self.stream.launch_builder(&self.prepare_effects);
-            args.arg(&self.state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&self.aggregates)
-                .arg(&self.aggregate_offsets)
-                .arg(&self.candidate_offsets)
-                .arg(&self.wins)
-                .arg(&self.write_offsets)
-                .arg(&mut self.owners)
-                .arg(&mut self.owner_values)
-                .arg(&rule_id)
-                .arg(&mut self.status);
-            unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
-            let mut args = self.stream.launch_builder(&self.commit_validation_status);
-            args.arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            for phase in 0..VALIDATION_REDUCTION_PASSES {
+                {
+                    let mut args = self.stream.launch_builder(&self.prepare_effects);
+                    args.arg(&self.state)
+                        .arg(&self.column_offsets)
+                        .arg(&self.row_counts)
+                        .arg(&self.inputs)
+                        .arg(&self.input_offsets)
+                        .arg(&self.input_counts)
+                        .arg(&self.params)
+                        .arg(&self.aggregates)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&self.candidate_offsets)
+                        .arg(&self.wins)
+                        .arg(&self.write_offsets)
+                        .arg(&mut self.owners)
+                        .arg(&mut self.owner_values)
+                        .arg(&rule_id)
+                        .arg(&mut self.status);
+                    unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }
+                        .map_err(driver_error)?;
+                }
+                finish_validation_reduction_pass(
+                    &self.stream,
+                    &self.advance_validation_phase,
+                    &self.commit_validation_status,
+                    &mut self.status,
+                    phase,
+                    one,
+                )?;
+            }
         }
         if self.layout.owner_count != 0 {
             let launch_count = owner_launch_count;
@@ -1770,24 +1840,31 @@ impl CudaBackend {
                 output_rows = output_rows.max(rows);
             }
             let output_config = self.validation_launch_config(output_rows, one);
-            let mut args = self.stream.launch_builder(&self.validate_outputs);
-            args.arg(&self.next_state)
-                .arg(&self.column_offsets)
-                .arg(&self.row_counts)
-                .arg(&self.inputs)
-                .arg(&self.input_offsets)
-                .arg(&self.input_counts)
-                .arg(&self.params)
-                .arg(&self.aggregates)
-                .arg(&self.aggregate_facts)
-                .arg(&self.aggregate_offsets)
-                .arg(&mut self.status);
-            unsafe { args.launch(output_config) }.map_err(driver_error)?;
-        }
-        {
-            let mut args = self.stream.launch_builder(&self.commit_validation_status);
-            args.arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            for phase in 0..VALIDATION_REDUCTION_PASSES {
+                {
+                    let mut args = self.stream.launch_builder(&self.validate_outputs);
+                    args.arg(&self.next_state)
+                        .arg(&self.column_offsets)
+                        .arg(&self.row_counts)
+                        .arg(&self.inputs)
+                        .arg(&self.input_offsets)
+                        .arg(&self.input_counts)
+                        .arg(&self.params)
+                        .arg(&self.aggregates)
+                        .arg(&self.aggregate_facts)
+                        .arg(&self.aggregate_offsets)
+                        .arg(&mut self.status);
+                    unsafe { args.launch(output_config) }.map_err(driver_error)?;
+                }
+                finish_validation_reduction_pass(
+                    &self.stream,
+                    &self.advance_validation_phase,
+                    &self.commit_validation_status,
+                    &mut self.status,
+                    phase,
+                    one,
+                )?;
+            }
         }
         {
             let port_count = self.layout.ports.len() as u64;
@@ -2526,9 +2603,10 @@ mod diagnostic_equality_hardware {
         ));
     }
 
-    #[test]
-    #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
-    fn negative_corpus_matches_cpu_status_under_three_geometries() {
+    const CHILD_ENV: &str = "SEMBLA_CUDA_DIAGNOSTIC_CHILD";
+    const DEADLINE: std::time::Duration = std::time::Duration::from_secs(120);
+
+    fn run_negative_corpus() {
         assert_eq!(cases::FAILING_ROWS, [2, 5, 7]);
         for case in cases::CASES {
             assert!(!case.expected_cpu_error.is_empty(), "{}", case.name);
@@ -2575,6 +2653,51 @@ mod diagnostic_equality_hardware {
                     case.name, grid, block, committed
                 );
             }
+        }
+    }
+
+    #[test]
+    #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
+    fn negative_corpus_matches_cpu_status_under_four_geometries() {
+        if std::env::var_os(CHILD_ENV).is_some() {
+            run_negative_corpus();
+            return;
+        }
+
+        // Run the GPU body in a child process so a non-terminating CUDA kernel
+        // becomes a bounded test failure. A thread-level timeout cannot recover
+        // a process whose CUDA context is blocked in stream synchronization.
+        let executable = std::env::current_exe().expect("locate current lib test binary");
+        let test_name =
+            "diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries";
+        let mut child = std::process::Command::new(executable)
+            .arg("--exact")
+            .arg(test_name)
+            .arg("--ignored")
+            .arg("--nocapture")
+            .env(CHILD_ENV, "1")
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .expect("spawn bounded CUDA diagnostic child");
+        let deadline = std::time::Instant::now() + DEADLINE;
+        loop {
+            if let Some(status) = child.try_wait().expect("poll CUDA diagnostic child") {
+                assert!(
+                    status.success(),
+                    "CUDA diagnostic child failed with {status}"
+                );
+                return;
+            }
+            if std::time::Instant::now() >= deadline {
+                child.kill().expect("kill timed-out CUDA diagnostic child");
+                let _ = child.wait();
+                panic!(
+                    "CUDA diagnostic corpus exceeded its {}s internal deadline; probable kernel deadlock",
+                    DEADLINE.as_secs()
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 }

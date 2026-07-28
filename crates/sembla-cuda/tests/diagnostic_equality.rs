@@ -19,7 +19,7 @@ fn negative_corpus_has_known_nonzero_multiple_failures() {
     assert_ne!(FAILING_ROWS[0], 0);
     assert!(FAILING_ROWS.windows(2).all(|rows| rows[0] < rows[1]));
 
-    assert_eq!(GEOMETRIES, [(1, 1), (1, 32), (3, 4)]);
+    assert_eq!(GEOMETRIES, [(1, 1), (1, 32), (3, 4), (4, 128)]);
     for case in CASES {
         let _ = load_model(&case);
         assert_eq!(initial_state(&case)[0].row_count, 8, "{}", case.name);
