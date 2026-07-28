@@ -165,10 +165,39 @@ for peer in (data.get("Peer") or {}).values():
 
 PUBLIC_IP="${PUBLIC_IP_OVERRIDE:-}"
 if [[ -z "$PUBLIC_IP" ]]; then
-  TS_IP="$(resolve_tailscale_ip)"
-  if [[ -n "$TS_IP" ]]; then
+  # WAIT for the node rather than checking once. The single check this replaced
+  # could not succeed on a fresh VM: the collector reaches this line within
+  # seconds of the apply, while the guest only joins the tailnet part-way
+  # through cloud-init, a minute or two later. So the tailnet branch was never
+  # taken on a new machine and every fresh session silently fell back to the
+  # public IP -- the path whose /32 pinning stranded a run on 2026-07-27. The
+  # feature was working; nothing ever gave it the chance to be used.
+  #
+  # Only wait when there is a reason to expect a node. With no auth key the
+  # guest was never going to join, and waiting would add minutes to every run
+  # that deliberately uses the public path.
+  if [[ -n "${TF_VAR_tailscale_auth_key:-}" ]] && command -v tailscale >/dev/null; then
+    ts_deadline=$((SECONDS + ${TAILSCALE_TIMEOUT_SECONDS:-300}))
+    ts_announced=false
+    while (( SECONDS < ts_deadline )); do
+      TS_IP="$(resolve_tailscale_ip)"
+      [[ -n "$TS_IP" ]] && break
+      if [[ "$ts_announced" != true ]]; then
+        echo "Waiting up to $(( (ts_deadline - SECONDS) / 60 )) minutes for tailnet node ${TAILSCALE_NODE:-sembla-bench} to appear."
+        echo "It joins part-way through cloud-init, so it is not there yet on a fresh VM."
+        ts_announced=true
+      fi
+      sleep 10
+    done
+  else
+    TS_IP="$(resolve_tailscale_ip)"
+  fi
+  if [[ -n "${TS_IP:-}" ]]; then
     echo "Found tailnet node ${TAILSCALE_NODE:-sembla-bench} at $TS_IP; using it instead of the public IP."
     PUBLIC_IP="$TS_IP"
+  elif [[ -n "${TF_VAR_tailscale_auth_key:-}" ]]; then
+    echo "Tailnet node did not appear within the timeout; falling back to the public IP." >&2
+    echo "Check the guest's bootstrap log for the 'tailscale up' step." >&2
   fi
 fi
 ip_deadline=$((SECONDS + ${IP_TIMEOUT_SECONDS:-600}))
