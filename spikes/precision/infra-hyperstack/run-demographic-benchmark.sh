@@ -1412,7 +1412,10 @@ if [[ "${EVIDENCE_PUSH_ENABLED:-0}" == "1" ]]; then
   # and a detached history cannot conflict with or accidentally revert trunk.
   git checkout --quiet --orphan "$PUSH_BRANCH"
   git rm -rq --cached . 2>/dev/null || true
-  rm -rf ./*
+  # `rm -rf ./*` leaves dotfiles behind. That previously published `.piprd`
+  # runner state on an otherwise orphan evidence branch. Remove every top-level
+  # entry except the clone's own `.git` directory.
+  find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf -- {} +
   mkdir -p "docs/evidence/demographic-bench/$(basename "$OUT_ROOT")"
   cp -R "$OUT_ROOT/." "docs/evidence/demographic-bench/$(basename "$OUT_ROOT")/"
   git add -A

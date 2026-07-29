@@ -227,8 +227,18 @@ the other. Preliminary 100k/1M CPU arms are recorded in
 [`sweep-concurrency-spike-20260729`](../evidence/sweep-concurrency-spike-20260729/):
 workers 1/2/4 are byte-identical and four lanes improve whole-sweep wall by
 3.22–3.29× under a fixed ten-thread budget. That is a feasibility result, not a
-completed gate: repeated 10M/second-shape CPU evidence and every CUDA arm remain
-open.
+completed gate: repeated 10M/second-shape CPU evidence remains open.
+
+The CUDA complete-backend lower-bound arm is recorded in
+[`hyperstack-concurrency-20260729T064051Z`](../evidence/demographic-bench/hyperstack-concurrency-20260729T064051Z/).
+Across three repetitions, workers 1/2/4 are byte-identical at 1M and 10M. Median
+whole-sweep speedups are 1.321×/1.265× at 1M and 1.487×/1.658× at 10M for two/four
+workers. Capacity reaches 22,699 MiB VRAM and 9,032 MiB RSS at 10M/four workers.
+However, Nsight reports all 39,552 traced kernels on context 1, stream 7, with
+zero time at concurrency ≥2. The gain is host-side overlap while CUDA kernels
+serialize. This closes the complete-default-stream design and triggers the
+scoped shared-context/non-blocking-stream prototype; CUDA Gate 1 is not complete
+until that direct arm is measured.
 
 **CPU arm**
 

@@ -1,0 +1,274 @@
+commit=b2bb18e19a756d824d5089a096d263c1be674f01
+utc=2026-07-29T06-34-32Z
+driver=570.195.03
+gpu=NVIDIA H100 PCIe
+correctness_hardware=any CUDA-capable NVIDIA GPU
+performance_hardware=verified full-rate FP64 required
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-0721523fd52b24b5)
+
+running 1 test
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 0.00s
+
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.10s
+
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends fixtures/demographic/benchmark/demographic_slots.no-grouped.json --population 1000 --seed 7 --ticks 20`
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="demographic" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="invalid_age" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="males" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="females" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_00_04" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_20_24" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_65_69" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_85_plus" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="births_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="deaths_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="locked_out" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_birth_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_overseas_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_internal_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="max_generation" eligible=true reason=Int min/max with row-local filter and value
+model=fixtures/demographic/benchmark/demographic_slots.no-grouped.json verdict=equal cpu_ticks_per_sec=4972.910 cuda_ticks_per_sec=207.317
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends fixtures/demographic/demographic_slots.json --population fixtures/state/demographic_slots.state --seed 7 --ticks 20 --enable grouped-observations`
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="demographic" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="invalid_age" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="males" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="females" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_00_04" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_20_24" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_65_69" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_85_plus" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="births_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="deaths_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="locked_out" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_birth_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_overseas_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_internal_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="max_generation" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="demographic" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="deaths_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="vacancy_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_grouped_observation tick=0 box="demographic" view="population_cells" key_space_size=152 occupied_groups=76 emitted_groups=76
+cuda_device_grouped_observation tick=0 box="demographic" view="deaths_cells" key_space_size=36 occupied_groups=15 emitted_groups=15
+cuda_device_grouped_observation tick=0 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=1 box="demographic" view="population_cells" key_space_size=160 occupied_groups=78 emitted_groups=78
+cuda_device_grouped_observation tick=1 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=13 emitted_groups=13
+cuda_device_grouped_observation tick=1 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=2 box="demographic" view="population_cells" key_space_size=160 occupied_groups=78 emitted_groups=78
+cuda_device_grouped_observation tick=2 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=10 emitted_groups=10
+cuda_device_grouped_observation tick=2 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=3 box="demographic" view="population_cells" key_space_size=160 occupied_groups=79 emitted_groups=79
+cuda_device_grouped_observation tick=3 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=17 emitted_groups=17
+cuda_device_grouped_observation tick=3 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=4 box="demographic" view="population_cells" key_space_size=160 occupied_groups=79 emitted_groups=79
+cuda_device_grouped_observation tick=4 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=4 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=5 box="demographic" view="population_cells" key_space_size=160 occupied_groups=79 emitted_groups=79
+cuda_device_grouped_observation tick=5 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=14 emitted_groups=14
+cuda_device_grouped_observation tick=5 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=6 box="demographic" view="population_cells" key_space_size=160 occupied_groups=79 emitted_groups=79
+cuda_device_grouped_observation tick=6 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=13 emitted_groups=13
+cuda_device_grouped_observation tick=6 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=7 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=7 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=7 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=8 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=8 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=8 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=9 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=9 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=10 emitted_groups=10
+cuda_device_grouped_observation tick=9 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=10 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=10 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=15 emitted_groups=15
+cuda_device_grouped_observation tick=10 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=11 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=11 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=9 emitted_groups=9
+cuda_device_grouped_observation tick=11 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=12 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=12 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=15 emitted_groups=15
+cuda_device_grouped_observation tick=12 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=13 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=13 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=11 emitted_groups=11
+cuda_device_grouped_observation tick=13 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=14 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=14 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=6 emitted_groups=6
+cuda_device_grouped_observation tick=14 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=15 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=15 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=15 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=16 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=16 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=8 emitted_groups=8
+cuda_device_grouped_observation tick=16 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=17 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=17 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=13 emitted_groups=13
+cuda_device_grouped_observation tick=17 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=18 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=18 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=7 emitted_groups=7
+cuda_device_grouped_observation tick=18 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=19 box="demographic" view="population_cells" key_space_size=160 occupied_groups=80 emitted_groups=80
+cuda_device_grouped_observation tick=19 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=15 emitted_groups=15
+cuda_device_grouped_observation tick=19 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+model=fixtures/demographic/demographic_slots.json verdict=equal cpu_ticks_per_sec=583.457 cuda_ticks_per_sec=192.857
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running tests/gpu_differential.rs (target/release/deps/gpu_differential-ab816b40e525be0f)
+
+running 6 tests
+test ineligible_views_take_state_download_differential_fallback ... ok
+test eligible_views_take_device_observation_differential_path ... ok
+test grouped_demographic_configuration_uses_device_histograms_differentially ... ok
+test cuda_manifest_verify_and_level_a_bytes_round_trip ... ok
+test differential_corpus_passes ... ok
+test supported_composition_plan_differential_corpus_passes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 30.40s
+
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends --all-examples --population 100 --seed 7 --ticks 20`
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/noisy_voter.json verdict=equal cpu_ticks_per_sec=65503.113 cuda_ticks_per_sec=250.853
+cuda_device_observation eligible=false reason=at least one view requires host observation
+cuda_device_observation_view box="population" view="total_value" eligible=false reason=Sum preserves host order for Real and host overflow association for Int
+cuda_device_observation_view box="population" view="active_count" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="minimum_visits" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="population" view="maximum_value" eligible=false reason=value is not a row-local infallible Int expression; Real extrema retain host NaN ordering
+model=examples/observations.json verdict=equal cpu_ticks_per_sec=134713.700 cuda_ticks_per_sec=269.588
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/radioactive_decay_chain.json verdict=equal cpu_ticks_per_sec=107626.407 cuda_ticks_per_sec=256.559
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/reversible_ctmc.json verdict=equal cpu_ticks_per_sec=129271.619 cuda_ticks_per_sec=257.981
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/seirs_waning.json verdict=equal cpu_ticks_per_sec=77679.858 cuda_ticks_per_sec=242.677
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="sir" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="R" eligible=true reason=count with a row-local filter
+model=examples/sir.json verdict=equal cpu_ticks_per_sec=119495.014 cuda_ticks_per_sec=253.046
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+model=examples/sir_policy.json verdict=equal cpu_ticks_per_sec=29.039 cuda_ticks_per_sec=1.754
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/sis_importation.json verdict=equal cpu_ticks_per_sec=89115.440 cuda_ticks_per_sec=255.187
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/two_box.json verdict=equal cpu_ticks_per_sec=118996.620 cuda_ticks_per_sec=254.109
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/two_box_merged.json verdict=equal cpu_ticks_per_sec=48696.635 cuda_ticks_per_sec=253.165
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/two_state.json verdict=equal cpu_ticks_per_sec=143257.240 cuda_ticks_per_sec=257.050
+corpus_verdict=equal models=11
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends --all-plan-fixtures --population 1000 --seed 7 --ticks 20 --enable grouped-observations`
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="world" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="world" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_grouped_observation tick=0 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=1 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=2 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=3 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=4 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=5 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=6 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=7 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=8 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=9 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=10 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=11 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=12 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=13 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=14 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=15 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=16 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=17 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=18 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=19 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+model=fixtures/plans/grouped_observation.plan.json verdict=equal cpu_ticks_per_sec=18474.624 cuda_ticks_per_sec=258.361
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/epidemic_policy.plan.json verdict=equal cpu_ticks_per_sec=36279.994 cuda_ticks_per_sec=215.736
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/independent_epidemic_policy.plan.json verdict=equal cpu_ticks_per_sec=37490.253 cuda_ticks_per_sec=230.959
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="pong" view="seen_yes" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/ping_pong.plan.json verdict=equal cpu_ticks_per_sec=135490.340 cuda_ticks_per_sec=241.867
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="epidemic/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="epidemic/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="epidemic/population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/regional_response.plan.json verdict=equal cpu_ticks_per_sec=33895.605 cuda_ticks_per_sec=208.479
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/solo_population.plan.json verdict=equal cpu_ticks_per_sec=39864.222 cuda_ticks_per_sec=238.114
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="north/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/two_independent_regions.plan.json verdict=equal cpu_ticks_per_sec=19992.743 cuda_ticks_per_sec=197.620
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="north/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/two_regions.plan.json verdict=equal cpu_ticks_per_sec=19063.305 cuda_ticks_per_sec=175.306
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="wpong/pong" view="seen_yes" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/wrapped_ping_pong.plan.json verdict=equal cpu_ticks_per_sec=140130.602 cuda_ticks_per_sec=240.507
+cuda_device_observation eligible=false reason=at least one view requires host observation
+cuda_device_observation_view box="population" view="active_count" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="maximum_value" eligible=false reason=value is not a row-local infallible Int expression; Real extrema retain host NaN ordering
+cuda_device_observation_view box="population" view="minimum_visits" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="population" view="total_value" eligible=false reason=Sum preserves host order for Real and host overflow association for Int
+model=fixtures/plans/observations.plan.json verdict=equal cpu_ticks_per_sec=41893.854 cuda_ticks_per_sec=270.141
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="sir" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/sir.plan.json verdict=equal cpu_ticks_per_sec=45340.987 cuda_ticks_per_sec=237.056
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/sir_policy.plan.json verdict=equal cpu_ticks_per_sec=29.173 cuda_ticks_per_sec=1.754
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=fixtures/plans/two_box.plan.json verdict=equal cpu_ticks_per_sec=127107.603 cuda_ticks_per_sec=249.394
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=fixtures/plans/two_box_plus_sibling.plan.json verdict=equal cpu_ticks_per_sec=109923.933 cuda_ticks_per_sec=248.307
+corpus_verdict=equal models=14
+0d81b6bfa9e7a21b3840fc4b6b4b13cdacea6c76b29506bfcdad0b44a4bfada8  provenance.txt
+292b4605271751e704d8f7b2ff930a8e2e0c40f0caa06042508cb606ba2cb354  diagnostic-corpus.log
+93c238f779ff59ca329fe96435c7e9d6e8d91b4131f203401b4b31c09bed0da8  tests.log
+485e8e071ad763e70a879db7c144394bdebb2b8d0ebd920b8c8c4e8ba963c41c  demographic-corpus.log
+ddeeab25b8ad3efcb61d009840b361851930428507762a2a54636e317b9b2a6b  demographic-grouped-corpus.log
+3935beecc9397c4c52c04a8cbad789996ad91e0936404975507eb87b62257be6  corpus.log
+35bc0f06f287ccdf4ecf69c89c57fbef80a2086926a3a71e7164352a05a7312b  plan-corpus.log
+CUDA differential corpus passed; evidence: /home/ubuntu/demographic-bench/differential-corpus
+Copy the recorded commit/GPU/driver/verdict/rates into the dated evidence note, then destroy remote resources.

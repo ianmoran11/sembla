@@ -1,0 +1,6 @@
+PASS targeted concurrency-only payload selected
+PASS workers 1/2/4 completed three repetitions at 1M and 10M
+PASS complete output trees matched their sequential references
+PASS negative comparator controls rejected a deliberate perturbation
+PASS forced completion inversion preserved ordered publication
+PASS Nsight Systems CUDA trace exported for overlap analysis

@@ -1,0 +1,6 @@
+commit=b2bb18e19a756d824d5089a096d263c1be674f01
+utc=2026-07-29T06-34-32Z
+driver=570.195.03
+gpu=NVIDIA H100 PCIe
+correctness_hardware=any CUDA-capable NVIDIA GPU
+performance_hardware=verified full-rate FP64 required

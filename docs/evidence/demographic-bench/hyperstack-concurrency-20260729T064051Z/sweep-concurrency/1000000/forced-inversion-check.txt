@@ -1,0 +1,1 @@
+PASS: draw 1 completed before draw 0; publication remained byte-identical
