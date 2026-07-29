@@ -772,11 +772,11 @@ PY
               --enable grouped-observations \
               --timing-json nsys-timing.json --out nsys-output \
               > nsys.stdout 2> nsys.stderr
-        nsys stats --report cuda_gpu_trace --format csv \
+        nsys stats --force-export=true --report cuda_gpu_trace --format csv \
           cuda-workers-2-trace.nsys-rep > nsys-cuda-gpu-trace.csv
-        nsys stats --report cuda_gpu_kern_sum --format csv \
+        nsys stats --force-export=true --report cuda_gpu_kern_sum --format csv \
           cuda-workers-2-trace.nsys-rep > nsys-cuda-kernel-summary.csv
-        nsys stats --report cuda_api_sum --format csv \
+        nsys stats --force-export=true --report cuda_api_sum --format csv \
           cuda-workers-2-trace.nsys-rep > nsys-cuda-api-summary.csv
         rm -f cuda-workers-2-trace.nsys-rep
       )
