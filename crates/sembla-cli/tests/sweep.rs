@@ -341,7 +341,34 @@ fn retained_draw_matches_fresh_backend_for_contests_and_grouped_under_both_noise
             if model_name == "grouped_observation" {
                 sweep.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
             }
-            assert_success(&sweep.output().unwrap());
+            let sequential = sweep.output().unwrap();
+            assert_success(&sequential);
+
+            let concurrent_out = temp.join(format!("{model_name}-{noise}-concurrent"));
+            let mut concurrent = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            concurrent
+                .arg("sweep")
+                .arg(&model_path)
+                .args([
+                    "--seed", "9182", "--draws", "4", "--ticks", "5", "--noise", noise,
+                ])
+                .arg("--population")
+                .arg(&state)
+                .arg("--out")
+                .arg(&concurrent_out)
+                .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", "2")
+                .env("SEMBLA_EVAL_THREADS", "1");
+            if model_name == "grouped_observation" {
+                concurrent.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
+            }
+            let concurrent = concurrent.output().unwrap();
+            assert_success(&concurrent);
+            assert_eq!(concurrent.stdout, sequential.stdout);
+            assert_eq!(
+                output_files(&concurrent_out),
+                output_files(&sweep_out),
+                "concurrent output tree for {model_name}/{noise}"
+            );
 
             let sweep_manifest = run_manifest(&sweep_out);
             let execution = &sweep_manifest["executions"][3];
@@ -446,6 +473,115 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
                 .unwrap()
     );
     assert!(!plain.join("timing.json").exists());
+
+    let concurrent = temp.join("concurrent");
+    let concurrent_timing = temp.join("concurrent-timing.json");
+    let mut concurrent_command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    concurrent_command
+        .arg("sweep")
+        .arg(repository_path("examples/sir.json"))
+        .arg("--population")
+        .arg(&population)
+        .args([
+            "--seed",
+            "19",
+            "--draws",
+            "3",
+            "--ticks",
+            "4",
+            "--timing-json",
+        ])
+        .arg(&concurrent_timing)
+        .arg("--out")
+        .arg(&concurrent)
+        .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", "2")
+        .env("SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS", "50")
+        .env("SEMBLA_EVAL_THREADS", "1");
+    let concurrent_output = concurrent_command.output().unwrap();
+    assert_success(&concurrent_output);
+    assert!(String::from_utf8_lossy(&concurrent_output.stderr)
+        .contains("EXPERIMENTAL sweep concurrency spike"));
+    assert_eq!(output_files(&concurrent), output_files(&plain));
+
+    let concurrent_document: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(concurrent_timing).unwrap()).unwrap();
+    assert_eq!(
+        concurrent_document["schema"],
+        "sembla-sweep-concurrency-spike-timing-v1"
+    );
+    assert_eq!(concurrent_document["requested_draw_workers"], 2);
+    assert_eq!(concurrent_document["effective_draw_workers"], 2);
+    assert_eq!(
+        concurrent_document["draw_timings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|draw| draw["k"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![0, 1, 2]
+    );
+    let concurrent_draw_timings = concurrent_document["draw_timings"].as_array().unwrap();
+    for draw in concurrent_draw_timings {
+        assert!(draw["lane"].as_u64().unwrap() < 2);
+        assert!(
+            draw["finish_offset_ms"].as_f64().unwrap() >= draw["start_offset_ms"].as_f64().unwrap()
+        );
+        assert!(draw["wall_time_ms"].as_f64().unwrap() >= 0.0);
+    }
+    assert!(
+        concurrent_draw_timings[1]["finish_offset_ms"]
+            .as_f64()
+            .unwrap()
+            < concurrent_draw_timings[0]["finish_offset_ms"]
+                .as_f64()
+                .unwrap(),
+        "the forced completion inversion did not occur"
+    );
+    assert!(
+        concurrent_document["whole_sweep_wall_time_ms"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
+    let temp = temp_dir("sweep-concurrency-spike-errors");
+    let population = temp.join("population.bin");
+    synth(&population, 20, 4, 1);
+    for (label, workers, eval_threads, expected) in [
+        ("zero", "0", Some("1"), "must be greater than zero"),
+        ("too-many", "4", Some("1"), "exceeds draw count 3"),
+        (
+            "unbudgeted",
+            "2",
+            None,
+            "requires an explicit SEMBLA_EVAL_THREADS budget per draw",
+        ),
+    ] {
+        let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+        process
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args(["--seed", "19", "--draws", "3", "--ticks", "1", "--out"])
+            .arg(temp.join(label))
+            .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", workers)
+            .env_remove("SEMBLA_EVAL_THREADS");
+        if let Some(eval_threads) = eval_threads {
+            process.env("SEMBLA_EVAL_THREADS", eval_threads);
+        }
+        let output = process.output().unwrap();
+        assert!(!output.status.success(), "{label}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{label}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
     std::fs::remove_dir_all(temp).unwrap();
 }
 

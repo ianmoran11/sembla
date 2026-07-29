@@ -1669,6 +1669,243 @@ fn params_from_theta_assignment(
         .map_err(|error| format!("{path}: theta assignment {draw}: {error}"))
 }
 
+const SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV: &str = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS";
+const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS";
+
+#[derive(Clone)]
+struct SweepPreparedDraw {
+    k: u32,
+    params: ParamEnv,
+    execution_seed: u64,
+}
+
+struct SweepConcurrentCompletedDraw {
+    index: usize,
+    lane: usize,
+    start_offset: Duration,
+    finish_offset: Duration,
+    elapsed: Duration,
+    execution: Result<SweepDrawOutput, String>,
+}
+
+struct SweepConcurrentExecution {
+    setup_elapsed: Duration,
+    execution_window_elapsed: Duration,
+    identity: manifest::BackendIdentity,
+    draws: Vec<SweepConcurrentCompletedDraw>,
+}
+
+fn sweep_concurrency_spike_workers(
+    draw_count: u32,
+    backend: BackendSelection,
+) -> Result<usize, String> {
+    let Some(raw) = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV) else {
+        return Ok(1);
+    };
+    let raw = raw.to_string_lossy();
+    let workers = raw.parse::<usize>().map_err(|_| {
+        format!("{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV} must be a positive integer, found '{raw}'")
+    })?;
+    if workers == 0 {
+        return Err(format!(
+            "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV} must be greater than zero"
+        ));
+    }
+    let draw_count = usize::try_from(draw_count).expect("draw count is u32");
+    if workers > draw_count {
+        return Err(format!(
+            "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}={workers} exceeds draw count {draw_count}"
+        ));
+    }
+    if workers > 1
+        && backend == BackendSelection::Cpu
+        && std::env::var_os("SEMBLA_EVAL_THREADS").is_none()
+    {
+        return Err(format!(
+            "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1 with --backend cpu requires an explicit SEMBLA_EVAL_THREADS budget per draw"
+        ));
+    }
+    Ok(workers)
+}
+
+fn sweep_concurrency_spike_draw_zero_delay() -> Result<Duration, String> {
+    let Some(raw) = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV) else {
+        return Ok(Duration::ZERO);
+    };
+    let raw = raw.to_string_lossy();
+    let milliseconds = raw.parse::<u64>().map_err(|_| {
+        format!(
+            "{SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV} must be an unsigned integer, found '{raw}'"
+        )
+    })?;
+    Ok(Duration::from_millis(milliseconds))
+}
+
+fn run_concurrent_sweep_spike(
+    model: &sembla_ir::ValidatedModel,
+    initial_tables: &[TableInit],
+    construction_params: &ParamEnv,
+    options: &SweepOptions,
+    workers: usize,
+    prepared: &[SweepPreparedDraw],
+) -> Result<SweepConcurrentExecution, String> {
+    let setup_started = Instant::now();
+    let mut backends = Vec::with_capacity(workers);
+    for _ in 0..workers {
+        backends.push(SweepBackend::new(
+            model,
+            initial_tables.to_vec(),
+            construction_params,
+            options.seed,
+            options.backend,
+        )?);
+    }
+    let setup_elapsed = setup_started.elapsed();
+    let identity = backends
+        .first()
+        .expect("concurrency spike has at least one backend")
+        .identity();
+    if backends
+        .iter()
+        .skip(1)
+        .any(|backend| backend.identity() != identity)
+    {
+        return Err("sweep concurrency spike backend identity changed across lanes".to_owned());
+    }
+
+    let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
+    let next_draw = std::sync::atomic::AtomicUsize::new(0);
+    let execution_started = Instant::now();
+    let mut draws = std::thread::scope(|scope| -> Result<Vec<_>, String> {
+        let handles = backends
+            .into_iter()
+            .enumerate()
+            .map(|(lane, mut backend)| {
+                let next_draw = &next_draw;
+                scope.spawn(move || {
+                    let mut completed = Vec::new();
+                    loop {
+                        let index = next_draw.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(draw) = prepared.get(index) else {
+                            break;
+                        };
+                        let start_offset = execution_started.elapsed();
+                        let started = Instant::now();
+                        if draw.k == 0 && !draw_zero_delay.is_zero() {
+                            std::thread::sleep(draw_zero_delay);
+                        }
+                        let execution = backend.run_draw(
+                            model,
+                            &draw.params,
+                            draw.execution_seed,
+                            options.ticks,
+                            &options.enabled_features,
+                        );
+                        let elapsed = started.elapsed();
+                        completed.push(SweepConcurrentCompletedDraw {
+                            index,
+                            lane,
+                            start_offset,
+                            finish_offset: execution_started.elapsed(),
+                            elapsed,
+                            execution,
+                        });
+                    }
+                    completed
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut completed = Vec::with_capacity(prepared.len());
+        for handle in handles {
+            completed.extend(handle.join().map_err(|_| {
+                "sweep concurrency spike worker panicked before returning its draws".to_owned()
+            })?);
+        }
+        Ok(completed)
+    })?;
+    let execution_window_elapsed = execution_started.elapsed();
+    draws.sort_by_key(|draw| draw.index);
+    if draws.len() != prepared.len()
+        || draws
+            .iter()
+            .enumerate()
+            .any(|(index, draw)| draw.index != index)
+    {
+        return Err("sweep concurrency spike did not return every draw exactly once".to_owned());
+    }
+    Ok(SweepConcurrentExecution {
+        setup_elapsed,
+        execution_window_elapsed,
+        identity,
+        draws,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn publish_sweep_draw(
+    draw: u32,
+    params: &ParamEnv,
+    execution_seed: u64,
+    execution: SweepDrawOutput,
+    reported_columns: &mut Option<Vec<String>>,
+    pairs_csv: &mut Option<String>,
+    parameter_columns: &[String],
+    summary_columns: &[String],
+    run_manifest: &mut manifest::RunManifest,
+    out: &Path,
+    export_pairs: bool,
+) -> Result<Vec<Vec<ReportedValue>>, String> {
+    let output = execution.output;
+    if let Some(columns) = reported_columns.as_ref() {
+        if columns != &output.series.columns {
+            return Err(format!(
+                "draw {draw}: reported column schema changed across draws"
+            ));
+        }
+    } else {
+        *reported_columns = Some(output.series.columns.clone());
+    }
+    if let Some(csv) = pairs_csv {
+        append_pairs_row(
+            csv,
+            draw,
+            params,
+            parameter_columns,
+            &output.summaries,
+            summary_columns,
+        )?;
+    }
+    let hashes = execution_hashes_with_state_hash(&output, execution.final_state_hash);
+    let grouped_outputs = grouped_output_records(&output.grouped);
+    run_manifest.executions.push(manifest::ManifestExecution {
+        k: draw,
+        seed: Some(execution_seed),
+        scenario: None,
+        model: None,
+        ir_hash: None,
+        dt: None,
+        resolved_theta: manifest::resolved_theta(params),
+        results_sha256: hashes.results_sha256,
+        final_state_sha256: hashes.final_state_sha256,
+        observation_sha256: Some(hashes.observation_sha256),
+        grouped_outputs,
+    });
+    let draw_path = out.join(format!("draw_{draw}.csv"));
+    std::fs::write(&draw_path, output.csv.as_bytes())
+        .map_err(|error| format!("{}: {error}", draw_path.display()))?;
+    for grouped in &output.grouped {
+        let path = grouped_output_path(&draw_path, &grouped.view);
+        std::fs::write(&path, grouped.csv.as_bytes())
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    if export_pairs {
+        let draw_summaries = PathBuf::from(format!("{}.summaries.csv", draw_path.display()));
+        std::fs::write(&draw_summaries, output.summaries_csv.as_bytes())
+            .map_err(|error| format!("{}: {error}", draw_summaries.display()))?;
+    }
+    Ok(output.series.rows)
+}
+
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let sweep_started = Instant::now();
     let RunInput { model, plan } = read_executable_input(path, None, &options.enabled_features)?;
@@ -1834,101 +2071,150 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     // Construction values are placeholders only: draw zero also follows the
     // same explicit reset and reseed path as every later draw.
     let construction_params = ParamEnv::defaults(&model);
-    let setup_started = Instant::now();
-    let mut backend = SweepBackend::new(
-        &model,
-        initial_tables,
-        &construction_params,
-        options.seed,
-        options.backend,
-    )?;
-    let setup_elapsed = setup_started.elapsed();
-    // This sole retained object cannot span devices. Capture identity once at
-    // construction in the unchanged manifest field/schema.
-    run_manifest.backend_identity = Some(backend.identity());
+    let draw_workers = sweep_concurrency_spike_workers(draw_count, options.backend)?;
     let mut draw_durations = Vec::with_capacity(draw_count as usize);
-    // Deliberately sequential: declaration order within each k, then k order.
-    for draw in 0..draw_count {
-        let params = match &theta_file {
-            Some(theta) => params_from_theta_assignment(
-                &model,
-                options.theta_file.as_deref().expect("theta path exists"),
-                draw,
-                &theta.assignments[draw as usize],
-                &pinned,
-            )?,
-            None => sample_parameters_for_draw(&model, options.seed, draw, &pinned)
-                .map_err(|error| format!("draw {draw}: {error}"))?,
-        };
-        csv_manifest.push_str(&draw.to_string());
-        for (_, value) in params.values() {
-            csv_manifest.push(',');
-            csv_manifest.push_str(&param_value_csv(value));
-        }
-        csv_manifest.push('\n');
+    let mut concurrency_spike_timing = None;
+    let setup_elapsed;
 
-        let execution_seed = match options.noise_mode {
-            manifest::NoiseMode::Crn => options.seed,
-            manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
-        };
-        let draw_started = Instant::now();
-        let execution = backend.run_draw(
+    if draw_workers == 1 {
+        let setup_started = Instant::now();
+        let mut backend = SweepBackend::new(
             &model,
-            &params,
-            execution_seed,
-            options.ticks,
-            &options.enabled_features,
+            initial_tables,
+            &construction_params,
+            options.seed,
+            options.backend,
         )?;
-        draw_durations.push(draw_started.elapsed());
-        let output = execution.output;
-        if let Some(columns) = &reported_columns {
-            if columns != &output.series.columns {
-                return Err(format!(
-                    "draw {draw}: reported column schema changed across draws"
-                ));
+        setup_elapsed = setup_started.elapsed();
+        // This sole retained object cannot span devices. Capture identity once
+        // at construction in the unchanged manifest field/schema.
+        run_manifest.backend_identity = Some(backend.identity());
+        // Deliberately sequential: declaration order within each k, then k order.
+        for draw in 0..draw_count {
+            let params = match &theta_file {
+                Some(theta) => params_from_theta_assignment(
+                    &model,
+                    options.theta_file.as_deref().expect("theta path exists"),
+                    draw,
+                    &theta.assignments[draw as usize],
+                    &pinned,
+                )?,
+                None => sample_parameters_for_draw(&model, options.seed, draw, &pinned)
+                    .map_err(|error| format!("draw {draw}: {error}"))?,
+            };
+            csv_manifest.push_str(&draw.to_string());
+            for (_, value) in params.values() {
+                csv_manifest.push(',');
+                csv_manifest.push_str(&param_value_csv(value));
             }
-        } else {
-            reported_columns = Some(output.series.columns.clone());
-        }
-        if let Some(csv) = &mut pairs_csv {
-            append_pairs_row(
-                csv,
+            csv_manifest.push('\n');
+
+            let execution_seed = match options.noise_mode {
+                manifest::NoiseMode::Crn => options.seed,
+                manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
+            };
+            let draw_started = Instant::now();
+            let execution = backend.run_draw(
+                &model,
+                &params,
+                execution_seed,
+                options.ticks,
+                &options.enabled_features,
+            )?;
+            draw_durations.push(draw_started.elapsed());
+            all_series.push(publish_sweep_draw(
                 draw,
                 &params,
+                execution_seed,
+                execution,
+                &mut reported_columns,
+                &mut pairs_csv,
                 &parameter_columns,
-                &output.summaries,
                 &summary_columns,
-            )?;
+                &mut run_manifest,
+                out,
+                options.export_pairs.is_some(),
+            )?);
         }
-        let hashes = execution_hashes_with_state_hash(&output, execution.final_state_hash);
-        let grouped_outputs = grouped_output_records(&output.grouped);
-        run_manifest.executions.push(manifest::ManifestExecution {
-            k: draw,
-            seed: Some(execution_seed),
-            scenario: None,
-            model: None,
-            ir_hash: None,
-            dt: None,
-            resolved_theta: manifest::resolved_theta(&params),
-            results_sha256: hashes.results_sha256,
-            final_state_sha256: hashes.final_state_sha256,
-            observation_sha256: Some(hashes.observation_sha256),
-            grouped_outputs,
-        });
-        let draw_path = out.join(format!("draw_{draw}.csv"));
-        std::fs::write(&draw_path, output.csv.as_bytes())
-            .map_err(|error| format!("{}: {error}", draw_path.display()))?;
-        for grouped in &output.grouped {
-            let path = grouped_output_path(&draw_path, &grouped.view);
-            std::fs::write(&path, grouped.csv.as_bytes())
-                .map_err(|error| format!("{}: {error}", path.display()))?;
+    } else {
+        eprintln!(
+            "EXPERIMENTAL sweep concurrency spike: {draw_workers} isolated {:?} backends; default sweep behavior remains sequential",
+            options.backend
+        );
+        let mut prepared = Vec::with_capacity(draw_count as usize);
+        for draw in 0..draw_count {
+            let params = match &theta_file {
+                Some(theta) => params_from_theta_assignment(
+                    &model,
+                    options.theta_file.as_deref().expect("theta path exists"),
+                    draw,
+                    &theta.assignments[draw as usize],
+                    &pinned,
+                )?,
+                None => sample_parameters_for_draw(&model, options.seed, draw, &pinned)
+                    .map_err(|error| format!("draw {draw}: {error}"))?,
+            };
+            csv_manifest.push_str(&draw.to_string());
+            for (_, value) in params.values() {
+                csv_manifest.push(',');
+                csv_manifest.push_str(&param_value_csv(value));
+            }
+            csv_manifest.push('\n');
+            let execution_seed = match options.noise_mode {
+                manifest::NoiseMode::Crn => options.seed,
+                manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
+            };
+            prepared.push(SweepPreparedDraw {
+                k: draw,
+                params,
+                execution_seed,
+            });
         }
-        if options.export_pairs.is_some() {
-            let draw_summaries = PathBuf::from(format!("{}.summaries.csv", draw_path.display()));
-            std::fs::write(&draw_summaries, output.summaries_csv.as_bytes())
-                .map_err(|error| format!("{}: {error}", draw_summaries.display()))?;
+
+        let concurrent = run_concurrent_sweep_spike(
+            &model,
+            &initial_tables,
+            &construction_params,
+            &options,
+            draw_workers,
+            &prepared,
+        )?;
+        setup_elapsed = concurrent.setup_elapsed;
+        run_manifest.backend_identity = Some(concurrent.identity);
+        let publication_started = Instant::now();
+        let mut timing_draws = Vec::with_capacity(concurrent.draws.len());
+        for completed in concurrent.draws {
+            let prepared_draw = &prepared[completed.index];
+            timing_draws.push(SweepConcurrencySpikeTimingDraw {
+                k: prepared_draw.k,
+                lane: completed.lane,
+                start_offset_ms: duration_ms(completed.start_offset),
+                finish_offset_ms: duration_ms(completed.finish_offset),
+                wall_time_ms: duration_ms(completed.elapsed),
+            });
+            draw_durations.push(completed.elapsed);
+            let execution = completed
+                .execution
+                .map_err(|error| format!("draw {}: {error}", prepared_draw.k))?;
+            all_series.push(publish_sweep_draw(
+                prepared_draw.k,
+                &prepared_draw.params,
+                prepared_draw.execution_seed,
+                execution,
+                &mut reported_columns,
+                &mut pairs_csv,
+                &parameter_columns,
+                &summary_columns,
+                &mut run_manifest,
+                out,
+                options.export_pairs.is_some(),
+            )?);
         }
-        all_series.push(output.series.rows);
+        concurrency_spike_timing = Some((
+            concurrent.execution_window_elapsed,
+            publication_started.elapsed(),
+            timing_draws,
+        ));
     }
 
     let summary = summary_csv(
@@ -1960,29 +2246,52 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         manifest::write_pairs_metadata(&manifest::pairs_sidecar_path(export_path), &metadata)?;
     }
     if let Some(path) = &options.timing_json {
-        let timing = SweepTimingDocument {
-            schema: "sembla-sweep-timing-v1",
-            backend: match options.backend {
-                BackendSelection::Cpu => "cpu",
-                BackendSelection::Cuda => "cuda",
-            },
-            draws: draw_count,
-            ticks_per_draw: options.ticks,
-            setup_wall_time_ms: duration_ms(setup_elapsed),
-            draw_zero_including_setup_wall_time_ms: duration_ms(setup_elapsed + draw_durations[0]),
-            draw_timings: draw_durations
-                .into_iter()
-                .enumerate()
-                .map(|(k, elapsed)| SweepTimingDraw {
-                    k: u32::try_from(k).expect("draw count is u32"),
-                    wall_time_ms: duration_ms(elapsed),
-                })
-                .collect(),
-            whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
-            repository_commit: repository_commit()?,
-            binary_sha256: current_binary_sha256()?,
+        let backend = match options.backend {
+            BackendSelection::Cpu => "cpu",
+            BackendSelection::Cuda => "cuda",
         };
-        let mut json = serde_json::to_string_pretty(&timing)
+        let repository_commit = repository_commit()?;
+        let binary_sha256 = current_binary_sha256()?;
+        let mut json =
+            if let Some((execution_window, publication, timing_draws)) = concurrency_spike_timing {
+                serde_json::to_string_pretty(&SweepConcurrencySpikeTimingDocument {
+                    schema: "sembla-sweep-concurrency-spike-timing-v1",
+                    backend,
+                    draws: draw_count,
+                    ticks_per_draw: options.ticks,
+                    requested_draw_workers: draw_workers,
+                    effective_draw_workers: draw_workers,
+                    setup_wall_time_ms: duration_ms(setup_elapsed),
+                    execution_window_wall_time_ms: duration_ms(execution_window),
+                    publication_wall_time_ms: duration_ms(publication),
+                    draw_timings: timing_draws,
+                    whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
+                    repository_commit,
+                    binary_sha256,
+                })
+            } else {
+                serde_json::to_string_pretty(&SweepTimingDocument {
+                    schema: "sembla-sweep-timing-v1",
+                    backend,
+                    draws: draw_count,
+                    ticks_per_draw: options.ticks,
+                    setup_wall_time_ms: duration_ms(setup_elapsed),
+                    draw_zero_including_setup_wall_time_ms: duration_ms(
+                        setup_elapsed + draw_durations[0],
+                    ),
+                    draw_timings: draw_durations
+                        .into_iter()
+                        .enumerate()
+                        .map(|(k, elapsed)| SweepTimingDraw {
+                            k: u32::try_from(k).expect("draw count is u32"),
+                            wall_time_ms: duration_ms(elapsed),
+                        })
+                        .collect(),
+                    whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
+                    repository_commit,
+                    binary_sha256,
+                })
+            }
             .map_err(|error| format!("could not serialize sweep timing JSON: {error}"))?;
         json.push('\n');
         std::fs::write(path, json).map_err(|error| format!("{path}: {error}"))?;
@@ -2642,6 +2951,32 @@ struct SweepTimingDocument {
     setup_wall_time_ms: f64,
     draw_zero_including_setup_wall_time_ms: f64,
     draw_timings: Vec<SweepTimingDraw>,
+    whole_sweep_wall_time_ms: f64,
+    repository_commit: String,
+    binary_sha256: String,
+}
+
+#[derive(Serialize)]
+struct SweepConcurrencySpikeTimingDraw {
+    k: u32,
+    lane: usize,
+    start_offset_ms: f64,
+    finish_offset_ms: f64,
+    wall_time_ms: f64,
+}
+
+#[derive(Serialize)]
+struct SweepConcurrencySpikeTimingDocument {
+    schema: &'static str,
+    backend: &'static str,
+    draws: u32,
+    ticks_per_draw: u32,
+    requested_draw_workers: usize,
+    effective_draw_workers: usize,
+    setup_wall_time_ms: f64,
+    execution_window_wall_time_ms: f64,
+    publication_wall_time_ms: f64,
+    draw_timings: Vec<SweepConcurrencySpikeTimingDraw>,
     whole_sweep_wall_time_ms: f64,
     repository_commit: String,
     binary_sha256: String,

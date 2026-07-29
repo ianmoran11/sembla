@@ -12,44 +12,44 @@ first; the constraints below are binding.
 ## Why this folder exists
 
 The driver workflow is **uncertainty and sensitivity analysis** — many draws
-over the same model and population, differing only in parameters and seed. After
-`prds-device-observation` landed (§L11), a single 1M-slot run over 24 ticks
-costs roughly 3.1 s on an H100, of which about **2.2 s is startup**: JIT-compiling
-the CUDA kernels, loading the state, uploading it.
+over the same model and population, differing only in parameters and seed.
+Before 0001, every draw constructed a new backend, recompiled the CUDA model
+through NVRTC, loaded and uploaded the state, and cloned the full host initial
+state — about 458 MiB at 10M slots. None of that work is inherently per draw.
 
-`sweep` pays that per draw. `crates/sembla-cli/src/main.rs:1809` loops over
-draws and calls `execute_backend_output_with_features`, which constructs a fresh
-backend each time — so `CudaBackend::new` recompiles the entire model through
-NVRTC on **every draw**. The same loop also does:
+0001 replaced that lifecycle with one retained CPU/CUDA backend that is reset
+and reseeded per draw. The current loop now deliberately executes draws in
+ascending `k` through that one mutable object. That fixed repeated setup and
+established the draw-independence seam on which the next candidate — several
+isolated retained backends running simultaneously — depends.
 
-```rust
-let initial = initial_tables.clone();   // main.rs:1828
-```
+## Measured current state
 
-a full host copy of the initial state per draw — about 458 MiB at 10M slots.
+The corrected H100 session at commit
+`5616dbe56cddb26e6a6541bead3572639827a8c2` is recorded in
+[`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/).
+For 20 CUDA draws over 24 ticks:
 
-Neither is inherent to what a sweep computes. Both are per-draw costs for work
-whose result is identical across draws.
+| scale | whole sweep | draw 0 | median later draw |
+|---:|---:|---:|---:|
+| 1M | 4.987 s | 1.431 s | 0.175 s |
+| 10M | 37.722 s | 6.362 s | 1.615 s |
 
-## The size of it
+The immediately preceding control-count implementation baseline
+`d598342e9b28f242758aad392253a26c690bccef` measured 12.115/2.419/0.496 s at
+1M and 210.570/15.021/10.290 s at 10M for the same three columns. The current
+whole sweep is therefore 2.43× faster at 1M and 5.58× at 10M; median later draws
+are 2.83× and 6.37× faster respectively.
 
-A hundred 1M draws, 24 ticks:
+Those comparisons measure the device-side control-count change, not 0001 in
+isolation. Their purpose here is to freeze the corrected sequential baseline
+from which concurrent draws must be measured. They also show why projection is
+not evidence: the old 100-draw estimate in this README did not predict the
+measured scale dependence.
 
-| | total |
-|---|---:|
-| today | ~310 s |
-| after the device-side `wins`/`deferred` reduction | ~230 s, of which ~220 s is startup |
-| after this folder | **~11 s** |
-
-Roughly **28×**, which independently reproduces the figure the earlier
-draw-independence analysis reached from a different direction.
-
-**This folder is worth more to the driver workflow than any remaining
-simulation optimisation**, and it needs no GPU session to develop — the change
-is in the CLI and the backend lifecycle, not in kernels.
-
-The two compound rather than compete: the reduction is what makes the per-draw
-simulation cost small enough for startup to dominate.
+The workflow is now fast enough that concurrency may matter at small scales,
+but that is a hypothesis. §M1 requires a direct overlapping same-result arm
+before a new PRD may claim a gain.
 
 ## Binding constraints
 
@@ -103,10 +103,22 @@ setup the others should not.
 not aggregate usefully over a sweep, say so rather than reporting a per-tick
 table that hides the setup being removed.
 
+Concurrent execution adds two requirements. Report throughput and the latency
+distribution as well as whole-sweep wall time: overlapping per-draw durations
+may sum to more than wall time. The existing `sembla-sweep-timing-v1` schema is
+therefore valid only for sequential execution unless a later PRD explicitly
+versions it with queue, start, finish, requested/effective concurrency, and
+whole-sweep fields. Do not silently reinterpret its current fields.
+
+Every performance comparison uses adjacent, otherwise identical arms and
+compares complete normalized output trees. It must include grouped sidecars,
+summaries, pairs, manifests, and final-state hashes. Per §M4, the comparator is
+not trusted until a deliberately perturbed copy makes it fail.
+
 ## Before running a PRD from here
 
 ```sh
-python3 scripts/check-prd-allowlist.py docs/prds-sweep-throughput/0001-*.md
+python3 scripts/check-prd-allowlist.py <the-PRD-at-its-current-path>
 ```
 
 It lists every repo path the PRD names that its allowed-file list does not
@@ -116,15 +128,241 @@ this defect — it required a sweep stage in the collector while omitting the
 collector from its own allowed files — and this check reproduces that finding in
 under a second.
 
+Never put a hard-coded self-path in an acceptance criterion. PRDs move into
+`docs/prds-run-queue/` by design; the command above must be run by the operator
+against the PRD where it currently lives.
+
 ## PRDs
 
-- `0001-reuse-the-backend-across-draws` — implemented locally 2026-07-28:
-  construct one retained CPU/CUDA backend, reset and reseed it per draw, and
-  capture identity once. Local correctness and 1M CPU evidence are recorded in
-  [`../evidence/sweep-backend-reuse-20260728.md`](../evidence/sweep-backend-reuse-20260728.md);
-  10M and GPU collector results remain hardware-pending.
+- `0001-reuse-the-backend-across-draws` — implemented 2026-07-28: construct
+  one retained CPU/CUDA backend, reset and reseed it per draw, and capture
+  identity once. Local correctness and initial CPU evidence are recorded in
+  [`../evidence/sweep-backend-reuse-20260728.md`](../evidence/sweep-backend-reuse-20260728.md).
+  Corrected-current 1M/10M GPU evidence, complete CPU/CUDA output-tree parity,
+  the negative comparator control, and final checksums are recorded in
+  [`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/).
 
-Later PRDs are **deliberately unwritten** and re-scoped from what 0001 measures,
-per §M1. The obvious candidate is running several draws concurrently on one
-device, since a 1M draw badly underutilises an H100 — but that is worth
-measuring before it is scoped, and it depends on 0001 landing first.
+No later numbered PRD is ready to draft yet. The concurrent-draw candidate is
+scoped below so the measurement can answer the architectural questions before
+an implementation specification freezes them.
+
+## Concurrent-draw track — scoped, not yet drafted
+
+This work stays in `docs/prds-sweep-throughput/`; do not create a second folder.
+It directly extends 0001's retained-backend lifecycle and inherits this folder's
+draw-independence, seed, identity, output, and timing contracts.
+
+### What exists today
+
+CPU execution is already parallel *within* a draw. `tick_worker_count` defaults
+to `available_parallelism()` (or `SEMBLA_EVAL_THREADS`), and fixed row-tile
+tasks run through `std::thread::scope`. That is not inter-draw parallelism.
+
+The sweep itself is explicit and sequential:
+
+```rust
+// Deliberately sequential: declaration order within each k, then k order.
+for draw in 0..draw_count {
+```
+
+It owns one mutable `SweepBackend`; the CPU variant owns one mutable
+`StateStore`, and the CUDA variant owns one `CudaBackend`, one default stream,
+and one complete mutable allocation set. `run_draw` takes `&mut self`.
+Concurrent draws are therefore not a `par_iter` change and may never share that
+mutable object.
+
+### Gate 0 — corrected sequential evidence complete
+
+The checksummed
+[`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/)
+session satisfies this gate:
+
+- all arms identify current commit
+  `5616dbe56cddb26e6a6541bead3572639827a8c2`;
+- the differential corpus exits 0 and grouped CPU/CUDA parity covers all five
+  primary/summary/grouped files;
+- the 1M and 10M sequential baseline/current sweep timings above are complete;
+- at both scales, 103 normalized CPU/CUDA output files are exact after backend
+  identity normalization, and the 1M grouped-sidecar perturbation is rejected;
+- the grouped 5M/2-tick CUDA profile reports 20.814 ms total,
+  0.029 ms `readback_control`, and 0.009 ms `report`, with its timing self-check
+  reconciled;
+- all 1,368 entries in `SHA256SUMS` pass;
+- evidence was delivered to `evidence/hyperstack-20260729T034132Z`; and
+- Terraform state, the Hyperstack account reconciliation, and the independent
+  watchdog all report clean teardown.
+
+These results are the sequential baseline. A profile or occupancy estimate may
+identify concurrency as a candidate, but cannot size it.
+
+### Gate 1 — direct same-result spikes before any numbered PRD
+
+Per `DECISIONS.md` §M1, concurrency must be measured by a runnable arm that
+executes the proposed shape and asserts the same complete result. This is a
+spike/evidence task, not a production PRD and not permission to change default
+behaviour.
+
+The runnable driver is `scripts/run-sweep-concurrency-spike.py`. It invokes the
+hidden `SEMBLA_SWEEP_SPIKE_DRAW_WORKERS` seam, keeps timing outside scientific
+output directories, records requested/effective lanes and resource samples,
+compares complete output trees byte-for-byte, and proves its comparator with one
+deliberate CSV perturbation. Example shapes are:
+
+```sh
+cargo build --release --locked -p sembla-cli --features cuda
+
+python3 scripts/run-sweep-concurrency-spike.py \
+  --binary target/release/sembla \
+  --model <model.json> --population <state> \
+  --backend cuda --output-root <evidence-dir> \
+  --workers 1 2 4 --draws 20 --ticks 24 --noise independent
+```
+
+For CPU add `--cpu-total-threads <physical-budget>`; the driver divides that
+budget across active draws and exports the resulting `SEMBLA_EVAL_THREADS` per
+arm. The output root must not exist, so an arm cannot silently reuse evidence.
+
+Measure CPU and CUDA separately; a positive result for one does not authorize
+the other. Preliminary 100k/1M CPU arms are recorded in
+[`sweep-concurrency-spike-20260729`](../evidence/sweep-concurrency-spike-20260729/):
+workers 1/2/4 are byte-identical and four lanes improve whole-sweep wall by
+3.22–3.29× under a fixed ten-thread budget. That is a feasibility result, not a
+completed gate: repeated 10M/second-shape CPU evidence and every CUDA arm remain
+open.
+
+**CPU arm**
+
+- Use isolated retained CPU backends for active draws.
+- Measure outer concurrency 1, 2, and 4 with an explicit total CPU budget.
+- Compare inner worker count 1 and budgeted intra-draw workers so nested
+  `available_parallelism()` pools cannot oversubscribe the host unnoticed.
+- Record CPU topology, affinity/NUMA policy, RSS, whole-sweep wall, throughput,
+  and p50/p95 draw latency.
+
+**CUDA arm**
+
+- First measure isolated complete backends to bound benefit and memory cost.
+- If default streams, repeated NVRTC, or separate contexts serialize/confound
+  that arm, measure the smallest shared-context, non-blocking-stream prototype
+  that can distinguish real kernel overlap from time slicing.
+- Record compile/setup count and time, stream/context shape, peak VRAM/RSS,
+  GPU utilization, event or `nsys` overlap evidence, whole-sweep wall,
+  throughput, and p50/p95 draw latency.
+- Request concurrency 1, 2, and 4 only where allocation preflight succeeds. An
+  OOM is evidence, not a reason to silently reduce the requested count.
+
+Both arms use at least the 1M and 10M demographic shapes, 24 ticks, at least 20
+draws, and adjacent sequential/concurrent arms. Independent noise is the timing
+case; CRN and independent noise are both correctness cases. Any worker policy
+intended to apply beyond this model needs a second materially different shape,
+reported separately rather than averaged.
+
+The spike must prove:
+
+- draw `k` alone equals draw `k` after and alongside other draws;
+- parameter sampling and replica seeds remain pure functions of `k`;
+- complete file sets and bytes equal the sequential arm, including grouped
+  sidecars and `final_state_sha256`;
+- a perturbed comparison fails; and
+- setup, steady-state execution, publication, and resource use are separately
+  visible.
+
+The outcome is recorded independently for CPU and CUDA as one of:
+
+1. negative — close that backend's concurrency track;
+2. positive — a bounded backend-pool implementation is justified; or
+3. blocked — compilation/module/state separation must be measured first.
+
+Do not choose a universal worker count or an `auto` policy from one scale.
+
+### Binding contract for future PRDs
+
+Any numbered PRD drafted after Gate 1 inherits these constraints:
+
+- Default concurrency remains 1 unless a later measured decision changes it.
+- Every active draw owns isolated mutable state, parameters, seed/tick,
+  diagnostics, observations, scratch, and — on CUDA — a non-blocking stream.
+- A lane is retained and reset between assigned draws; concurrency must not
+  reintroduce per-draw construction, state cloning, or NVRTC compilation.
+- Theta and execution seed are derived from `k`, never from admission,
+  completion, lane, thread, or stream order.
+- Admission is bounded. A slow low-`k` draw may not cause an unbounded queue of
+  completed higher-`k` outputs or multiply host/device memory without limit.
+- Workers return isolated results. One coordinator publishes files, pairs,
+  summaries, `all_series`, and `RunManifest.executions` in ascending `k`.
+- Observable failure matches sequential order: publish only the contiguous
+  successful prefix and report the lowest failing `k` after all lower draws
+  have resolved. Higher speculative results remain unpublished.
+- Requested unsupported concurrency fails clearly before scientific output. No
+  silent fallback, implicit cap, cross-device migration, or identity change.
+- Existing manifests and scientific outputs remain byte-identical. Scheduler
+  provenance belongs in a versioned timing/evidence record unless a separate
+  semantic decision authorizes a manifest change.
+- No new dependencies. No lock that serializes all CUDA work may be presented as
+  concurrency.
+
+### Conditional PRD sequence after Gate 1
+
+The evidence decides which entries exist and their final numbering. If both
+backends pass Gate 1, the tentative draft names are
+`0002-bounded-ordered-draw-scheduler`,
+`0003-control-cpu-draw-resources`,
+`0004-run-cuda-draws-concurrently`, and
+`0005-publish-concurrency-defaults`. Remove and renumber conditional entries
+rather than creating placeholder PRDs when one backend's evidence is negative.
+The expected order is:
+
+1. **Bounded ordered draw scheduler.** Add fixed-window admission, isolated
+   worker results, ascending-`k` publication, deterministic prefix/error
+   behaviour, bounded reordering storage, and timing that remains truthful
+   under overlap. Completion-order inversion and injected-error tests are
+   mandatory. If only one backend measured positively, reject concurrency on
+   the other rather than widening this PRD.
+2. **CPU resource control and backend lanes — conditional.** Only if the CPU
+   arm wins: thread an explicit inner-worker budget through runtime execution,
+   retain one resettable `StateStore` per lane, prevent nested oversubscription,
+   and prove bit identity across outer/inner partitions.
+3. **CUDA compiled program and draw slots — conditional.** Only if the CUDA arm
+   wins: compile/load once, share only lifetime-safe immutable program material,
+   create one retained mutable allocation set and non-blocking stream per slot,
+   and preflight checked VRAM requirements. If `cudarc` cannot support safe
+   sharing without broad `unsafe` code or a dependency change, stop and report
+   the boundary rather than hiding recompilation or serialization.
+4. **Measured defaults and publication — conditional.** Decide whether the
+   option remains explicit or gains an `auto` policy only after repeated
+   multi-shape evidence. Dynamic throttling is not part of the first delivery.
+
+Do not manufacture a mechanism PRD when its prerequisite measurement is
+negative, or split out immutable CUDA program state when independent backends
+are already measured to be cheap and capacity-safe.
+
+### Required acceptance evidence shape
+
+Each implementation PRD records a narrative summary plus machine-readable raw
+records sufficient to recompute every headline number. At minimum include:
+
+- repository/dirty state and release binary SHA-256;
+- CPU/GPU/driver/CUDA/topology and tool versions;
+- model/state hashes, scale, ticks, draws, seed, noise mode, and features;
+- exact commands and adjacent arm order;
+- requested/effective concurrency and backend/stream/context/compile counts;
+- whole-sweep wall, setup/compile, draw-0, later-draw p50/p95, and draws/second;
+- peak VRAM and RSS, headroom/OOM, and utilization/overlap evidence;
+- complete normalized file-tree equality and hashes;
+- draw-alone/schedule-independence matrices for contest/grouped cases under CRN
+  and independent noise;
+- comparator perturbation and expected nonzero result; and
+- local versus hardware criteria, with every deferred hardware criterion naming
+  the exact runnable collector command per §M3.
+
+Do not regenerate or bless changed goldens. Negative and inconclusive results
+are first-class evidence.
+
+### Global non-goals
+
+Until separate measured work authorizes them, this track excludes multi-GPU or
+distributed scheduling, kernel algorithm changes, RNG coordinates or draw-set
+changes, calibration-method changes, resumable/atomic sweep directories,
+graceful CUDA kernel cancellation, automatic VRAM throttling, adaptive
+self-tuning, changes to `run`/`compare`/differential paths, and concurrent final
+artifact writes from workers.

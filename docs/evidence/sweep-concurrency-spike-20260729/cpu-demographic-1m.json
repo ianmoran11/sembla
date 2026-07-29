@@ -1,0 +1,4582 @@
+{
+  "backend": "cpu",
+  "binary": "/Users/ian/projects/sembla/target/release/sembla",
+  "binary_sha256": "48dc4fa8db73d62e11f1e54f7817ac97299aa639994fe2b7972bba9b4570bbd0",
+  "comparisons": [
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 1
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 2
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 4
+    }
+  ],
+  "cpu_total_threads": 10,
+  "draws": 20,
+  "enabled_features": [
+    "grouped-observations"
+  ],
+  "model": "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state.model.json",
+  "model_sha256": "e3ab8287f97b9c8a766075cbec29e290c234d2614394baea9f60665d2a2a3024",
+  "negative_control": {
+    "comparison": {
+      "changed": [
+        "draw_0.grouped.deaths_cells.csv"
+      ],
+      "equal": false,
+      "extra": [],
+      "missing": []
+    },
+    "target": "draw_0.grouped.deaths_cells.csv"
+  },
+  "noise": "independent",
+  "passed": true,
+  "population": "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state",
+  "population_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b",
+  "repetitions": 1,
+  "repository_commit": "5616dbe56cddb26e6a6541bead3572639827a8c2",
+  "runs": [
+    {
+      "command": [
+        "/Users/ian/projects/sembla/target/release/sembla",
+        "sweep",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state.model.json",
+        "--population",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cpu",
+        "--out",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/evidence/workers-1/rep-0/output",
+        "--timing-json",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/evidence/workers-1/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": 10,
+      "external_wall_time_ms": 132697.885083,
+      "output_hashes": {
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "bcf122d81d98034d4f4262d68ef58254161d282fcb18674ebb5a8c80fab34a50",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 0,
+      "peak_gpu_utilization_percent": 0,
+      "peak_process_rss_kib": 503424,
+      "repetition": 0,
+      "resource_samples": [
+        {
+          "offset_ms": 1.950375,
+          "process_rss_kib": 7824
+        },
+        {
+          "offset_ms": 258.991917,
+          "process_rss_kib": 191472
+        },
+        {
+          "offset_ms": 523.934958,
+          "process_rss_kib": 359952
+        },
+        {
+          "offset_ms": 785.28325,
+          "process_rss_kib": 406560
+        },
+        {
+          "offset_ms": 1051.3065,
+          "process_rss_kib": 427984
+        },
+        {
+          "offset_ms": 1315.90825,
+          "process_rss_kib": 417056
+        },
+        {
+          "offset_ms": 1571.229458,
+          "process_rss_kib": 450368
+        },
+        {
+          "offset_ms": 1836.5175,
+          "process_rss_kib": 416752
+        },
+        {
+          "offset_ms": 2101.140333,
+          "process_rss_kib": 456688
+        },
+        {
+          "offset_ms": 2365.640292,
+          "process_rss_kib": 433520
+        },
+        {
+          "offset_ms": 2626.321542,
+          "process_rss_kib": 412064
+        },
+        {
+          "offset_ms": 2890.478,
+          "process_rss_kib": 343488
+        },
+        {
+          "offset_ms": 3157.211417,
+          "process_rss_kib": 375248
+        },
+        {
+          "offset_ms": 3416.230125,
+          "process_rss_kib": 379632
+        },
+        {
+          "offset_ms": 3679.704042,
+          "process_rss_kib": 377296
+        },
+        {
+          "offset_ms": 3943.869417,
+          "process_rss_kib": 387328
+        },
+        {
+          "offset_ms": 4207.862875,
+          "process_rss_kib": 405056
+        },
+        {
+          "offset_ms": 4469.742167,
+          "process_rss_kib": 419104
+        },
+        {
+          "offset_ms": 4734.057583,
+          "process_rss_kib": 420128
+        },
+        {
+          "offset_ms": 4997.924792,
+          "process_rss_kib": 422912
+        },
+        {
+          "offset_ms": 5253.584167,
+          "process_rss_kib": 450800
+        },
+        {
+          "offset_ms": 5516.970167,
+          "process_rss_kib": 477024
+        },
+        {
+          "offset_ms": 5781.498833,
+          "process_rss_kib": 452816
+        },
+        {
+          "offset_ms": 6045.317625,
+          "process_rss_kib": 412512
+        },
+        {
+          "offset_ms": 6309.200417,
+          "process_rss_kib": 403680
+        },
+        {
+          "offset_ms": 6572.355333,
+          "process_rss_kib": 373728
+        },
+        {
+          "offset_ms": 6836.344542,
+          "process_rss_kib": 361952
+        },
+        {
+          "offset_ms": 7100.689583,
+          "process_rss_kib": 328560
+        },
+        {
+          "offset_ms": 7364.598208,
+          "process_rss_kib": 389168
+        },
+        {
+          "offset_ms": 7628.586667,
+          "process_rss_kib": 384400
+        },
+        {
+          "offset_ms": 7892.85325,
+          "process_rss_kib": 389424
+        },
+        {
+          "offset_ms": 8157.449542,
+          "process_rss_kib": 400032
+        },
+        {
+          "offset_ms": 8428.02325,
+          "process_rss_kib": 406512
+        },
+        {
+          "offset_ms": 8683.29675,
+          "process_rss_kib": 458752
+        },
+        {
+          "offset_ms": 8945.918667,
+          "process_rss_kib": 454816
+        },
+        {
+          "offset_ms": 9205.985625,
+          "process_rss_kib": 466176
+        },
+        {
+          "offset_ms": 9462.800083,
+          "process_rss_kib": 463760
+        },
+        {
+          "offset_ms": 9726.900917,
+          "process_rss_kib": 471904
+        },
+        {
+          "offset_ms": 9991.13425,
+          "process_rss_kib": 457760
+        },
+        {
+          "offset_ms": 10251.78375,
+          "process_rss_kib": 454016
+        },
+        {
+          "offset_ms": 10515.359125,
+          "process_rss_kib": 360080
+        },
+        {
+          "offset_ms": 10780.337792,
+          "process_rss_kib": 361040
+        },
+        {
+          "offset_ms": 11037.050125,
+          "process_rss_kib": 373008
+        },
+        {
+          "offset_ms": 11301.335792,
+          "process_rss_kib": 379088
+        },
+        {
+          "offset_ms": 11568.0855,
+          "process_rss_kib": 383616
+        },
+        {
+          "offset_ms": 11832.199083,
+          "process_rss_kib": 376496
+        },
+        {
+          "offset_ms": 12089.933208,
+          "process_rss_kib": 397776
+        },
+        {
+          "offset_ms": 12349.73675,
+          "process_rss_kib": 433472
+        },
+        {
+          "offset_ms": 12613.559125,
+          "process_rss_kib": 423552
+        },
+        {
+          "offset_ms": 12875.762958,
+          "process_rss_kib": 442208
+        },
+        {
+          "offset_ms": 13135.854583,
+          "process_rss_kib": 437024
+        },
+        {
+          "offset_ms": 13400.005333,
+          "process_rss_kib": 437040
+        },
+        {
+          "offset_ms": 13664.148583,
+          "process_rss_kib": 387632
+        },
+        {
+          "offset_ms": 13925.512292,
+          "process_rss_kib": 411824
+        },
+        {
+          "offset_ms": 14188.192417,
+          "process_rss_kib": 436032
+        },
+        {
+          "offset_ms": 14452.143833,
+          "process_rss_kib": 434016
+        },
+        {
+          "offset_ms": 14709.170083,
+          "process_rss_kib": 430032
+        },
+        {
+          "offset_ms": 14973.105458,
+          "process_rss_kib": 425728
+        },
+        {
+          "offset_ms": 15233.462792,
+          "process_rss_kib": 430672
+        },
+        {
+          "offset_ms": 15492.006167,
+          "process_rss_kib": 437600
+        },
+        {
+          "offset_ms": 15756.05825,
+          "process_rss_kib": 430320
+        },
+        {
+          "offset_ms": 16020.426375,
+          "process_rss_kib": 443120
+        },
+        {
+          "offset_ms": 16276.251208,
+          "process_rss_kib": 440560
+        },
+        {
+          "offset_ms": 16530.02975,
+          "process_rss_kib": 425088
+        },
+        {
+          "offset_ms": 16793.875542,
+          "process_rss_kib": 430816
+        },
+        {
+          "offset_ms": 17057.335042,
+          "process_rss_kib": 434064
+        },
+        {
+          "offset_ms": 17320.814792,
+          "process_rss_kib": 427872
+        },
+        {
+          "offset_ms": 17582.229208,
+          "process_rss_kib": 411296
+        },
+        {
+          "offset_ms": 17845.421,
+          "process_rss_kib": 419216
+        },
+        {
+          "offset_ms": 18108.814417,
+          "process_rss_kib": 415408
+        },
+        {
+          "offset_ms": 18371.47475,
+          "process_rss_kib": 418800
+        },
+        {
+          "offset_ms": 18634.932875,
+          "process_rss_kib": 432192
+        },
+        {
+          "offset_ms": 18898.860042,
+          "process_rss_kib": 422272
+        },
+        {
+          "offset_ms": 19162.775583,
+          "process_rss_kib": 371664
+        },
+        {
+          "offset_ms": 19426.238167,
+          "process_rss_kib": 366032
+        },
+        {
+          "offset_ms": 19689.964708,
+          "process_rss_kib": 348096
+        },
+        {
+          "offset_ms": 19953.684375,
+          "process_rss_kib": 343872
+        },
+        {
+          "offset_ms": 20209.189667,
+          "process_rss_kib": 382032
+        },
+        {
+          "offset_ms": 20473.374417,
+          "process_rss_kib": 378960
+        },
+        {
+          "offset_ms": 20729.969625,
+          "process_rss_kib": 366176
+        },
+        {
+          "offset_ms": 20991.718833,
+          "process_rss_kib": 345536
+        },
+        {
+          "offset_ms": 21249.119125,
+          "process_rss_kib": 380048
+        },
+        {
+          "offset_ms": 21513.002542,
+          "process_rss_kib": 348496
+        },
+        {
+          "offset_ms": 21776.3705,
+          "process_rss_kib": 371936
+        },
+        {
+          "offset_ms": 22030.982458,
+          "process_rss_kib": 403744
+        },
+        {
+          "offset_ms": 22285.243625,
+          "process_rss_kib": 392064
+        },
+        {
+          "offset_ms": 22548.68275,
+          "process_rss_kib": 393936
+        },
+        {
+          "offset_ms": 22812.314833,
+          "process_rss_kib": 389792
+        },
+        {
+          "offset_ms": 23076.083333,
+          "process_rss_kib": 388112
+        },
+        {
+          "offset_ms": 23339.603292,
+          "process_rss_kib": 402496
+        },
+        {
+          "offset_ms": 23602.602792,
+          "process_rss_kib": 384096
+        },
+        {
+          "offset_ms": 23866.634708,
+          "process_rss_kib": 402320
+        },
+        {
+          "offset_ms": 24126.750333,
+          "process_rss_kib": 381264
+        },
+        {
+          "offset_ms": 24390.786208,
+          "process_rss_kib": 409376
+        },
+        {
+          "offset_ms": 24649.369167,
+          "process_rss_kib": 414368
+        },
+        {
+          "offset_ms": 24910.383958,
+          "process_rss_kib": 409952
+        },
+        {
+          "offset_ms": 25174.405833,
+          "process_rss_kib": 412736
+        },
+        {
+          "offset_ms": 25434.693708,
+          "process_rss_kib": 419680
+        },
+        {
+          "offset_ms": 25697.996958,
+          "process_rss_kib": 367104
+        },
+        {
+          "offset_ms": 25963.987,
+          "process_rss_kib": 315520
+        },
+        {
+          "offset_ms": 26228.239583,
+          "process_rss_kib": 289872
+        },
+        {
+          "offset_ms": 26489.5795,
+          "process_rss_kib": 312688
+        },
+        {
+          "offset_ms": 26745.050208,
+          "process_rss_kib": 302064
+        },
+        {
+          "offset_ms": 27009.182333,
+          "process_rss_kib": 332672
+        },
+        {
+          "offset_ms": 27272.218417,
+          "process_rss_kib": 376096
+        },
+        {
+          "offset_ms": 27535.880583,
+          "process_rss_kib": 391808
+        },
+        {
+          "offset_ms": 27799.86725,
+          "process_rss_kib": 404896
+        },
+        {
+          "offset_ms": 28063.600208,
+          "process_rss_kib": 388208
+        },
+        {
+          "offset_ms": 28327.5835,
+          "process_rss_kib": 392448
+        },
+        {
+          "offset_ms": 28591.434958,
+          "process_rss_kib": 394784
+        },
+        {
+          "offset_ms": 28853.144208,
+          "process_rss_kib": 382112
+        },
+        {
+          "offset_ms": 29114.499667,
+          "process_rss_kib": 379616
+        },
+        {
+          "offset_ms": 29381.429417,
+          "process_rss_kib": 382624
+        },
+        {
+          "offset_ms": 29645.554625,
+          "process_rss_kib": 389424
+        },
+        {
+          "offset_ms": 29912.357792,
+          "process_rss_kib": 383264
+        },
+        {
+          "offset_ms": 30176.713167,
+          "process_rss_kib": 394752
+        },
+        {
+          "offset_ms": 30437.417208,
+          "process_rss_kib": 381120
+        },
+        {
+          "offset_ms": 30692.62725,
+          "process_rss_kib": 387440
+        },
+        {
+          "offset_ms": 30954.098042,
+          "process_rss_kib": 378768
+        },
+        {
+          "offset_ms": 31217.665833,
+          "process_rss_kib": 380720
+        },
+        {
+          "offset_ms": 31482.223333,
+          "process_rss_kib": 364528
+        },
+        {
+          "offset_ms": 31741.413375,
+          "process_rss_kib": 366576
+        },
+        {
+          "offset_ms": 32004.706167,
+          "process_rss_kib": 355872
+        },
+        {
+          "offset_ms": 32271.267875,
+          "process_rss_kib": 366256
+        },
+        {
+          "offset_ms": 32533.42275,
+          "process_rss_kib": 380512
+        },
+        {
+          "offset_ms": 32797.049167,
+          "process_rss_kib": 382032
+        },
+        {
+          "offset_ms": 33060.81725,
+          "process_rss_kib": 386384
+        },
+        {
+          "offset_ms": 33324.809625,
+          "process_rss_kib": 386400
+        },
+        {
+          "offset_ms": 33583.23,
+          "process_rss_kib": 387296
+        },
+        {
+          "offset_ms": 33846.872,
+          "process_rss_kib": 422160
+        },
+        {
+          "offset_ms": 34110.372958,
+          "process_rss_kib": 420080
+        },
+        {
+          "offset_ms": 34374.005375,
+          "process_rss_kib": 428432
+        },
+        {
+          "offset_ms": 34630.199083,
+          "process_rss_kib": 448192
+        },
+        {
+          "offset_ms": 34893.425458,
+          "process_rss_kib": 452752
+        },
+        {
+          "offset_ms": 35157.030125,
+          "process_rss_kib": 472320
+        },
+        {
+          "offset_ms": 35412.288583,
+          "process_rss_kib": 472224
+        },
+        {
+          "offset_ms": 35676.054958,
+          "process_rss_kib": 474416
+        },
+        {
+          "offset_ms": 35939.346625,
+          "process_rss_kib": 475616
+        },
+        {
+          "offset_ms": 36202.681167,
+          "process_rss_kib": 475520
+        },
+        {
+          "offset_ms": 36466.622667,
+          "process_rss_kib": 474544
+        },
+        {
+          "offset_ms": 36722.172208,
+          "process_rss_kib": 475360
+        },
+        {
+          "offset_ms": 36986.727083,
+          "process_rss_kib": 477840
+        },
+        {
+          "offset_ms": 37246.785167,
+          "process_rss_kib": 477792
+        },
+        {
+          "offset_ms": 37508.397083,
+          "process_rss_kib": 477760
+        },
+        {
+          "offset_ms": 37771.996583,
+          "process_rss_kib": 476848
+        },
+        {
+          "offset_ms": 38035.872917,
+          "process_rss_kib": 478720
+        },
+        {
+          "offset_ms": 38290.747042,
+          "process_rss_kib": 478528
+        },
+        {
+          "offset_ms": 38547.49325,
+          "process_rss_kib": 458912
+        },
+        {
+          "offset_ms": 38804.538792,
+          "process_rss_kib": 411392
+        },
+        {
+          "offset_ms": 39067.893208,
+          "process_rss_kib": 393440
+        },
+        {
+          "offset_ms": 39331.916292,
+          "process_rss_kib": 382128
+        },
+        {
+          "offset_ms": 39595.380458,
+          "process_rss_kib": 384320
+        },
+        {
+          "offset_ms": 39851.074708,
+          "process_rss_kib": 434592
+        },
+        {
+          "offset_ms": 40107.122417,
+          "process_rss_kib": 460544
+        },
+        {
+          "offset_ms": 40368.240625,
+          "process_rss_kib": 440288
+        },
+        {
+          "offset_ms": 40623.394542,
+          "process_rss_kib": 438800
+        },
+        {
+          "offset_ms": 40888.0285,
+          "process_rss_kib": 385408
+        },
+        {
+          "offset_ms": 41148.895833,
+          "process_rss_kib": 362752
+        },
+        {
+          "offset_ms": 41413.742167,
+          "process_rss_kib": 345648
+        },
+        {
+          "offset_ms": 41677.978583,
+          "process_rss_kib": 366736
+        },
+        {
+          "offset_ms": 41935.110625,
+          "process_rss_kib": 387760
+        },
+        {
+          "offset_ms": 42199.551583,
+          "process_rss_kib": 386384
+        },
+        {
+          "offset_ms": 42465.00675,
+          "process_rss_kib": 389776
+        },
+        {
+          "offset_ms": 42732.748042,
+          "process_rss_kib": 413472
+        },
+        {
+          "offset_ms": 42995.542667,
+          "process_rss_kib": 407408
+        },
+        {
+          "offset_ms": 43253.9215,
+          "process_rss_kib": 396688
+        },
+        {
+          "offset_ms": 43517.535125,
+          "process_rss_kib": 395584
+        },
+        {
+          "offset_ms": 43781.157375,
+          "process_rss_kib": 395888
+        },
+        {
+          "offset_ms": 44044.95575,
+          "process_rss_kib": 399280
+        },
+        {
+          "offset_ms": 44301.878292,
+          "process_rss_kib": 401168
+        },
+        {
+          "offset_ms": 44561.012417,
+          "process_rss_kib": 386112
+        },
+        {
+          "offset_ms": 44825.238042,
+          "process_rss_kib": 395728
+        },
+        {
+          "offset_ms": 45083.0465,
+          "process_rss_kib": 401648
+        },
+        {
+          "offset_ms": 45346.811417,
+          "process_rss_kib": 401056
+        },
+        {
+          "offset_ms": 45602.73375,
+          "process_rss_kib": 381072
+        },
+        {
+          "offset_ms": 45862.236792,
+          "process_rss_kib": 392448
+        },
+        {
+          "offset_ms": 46116.856083,
+          "process_rss_kib": 396912
+        },
+        {
+          "offset_ms": 46380.395458,
+          "process_rss_kib": 443328
+        },
+        {
+          "offset_ms": 46644.654458,
+          "process_rss_kib": 454464
+        },
+        {
+          "offset_ms": 46908.42225,
+          "process_rss_kib": 467776
+        },
+        {
+          "offset_ms": 47171.412458,
+          "process_rss_kib": 454112
+        },
+        {
+          "offset_ms": 47435.54775,
+          "process_rss_kib": 462736
+        },
+        {
+          "offset_ms": 47699.300708,
+          "process_rss_kib": 464064
+        },
+        {
+          "offset_ms": 47953.496292,
+          "process_rss_kib": 471968
+        },
+        {
+          "offset_ms": 48211.211917,
+          "process_rss_kib": 471296
+        },
+        {
+          "offset_ms": 48473.527917,
+          "process_rss_kib": 476352
+        },
+        {
+          "offset_ms": 48733.016958,
+          "process_rss_kib": 477360
+        },
+        {
+          "offset_ms": 48992.456292,
+          "process_rss_kib": 477376
+        },
+        {
+          "offset_ms": 49256.632542,
+          "process_rss_kib": 485360
+        },
+        {
+          "offset_ms": 49514.585542,
+          "process_rss_kib": 485456
+        },
+        {
+          "offset_ms": 49778.632125,
+          "process_rss_kib": 479728
+        },
+        {
+          "offset_ms": 50042.818208,
+          "process_rss_kib": 478464
+        },
+        {
+          "offset_ms": 50299.792083,
+          "process_rss_kib": 485184
+        },
+        {
+          "offset_ms": 50563.884375,
+          "process_rss_kib": 485568
+        },
+        {
+          "offset_ms": 50827.384375,
+          "process_rss_kib": 485328
+        },
+        {
+          "offset_ms": 51089.778583,
+          "process_rss_kib": 487728
+        },
+        {
+          "offset_ms": 51348.642292,
+          "process_rss_kib": 494752
+        },
+        {
+          "offset_ms": 51605.06125,
+          "process_rss_kib": 492512
+        },
+        {
+          "offset_ms": 51866.697458,
+          "process_rss_kib": 503424
+        },
+        {
+          "offset_ms": 52130.935708,
+          "process_rss_kib": 497920
+        },
+        {
+          "offset_ms": 52389.772625,
+          "process_rss_kib": 498912
+        },
+        {
+          "offset_ms": 52644.979958,
+          "process_rss_kib": 457312
+        },
+        {
+          "offset_ms": 52906.538708,
+          "process_rss_kib": 480512
+        },
+        {
+          "offset_ms": 53170.02875,
+          "process_rss_kib": 480768
+        },
+        {
+          "offset_ms": 53433.633375,
+          "process_rss_kib": 480576
+        },
+        {
+          "offset_ms": 53697.484792,
+          "process_rss_kib": 480448
+        },
+        {
+          "offset_ms": 53960.818625,
+          "process_rss_kib": 476384
+        },
+        {
+          "offset_ms": 54224.630708,
+          "process_rss_kib": 469136
+        },
+        {
+          "offset_ms": 54488.530792,
+          "process_rss_kib": 469936
+        },
+        {
+          "offset_ms": 54751.93225,
+          "process_rss_kib": 467184
+        },
+        {
+          "offset_ms": 55011.955917,
+          "process_rss_kib": 466992
+        },
+        {
+          "offset_ms": 55267.404125,
+          "process_rss_kib": 466304
+        },
+        {
+          "offset_ms": 55531.474125,
+          "process_rss_kib": 444640
+        },
+        {
+          "offset_ms": 55788.870125,
+          "process_rss_kib": 295280
+        },
+        {
+          "offset_ms": 56047.807375,
+          "process_rss_kib": 284576
+        },
+        {
+          "offset_ms": 56309.053917,
+          "process_rss_kib": 301120
+        },
+        {
+          "offset_ms": 56571.549667,
+          "process_rss_kib": 300816
+        },
+        {
+          "offset_ms": 56825.983875,
+          "process_rss_kib": 318880
+        },
+        {
+          "offset_ms": 57089.496083,
+          "process_rss_kib": 319184
+        },
+        {
+          "offset_ms": 57351.852042,
+          "process_rss_kib": 286320
+        },
+        {
+          "offset_ms": 57611.73775,
+          "process_rss_kib": 298240
+        },
+        {
+          "offset_ms": 57877.49125,
+          "process_rss_kib": 324080
+        },
+        {
+          "offset_ms": 58144.158542,
+          "process_rss_kib": 313664
+        },
+        {
+          "offset_ms": 58407.702792,
+          "process_rss_kib": 342368
+        },
+        {
+          "offset_ms": 58671.812875,
+          "process_rss_kib": 345056
+        },
+        {
+          "offset_ms": 58933.014583,
+          "process_rss_kib": 304800
+        },
+        {
+          "offset_ms": 59197.86075,
+          "process_rss_kib": 306400
+        },
+        {
+          "offset_ms": 59453.233583,
+          "process_rss_kib": 367616
+        },
+        {
+          "offset_ms": 59710.087792,
+          "process_rss_kib": 394640
+        },
+        {
+          "offset_ms": 59973.585917,
+          "process_rss_kib": 417280
+        },
+        {
+          "offset_ms": 60237.811375,
+          "process_rss_kib": 413968
+        },
+        {
+          "offset_ms": 60498.337167,
+          "process_rss_kib": 423824
+        },
+        {
+          "offset_ms": 60761.762458,
+          "process_rss_kib": 419520
+        },
+        {
+          "offset_ms": 61025.7655,
+          "process_rss_kib": 404144
+        },
+        {
+          "offset_ms": 61289.639042,
+          "process_rss_kib": 384032
+        },
+        {
+          "offset_ms": 61553.698417,
+          "process_rss_kib": 382048
+        },
+        {
+          "offset_ms": 61817.6595,
+          "process_rss_kib": 384832
+        },
+        {
+          "offset_ms": 62073.607708,
+          "process_rss_kib": 394400
+        },
+        {
+          "offset_ms": 62334.396667,
+          "process_rss_kib": 398528
+        },
+        {
+          "offset_ms": 62591.389,
+          "process_rss_kib": 397328
+        },
+        {
+          "offset_ms": 62849.236833,
+          "process_rss_kib": 377680
+        },
+        {
+          "offset_ms": 63116.16525,
+          "process_rss_kib": 355504
+        },
+        {
+          "offset_ms": 63385.129125,
+          "process_rss_kib": 358592
+        },
+        {
+          "offset_ms": 63647.398083,
+          "process_rss_kib": 340864
+        },
+        {
+          "offset_ms": 63903.20925,
+          "process_rss_kib": 363616
+        },
+        {
+          "offset_ms": 64164.881708,
+          "process_rss_kib": 368736
+        },
+        {
+          "offset_ms": 64427.020875,
+          "process_rss_kib": 379504
+        },
+        {
+          "offset_ms": 64686.178625,
+          "process_rss_kib": 389616
+        },
+        {
+          "offset_ms": 64949.528375,
+          "process_rss_kib": 390336
+        },
+        {
+          "offset_ms": 65209.901375,
+          "process_rss_kib": 397792
+        },
+        {
+          "offset_ms": 65470.22175,
+          "process_rss_kib": 382192
+        },
+        {
+          "offset_ms": 65741.302708,
+          "process_rss_kib": 352816
+        },
+        {
+          "offset_ms": 66004.065708,
+          "process_rss_kib": 354800
+        },
+        {
+          "offset_ms": 66259.979958,
+          "process_rss_kib": 394112
+        },
+        {
+          "offset_ms": 66524.402625,
+          "process_rss_kib": 419488
+        },
+        {
+          "offset_ms": 66788.146,
+          "process_rss_kib": 406112
+        },
+        {
+          "offset_ms": 67043.501917,
+          "process_rss_kib": 394800
+        },
+        {
+          "offset_ms": 67307.335792,
+          "process_rss_kib": 404496
+        },
+        {
+          "offset_ms": 67563.182292,
+          "process_rss_kib": 397984
+        },
+        {
+          "offset_ms": 67827.186167,
+          "process_rss_kib": 376944
+        },
+        {
+          "offset_ms": 68085.0675,
+          "process_rss_kib": 371088
+        },
+        {
+          "offset_ms": 68346.75475,
+          "process_rss_kib": 387584
+        },
+        {
+          "offset_ms": 68611.757458,
+          "process_rss_kib": 441520
+        },
+        {
+          "offset_ms": 68871.507583,
+          "process_rss_kib": 445072
+        },
+        {
+          "offset_ms": 69131.138958,
+          "process_rss_kib": 432096
+        },
+        {
+          "offset_ms": 69395.317417,
+          "process_rss_kib": 447360
+        },
+        {
+          "offset_ms": 69654.06825,
+          "process_rss_kib": 425952
+        },
+        {
+          "offset_ms": 69920.141083,
+          "process_rss_kib": 358992
+        },
+        {
+          "offset_ms": 70178.974958,
+          "process_rss_kib": 405888
+        },
+        {
+          "offset_ms": 70433.026708,
+          "process_rss_kib": 416784
+        },
+        {
+          "offset_ms": 70694.305542,
+          "process_rss_kib": 421024
+        },
+        {
+          "offset_ms": 70955.462458,
+          "process_rss_kib": 396704
+        },
+        {
+          "offset_ms": 71219.684958,
+          "process_rss_kib": 392448
+        },
+        {
+          "offset_ms": 71474.094208,
+          "process_rss_kib": 384736
+        },
+        {
+          "offset_ms": 71735.180583,
+          "process_rss_kib": 398720
+        },
+        {
+          "offset_ms": 71997.333417,
+          "process_rss_kib": 383680
+        },
+        {
+          "offset_ms": 72254.265667,
+          "process_rss_kib": 387376
+        },
+        {
+          "offset_ms": 72518.195208,
+          "process_rss_kib": 384832
+        },
+        {
+          "offset_ms": 72780.482917,
+          "process_rss_kib": 424400
+        },
+        {
+          "offset_ms": 73046.419875,
+          "process_rss_kib": 427632
+        },
+        {
+          "offset_ms": 73308.261375,
+          "process_rss_kib": 423568
+        },
+        {
+          "offset_ms": 73570.6315,
+          "process_rss_kib": 427664
+        },
+        {
+          "offset_ms": 73841.428542,
+          "process_rss_kib": 433184
+        },
+        {
+          "offset_ms": 74105.318833,
+          "process_rss_kib": 431648
+        },
+        {
+          "offset_ms": 74367.489,
+          "process_rss_kib": 438896
+        },
+        {
+          "offset_ms": 74631.059625,
+          "process_rss_kib": 442176
+        },
+        {
+          "offset_ms": 74894.693542,
+          "process_rss_kib": 446064
+        },
+        {
+          "offset_ms": 75158.191125,
+          "process_rss_kib": 446000
+        },
+        {
+          "offset_ms": 75412.053958,
+          "process_rss_kib": 448480
+        },
+        {
+          "offset_ms": 75675.785625,
+          "process_rss_kib": 448832
+        },
+        {
+          "offset_ms": 75939.379333,
+          "process_rss_kib": 400912
+        },
+        {
+          "offset_ms": 76203.016333,
+          "process_rss_kib": 273936
+        },
+        {
+          "offset_ms": 76457.031042,
+          "process_rss_kib": 316944
+        },
+        {
+          "offset_ms": 76721.875958,
+          "process_rss_kib": 279040
+        },
+        {
+          "offset_ms": 76985.730958,
+          "process_rss_kib": 324304
+        },
+        {
+          "offset_ms": 77249.860875,
+          "process_rss_kib": 326464
+        },
+        {
+          "offset_ms": 77514.152125,
+          "process_rss_kib": 327424
+        },
+        {
+          "offset_ms": 77777.747208,
+          "process_rss_kib": 328048
+        },
+        {
+          "offset_ms": 78041.395292,
+          "process_rss_kib": 325184
+        },
+        {
+          "offset_ms": 78298.519125,
+          "process_rss_kib": 324656
+        },
+        {
+          "offset_ms": 78560.162792,
+          "process_rss_kib": 332160
+        },
+        {
+          "offset_ms": 78824.569625,
+          "process_rss_kib": 331840
+        },
+        {
+          "offset_ms": 79091.061125,
+          "process_rss_kib": 337168
+        },
+        {
+          "offset_ms": 79355.33125,
+          "process_rss_kib": 292832
+        },
+        {
+          "offset_ms": 79619.275083,
+          "process_rss_kib": 351184
+        },
+        {
+          "offset_ms": 79878.290375,
+          "process_rss_kib": 377104
+        },
+        {
+          "offset_ms": 80132.703458,
+          "process_rss_kib": 386944
+        },
+        {
+          "offset_ms": 80396.916708,
+          "process_rss_kib": 396592
+        },
+        {
+          "offset_ms": 80660.759875,
+          "process_rss_kib": 414688
+        },
+        {
+          "offset_ms": 80916.777958,
+          "process_rss_kib": 417072
+        },
+        {
+          "offset_ms": 81173.300708,
+          "process_rss_kib": 430720
+        },
+        {
+          "offset_ms": 81431.597792,
+          "process_rss_kib": 432448
+        },
+        {
+          "offset_ms": 81689.254333,
+          "process_rss_kib": 432352
+        },
+        {
+          "offset_ms": 81956.156417,
+          "process_rss_kib": 432816
+        },
+        {
+          "offset_ms": 82220.162625,
+          "process_rss_kib": 433120
+        },
+        {
+          "offset_ms": 82484.139625,
+          "process_rss_kib": 433024
+        },
+        {
+          "offset_ms": 82748.267625,
+          "process_rss_kib": 446160
+        },
+        {
+          "offset_ms": 83012.195,
+          "process_rss_kib": 446192
+        },
+        {
+          "offset_ms": 83276.124292,
+          "process_rss_kib": 447856
+        },
+        {
+          "offset_ms": 83542.007458,
+          "process_rss_kib": 450656
+        },
+        {
+          "offset_ms": 83805.454417,
+          "process_rss_kib": 452624
+        },
+        {
+          "offset_ms": 84061.732125,
+          "process_rss_kib": 451584
+        },
+        {
+          "offset_ms": 84325.804125,
+          "process_rss_kib": 450736
+        },
+        {
+          "offset_ms": 84584.156208,
+          "process_rss_kib": 449712
+        },
+        {
+          "offset_ms": 84848.0535,
+          "process_rss_kib": 431152
+        },
+        {
+          "offset_ms": 85111.949042,
+          "process_rss_kib": 438816
+        },
+        {
+          "offset_ms": 85373.41875,
+          "process_rss_kib": 436272
+        },
+        {
+          "offset_ms": 85633.025667,
+          "process_rss_kib": 419328
+        },
+        {
+          "offset_ms": 85897.80225,
+          "process_rss_kib": 253312
+        },
+        {
+          "offset_ms": 86160.024417,
+          "process_rss_kib": 336752
+        },
+        {
+          "offset_ms": 86423.611042,
+          "process_rss_kib": 297152
+        },
+        {
+          "offset_ms": 86677.138375,
+          "process_rss_kib": 328064
+        },
+        {
+          "offset_ms": 86942.939625,
+          "process_rss_kib": 323248
+        },
+        {
+          "offset_ms": 87204.942292,
+          "process_rss_kib": 318832
+        },
+        {
+          "offset_ms": 87464.843125,
+          "process_rss_kib": 329936
+        },
+        {
+          "offset_ms": 87727.94725,
+          "process_rss_kib": 364304
+        },
+        {
+          "offset_ms": 87987.856542,
+          "process_rss_kib": 396640
+        },
+        {
+          "offset_ms": 88253.561458,
+          "process_rss_kib": 395392
+        },
+        {
+          "offset_ms": 88514.162708,
+          "process_rss_kib": 408000
+        },
+        {
+          "offset_ms": 88774.374333,
+          "process_rss_kib": 399696
+        },
+        {
+          "offset_ms": 89039.49525,
+          "process_rss_kib": 406288
+        },
+        {
+          "offset_ms": 89295.12,
+          "process_rss_kib": 409200
+        },
+        {
+          "offset_ms": 89559.771417,
+          "process_rss_kib": 412016
+        },
+        {
+          "offset_ms": 89816.822833,
+          "process_rss_kib": 408368
+        },
+        {
+          "offset_ms": 90077.365042,
+          "process_rss_kib": 409088
+        },
+        {
+          "offset_ms": 90341.458708,
+          "process_rss_kib": 410208
+        },
+        {
+          "offset_ms": 90595.723083,
+          "process_rss_kib": 404304
+        },
+        {
+          "offset_ms": 90856.324708,
+          "process_rss_kib": 404592
+        },
+        {
+          "offset_ms": 91120.553167,
+          "process_rss_kib": 402800
+        },
+        {
+          "offset_ms": 91376.49125,
+          "process_rss_kib": 380256
+        },
+        {
+          "offset_ms": 91631.990958,
+          "process_rss_kib": 386512
+        },
+        {
+          "offset_ms": 91896.043792,
+          "process_rss_kib": 380656
+        },
+        {
+          "offset_ms": 92159.714583,
+          "process_rss_kib": 383584
+        },
+        {
+          "offset_ms": 92424.022,
+          "process_rss_kib": 325296
+        },
+        {
+          "offset_ms": 92687.575625,
+          "process_rss_kib": 372416
+        },
+        {
+          "offset_ms": 92948.666292,
+          "process_rss_kib": 382352
+        },
+        {
+          "offset_ms": 93211.269167,
+          "process_rss_kib": 383872
+        },
+        {
+          "offset_ms": 93475.216458,
+          "process_rss_kib": 387456
+        },
+        {
+          "offset_ms": 93740.304167,
+          "process_rss_kib": 394400
+        },
+        {
+          "offset_ms": 94001.852292,
+          "process_rss_kib": 385456
+        },
+        {
+          "offset_ms": 94269.452708,
+          "process_rss_kib": 409456
+        },
+        {
+          "offset_ms": 94533.407125,
+          "process_rss_kib": 409344
+        },
+        {
+          "offset_ms": 94797.314292,
+          "process_rss_kib": 410320
+        },
+        {
+          "offset_ms": 95060.668917,
+          "process_rss_kib": 412960
+        },
+        {
+          "offset_ms": 95324.114042,
+          "process_rss_kib": 414768
+        },
+        {
+          "offset_ms": 95587.266042,
+          "process_rss_kib": 421120
+        },
+        {
+          "offset_ms": 95851.252292,
+          "process_rss_kib": 421072
+        },
+        {
+          "offset_ms": 96115.66725,
+          "process_rss_kib": 421920
+        },
+        {
+          "offset_ms": 96379.74475,
+          "process_rss_kib": 421792
+        },
+        {
+          "offset_ms": 96640.439375,
+          "process_rss_kib": 421680
+        },
+        {
+          "offset_ms": 96904.120958,
+          "process_rss_kib": 421600
+        },
+        {
+          "offset_ms": 97167.501458,
+          "process_rss_kib": 421520
+        },
+        {
+          "offset_ms": 97430.806167,
+          "process_rss_kib": 431552
+        },
+        {
+          "offset_ms": 97689.851083,
+          "process_rss_kib": 430368
+        },
+        {
+          "offset_ms": 97947.296542,
+          "process_rss_kib": 420256
+        },
+        {
+          "offset_ms": 98210.630708,
+          "process_rss_kib": 416400
+        },
+        {
+          "offset_ms": 98474.369667,
+          "process_rss_kib": 385360
+        },
+        {
+          "offset_ms": 98735.850333,
+          "process_rss_kib": 383632
+        },
+        {
+          "offset_ms": 98999.505083,
+          "process_rss_kib": 449904
+        },
+        {
+          "offset_ms": 99265.218667,
+          "process_rss_kib": 459056
+        },
+        {
+          "offset_ms": 99528.7175,
+          "process_rss_kib": 456880
+        },
+        {
+          "offset_ms": 99794.394792,
+          "process_rss_kib": 471728
+        },
+        {
+          "offset_ms": 100056.216083,
+          "process_rss_kib": 462608
+        },
+        {
+          "offset_ms": 100319.869167,
+          "process_rss_kib": 478096
+        },
+        {
+          "offset_ms": 100584.024958,
+          "process_rss_kib": 454832
+        },
+        {
+          "offset_ms": 100840.714042,
+          "process_rss_kib": 438944
+        },
+        {
+          "offset_ms": 101099.023875,
+          "process_rss_kib": 431216
+        },
+        {
+          "offset_ms": 101364.208542,
+          "process_rss_kib": 419184
+        },
+        {
+          "offset_ms": 101628.14425,
+          "process_rss_kib": 409328
+        },
+        {
+          "offset_ms": 101891.853583,
+          "process_rss_kib": 412384
+        },
+        {
+          "offset_ms": 102152.525292,
+          "process_rss_kib": 433776
+        },
+        {
+          "offset_ms": 102411.8905,
+          "process_rss_kib": 429744
+        },
+        {
+          "offset_ms": 102674.26225,
+          "process_rss_kib": 413328
+        },
+        {
+          "offset_ms": 102938.402542,
+          "process_rss_kib": 411120
+        },
+        {
+          "offset_ms": 103194.101583,
+          "process_rss_kib": 403536
+        },
+        {
+          "offset_ms": 103449.551708,
+          "process_rss_kib": 397568
+        },
+        {
+          "offset_ms": 103712.872333,
+          "process_rss_kib": 391712
+        },
+        {
+          "offset_ms": 103974.536,
+          "process_rss_kib": 381472
+        },
+        {
+          "offset_ms": 104237.95725,
+          "process_rss_kib": 381424
+        },
+        {
+          "offset_ms": 104497.220042,
+          "process_rss_kib": 383072
+        },
+        {
+          "offset_ms": 104761.055083,
+          "process_rss_kib": 358272
+        },
+        {
+          "offset_ms": 105023.922125,
+          "process_rss_kib": 358688
+        },
+        {
+          "offset_ms": 105287.823375,
+          "process_rss_kib": 356688
+        },
+        {
+          "offset_ms": 105543.426917,
+          "process_rss_kib": 344304
+        },
+        {
+          "offset_ms": 105806.171583,
+          "process_rss_kib": 371552
+        },
+        {
+          "offset_ms": 106063.250125,
+          "process_rss_kib": 383616
+        },
+        {
+          "offset_ms": 106322.923208,
+          "process_rss_kib": 381488
+        },
+        {
+          "offset_ms": 106581.705417,
+          "process_rss_kib": 335536
+        },
+        {
+          "offset_ms": 106981.107875,
+          "process_rss_kib": 343120
+        },
+        {
+          "offset_ms": 107244.005792,
+          "process_rss_kib": 375584
+        },
+        {
+          "offset_ms": 107499.834917,
+          "process_rss_kib": 377296
+        },
+        {
+          "offset_ms": 107764.299042,
+          "process_rss_kib": 429232
+        },
+        {
+          "offset_ms": 108028.965917,
+          "process_rss_kib": 467088
+        },
+        {
+          "offset_ms": 108290.202375,
+          "process_rss_kib": 470048
+        },
+        {
+          "offset_ms": 108550.196167,
+          "process_rss_kib": 451280
+        },
+        {
+          "offset_ms": 108805.639167,
+          "process_rss_kib": 449360
+        },
+        {
+          "offset_ms": 109070.045083,
+          "process_rss_kib": 464576
+        },
+        {
+          "offset_ms": 109333.780708,
+          "process_rss_kib": 468848
+        },
+        {
+          "offset_ms": 109600.267125,
+          "process_rss_kib": 457904
+        },
+        {
+          "offset_ms": 109857.675958,
+          "process_rss_kib": 409440
+        },
+        {
+          "offset_ms": 110120.181125,
+          "process_rss_kib": 361632
+        },
+        {
+          "offset_ms": 110384.228958,
+          "process_rss_kib": 399504
+        },
+        {
+          "offset_ms": 110648.267667,
+          "process_rss_kib": 389584
+        },
+        {
+          "offset_ms": 110916.703875,
+          "process_rss_kib": 388288
+        },
+        {
+          "offset_ms": 111188.875375,
+          "process_rss_kib": 388944
+        },
+        {
+          "offset_ms": 111456.434958,
+          "process_rss_kib": 387408
+        },
+        {
+          "offset_ms": 111724.212917,
+          "process_rss_kib": 388208
+        },
+        {
+          "offset_ms": 111987.290083,
+          "process_rss_kib": 390688
+        },
+        {
+          "offset_ms": 112256.121083,
+          "process_rss_kib": 397216
+        },
+        {
+          "offset_ms": 112521.397542,
+          "process_rss_kib": 387728
+        },
+        {
+          "offset_ms": 112785.39325,
+          "process_rss_kib": 396208
+        },
+        {
+          "offset_ms": 113049.454708,
+          "process_rss_kib": 394400
+        },
+        {
+          "offset_ms": 113310.667917,
+          "process_rss_kib": 401632
+        },
+        {
+          "offset_ms": 113571.6145,
+          "process_rss_kib": 434112
+        },
+        {
+          "offset_ms": 113826.361083,
+          "process_rss_kib": 463808
+        },
+        {
+          "offset_ms": 114087.721417,
+          "process_rss_kib": 458960
+        },
+        {
+          "offset_ms": 114343.470333,
+          "process_rss_kib": 443936
+        },
+        {
+          "offset_ms": 114603.314333,
+          "process_rss_kib": 436272
+        },
+        {
+          "offset_ms": 114866.705958,
+          "process_rss_kib": 439808
+        },
+        {
+          "offset_ms": 115130.943583,
+          "process_rss_kib": 422592
+        },
+        {
+          "offset_ms": 115395.691125,
+          "process_rss_kib": 431952
+        },
+        {
+          "offset_ms": 115659.975958,
+          "process_rss_kib": 380128
+        },
+        {
+          "offset_ms": 115927.875375,
+          "process_rss_kib": 274976
+        },
+        {
+          "offset_ms": 116192.016625,
+          "process_rss_kib": 320208
+        },
+        {
+          "offset_ms": 116454.186542,
+          "process_rss_kib": 333216
+        },
+        {
+          "offset_ms": 116717.715083,
+          "process_rss_kib": 326432
+        },
+        {
+          "offset_ms": 116981.632542,
+          "process_rss_kib": 346624
+        },
+        {
+          "offset_ms": 117236.835167,
+          "process_rss_kib": 334384
+        },
+        {
+          "offset_ms": 117501.032333,
+          "process_rss_kib": 327840
+        },
+        {
+          "offset_ms": 117763.506875,
+          "process_rss_kib": 351232
+        },
+        {
+          "offset_ms": 118027.160792,
+          "process_rss_kib": 351488
+        },
+        {
+          "offset_ms": 118283.690875,
+          "process_rss_kib": 349936
+        },
+        {
+          "offset_ms": 118547.484917,
+          "process_rss_kib": 337616
+        },
+        {
+          "offset_ms": 118804.462833,
+          "process_rss_kib": 330656
+        },
+        {
+          "offset_ms": 119068.265375,
+          "process_rss_kib": 330896
+        },
+        {
+          "offset_ms": 119329.474625,
+          "process_rss_kib": 364768
+        },
+        {
+          "offset_ms": 119593.173625,
+          "process_rss_kib": 400608
+        },
+        {
+          "offset_ms": 119846.962292,
+          "process_rss_kib": 397664
+        },
+        {
+          "offset_ms": 120110.331333,
+          "process_rss_kib": 407904
+        },
+        {
+          "offset_ms": 120370.167708,
+          "process_rss_kib": 416112
+        },
+        {
+          "offset_ms": 120626.9255,
+          "process_rss_kib": 368416
+        },
+        {
+          "offset_ms": 120891.106958,
+          "process_rss_kib": 376256
+        },
+        {
+          "offset_ms": 121155.366667,
+          "process_rss_kib": 364432
+        },
+        {
+          "offset_ms": 121419.631125,
+          "process_rss_kib": 363984
+        },
+        {
+          "offset_ms": 121677.109792,
+          "process_rss_kib": 373936
+        },
+        {
+          "offset_ms": 121937.02,
+          "process_rss_kib": 403824
+        },
+        {
+          "offset_ms": 122195.629125,
+          "process_rss_kib": 455648
+        },
+        {
+          "offset_ms": 122461.046083,
+          "process_rss_kib": 455696
+        },
+        {
+          "offset_ms": 122730.782042,
+          "process_rss_kib": 293536
+        },
+        {
+          "offset_ms": 123012.232042,
+          "process_rss_kib": 339744
+        },
+        {
+          "offset_ms": 123268.68375,
+          "process_rss_kib": 365776
+        },
+        {
+          "offset_ms": 123533.082333,
+          "process_rss_kib": 332064
+        },
+        {
+          "offset_ms": 123791.814208,
+          "process_rss_kib": 360384
+        },
+        {
+          "offset_ms": 124053.838083,
+          "process_rss_kib": 367008
+        },
+        {
+          "offset_ms": 124319.658125,
+          "process_rss_kib": 375776
+        },
+        {
+          "offset_ms": 124582.686833,
+          "process_rss_kib": 392352
+        },
+        {
+          "offset_ms": 124845.38575,
+          "process_rss_kib": 393296
+        },
+        {
+          "offset_ms": 125100.885917,
+          "process_rss_kib": 377904
+        },
+        {
+          "offset_ms": 125367.155708,
+          "process_rss_kib": 383392
+        },
+        {
+          "offset_ms": 125628.389042,
+          "process_rss_kib": 392816
+        },
+        {
+          "offset_ms": 125885.175458,
+          "process_rss_kib": 378656
+        },
+        {
+          "offset_ms": 126149.373708,
+          "process_rss_kib": 473088
+        },
+        {
+          "offset_ms": 126409.370375,
+          "process_rss_kib": 455216
+        },
+        {
+          "offset_ms": 126676.805333,
+          "process_rss_kib": 436560
+        },
+        {
+          "offset_ms": 126941.014875,
+          "process_rss_kib": 415424
+        },
+        {
+          "offset_ms": 127203.382958,
+          "process_rss_kib": 403792
+        },
+        {
+          "offset_ms": 127471.022458,
+          "process_rss_kib": 412176
+        },
+        {
+          "offset_ms": 127734.381083,
+          "process_rss_kib": 416528
+        },
+        {
+          "offset_ms": 127996.375292,
+          "process_rss_kib": 398176
+        },
+        {
+          "offset_ms": 128260.425708,
+          "process_rss_kib": 400960
+        },
+        {
+          "offset_ms": 128519.293292,
+          "process_rss_kib": 399056
+        },
+        {
+          "offset_ms": 128781.180375,
+          "process_rss_kib": 402640
+        },
+        {
+          "offset_ms": 129044.619917,
+          "process_rss_kib": 384992
+        },
+        {
+          "offset_ms": 129310.779542,
+          "process_rss_kib": 388624
+        },
+        {
+          "offset_ms": 129574.477042,
+          "process_rss_kib": 383776
+        },
+        {
+          "offset_ms": 129838.212667,
+          "process_rss_kib": 373744
+        },
+        {
+          "offset_ms": 130101.7725,
+          "process_rss_kib": 386528
+        },
+        {
+          "offset_ms": 130356.5415,
+          "process_rss_kib": 389712
+        },
+        {
+          "offset_ms": 130620.23625,
+          "process_rss_kib": 390192
+        },
+        {
+          "offset_ms": 130883.860083,
+          "process_rss_kib": 386416
+        },
+        {
+          "offset_ms": 131139.851,
+          "process_rss_kib": 366848
+        },
+        {
+          "offset_ms": 131394.199292,
+          "process_rss_kib": 371536
+        },
+        {
+          "offset_ms": 131653.222667,
+          "process_rss_kib": 357168
+        },
+        {
+          "offset_ms": 131914.315458,
+          "process_rss_kib": 364672
+        },
+        {
+          "offset_ms": 132178.128417,
+          "process_rss_kib": 378560
+        },
+        {
+          "offset_ms": 132441.825375,
+          "process_rss_kib": 386224
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cpu",
+        "binary_sha256": "48dc4fa8db73d62e11f1e54f7817ac97299aa639994fe2b7972bba9b4570bbd0",
+        "draw_timings": [
+          {
+            "k": 0,
+            "wall_time_ms": 6842.177541
+          },
+          {
+            "k": 1,
+            "wall_time_ms": 6518.216667
+          },
+          {
+            "k": 2,
+            "wall_time_ms": 6446.230875
+          },
+          {
+            "k": 3,
+            "wall_time_ms": 6598.416625000001
+          },
+          {
+            "k": 4,
+            "wall_time_ms": 6545.870167
+          },
+          {
+            "k": 5,
+            "wall_time_ms": 6447.525417
+          },
+          {
+            "k": 6,
+            "wall_time_ms": 6539.480541
+          },
+          {
+            "k": 7,
+            "wall_time_ms": 6390.4295409999995
+          },
+          {
+            "k": 8,
+            "wall_time_ms": 6521.248791999999
+          },
+          {
+            "k": 9,
+            "wall_time_ms": 6809.148709
+          },
+          {
+            "k": 10,
+            "wall_time_ms": 6697.815667000001
+          },
+          {
+            "k": 11,
+            "wall_time_ms": 6643.339167
+          },
+          {
+            "k": 12,
+            "wall_time_ms": 6513.619916
+          },
+          {
+            "k": 13,
+            "wall_time_ms": 6618.993042
+          },
+          {
+            "k": 14,
+            "wall_time_ms": 6440.76025
+          },
+          {
+            "k": 15,
+            "wall_time_ms": 6607.830042
+          },
+          {
+            "k": 16,
+            "wall_time_ms": 6812.479791999999
+          },
+          {
+            "k": 17,
+            "wall_time_ms": 6720.297750000001
+          },
+          {
+            "k": 18,
+            "wall_time_ms": 6983.0115
+          },
+          {
+            "k": 19,
+            "wall_time_ms": 6523.060458
+          }
+        ],
+        "draw_zero_including_setup_wall_time_ms": 6876.21875,
+        "draws": 20,
+        "repository_commit": "5616dbe56cddb26e6a6541bead3572639827a8c2",
+        "schema": "sembla-sweep-timing-v1",
+        "setup_wall_time_ms": 34.041209,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 132643.27579100002
+      },
+      "workers": 1
+    },
+    {
+      "command": [
+        "/Users/ian/projects/sembla/target/release/sembla",
+        "sweep",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state.model.json",
+        "--population",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cpu",
+        "--out",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/evidence/workers-2/rep-0/output",
+        "--timing-json",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/evidence/workers-2/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": 5,
+      "external_wall_time_ms": 68955.162,
+      "output_hashes": {
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "bcf122d81d98034d4f4262d68ef58254161d282fcb18674ebb5a8c80fab34a50",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 0,
+      "peak_gpu_utilization_percent": 0,
+      "peak_process_rss_kib": 799824,
+      "repetition": 0,
+      "resource_samples": [
+        {
+          "offset_ms": 1.733333,
+          "process_rss_kib": 3104
+        },
+        {
+          "offset_ms": 265.208833,
+          "process_rss_kib": 191248
+        },
+        {
+          "offset_ms": 521.029833,
+          "process_rss_kib": 624192
+        },
+        {
+          "offset_ms": 785.610542,
+          "process_rss_kib": 670448
+        },
+        {
+          "offset_ms": 1043.3385,
+          "process_rss_kib": 701424
+        },
+        {
+          "offset_ms": 1308.871458,
+          "process_rss_kib": 656720
+        },
+        {
+          "offset_ms": 1573.984,
+          "process_rss_kib": 583920
+        },
+        {
+          "offset_ms": 1837.756167,
+          "process_rss_kib": 696384
+        },
+        {
+          "offset_ms": 2101.3065,
+          "process_rss_kib": 727168
+        },
+        {
+          "offset_ms": 2365.167583,
+          "process_rss_kib": 709696
+        },
+        {
+          "offset_ms": 2628.340458,
+          "process_rss_kib": 726912
+        },
+        {
+          "offset_ms": 2892.177917,
+          "process_rss_kib": 691904
+        },
+        {
+          "offset_ms": 3156.517167,
+          "process_rss_kib": 734064
+        },
+        {
+          "offset_ms": 3418.970083,
+          "process_rss_kib": 705392
+        },
+        {
+          "offset_ms": 3684.216792,
+          "process_rss_kib": 721040
+        },
+        {
+          "offset_ms": 3940.777375,
+          "process_rss_kib": 690448
+        },
+        {
+          "offset_ms": 4201.168417,
+          "process_rss_kib": 720272
+        },
+        {
+          "offset_ms": 4465.427792,
+          "process_rss_kib": 688224
+        },
+        {
+          "offset_ms": 4720.744292,
+          "process_rss_kib": 716288
+        },
+        {
+          "offset_ms": 4985.278542,
+          "process_rss_kib": 731408
+        },
+        {
+          "offset_ms": 5249.701875,
+          "process_rss_kib": 706592
+        },
+        {
+          "offset_ms": 5513.919208,
+          "process_rss_kib": 674944
+        },
+        {
+          "offset_ms": 5778.531167,
+          "process_rss_kib": 722272
+        },
+        {
+          "offset_ms": 6043.514792,
+          "process_rss_kib": 743040
+        },
+        {
+          "offset_ms": 6307.00825,
+          "process_rss_kib": 664704
+        },
+        {
+          "offset_ms": 6571.555292,
+          "process_rss_kib": 668336
+        },
+        {
+          "offset_ms": 6841.818417,
+          "process_rss_kib": 700384
+        },
+        {
+          "offset_ms": 7106.029708,
+          "process_rss_kib": 692224
+        },
+        {
+          "offset_ms": 7366.526667,
+          "process_rss_kib": 706896
+        },
+        {
+          "offset_ms": 7631.877875,
+          "process_rss_kib": 628352
+        },
+        {
+          "offset_ms": 7896.320917,
+          "process_rss_kib": 666000
+        },
+        {
+          "offset_ms": 8161.052958,
+          "process_rss_kib": 702896
+        },
+        {
+          "offset_ms": 8419.6445,
+          "process_rss_kib": 650752
+        },
+        {
+          "offset_ms": 8675.276,
+          "process_rss_kib": 650672
+        },
+        {
+          "offset_ms": 8935.0115,
+          "process_rss_kib": 699024
+        },
+        {
+          "offset_ms": 9205.123625,
+          "process_rss_kib": 713232
+        },
+        {
+          "offset_ms": 9469.867042,
+          "process_rss_kib": 688080
+        },
+        {
+          "offset_ms": 9733.869958,
+          "process_rss_kib": 693424
+        },
+        {
+          "offset_ms": 9996.84175,
+          "process_rss_kib": 695296
+        },
+        {
+          "offset_ms": 10260.486792,
+          "process_rss_kib": 698000
+        },
+        {
+          "offset_ms": 10520.532333,
+          "process_rss_kib": 672800
+        },
+        {
+          "offset_ms": 10784.227625,
+          "process_rss_kib": 615008
+        },
+        {
+          "offset_ms": 11047.112875,
+          "process_rss_kib": 622192
+        },
+        {
+          "offset_ms": 11301.317583,
+          "process_rss_kib": 596784
+        },
+        {
+          "offset_ms": 11561.945583,
+          "process_rss_kib": 581920
+        },
+        {
+          "offset_ms": 11821.815458,
+          "process_rss_kib": 625552
+        },
+        {
+          "offset_ms": 12086.091917,
+          "process_rss_kib": 612464
+        },
+        {
+          "offset_ms": 12350.810833,
+          "process_rss_kib": 584512
+        },
+        {
+          "offset_ms": 12616.940708,
+          "process_rss_kib": 604384
+        },
+        {
+          "offset_ms": 12872.585208,
+          "process_rss_kib": 604416
+        },
+        {
+          "offset_ms": 13138.641792,
+          "process_rss_kib": 393360
+        },
+        {
+          "offset_ms": 13397.090458,
+          "process_rss_kib": 535120
+        },
+        {
+          "offset_ms": 13666.516333,
+          "process_rss_kib": 547152
+        },
+        {
+          "offset_ms": 13920.526625,
+          "process_rss_kib": 562032
+        },
+        {
+          "offset_ms": 14178.663458,
+          "process_rss_kib": 568704
+        },
+        {
+          "offset_ms": 14442.854417,
+          "process_rss_kib": 695936
+        },
+        {
+          "offset_ms": 14706.811375,
+          "process_rss_kib": 793792
+        },
+        {
+          "offset_ms": 14965.245292,
+          "process_rss_kib": 715920
+        },
+        {
+          "offset_ms": 15220.104458,
+          "process_rss_kib": 743728
+        },
+        {
+          "offset_ms": 15484.873208,
+          "process_rss_kib": 697312
+        },
+        {
+          "offset_ms": 15749.634792,
+          "process_rss_kib": 717552
+        },
+        {
+          "offset_ms": 16007.257667,
+          "process_rss_kib": 680880
+        },
+        {
+          "offset_ms": 16264.778708,
+          "process_rss_kib": 779696
+        },
+        {
+          "offset_ms": 16525.267,
+          "process_rss_kib": 687408
+        },
+        {
+          "offset_ms": 16788.681042,
+          "process_rss_kib": 696528
+        },
+        {
+          "offset_ms": 17049.161333,
+          "process_rss_kib": 737024
+        },
+        {
+          "offset_ms": 17312.197375,
+          "process_rss_kib": 758080
+        },
+        {
+          "offset_ms": 17572.487875,
+          "process_rss_kib": 777680
+        },
+        {
+          "offset_ms": 17836.439458,
+          "process_rss_kib": 799824
+        },
+        {
+          "offset_ms": 18100.683875,
+          "process_rss_kib": 790816
+        },
+        {
+          "offset_ms": 18360.593583,
+          "process_rss_kib": 707344
+        },
+        {
+          "offset_ms": 18616.001833,
+          "process_rss_kib": 709424
+        },
+        {
+          "offset_ms": 18881.90875,
+          "process_rss_kib": 687200
+        },
+        {
+          "offset_ms": 19149.521542,
+          "process_rss_kib": 695744
+        },
+        {
+          "offset_ms": 19414.341625,
+          "process_rss_kib": 621136
+        },
+        {
+          "offset_ms": 19674.149083,
+          "process_rss_kib": 618928
+        },
+        {
+          "offset_ms": 19936.40575,
+          "process_rss_kib": 632016
+        },
+        {
+          "offset_ms": 20198.810083,
+          "process_rss_kib": 702032
+        },
+        {
+          "offset_ms": 20458.920833,
+          "process_rss_kib": 664608
+        },
+        {
+          "offset_ms": 20723.650875,
+          "process_rss_kib": 624016
+        },
+        {
+          "offset_ms": 20988.903292,
+          "process_rss_kib": 678432
+        },
+        {
+          "offset_ms": 21252.757792,
+          "process_rss_kib": 671280
+        },
+        {
+          "offset_ms": 21513.157458,
+          "process_rss_kib": 617472
+        },
+        {
+          "offset_ms": 21770.840625,
+          "process_rss_kib": 636576
+        },
+        {
+          "offset_ms": 22035.89775,
+          "process_rss_kib": 681616
+        },
+        {
+          "offset_ms": 22292.404792,
+          "process_rss_kib": 643024
+        },
+        {
+          "offset_ms": 22554.290167,
+          "process_rss_kib": 709648
+        },
+        {
+          "offset_ms": 22816.143917,
+          "process_rss_kib": 633072
+        },
+        {
+          "offset_ms": 23080.365042,
+          "process_rss_kib": 667680
+        },
+        {
+          "offset_ms": 23344.34575,
+          "process_rss_kib": 647328
+        },
+        {
+          "offset_ms": 23601.040042,
+          "process_rss_kib": 686528
+        },
+        {
+          "offset_ms": 23865.572375,
+          "process_rss_kib": 771584
+        },
+        {
+          "offset_ms": 24126.243375,
+          "process_rss_kib": 723072
+        },
+        {
+          "offset_ms": 24394.229125,
+          "process_rss_kib": 662416
+        },
+        {
+          "offset_ms": 24660.336167,
+          "process_rss_kib": 708288
+        },
+        {
+          "offset_ms": 24919.835375,
+          "process_rss_kib": 664928
+        },
+        {
+          "offset_ms": 25193.846125,
+          "process_rss_kib": 703728
+        },
+        {
+          "offset_ms": 25452.236875,
+          "process_rss_kib": 649824
+        },
+        {
+          "offset_ms": 25716.416625,
+          "process_rss_kib": 643360
+        },
+        {
+          "offset_ms": 25973.830208,
+          "process_rss_kib": 736880
+        },
+        {
+          "offset_ms": 26237.978417,
+          "process_rss_kib": 664064
+        },
+        {
+          "offset_ms": 26492.283,
+          "process_rss_kib": 645264
+        },
+        {
+          "offset_ms": 26756.080333,
+          "process_rss_kib": 692672
+        },
+        {
+          "offset_ms": 27024.468125,
+          "process_rss_kib": 632336
+        },
+        {
+          "offset_ms": 27288.290875,
+          "process_rss_kib": 581472
+        },
+        {
+          "offset_ms": 27545.940542,
+          "process_rss_kib": 595184
+        },
+        {
+          "offset_ms": 27809.35975,
+          "process_rss_kib": 675520
+        },
+        {
+          "offset_ms": 28065.278208,
+          "process_rss_kib": 652080
+        },
+        {
+          "offset_ms": 28324.27275,
+          "process_rss_kib": 690880
+        },
+        {
+          "offset_ms": 28592.094125,
+          "process_rss_kib": 706272
+        },
+        {
+          "offset_ms": 28851.936667,
+          "process_rss_kib": 672352
+        },
+        {
+          "offset_ms": 29108.70825,
+          "process_rss_kib": 662768
+        },
+        {
+          "offset_ms": 29370.749958,
+          "process_rss_kib": 679776
+        },
+        {
+          "offset_ms": 29634.19,
+          "process_rss_kib": 636848
+        },
+        {
+          "offset_ms": 29899.559542,
+          "process_rss_kib": 672176
+        },
+        {
+          "offset_ms": 30163.320292,
+          "process_rss_kib": 637776
+        },
+        {
+          "offset_ms": 30427.747292,
+          "process_rss_kib": 617408
+        },
+        {
+          "offset_ms": 30691.166042,
+          "process_rss_kib": 649968
+        },
+        {
+          "offset_ms": 30955.108583,
+          "process_rss_kib": 720800
+        },
+        {
+          "offset_ms": 31216.426667,
+          "process_rss_kib": 615584
+        },
+        {
+          "offset_ms": 31476.9775,
+          "process_rss_kib": 617792
+        },
+        {
+          "offset_ms": 31740.35825,
+          "process_rss_kib": 629536
+        },
+        {
+          "offset_ms": 31997.976875,
+          "process_rss_kib": 677856
+        },
+        {
+          "offset_ms": 32259.520292,
+          "process_rss_kib": 683040
+        },
+        {
+          "offset_ms": 32522.534667,
+          "process_rss_kib": 673840
+        },
+        {
+          "offset_ms": 32786.803417,
+          "process_rss_kib": 635664
+        },
+        {
+          "offset_ms": 33052.70625,
+          "process_rss_kib": 647648
+        },
+        {
+          "offset_ms": 33316.279125,
+          "process_rss_kib": 579792
+        },
+        {
+          "offset_ms": 33579.222417,
+          "process_rss_kib": 649200
+        },
+        {
+          "offset_ms": 33839.788292,
+          "process_rss_kib": 620240
+        },
+        {
+          "offset_ms": 34100.162875,
+          "process_rss_kib": 660736
+        },
+        {
+          "offset_ms": 34361.687833,
+          "process_rss_kib": 668656
+        },
+        {
+          "offset_ms": 34625.436083,
+          "process_rss_kib": 656144
+        },
+        {
+          "offset_ms": 34881.873375,
+          "process_rss_kib": 643312
+        },
+        {
+          "offset_ms": 35141.428167,
+          "process_rss_kib": 605392
+        },
+        {
+          "offset_ms": 35406.232125,
+          "process_rss_kib": 624528
+        },
+        {
+          "offset_ms": 35670.949833,
+          "process_rss_kib": 623584
+        },
+        {
+          "offset_ms": 35928.916125,
+          "process_rss_kib": 636080
+        },
+        {
+          "offset_ms": 36188.767083,
+          "process_rss_kib": 633344
+        },
+        {
+          "offset_ms": 36445.447167,
+          "process_rss_kib": 635056
+        },
+        {
+          "offset_ms": 36701.894875,
+          "process_rss_kib": 645088
+        },
+        {
+          "offset_ms": 36964.12275,
+          "process_rss_kib": 645712
+        },
+        {
+          "offset_ms": 37224.9995,
+          "process_rss_kib": 583920
+        },
+        {
+          "offset_ms": 37487.902208,
+          "process_rss_kib": 626896
+        },
+        {
+          "offset_ms": 37744.756083,
+          "process_rss_kib": 640608
+        },
+        {
+          "offset_ms": 38009.1745,
+          "process_rss_kib": 633680
+        },
+        {
+          "offset_ms": 38273.371625,
+          "process_rss_kib": 628304
+        },
+        {
+          "offset_ms": 38532.831167,
+          "process_rss_kib": 600176
+        },
+        {
+          "offset_ms": 38793.982417,
+          "process_rss_kib": 572688
+        },
+        {
+          "offset_ms": 39051.668833,
+          "process_rss_kib": 566576
+        },
+        {
+          "offset_ms": 39315.283917,
+          "process_rss_kib": 528992
+        },
+        {
+          "offset_ms": 39579.647458,
+          "process_rss_kib": 456480
+        },
+        {
+          "offset_ms": 39847.189083,
+          "process_rss_kib": 509200
+        },
+        {
+          "offset_ms": 40108.918583,
+          "process_rss_kib": 552912
+        },
+        {
+          "offset_ms": 40373.216625,
+          "process_rss_kib": 559968
+        },
+        {
+          "offset_ms": 40637.6795,
+          "process_rss_kib": 587600
+        },
+        {
+          "offset_ms": 40900.542708,
+          "process_rss_kib": 548112
+        },
+        {
+          "offset_ms": 41155.611042,
+          "process_rss_kib": 541552
+        },
+        {
+          "offset_ms": 41419.873792,
+          "process_rss_kib": 615280
+        },
+        {
+          "offset_ms": 41683.618333,
+          "process_rss_kib": 699648
+        },
+        {
+          "offset_ms": 41947.473417,
+          "process_rss_kib": 701024
+        },
+        {
+          "offset_ms": 42208.7405,
+          "process_rss_kib": 712448
+        },
+        {
+          "offset_ms": 42472.878125,
+          "process_rss_kib": 673504
+        },
+        {
+          "offset_ms": 42734.14575,
+          "process_rss_kib": 666144
+        },
+        {
+          "offset_ms": 42997.449042,
+          "process_rss_kib": 605696
+        },
+        {
+          "offset_ms": 43259.715958,
+          "process_rss_kib": 592016
+        },
+        {
+          "offset_ms": 43523.201417,
+          "process_rss_kib": 591168
+        },
+        {
+          "offset_ms": 43787.587875,
+          "process_rss_kib": 611856
+        },
+        {
+          "offset_ms": 44049.45175,
+          "process_rss_kib": 533760
+        },
+        {
+          "offset_ms": 44304.593417,
+          "process_rss_kib": 553600
+        },
+        {
+          "offset_ms": 44568.587292,
+          "process_rss_kib": 527152
+        },
+        {
+          "offset_ms": 44835.989292,
+          "process_rss_kib": 519984
+        },
+        {
+          "offset_ms": 45101.594583,
+          "process_rss_kib": 522416
+        },
+        {
+          "offset_ms": 45360.173333,
+          "process_rss_kib": 540016
+        },
+        {
+          "offset_ms": 45620.975917,
+          "process_rss_kib": 611040
+        },
+        {
+          "offset_ms": 45885.104083,
+          "process_rss_kib": 545072
+        },
+        {
+          "offset_ms": 46148.925125,
+          "process_rss_kib": 489200
+        },
+        {
+          "offset_ms": 46404.26075,
+          "process_rss_kib": 538960
+        },
+        {
+          "offset_ms": 46669.009958,
+          "process_rss_kib": 537872
+        },
+        {
+          "offset_ms": 46933.850125,
+          "process_rss_kib": 498096
+        },
+        {
+          "offset_ms": 47189.319708,
+          "process_rss_kib": 539184
+        },
+        {
+          "offset_ms": 47455.08575,
+          "process_rss_kib": 549520
+        },
+        {
+          "offset_ms": 47721.339417,
+          "process_rss_kib": 417328
+        },
+        {
+          "offset_ms": 47986.455333,
+          "process_rss_kib": 522160
+        },
+        {
+          "offset_ms": 48242.604167,
+          "process_rss_kib": 556400
+        },
+        {
+          "offset_ms": 48504.008458,
+          "process_rss_kib": 633840
+        },
+        {
+          "offset_ms": 48768.07975,
+          "process_rss_kib": 607920
+        },
+        {
+          "offset_ms": 49031.954833,
+          "process_rss_kib": 646208
+        },
+        {
+          "offset_ms": 49289.520792,
+          "process_rss_kib": 709056
+        },
+        {
+          "offset_ms": 49548.542083,
+          "process_rss_kib": 706944
+        },
+        {
+          "offset_ms": 49812.734292,
+          "process_rss_kib": 666368
+        },
+        {
+          "offset_ms": 50076.71,
+          "process_rss_kib": 693904
+        },
+        {
+          "offset_ms": 50343.982375,
+          "process_rss_kib": 651872
+        },
+        {
+          "offset_ms": 50611.832458,
+          "process_rss_kib": 634544
+        },
+        {
+          "offset_ms": 50883.81675,
+          "process_rss_kib": 599808
+        },
+        {
+          "offset_ms": 51140.582792,
+          "process_rss_kib": 591408
+        },
+        {
+          "offset_ms": 51404.9415,
+          "process_rss_kib": 561776
+        },
+        {
+          "offset_ms": 51663.08225,
+          "process_rss_kib": 616480
+        },
+        {
+          "offset_ms": 51923.993458,
+          "process_rss_kib": 594096
+        },
+        {
+          "offset_ms": 52188.432667,
+          "process_rss_kib": 665376
+        },
+        {
+          "offset_ms": 52453.731375,
+          "process_rss_kib": 627168
+        },
+        {
+          "offset_ms": 52722.608375,
+          "process_rss_kib": 632336
+        },
+        {
+          "offset_ms": 52987.966875,
+          "process_rss_kib": 647072
+        },
+        {
+          "offset_ms": 53249.335833,
+          "process_rss_kib": 609552
+        },
+        {
+          "offset_ms": 53506.563625,
+          "process_rss_kib": 584816
+        },
+        {
+          "offset_ms": 53770.040542,
+          "process_rss_kib": 575792
+        },
+        {
+          "offset_ms": 54034.506583,
+          "process_rss_kib": 599936
+        },
+        {
+          "offset_ms": 54298.368833,
+          "process_rss_kib": 601856
+        },
+        {
+          "offset_ms": 54554.806167,
+          "process_rss_kib": 575136
+        },
+        {
+          "offset_ms": 54818.94225,
+          "process_rss_kib": 607840
+        },
+        {
+          "offset_ms": 55080.131708,
+          "process_rss_kib": 564384
+        },
+        {
+          "offset_ms": 55340.400875,
+          "process_rss_kib": 613152
+        },
+        {
+          "offset_ms": 55602.5965,
+          "process_rss_kib": 667248
+        },
+        {
+          "offset_ms": 55865.997792,
+          "process_rss_kib": 664624
+        },
+        {
+          "offset_ms": 56130.998,
+          "process_rss_kib": 679360
+        },
+        {
+          "offset_ms": 56394.729792,
+          "process_rss_kib": 716288
+        },
+        {
+          "offset_ms": 56658.694542,
+          "process_rss_kib": 688368
+        },
+        {
+          "offset_ms": 56912.561583,
+          "process_rss_kib": 727664
+        },
+        {
+          "offset_ms": 57179.075542,
+          "process_rss_kib": 737120
+        },
+        {
+          "offset_ms": 57443.215833,
+          "process_rss_kib": 738352
+        },
+        {
+          "offset_ms": 57704.998917,
+          "process_rss_kib": 708960
+        },
+        {
+          "offset_ms": 57970.011125,
+          "process_rss_kib": 727920
+        },
+        {
+          "offset_ms": 58234.966167,
+          "process_rss_kib": 685568
+        },
+        {
+          "offset_ms": 58499.832417,
+          "process_rss_kib": 738528
+        },
+        {
+          "offset_ms": 58765.899583,
+          "process_rss_kib": 697696
+        },
+        {
+          "offset_ms": 59020.128292,
+          "process_rss_kib": 698816
+        },
+        {
+          "offset_ms": 59284.900333,
+          "process_rss_kib": 759360
+        },
+        {
+          "offset_ms": 59549.371667,
+          "process_rss_kib": 638624
+        },
+        {
+          "offset_ms": 59812.935917,
+          "process_rss_kib": 729088
+        },
+        {
+          "offset_ms": 60076.493583,
+          "process_rss_kib": 683968
+        },
+        {
+          "offset_ms": 60340.151958,
+          "process_rss_kib": 727952
+        },
+        {
+          "offset_ms": 60603.753042,
+          "process_rss_kib": 651552
+        },
+        {
+          "offset_ms": 60865.471,
+          "process_rss_kib": 705520
+        },
+        {
+          "offset_ms": 61129.347458,
+          "process_rss_kib": 741680
+        },
+        {
+          "offset_ms": 61393.650542,
+          "process_rss_kib": 705488
+        },
+        {
+          "offset_ms": 61648.414542,
+          "process_rss_kib": 746160
+        },
+        {
+          "offset_ms": 61905.085417,
+          "process_rss_kib": 761776
+        },
+        {
+          "offset_ms": 62167.360417,
+          "process_rss_kib": 747808
+        },
+        {
+          "offset_ms": 62431.11775,
+          "process_rss_kib": 753280
+        },
+        {
+          "offset_ms": 62695.327708,
+          "process_rss_kib": 713840
+        },
+        {
+          "offset_ms": 62959.427833,
+          "process_rss_kib": 733904
+        },
+        {
+          "offset_ms": 63214.8155,
+          "process_rss_kib": 787056
+        },
+        {
+          "offset_ms": 63474.8235,
+          "process_rss_kib": 721312
+        },
+        {
+          "offset_ms": 63738.530333,
+          "process_rss_kib": 714160
+        },
+        {
+          "offset_ms": 64002.479458,
+          "process_rss_kib": 714448
+        },
+        {
+          "offset_ms": 64266.048167,
+          "process_rss_kib": 718128
+        },
+        {
+          "offset_ms": 64522.326292,
+          "process_rss_kib": 694416
+        },
+        {
+          "offset_ms": 64776.013333,
+          "process_rss_kib": 690384
+        },
+        {
+          "offset_ms": 65039.962167,
+          "process_rss_kib": 714288
+        },
+        {
+          "offset_ms": 65303.597625,
+          "process_rss_kib": 724832
+        },
+        {
+          "offset_ms": 65560.839,
+          "process_rss_kib": 718608
+        },
+        {
+          "offset_ms": 65815.877792,
+          "process_rss_kib": 739728
+        },
+        {
+          "offset_ms": 66079.648042,
+          "process_rss_kib": 760512
+        },
+        {
+          "offset_ms": 66344.518375,
+          "process_rss_kib": 675168
+        },
+        {
+          "offset_ms": 66598.186833,
+          "process_rss_kib": 641024
+        },
+        {
+          "offset_ms": 66855.644167,
+          "process_rss_kib": 575280
+        },
+        {
+          "offset_ms": 67120.112167,
+          "process_rss_kib": 631792
+        },
+        {
+          "offset_ms": 67375.144375,
+          "process_rss_kib": 639104
+        },
+        {
+          "offset_ms": 67640.319667,
+          "process_rss_kib": 662512
+        },
+        {
+          "offset_ms": 67899.450917,
+          "process_rss_kib": 750080
+        },
+        {
+          "offset_ms": 68167.04975,
+          "process_rss_kib": 692768
+        },
+        {
+          "offset_ms": 68427.025792,
+          "process_rss_kib": 703824
+        },
+        {
+          "offset_ms": 68691.199083,
+          "process_rss_kib": 634576
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "0ac3e14246cd56f4b634e6ef98f861f84e0be97c7a64bf933c742a626f644920",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cpu",
+        "binary_sha256": "48dc4fa8db73d62e11f1e54f7817ac97299aa639994fe2b7972bba9b4570bbd0",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 6912.842834,
+            "k": 0,
+            "lane": 1,
+            "start_offset_ms": 0.054375,
+            "wall_time_ms": 6912.7883329999995
+          },
+          {
+            "finish_offset_ms": 6888.132500000001,
+            "k": 1,
+            "lane": 0,
+            "start_offset_ms": 0.08375,
+            "wall_time_ms": 6888.048666
+          },
+          {
+            "finish_offset_ms": 13875.695416999999,
+            "k": 2,
+            "lane": 0,
+            "start_offset_ms": 6888.133167,
+            "wall_time_ms": 6987.562166
+          },
+          {
+            "finish_offset_ms": 13873.4355,
+            "k": 3,
+            "lane": 1,
+            "start_offset_ms": 6912.843709,
+            "wall_time_ms": 6960.59175
+          },
+          {
+            "finish_offset_ms": 20678.222917,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 13873.435583999999,
+            "wall_time_ms": 6804.78725
+          },
+          {
+            "finish_offset_ms": 20743.001667,
+            "k": 5,
+            "lane": 0,
+            "start_offset_ms": 13875.695667,
+            "wall_time_ms": 6867.305958
+          },
+          {
+            "finish_offset_ms": 27339.718584,
+            "k": 6,
+            "lane": 1,
+            "start_offset_ms": 20678.223041999998,
+            "wall_time_ms": 6661.495458
+          },
+          {
+            "finish_offset_ms": 27389.152584000003,
+            "k": 7,
+            "lane": 0,
+            "start_offset_ms": 20743.001875,
+            "wall_time_ms": 6646.150624999999
+          },
+          {
+            "finish_offset_ms": 33932.73275,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 27339.71875,
+            "wall_time_ms": 6593.013917
+          },
+          {
+            "finish_offset_ms": 34024.238959,
+            "k": 9,
+            "lane": 0,
+            "start_offset_ms": 27389.152709,
+            "wall_time_ms": 6635.086083
+          },
+          {
+            "finish_offset_ms": 40826.873167000005,
+            "k": 10,
+            "lane": 1,
+            "start_offset_ms": 33932.733542,
+            "wall_time_ms": 6894.1395410000005
+          },
+          {
+            "finish_offset_ms": 40890.580583999996,
+            "k": 11,
+            "lane": 0,
+            "start_offset_ms": 34024.242084,
+            "wall_time_ms": 6866.338334
+          },
+          {
+            "finish_offset_ms": 47782.760584,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 40826.873458999995,
+            "wall_time_ms": 6955.887041999999
+          },
+          {
+            "finish_offset_ms": 47859.086292,
+            "k": 13,
+            "lane": 0,
+            "start_offset_ms": 40890.581,
+            "wall_time_ms": 6968.505208
+          },
+          {
+            "finish_offset_ms": 54977.013125,
+            "k": 14,
+            "lane": 1,
+            "start_offset_ms": 47782.760875,
+            "wall_time_ms": 7194.252167000001
+          },
+          {
+            "finish_offset_ms": 55048.961584,
+            "k": 15,
+            "lane": 0,
+            "start_offset_ms": 47859.086584000004,
+            "wall_time_ms": 7189.874917
+          },
+          {
+            "finish_offset_ms": 61758.161459,
+            "k": 16,
+            "lane": 1,
+            "start_offset_ms": 54977.013374999995,
+            "wall_time_ms": 6781.148042
+          },
+          {
+            "finish_offset_ms": 61804.154124999994,
+            "k": 17,
+            "lane": 0,
+            "start_offset_ms": 55048.961667,
+            "wall_time_ms": 6755.192417
+          },
+          {
+            "finish_offset_ms": 68392.449584,
+            "k": 18,
+            "lane": 1,
+            "start_offset_ms": 61758.163792,
+            "wall_time_ms": 6634.285708
+          },
+          {
+            "finish_offset_ms": 68401.17329199999,
+            "k": 19,
+            "lane": 0,
+            "start_offset_ms": 61804.155416999994,
+            "wall_time_ms": 6597.017833
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 2,
+        "execution_window_wall_time_ms": 68405.409875,
+        "publication_wall_time_ms": 19.273416,
+        "repository_commit": "5616dbe56cddb26e6a6541bead3572639827a8c2",
+        "requested_draw_workers": 2,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 48.419084,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 68818.966625
+      },
+      "workers": 2
+    },
+    {
+      "command": [
+        "/Users/ian/projects/sembla/target/release/sembla",
+        "sweep",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state.model.json",
+        "--population",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/initial.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cpu",
+        "--out",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/evidence/workers-4/rep-0/output",
+        "--timing-json",
+        "/private/tmp/sembla-concurrency-spike-demographic-1m/evidence/workers-4/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": 2,
+      "external_wall_time_ms": 41341.542542,
+      "output_hashes": {
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "bcf122d81d98034d4f4262d68ef58254161d282fcb18674ebb5a8c80fab34a50",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 0,
+      "peak_gpu_utilization_percent": 0,
+      "peak_process_rss_kib": 1256208,
+      "repetition": 0,
+      "resource_samples": [
+        {
+          "offset_ms": 2.113875,
+          "process_rss_kib": 2672
+        },
+        {
+          "offset_ms": 256.482417,
+          "process_rss_kib": 191040
+        },
+        {
+          "offset_ms": 513.312208,
+          "process_rss_kib": 988192
+        },
+        {
+          "offset_ms": 799.047458,
+          "process_rss_kib": 1020112
+        },
+        {
+          "offset_ms": 1055.527042,
+          "process_rss_kib": 1054816
+        },
+        {
+          "offset_ms": 1320.320583,
+          "process_rss_kib": 1148064
+        },
+        {
+          "offset_ms": 1585.4005,
+          "process_rss_kib": 1093536
+        },
+        {
+          "offset_ms": 1857.586292,
+          "process_rss_kib": 1171232
+        },
+        {
+          "offset_ms": 2113.082167,
+          "process_rss_kib": 1185024
+        },
+        {
+          "offset_ms": 2377.437417,
+          "process_rss_kib": 1072960
+        },
+        {
+          "offset_ms": 2644.157417,
+          "process_rss_kib": 1191040
+        },
+        {
+          "offset_ms": 2910.281417,
+          "process_rss_kib": 1120512
+        },
+        {
+          "offset_ms": 3168.061,
+          "process_rss_kib": 1166496
+        },
+        {
+          "offset_ms": 3432.387833,
+          "process_rss_kib": 1187408
+        },
+        {
+          "offset_ms": 3699.419833,
+          "process_rss_kib": 1102832
+        },
+        {
+          "offset_ms": 3967.022208,
+          "process_rss_kib": 960960
+        },
+        {
+          "offset_ms": 4240.452583,
+          "process_rss_kib": 859584
+        },
+        {
+          "offset_ms": 4500.520708,
+          "process_rss_kib": 897312
+        },
+        {
+          "offset_ms": 4760.751083,
+          "process_rss_kib": 944464
+        },
+        {
+          "offset_ms": 5031.045583,
+          "process_rss_kib": 849648
+        },
+        {
+          "offset_ms": 5294.766208,
+          "process_rss_kib": 926320
+        },
+        {
+          "offset_ms": 5552.002292,
+          "process_rss_kib": 894192
+        },
+        {
+          "offset_ms": 5817.027,
+          "process_rss_kib": 960928
+        },
+        {
+          "offset_ms": 6081.894333,
+          "process_rss_kib": 838416
+        },
+        {
+          "offset_ms": 6348.304458,
+          "process_rss_kib": 840144
+        },
+        {
+          "offset_ms": 6608.325208,
+          "process_rss_kib": 857744
+        },
+        {
+          "offset_ms": 6871.30225,
+          "process_rss_kib": 944640
+        },
+        {
+          "offset_ms": 7133.696792,
+          "process_rss_kib": 835056
+        },
+        {
+          "offset_ms": 7403.714625,
+          "process_rss_kib": 842224
+        },
+        {
+          "offset_ms": 7667.591375,
+          "process_rss_kib": 814096
+        },
+        {
+          "offset_ms": 7933.251333,
+          "process_rss_kib": 836320
+        },
+        {
+          "offset_ms": 8197.6915,
+          "process_rss_kib": 866368
+        },
+        {
+          "offset_ms": 8463.447958,
+          "process_rss_kib": 846096
+        },
+        {
+          "offset_ms": 8728.371917,
+          "process_rss_kib": 946128
+        },
+        {
+          "offset_ms": 8992.903042,
+          "process_rss_kib": 1067120
+        },
+        {
+          "offset_ms": 9257.267792,
+          "process_rss_kib": 1141984
+        },
+        {
+          "offset_ms": 9513.564583,
+          "process_rss_kib": 1062160
+        },
+        {
+          "offset_ms": 9779.511167,
+          "process_rss_kib": 1104656
+        },
+        {
+          "offset_ms": 10039.3935,
+          "process_rss_kib": 1148256
+        },
+        {
+          "offset_ms": 10298.51725,
+          "process_rss_kib": 1151264
+        },
+        {
+          "offset_ms": 10562.879542,
+          "process_rss_kib": 1139888
+        },
+        {
+          "offset_ms": 10824.447625,
+          "process_rss_kib": 1038992
+        },
+        {
+          "offset_ms": 11088.040875,
+          "process_rss_kib": 1103392
+        },
+        {
+          "offset_ms": 11352.775542,
+          "process_rss_kib": 1104320
+        },
+        {
+          "offset_ms": 11612.78825,
+          "process_rss_kib": 1155024
+        },
+        {
+          "offset_ms": 11879.627542,
+          "process_rss_kib": 1098416
+        },
+        {
+          "offset_ms": 12137.943417,
+          "process_rss_kib": 1120816
+        },
+        {
+          "offset_ms": 12400.275833,
+          "process_rss_kib": 1183600
+        },
+        {
+          "offset_ms": 12659.143083,
+          "process_rss_kib": 1242064
+        },
+        {
+          "offset_ms": 12920.894458,
+          "process_rss_kib": 1201488
+        },
+        {
+          "offset_ms": 13195.544458,
+          "process_rss_kib": 1118736
+        },
+        {
+          "offset_ms": 13455.7325,
+          "process_rss_kib": 1238464
+        },
+        {
+          "offset_ms": 13711.977083,
+          "process_rss_kib": 1180224
+        },
+        {
+          "offset_ms": 13970.090333,
+          "process_rss_kib": 1256208
+        },
+        {
+          "offset_ms": 14239.524083,
+          "process_rss_kib": 1135584
+        },
+        {
+          "offset_ms": 14505.446042,
+          "process_rss_kib": 1159616
+        },
+        {
+          "offset_ms": 14770.043583,
+          "process_rss_kib": 1211168
+        },
+        {
+          "offset_ms": 15032.04775,
+          "process_rss_kib": 1201712
+        },
+        {
+          "offset_ms": 15295.958417,
+          "process_rss_kib": 1200192
+        },
+        {
+          "offset_ms": 15562.410375,
+          "process_rss_kib": 1194400
+        },
+        {
+          "offset_ms": 15824.941542,
+          "process_rss_kib": 1107120
+        },
+        {
+          "offset_ms": 16085.054917,
+          "process_rss_kib": 1026816
+        },
+        {
+          "offset_ms": 16349.654125,
+          "process_rss_kib": 1050560
+        },
+        {
+          "offset_ms": 16610.72625,
+          "process_rss_kib": 1097360
+        },
+        {
+          "offset_ms": 16867.635,
+          "process_rss_kib": 1099072
+        },
+        {
+          "offset_ms": 17131.599792,
+          "process_rss_kib": 1064592
+        },
+        {
+          "offset_ms": 17395.7995,
+          "process_rss_kib": 1087232
+        },
+        {
+          "offset_ms": 17655.050333,
+          "process_rss_kib": 1154224
+        },
+        {
+          "offset_ms": 17914.594875,
+          "process_rss_kib": 1100944
+        },
+        {
+          "offset_ms": 18175.807,
+          "process_rss_kib": 1081792
+        },
+        {
+          "offset_ms": 18440.800917,
+          "process_rss_kib": 1124448
+        },
+        {
+          "offset_ms": 18696.908625,
+          "process_rss_kib": 1150784
+        },
+        {
+          "offset_ms": 18957.975542,
+          "process_rss_kib": 1112880
+        },
+        {
+          "offset_ms": 19223.7655,
+          "process_rss_kib": 1117984
+        },
+        {
+          "offset_ms": 19484.234375,
+          "process_rss_kib": 1179840
+        },
+        {
+          "offset_ms": 19740.791958,
+          "process_rss_kib": 1071328
+        },
+        {
+          "offset_ms": 20007.685208,
+          "process_rss_kib": 1048512
+        },
+        {
+          "offset_ms": 20261.651,
+          "process_rss_kib": 1078464
+        },
+        {
+          "offset_ms": 20517.506208,
+          "process_rss_kib": 1014800
+        },
+        {
+          "offset_ms": 20781.9285,
+          "process_rss_kib": 1012112
+        },
+        {
+          "offset_ms": 21049.021917,
+          "process_rss_kib": 1082960
+        },
+        {
+          "offset_ms": 21312.849458,
+          "process_rss_kib": 1076912
+        },
+        {
+          "offset_ms": 21578.186458,
+          "process_rss_kib": 1087760
+        },
+        {
+          "offset_ms": 21842.652,
+          "process_rss_kib": 1087360
+        },
+        {
+          "offset_ms": 22102.044542,
+          "process_rss_kib": 1075008
+        },
+        {
+          "offset_ms": 22366.331625,
+          "process_rss_kib": 1042512
+        },
+        {
+          "offset_ms": 22624.788958,
+          "process_rss_kib": 966144
+        },
+        {
+          "offset_ms": 22884.389208,
+          "process_rss_kib": 1062480
+        },
+        {
+          "offset_ms": 23148.81425,
+          "process_rss_kib": 1075600
+        },
+        {
+          "offset_ms": 23413.309,
+          "process_rss_kib": 1084208
+        },
+        {
+          "offset_ms": 23678.007958,
+          "process_rss_kib": 986416
+        },
+        {
+          "offset_ms": 23941.225167,
+          "process_rss_kib": 1055760
+        },
+        {
+          "offset_ms": 24204.819458,
+          "process_rss_kib": 1055456
+        },
+        {
+          "offset_ms": 24468.958792,
+          "process_rss_kib": 1041472
+        },
+        {
+          "offset_ms": 24735.484833,
+          "process_rss_kib": 1104496
+        },
+        {
+          "offset_ms": 25001.334625,
+          "process_rss_kib": 1141504
+        },
+        {
+          "offset_ms": 25260.164083,
+          "process_rss_kib": 1104832
+        },
+        {
+          "offset_ms": 25521.484083,
+          "process_rss_kib": 1174512
+        },
+        {
+          "offset_ms": 25786.728708,
+          "process_rss_kib": 1092432
+        },
+        {
+          "offset_ms": 26043.784583,
+          "process_rss_kib": 1096432
+        },
+        {
+          "offset_ms": 26307.110375,
+          "process_rss_kib": 1090928
+        },
+        {
+          "offset_ms": 26572.285625,
+          "process_rss_kib": 1052672
+        },
+        {
+          "offset_ms": 26838.222167,
+          "process_rss_kib": 1015904
+        },
+        {
+          "offset_ms": 27099.428,
+          "process_rss_kib": 1002640
+        },
+        {
+          "offset_ms": 27365.148958,
+          "process_rss_kib": 986560
+        },
+        {
+          "offset_ms": 27619.611292,
+          "process_rss_kib": 1002032
+        },
+        {
+          "offset_ms": 27883.967208,
+          "process_rss_kib": 934016
+        },
+        {
+          "offset_ms": 28149.107417,
+          "process_rss_kib": 962688
+        },
+        {
+          "offset_ms": 28411.074708,
+          "process_rss_kib": 1012160
+        },
+        {
+          "offset_ms": 28668.737167,
+          "process_rss_kib": 891296
+        },
+        {
+          "offset_ms": 28933.96225,
+          "process_rss_kib": 825456
+        },
+        {
+          "offset_ms": 29188.968792,
+          "process_rss_kib": 969872
+        },
+        {
+          "offset_ms": 29453.098333,
+          "process_rss_kib": 946448
+        },
+        {
+          "offset_ms": 29717.769125,
+          "process_rss_kib": 859120
+        },
+        {
+          "offset_ms": 29980.630208,
+          "process_rss_kib": 893232
+        },
+        {
+          "offset_ms": 30242.581,
+          "process_rss_kib": 852512
+        },
+        {
+          "offset_ms": 30506.927458,
+          "process_rss_kib": 861728
+        },
+        {
+          "offset_ms": 30770.747417,
+          "process_rss_kib": 894160
+        },
+        {
+          "offset_ms": 31028.715042,
+          "process_rss_kib": 935424
+        },
+        {
+          "offset_ms": 31285.538042,
+          "process_rss_kib": 579360
+        },
+        {
+          "offset_ms": 31573.234458,
+          "process_rss_kib": 742816
+        },
+        {
+          "offset_ms": 31834.334417,
+          "process_rss_kib": 807248
+        },
+        {
+          "offset_ms": 32101.513458,
+          "process_rss_kib": 859936
+        },
+        {
+          "offset_ms": 32367.876417,
+          "process_rss_kib": 873472
+        },
+        {
+          "offset_ms": 32633.23775,
+          "process_rss_kib": 1058576
+        },
+        {
+          "offset_ms": 32889.231292,
+          "process_rss_kib": 971120
+        },
+        {
+          "offset_ms": 33144.7965,
+          "process_rss_kib": 1093472
+        },
+        {
+          "offset_ms": 33407.609125,
+          "process_rss_kib": 1089520
+        },
+        {
+          "offset_ms": 33674.744917,
+          "process_rss_kib": 1087920
+        },
+        {
+          "offset_ms": 33940.930083,
+          "process_rss_kib": 763280
+        },
+        {
+          "offset_ms": 34247.43525,
+          "process_rss_kib": 689056
+        },
+        {
+          "offset_ms": 34511.929,
+          "process_rss_kib": 853744
+        },
+        {
+          "offset_ms": 34772.551042,
+          "process_rss_kib": 750976
+        },
+        {
+          "offset_ms": 35047.556083,
+          "process_rss_kib": 761984
+        },
+        {
+          "offset_ms": 35311.977625,
+          "process_rss_kib": 832528
+        },
+        {
+          "offset_ms": 35577.612833,
+          "process_rss_kib": 878064
+        },
+        {
+          "offset_ms": 35836.999583,
+          "process_rss_kib": 918896
+        },
+        {
+          "offset_ms": 36096.056792,
+          "process_rss_kib": 835568
+        },
+        {
+          "offset_ms": 36356.641875,
+          "process_rss_kib": 845168
+        },
+        {
+          "offset_ms": 36621.0015,
+          "process_rss_kib": 675424
+        },
+        {
+          "offset_ms": 36881.051708,
+          "process_rss_kib": 786592
+        },
+        {
+          "offset_ms": 37139.741458,
+          "process_rss_kib": 886448
+        },
+        {
+          "offset_ms": 37401.450625,
+          "process_rss_kib": 920400
+        },
+        {
+          "offset_ms": 37669.410042,
+          "process_rss_kib": 944992
+        },
+        {
+          "offset_ms": 37928.289375,
+          "process_rss_kib": 838688
+        },
+        {
+          "offset_ms": 38192.539208,
+          "process_rss_kib": 896944
+        },
+        {
+          "offset_ms": 38451.776625,
+          "process_rss_kib": 980864
+        },
+        {
+          "offset_ms": 38707.462583,
+          "process_rss_kib": 859440
+        },
+        {
+          "offset_ms": 38970.738417,
+          "process_rss_kib": 792912
+        },
+        {
+          "offset_ms": 39234.213292,
+          "process_rss_kib": 900928
+        },
+        {
+          "offset_ms": 39498.23725,
+          "process_rss_kib": 974416
+        },
+        {
+          "offset_ms": 39762.759167,
+          "process_rss_kib": 1056592
+        },
+        {
+          "offset_ms": 40027.718625,
+          "process_rss_kib": 988944
+        },
+        {
+          "offset_ms": 40294.132,
+          "process_rss_kib": 936272
+        },
+        {
+          "offset_ms": 40554.070792,
+          "process_rss_kib": 915600
+        },
+        {
+          "offset_ms": 40811.693125,
+          "process_rss_kib": 960096
+        },
+        {
+          "offset_ms": 41078.154,
+          "process_rss_kib": 936640
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "89a498376daccaf1f32e066a14df4f08c1adcdd83b23689b5ea232bf05fc39ad",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cpu",
+        "binary_sha256": "48dc4fa8db73d62e11f1e54f7817ac97299aa639994fe2b7972bba9b4570bbd0",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 8474.702083,
+            "k": 0,
+            "lane": 0,
+            "start_offset_ms": 0.071875,
+            "wall_time_ms": 8474.630125000001
+          },
+          {
+            "finish_offset_ms": 8133.341041,
+            "k": 1,
+            "lane": 1,
+            "start_offset_ms": 0.08608299999999999,
+            "wall_time_ms": 8133.254792000001
+          },
+          {
+            "finish_offset_ms": 8426.0195,
+            "k": 2,
+            "lane": 2,
+            "start_offset_ms": 0.106833,
+            "wall_time_ms": 8425.912541000002
+          },
+          {
+            "finish_offset_ms": 8288.168333,
+            "k": 3,
+            "lane": 3,
+            "start_offset_ms": 0.167875,
+            "wall_time_ms": 8288.000166
+          },
+          {
+            "finish_offset_ms": 15932.681458,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 8133.342041000001,
+            "wall_time_ms": 7799.339333
+          },
+          {
+            "finish_offset_ms": 16184.934250000002,
+            "k": 5,
+            "lane": 3,
+            "start_offset_ms": 8288.168791,
+            "wall_time_ms": 7896.7654170000005
+          },
+          {
+            "finish_offset_ms": 16404.336375,
+            "k": 6,
+            "lane": 2,
+            "start_offset_ms": 8426.020166,
+            "wall_time_ms": 7978.316167
+          },
+          {
+            "finish_offset_ms": 16488.349916,
+            "k": 7,
+            "lane": 0,
+            "start_offset_ms": 8474.702666000001,
+            "wall_time_ms": 8013.647167
+          },
+          {
+            "finish_offset_ms": 23596.633916000003,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 15932.68175,
+            "wall_time_ms": 7663.952083
+          },
+          {
+            "finish_offset_ms": 23837.278707999998,
+            "k": 9,
+            "lane": 3,
+            "start_offset_ms": 16184.934333000001,
+            "wall_time_ms": 7652.344333
+          },
+          {
+            "finish_offset_ms": 24048.020333,
+            "k": 10,
+            "lane": 2,
+            "start_offset_ms": 16404.336708,
+            "wall_time_ms": 7643.683583
+          },
+          {
+            "finish_offset_ms": 24081.363708,
+            "k": 11,
+            "lane": 0,
+            "start_offset_ms": 16488.350000000002,
+            "wall_time_ms": 7593.013416
+          },
+          {
+            "finish_offset_ms": 31573.920749999997,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 23596.633958,
+            "wall_time_ms": 7977.286583
+          },
+          {
+            "finish_offset_ms": 31892.608083,
+            "k": 13,
+            "lane": 3,
+            "start_offset_ms": 23837.278916,
+            "wall_time_ms": 8055.3290830000005
+          },
+          {
+            "finish_offset_ms": 31916.581208,
+            "k": 14,
+            "lane": 2,
+            "start_offset_ms": 24048.0205,
+            "wall_time_ms": 7868.560625
+          },
+          {
+            "finish_offset_ms": 32121.31925,
+            "k": 15,
+            "lane": 0,
+            "start_offset_ms": 24081.363958,
+            "wall_time_ms": 8039.955208
+          },
+          {
+            "finish_offset_ms": 40085.385916,
+            "k": 16,
+            "lane": 1,
+            "start_offset_ms": 31573.928041,
+            "wall_time_ms": 8511.457833999999
+          },
+          {
+            "finish_offset_ms": 40632.590125,
+            "k": 17,
+            "lane": 3,
+            "start_offset_ms": 31892.6135,
+            "wall_time_ms": 8739.9765
+          },
+          {
+            "finish_offset_ms": 40721.270666000004,
+            "k": 18,
+            "lane": 2,
+            "start_offset_ms": 31916.581375,
+            "wall_time_ms": 8804.689209
+          },
+          {
+            "finish_offset_ms": 40713.014541,
+            "k": 19,
+            "lane": 0,
+            "start_offset_ms": 32121.319291,
+            "wall_time_ms": 8591.695167
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 4,
+        "execution_window_wall_time_ms": 40731.452583,
+        "publication_wall_time_ms": 23.840917,
+        "repository_commit": "5616dbe56cddb26e6a6541bead3572639827a8c2",
+        "requested_draw_workers": 4,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 78.349542,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 41191.014125
+      },
+      "workers": 4
+    }
+  ],
+  "schema": "sembla-sweep-concurrency-spike/v1",
+  "seed": 9009,
+  "theta_file": null,
+  "ticks": 24,
+  "workers": [
+    1,
+    2,
+    4
+  ],
+  "worktree_status": [
+    " M .piprd/log.jsonl",
+    " M .piprd/run-state.json",
+    " M crates/sembla-cli/src/main.rs",
+    " M crates/sembla-cli/tests/sweep.rs",
+    " M docs/prds-sweep-throughput/README.md",
+    "?? .piprd/advice/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-1-1785234903736-dd3988e9-c23f-4918-99ae-d4ea46fa5051.json",
+    "?? .piprd/advice/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-2-1785235057705-89810243-6a78-4f12-8312-29dd8f1ea004.json",
+    "?? .piprd/advice/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-3-1785235168041-1f3ce4c1-e059-4933-9258-1b0e92f83881.json",
+    "?? .piprd/advice/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-4-1785235270323-2dce8975-fa25-4039-8577-0fa9c95c54a4.json",
+    "?? .piprd/advice/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-5-1785235361853-86a0570f-e430-4535-abf0-5d0a32c32754.json",
+    "?? .piprd/advice/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-1-1785246732485-a56095fb-0813-4e8f-a705-728c67b358d1.json",
+    "?? .piprd/advice/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-2-1785246921754-40c1c799-e496-4ece-a697-35ac2245b968.json",
+    "?? .piprd/advice/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-3-1785247021372-5fb7ff49-5a67-4264-b756-a1cb175b9ebf.json",
+    "?? .piprd/advice/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-4-1785247112217-a6f6ace3-9616-48b4-9180-e380f46af97a.json",
+    "?? .piprd/advice/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-5-1785247193550-d35390be-2b3b-4a5d-b620-5bd4b246fbd0.json",
+    "?? .piprd/reviews/2026-07-28T09-04-36-694Z-docs-prds-cuda-validation-parallelism-0008-remove-the-validation-spin-lock.md-attempt-1-1785231844033-7427891f-a724-4031-88da-90bc612e4c16.json",
+    "?? .piprd/reviews/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-1-1785233441464-ecaf49ee-7377-48fd-afa0-fce880035e61.json",
+    "?? .piprd/reviews/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-1-1785235007349-a5a52bf3-33b6-4e3e-8dea-072c2e538b6a.json",
+    "?? .piprd/reviews/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-2-1785235120132-7403a15f-e8c8-43a0-8628-3b953e6db0cd.json",
+    "?? .piprd/reviews/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-3-1785235234189-3f1f9495-3811-4e12-a6a4-abb1a183437e.json",
+    "?? .piprd/reviews/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-4-1785235325690-48c2a347-6b43-4a60-b025-2c6d5a48c0a4.json",
+    "?? .piprd/reviews/2026-07-28T09-54-33-590Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-5-1785235533073-5ef9073f-024d-46b1-b679-7d4589372bb8.json",
+    "?? .piprd/reviews/2026-07-28T11-05-50-632Z-docs-prds-sweep-throughput-0001-reuse-the-backend-across-draws.md-attempt-1-1785239601743-2b144184-1a88-4792-bb30-91566fd005c9.json",
+    "?? .piprd/reviews/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-1-1785246535653-048bfb3b-cc0d-4bcd-8bc4-99a58bb351b9.json",
+    "?? .piprd/reviews/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-1-1785246849749-af303dcc-9a69-448c-8b62-b541fa9a6e62.json",
+    "?? .piprd/reviews/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-2-1785246983019-7f027b9f-935e-4848-81f2-dd5b5060a805.json",
+    "?? .piprd/reviews/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-3-1785247083024-126666d2-da40-445c-8735-9545c517ec84.json",
+    "?? .piprd/reviews/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-4-1785247166108-9814ae42-25fa-4f66-8101-594c732e8d8b.json",
+    "?? .piprd/reviews/2026-07-28T13-40-11-258Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-5-1785247250557-03571974-2c2e-47c1-a531-30a77d56d8bb.json",
+    "?? .piprd/reviews/2026-07-28T14-18-55-181Z-docs-prds-run-queue-0001-reduce-control-counts-on-device.md-attempt-1-1785249555210-38a762a0-dbd1-478c-9a42-acc110c9d565.json",
+    "?? .piprd/runs/2026-07-28T09-04-36-694Z.json",
+    "?? .piprd/runs/2026-07-28T09-54-33-590Z.json",
+    "?? .piprd/runs/2026-07-28T11-05-50-632Z.json",
+    "?? .piprd/runs/2026-07-28T13-40-11-258Z.json",
+    "?? .piprd/runs/2026-07-28T14-18-55-181Z.json",
+    "?? docs/evidence/demographic-bench/hyperstack-l4-20260728T213654Z/",
+    "?? docs/evidence/demographic-bench/hyperstack-l4-20260729T012433Z/",
+    "?? docs/evidence/demographic-bench/hyperstack-l4-20260729T022057Z/",
+    "?? scripts/run-sweep-concurrency-spike.py"
+  ]
+}
