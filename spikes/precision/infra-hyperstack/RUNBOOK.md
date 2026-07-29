@@ -424,6 +424,30 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
+## Concurrent sweep-draw spike stage
+
+Set both flags below to collect only the direct CUDA concurrency experiment,
+without paying to rerun the unrelated frozen §L4 gate:
+
+```bash
+BENCH_CONCURRENCY_SPIKE=1 \
+BENCH_CONCURRENCY_SPIKE_ONLY=1 \
+  bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
+```
+
+The stage runs worker counts 1, 2, and 4 at 1M and 10M slots, with three
+repetitions per count, 20 draws, 24 ticks, independent noise, exported pairs,
+and grouped observations. Each repetition compares the complete output tree to
+its sequential reference. It also runs a deliberately failing comparator
+control, forces draw 1 to finish before draw 0 while requiring identical ordered
+publication, records RSS/VRAM/utilization samples, and exports a 1M Nsight
+Systems CUDA trace as CSV for actual overlap analysis.
+
+`BENCH_CONCURRENCY_SPIKE_ONLY=1` is rejected unless the stage itself is enabled.
+Both flags are included in the immutable remote payload hash. The production
+sweep default remains sequential; only child benchmark processes receive the
+hidden experimental environment variables.
+
 ## Retained-backend sweep stage
 
 Set `BENCH_SWEEP=1` only when collecting PRD sweep-throughput evidence. The

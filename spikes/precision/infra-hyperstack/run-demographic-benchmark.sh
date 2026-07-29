@@ -29,6 +29,13 @@
 #                                 evidence at 1M and 10M rows, 24 ticks, 20
 #                                 draws; requires BENCH_SWEEP_BASELINE_COMMIT
 #   BENCH_SWEEP_BASELINE_COMMIT - exact clean baseline commit for before/after
+#   BENCH_CONCURRENCY_SPIKE=1   - run CUDA sweep-draw workers 1/2/4 at 1M and
+#                                 10M, three repetitions, exact output parity,
+#                                 forced completion inversion, and an nsys trace
+#   BENCH_CONCURRENCY_SPIKE_ONLY=1
+#                               - package the concurrency spike without running
+#                                 the unrelated frozen §L4 gate; requires
+#                                 BENCH_CONCURRENCY_SPIKE=1
 #   BENCH_CORPUS=1              - additionally run the CPU/CUDA differential
 #                                 corpus, including the grouped demographic
 #                                 configuration. Runs BEFORE the frozen gate and
@@ -38,8 +45,8 @@
 #   SSH_FAILURE_LIMIT           - default 5 consecutive poll failures before the
 #                                 collector gives up and says why
 #
-# BENCH_PROFILE, BENCH_CORPUS, BENCH_SWEEP, and its baseline commit are baked
-# into the content-addressed
+# BENCH_PROFILE, BENCH_CORPUS, BENCH_SWEEP, its baseline commit, and the
+# concurrency-spike flags are baked into the content-addressed
 # payload hash, so a run with them set will not silently rejoin a plain gate run
 # already in progress -- it is correctly treated as a different payload.
 #
@@ -89,6 +96,11 @@ for legacy_override in BENCH_SCALES_CUDA BENCH_SCALES_CPU BENCH_TICKS BENCH_SEED
     exit 2
   fi
 done
+if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
+  echo 'BENCH_CONCURRENCY_SPIKE_ONLY=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
   echo "evidence directory already exists; choose a new ARTIFACT_DIR: $ARTIFACT_DIR" >&2
   exit 2
@@ -393,6 +405,8 @@ printf 'export BENCH_PROFILE=%q\n' "${BENCH_PROFILE:-0}" > "$REMOTE_SCRIPT"
 printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_SPIKE=%q\n' "${BENCH_CONCURRENCY_SPIKE:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_SPIKE_ONLY=%q\n' "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
 # shellcheck disable=SC1091
@@ -678,6 +692,100 @@ if [[ "${BENCH_CORPUS:-0}" == "1" ]]; then
   fi
 fi
 
+# --- optional concurrent CUDA sweep-draw spike -------------------------------
+# This is the direct §M1 feasibility arm. It does not alter the production
+# default: the hidden worker seam is set only in child benchmark processes.
+if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
+  echo '=== concurrent CUDA sweep-draw spike (1M and 10M, workers 1/2/4) ==='
+  CONCURRENCY_DIR="$OUT_ROOT/sweep-concurrency"
+  mkdir -p "$CONCURRENCY_DIR"
+  nvidia-smi --query-gpu=name,uuid,driver_version,memory.total \
+    --format=csv,noheader > "$CONCURRENCY_DIR/gpu.txt"
+
+  for concurrency_scale in 1000000 10000000; do
+    scale_dir="$CONCURRENCY_DIR/$concurrency_scale"
+    mkdir -p "$scale_dir"
+    concurrency_state="$WORK/concurrency-$concurrency_scale.state"
+    "$BIN" synth-state \
+      --model fixtures/demographic/benchmark/demographic_slots.full.json \
+      --slots "$concurrency_scale" --areas "$AREAS" \
+      --present-fraction "$PRESENT_FRACTION" --streams "$STREAMS" \
+      --seed "$SEED" --out "$concurrency_state" \
+      > "$scale_dir/synth.stdout" 2> "$scale_dir/synth.stderr"
+    concurrency_model="$concurrency_state.model.json"
+    sha256sum "$concurrency_state" > "$scale_dir/state.sha256"
+    sha256sum "$concurrency_model" > "$scale_dir/model.sha256"
+
+    python3 scripts/run-sweep-concurrency-spike.py \
+      --binary "$BIN" --model "$concurrency_model" \
+      --population "$concurrency_state" --backend cuda \
+      --output-root "$scale_dir/cuda" --workers 1 2 4 --repetitions 3 \
+      --draws 20 --ticks 24 --seed "$SEED" --noise independent \
+      --export-pairs --enable grouped-observations \
+      2>&1 | tee "$scale_dir/cuda-driver.log"
+
+    if [[ "$concurrency_scale" == "1000000" ]]; then
+      # Force draw 1 to complete before draw 0. Publication must still be the
+      # exact ascending-k tree produced by the sequential reference.
+      SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 \
+      SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS=2000 \
+        "$BIN" sweep "$concurrency_model" \
+          --population "$concurrency_state" --backend cuda \
+          --seed "$SEED" --draws 20 --ticks 24 --noise independent \
+          --enable grouped-observations \
+          --timing-json "$scale_dir/forced-inversion-timing.json" \
+          --out "$scale_dir/forced-inversion-output" \
+          > "$scale_dir/forced-inversion.stdout" \
+          2> "$scale_dir/forced-inversion.stderr"
+      diff -qr "$scale_dir/cuda/workers-1/rep-0/output" \
+        "$scale_dir/forced-inversion-output" \
+        > "$scale_dir/forced-inversion-diff.txt"
+      python3 - "$scale_dir/forced-inversion-timing.json" \
+        "$scale_dir/forced-inversion-check.txt" <<'PY'
+import json, pathlib, sys
+source, report = map(pathlib.Path, sys.argv[1:])
+doc = json.loads(source.read_text())
+draws = doc["draw_timings"]
+assert [draw["k"] for draw in draws] == list(range(20))
+assert draws[1]["finish_offset_ms"] < draws[0]["finish_offset_ms"]
+report.write_text(
+    "PASS: draw 1 completed before draw 0; publication remained byte-identical\n"
+)
+PY
+
+      # One short Nsight Systems arm retains kernel start/duration/stream detail.
+      # The CSV is sufficient for overlap analysis and avoids publishing a large
+      # .nsys-rep file on the evidence branch.
+      if ! command -v nsys >/dev/null; then
+        echo 'nsys is required for the concurrency overlap arm' >&2
+        exit 9
+      fi
+      (
+        cd "$scale_dir"
+        SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 \
+          nsys profile --trace=cuda --force-overwrite=true \
+            -o cuda-workers-2-trace \
+            "$BIN" sweep "$concurrency_model" \
+              --population "$concurrency_state" --backend cuda \
+              --seed "$SEED" --draws 4 --ticks 24 --noise independent \
+              --enable grouped-observations \
+              --timing-json nsys-timing.json --out nsys-output \
+              > nsys.stdout 2> nsys.stderr
+        nsys stats --report cuda_gpu_trace --format csv \
+          cuda-workers-2-trace.nsys-rep > nsys-cuda-gpu-trace.csv
+        nsys stats --report cuda_gpu_kern_sum --format csv \
+          cuda-workers-2-trace.nsys-rep > nsys-cuda-kernel-summary.csv
+        nsys stats --report cuda_api_sum --format csv \
+          cuda-workers-2-trace.nsys-rep > nsys-cuda-api-summary.csv
+        rm -f cuda-workers-2-trace.nsys-rep
+      )
+    fi
+
+    rm -f "$concurrency_state" "$concurrency_model"
+  done
+  echo '=== concurrent CUDA sweep-draw spike complete ==='
+fi
+
 # --- optional retained-backend sweep evidence --------------------------------
 # Runs before the frozen gate and is fully additive. It uses a detached baseline
 # worktree so neither the evidence checkout nor its binary changes in place.
@@ -949,6 +1057,7 @@ PY
   echo '=== retained-backend sweep evidence complete ==='
 fi
 
+if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" != "1" ]]; then
 STATE="$WORK/initial.state"
 echo '=== synthesizing one shared 10M state artifact ==='
 "$BIN" synth-state \
@@ -1227,6 +1336,27 @@ assert all(doc["assertions"].values())
     "PASS exactly three no-grouped replicates per backend\n"
 )
 PY
+else
+  cat > "$OUT_ROOT/README.md" <<EOF
+# Concurrent CUDA sweep-draw spike evidence
+
+This targeted paid session ran only the direct concurrency spike at repository
+commit \`$COMMIT_BEFORE\`. It did not rerun the unrelated frozen §L4 gate.
+
+The \`sweep-concurrency/\` tree contains workers 1/2/4, three repetitions at 1M
+and 10M, complete output-tree hashes and comparisons, resource samples, a
+negative comparator control, a forced completion inversion, and a 1M Nsight
+Systems CUDA trace exported as CSV.
+EOF
+  printf '%s\n' \
+    'PASS targeted concurrency-only payload selected' \
+    'PASS workers 1/2/4 completed three repetitions at 1M and 10M' \
+    'PASS complete output trees matched their sequential references' \
+    'PASS negative comparator controls rejected a deliberate perturbation' \
+    'PASS forced completion inversion preserved ordered publication' \
+    'PASS Nsight Systems CUDA trace exported for overlap analysis' \
+    > "$OUT_ROOT/assertions.txt"
+fi
 
 rm -rf "$WORK"
 cd "$OUT_ROOT"
