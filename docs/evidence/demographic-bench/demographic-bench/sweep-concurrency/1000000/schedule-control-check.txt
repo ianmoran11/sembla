@@ -1,0 +1,1 @@
+PASS: free-stream execution mode, completion inversion, and byte-identical publication
