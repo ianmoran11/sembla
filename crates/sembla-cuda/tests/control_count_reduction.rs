@@ -28,6 +28,25 @@ fn kernel_body<'a>(source: &'a str, name: &str) -> &'a str {
     &rest[..end]
 }
 
+fn assert_compatible_dynamic_shared_symbols(source: &str) {
+    let mut types_by_symbol = std::collections::BTreeMap::new();
+    for line in source.lines() {
+        let Some(declaration) = line.trim().strip_prefix("extern __shared__ ") else {
+            continue;
+        };
+        let (ty, symbol) = declaration
+            .rsplit_once(' ')
+            .expect("shared declaration has a type and symbol");
+        let symbol = symbol.trim_end_matches("[];");
+        if let Some(previous) = types_by_symbol.insert(symbol, ty) {
+            assert_eq!(
+                previous, ty,
+                "dynamic shared symbol {symbol:?} has incompatible declarations"
+            );
+        }
+    }
+}
+
 #[test]
 fn generated_control_counts_use_resident_segmented_and_strided_reductions() {
     let generated = generate(&sir_model()).unwrap();
@@ -40,15 +59,17 @@ fn generated_control_counts_use_resident_segmented_and_strided_reductions() {
     assert!(fired.contains("begin = candidate_offsets[rule]"));
     assert!(fired.contains("candidate_offsets[rule + 1ULL] : candidate_count"));
     assert!(fired.contains("local += wins[candidate] != 0U"));
-    assert!(fired.contains("atomicAdd(fired_counts + rule, partials[0])"));
+    assert!(fired.contains("extern __shared__ unsigned long long fired_partials[]"));
+    assert!(fired.contains("atomicAdd(fired_counts + rule, fired_partials[0])"));
 
     let deferred = kernel_body(&generated.source, "sembla_count_deferred");
     assert!(deferred.contains("deferred[candidate * table_count + table] != 0U"));
-    assert!(deferred.contains("atomicAdd(deferred_counts + table, partials[0])"));
+    assert!(deferred.contains("extern __shared__ unsigned long long deferred_partials[]"));
+    assert!(deferred.contains("atomicAdd(deferred_counts + table, deferred_partials[0])"));
 
+    assert_compatible_dynamic_shared_symbols(&generated.source);
     for kernel in [fired, deferred] {
         assert!(kernel.contains("gridDim.x * blockDim.x"));
-        assert!(kernel.contains("extern __shared__ unsigned long long partials[]"));
         assert!(!kernel.contains("atomicCAS"));
         assert!(!kernel.contains("while ("));
     }
