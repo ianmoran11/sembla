@@ -1,0 +1,1 @@
+PASS: deterministic lane assignment, overlapping lane intervals, lockstep timing identity, and byte-identical publication
