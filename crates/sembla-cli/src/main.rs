@@ -1750,80 +1750,106 @@ fn run_concurrent_sweep_spike(
     prepared: &[SweepPreparedDraw],
 ) -> Result<SweepConcurrentExecution, String> {
     let setup_started = Instant::now();
-    let mut backends = Vec::with_capacity(workers);
-    for _ in 0..workers {
-        backends.push(SweepBackend::new(
-            model,
-            initial_tables.to_vec(),
-            construction_params,
-            options.seed,
-            options.backend,
-        )?);
-    }
-    let setup_elapsed = setup_started.elapsed();
-    let identity = backends
+    let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
+    let next_draw = std::sync::atomic::AtomicUsize::new(0);
+    let ready = std::sync::Barrier::new(workers + 1);
+    let start = std::sync::Barrier::new(workers + 1);
+    let execution_started = std::sync::OnceLock::<Instant>::new();
+    let (lanes, setup_elapsed, execution_window_elapsed) =
+        std::thread::scope(|scope| -> Result<(Vec<_>, Duration, Duration), String> {
+            let handles = (0..workers)
+                .map(|lane| {
+                    let next_draw = &next_draw;
+                    let ready = &ready;
+                    let start = &start;
+                    let execution_started = &execution_started;
+                    scope.spawn(move || -> Result<_, String> {
+                        // CUDA contexts are thread-current. Constructing a backend on
+                        // the coordinator and moving it here produces
+                        // CUDA_ERROR_INVALID_CONTEXT on the first driver operation.
+                        // Each isolated lane therefore owns and uses its backend on
+                        // one worker thread for its complete lifetime.
+                        let backend = SweepBackend::new(
+                            model,
+                            initial_tables.to_vec(),
+                            construction_params,
+                            options.seed,
+                            options.backend,
+                        );
+                        // Both barriers must be reached even if construction failed,
+                        // otherwise one failed lane would deadlock every healthy lane.
+                        ready.wait();
+                        start.wait();
+                        let mut backend = backend?;
+                        let execution_started = *execution_started
+                            .get()
+                            .expect("coordinator sets execution start before release");
+                        let identity = backend.identity();
+                        let mut completed = Vec::new();
+                        loop {
+                            let index =
+                                next_draw.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let Some(draw) = prepared.get(index) else {
+                                break;
+                            };
+                            let start_offset = execution_started.elapsed();
+                            let started = Instant::now();
+                            if draw.k == 0 && !draw_zero_delay.is_zero() {
+                                std::thread::sleep(draw_zero_delay);
+                            }
+                            let execution = backend.run_draw(
+                                model,
+                                &draw.params,
+                                draw.execution_seed,
+                                options.ticks,
+                                &options.enabled_features,
+                            );
+                            let elapsed = started.elapsed();
+                            completed.push(SweepConcurrentCompletedDraw {
+                                index,
+                                lane,
+                                start_offset,
+                                finish_offset: execution_started.elapsed(),
+                                elapsed,
+                                execution,
+                            });
+                        }
+                        Ok((identity, completed))
+                    })
+                })
+                .collect::<Vec<_>>();
+            ready.wait();
+            let setup_elapsed = setup_started.elapsed();
+            let execution_start = Instant::now();
+            execution_started
+                .set(execution_start)
+                .expect("execution start is set exactly once");
+            start.wait();
+
+            let mut lanes = Vec::with_capacity(workers);
+            for handle in handles {
+                lanes.push(handle.join().map_err(|_| {
+                    "sweep concurrency spike worker panicked before returning its draws".to_owned()
+                })??);
+            }
+            Ok((lanes, setup_elapsed, execution_start.elapsed()))
+        })?;
+    let identity = lanes
         .first()
         .expect("concurrency spike has at least one backend")
-        .identity();
-    if backends
+        .0
+        .clone();
+    if lanes
         .iter()
         .skip(1)
-        .any(|backend| backend.identity() != identity)
+        .any(|(lane_identity, _)| lane_identity != &identity)
     {
         return Err("sweep concurrency spike backend identity changed across lanes".to_owned());
     }
-
-    let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
-    let next_draw = std::sync::atomic::AtomicUsize::new(0);
-    let execution_started = Instant::now();
-    let mut draws = std::thread::scope(|scope| -> Result<Vec<_>, String> {
-        let handles = backends
-            .into_iter()
-            .enumerate()
-            .map(|(lane, mut backend)| {
-                let next_draw = &next_draw;
-                scope.spawn(move || {
-                    let mut completed = Vec::new();
-                    loop {
-                        let index = next_draw.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                        let Some(draw) = prepared.get(index) else {
-                            break;
-                        };
-                        let start_offset = execution_started.elapsed();
-                        let started = Instant::now();
-                        if draw.k == 0 && !draw_zero_delay.is_zero() {
-                            std::thread::sleep(draw_zero_delay);
-                        }
-                        let execution = backend.run_draw(
-                            model,
-                            &draw.params,
-                            draw.execution_seed,
-                            options.ticks,
-                            &options.enabled_features,
-                        );
-                        let elapsed = started.elapsed();
-                        completed.push(SweepConcurrentCompletedDraw {
-                            index,
-                            lane,
-                            start_offset,
-                            finish_offset: execution_started.elapsed(),
-                            elapsed,
-                            execution,
-                        });
-                    }
-                    completed
-                })
-            })
-            .collect::<Vec<_>>();
-        let mut completed = Vec::with_capacity(prepared.len());
-        for handle in handles {
-            completed.extend(handle.join().map_err(|_| {
-                "sweep concurrency spike worker panicked before returning its draws".to_owned()
-            })?);
-        }
-        Ok(completed)
-    })?;
-    let execution_window_elapsed = execution_started.elapsed();
+    let mut draws = lanes
+        .into_iter()
+        .flat_map(|(_, completed)| completed)
+        .collect::<Vec<_>>();
     draws.sort_by_key(|draw| draw.index);
     if draws.len() != prepared.len()
         || draws
