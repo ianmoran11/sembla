@@ -2735,6 +2735,195 @@ pub fn generate(model: &ValidatedModel) -> Result<GeneratedCuda, CudaError> {
     Generator::new(model)?.emit()
 }
 
+/// Draw-major mutable buffer slots used by the hidden fused-sweep spike.
+/// Values are ABI-visible to generated CUDA through `sembla_batch_strides`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub(crate) enum FusedBuffer {
+    State,
+    NextState,
+    Inputs,
+    NextInputs,
+    InputCounts,
+    NextInputCounts,
+    Params,
+    Aggregates,
+    AggregatePartials,
+    AggregateErrors,
+    AggregateFacts,
+    AggregateActive,
+    Enabled,
+    Times,
+    CandidateErrors,
+    Wins,
+    Deferred,
+    FiredCounts,
+    DeferredCounts,
+    InstanceResources,
+    InstanceKeys,
+    InstanceRules,
+    InstanceEntities,
+    WinnerKeys,
+    WinnerRules,
+    WinnerEntities,
+    WinnerInstances,
+    Owners,
+    OwnerValues,
+    OutputPartials,
+    OutputErrors,
+    ObservationValues,
+    GroupedExtrema,
+    GroupedAxisMins,
+    GroupedAxisCardinalities,
+    GroupedHistogram,
+    GenericEnumCounts,
+    EffectActive,
+    Status,
+}
+
+#[cfg_attr(not(feature = "cuda"), allow(dead_code))]
+pub(crate) const FUSED_BUFFER_COUNT: usize = FusedBuffer::Status as usize + 1;
+
+fn fused_pointer_buffer(kernel: &str, name: &str) -> Option<FusedBuffer> {
+    use FusedBuffer as B;
+    Some(match name {
+        "state" => B::State,
+        "next_state" => B::NextState,
+        "inputs" => B::Inputs,
+        "next_inputs" => B::NextInputs,
+        "input_counts" => B::InputCounts,
+        "next_input_counts" => B::NextInputCounts,
+        "params" => B::Params,
+        "aggs" => B::Aggregates,
+        "partials" => B::AggregatePartials,
+        "aggregate_errors" => B::AggregateErrors,
+        "aggregate_facts" => B::AggregateFacts,
+        "aggregate_active" | "active" => B::AggregateActive,
+        "enabled" => B::Enabled,
+        "times" => B::Times,
+        "wins" => B::Wins,
+        "deferred" => B::Deferred,
+        "fired_counts" => B::FiredCounts,
+        "deferred_counts" => B::DeferredCounts,
+        "instance_resources" => B::InstanceResources,
+        "instance_keys" => B::InstanceKeys,
+        "instance_rules" => B::InstanceRules,
+        "instance_entities" => B::InstanceEntities,
+        "winner_keys" => B::WinnerKeys,
+        "winner_rules" => B::WinnerRules,
+        "winner_entities" => B::WinnerEntities,
+        "winner_instances" => B::WinnerInstances,
+        "owners" => B::Owners,
+        "owner_values" => B::OwnerValues,
+        "output_partials" => B::OutputPartials,
+        "output_errors" => B::OutputErrors,
+        "extrema" => B::GroupedExtrema,
+        "axis_mins" => B::GroupedAxisMins,
+        "axis_cardinalities" => B::GroupedAxisCardinalities,
+        "generic_enum_counts" => B::GenericEnumCounts,
+        "effect_active" => B::EffectActive,
+        "status" => B::Status,
+        "values" => B::ObservationValues,
+        "errors" if kernel == "sembla_record_aggregate_errors" => B::AggregateErrors,
+        "errors" if kernel == "sembla_check_candidate_errors" => B::CandidateErrors,
+        "errors" if kernel == "sembla_check_output_errors" => B::OutputErrors,
+        "errors" => B::CandidateErrors,
+        "counts" if kernel.contains("grouped") => B::GroupedHistogram,
+        "counts" => B::GenericEnumCounts,
+        // Immutable layout metadata and the Philox test-kernel pointers are
+        // deliberately shared/unmodified.
+        _ => return None,
+    })
+}
+
+fn fused_batch_source(source: &str) -> Result<String, CudaError> {
+    const MARKER: &str = "extern \"C\" __global__ void ";
+    let mut out = String::with_capacity(source.len() + source.len() / 8);
+    let mut cursor = 0;
+    while let Some(relative) = source[cursor..].find(MARKER) {
+        let start = cursor + relative;
+        out.push_str(&source[cursor..start]);
+        let name_start = start + MARKER.len();
+        let open = source[name_start..]
+            .find('(')
+            .map(|offset| name_start + offset)
+            .ok_or_else(|| codegen("fused kernel signature is missing '('"))?;
+        let kernel_name = source[name_start..open].trim();
+        let mut depth = 1_usize;
+        let mut close = None;
+        for (offset, byte) in source.as_bytes()[open + 1..].iter().copied().enumerate() {
+            match byte {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = Some(open + 1 + offset);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let close = close.ok_or_else(|| codegen("fused kernel signature is unterminated"))?;
+        let body = source[close + 1..]
+            .find('{')
+            .map(|offset| close + 1 + offset)
+            .ok_or_else(|| codegen("fused kernel body is missing '{'"))?;
+        if kernel_name == "sembla_philox_vectors" {
+            out.push_str(&source[start..=body]);
+            cursor = body + 1;
+            continue;
+        }
+
+        let arguments = &source[open + 1..close];
+        out.push_str(&source[start..=open]);
+        out.push_str("const unsigned long long* sembla_batch_strides, const unsigned char* sembla_batch_active, const unsigned long long* sembla_batch_seeds");
+        if !arguments.trim().is_empty() {
+            out.push_str(", ");
+            out.push_str(arguments);
+        }
+        out.push_str(&source[close..=body]);
+        out.push_str("\n  const unsigned int sembla_slot = blockIdx.y;\n  if (sembla_batch_active[sembla_slot] == 0U) return;\n");
+
+        for argument in arguments.split(',') {
+            let argument = argument.trim();
+            if !argument.contains('*') {
+                continue;
+            }
+            let Some(argument_name) = argument
+                .split_whitespace()
+                .last()
+                .map(|name| name.trim_start_matches('*'))
+            else {
+                continue;
+            };
+            if let Some(buffer) = fused_pointer_buffer(kernel_name, argument_name) {
+                writeln!(
+                    out,
+                    "  {argument_name} += (unsigned long long)sembla_slot * sembla_batch_strides[{}ULL];",
+                    buffer as usize
+                )
+                .unwrap();
+            }
+        }
+        if arguments.contains("unsigned long long seed") {
+            out.push_str("  seed = sembla_batch_seeds[sembla_slot];\n");
+        }
+        cursor = body + 1;
+    }
+    out.push_str(&source[cursor..]);
+    Ok(out)
+}
+
+/// Generates the separate grid-y translation unit used only by the hidden
+/// fused sweep spike. Ordinary `generate()` bytes and hashes are untouched.
+pub fn generate_fused_batch(model: &ValidatedModel) -> Result<GeneratedCuda, CudaError> {
+    let mut generated = Generator::new(model)?.emit()?;
+    generated.source = fused_batch_source(&generated.source)?;
+    generated.source_sha256 = hex(Sha256::digest(generated.source.as_bytes()).as_slice());
+    Ok(generated)
+}
+
 const PRELUDE: &str = r#"
 // Conflict winners use ordered atomicMin passes over an explicit total key;
 // every pass is order-independent and only sees the prefix selected earlier.

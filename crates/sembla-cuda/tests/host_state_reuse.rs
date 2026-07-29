@@ -60,6 +60,54 @@ fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
 }
 
 #[test]
+fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
+    let backend = include_str!("../src/backend.rs");
+    assert!(backend.contains("pub fn new_fused_batch("));
+    assert!(backend.contains("generate_fused_batch(model)?"));
+    assert!(backend.contains("context.default_stream()"));
+    assert!(backend.contains("config.grid_dim.1 = self.grid_y;"));
+    assert!(backend.contains(".arg(&batch.strides)"));
+    assert!(backend.contains("pub fn reset_fused_batch("));
+    assert!(backend.contains("pub fn run_tick_observed_reused_fused("));
+    assert!(!backend.contains("Vec<CudaBackend>"));
+
+    let batch_tick = section(
+        backend,
+        "    fn execute_tick_batch_statuses(",
+        "\n    fn download_fused_state_stores(",
+    );
+    let ordinary_error = batch_tick
+        .find("if self.fused_batch.is_none()")
+        .expect("ordinary error guard exists");
+    let state_swap = batch_tick
+        .find("mem::swap(&mut self.state")
+        .expect("state swap exists");
+    assert!(ordinary_error < state_swap);
+
+    let fused_tick = section(
+        backend,
+        "    pub fn run_tick_observed_reused_fused(",
+        "\n    #[doc(hidden)]\n    pub fn fused_observed_state(",
+    );
+    assert!(fused_tick.contains("if active_width == 0"));
+    assert!(fused_tick.contains("must be reset with at least one active draw"));
+
+    let cli = include_str!("../../sembla-cli/src/main.rs");
+    assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS"));
+    assert!(cli.contains("prepared.chunks(capacity)"));
+    assert!(cli.contains("CudaBackend::new_fused_batch("));
+    assert!(cli.contains("run_tick_observed_reused_fused()"));
+    let fused_cli = section(
+        cli,
+        "#[cfg(feature = \"cuda\")]\nfn run_fused_sweep_spike(",
+        "\n#[cfg(not(feature = \"cuda\"))]\nfn run_fused_sweep_spike(",
+    );
+    assert!(fused_cli.contains("failures[slot] = Some(format!"));
+    assert!(fused_cli.contains(".finish(model, None)\n                    .and_then("));
+    assert!(!fused_cli.contains(".finish(model, None)?"));
+}
+
+#[test]
 fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
     let backend = include_str!("../src/backend.rs");
     let reused = section(

@@ -265,12 +265,49 @@ gaps rise from 168.988 ms to 418.451 ms. Real overlap therefore does not make
 this synchronized complete-backend design competitive. The arm is negative and
 closed as a production candidate.
 
-The remaining possible CUDA experiment is a fused grid-y batch: one kernel
-launch with draw as an explicit dimension and draw-major mutable state. That is
-a broader codegen/state-layout spike, not an extension of the measured stream
-arm and not permission for a numbered PRD. If pursued, it must be runnable,
-default-off, exact against both sequential output and the isolated-backend
-result, and judged by whole-sweep wall and capacity rather than overlap alone.
+The remaining CUDA experiment is now a hidden fused grid-y spike. With
+`SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS=1|2|4`, one context, generated module, and
+default stream retain draw-major mutable arenas. Every existing logical phase
+launch keeps its x geometry and adds `gridDim.y = active_slots`; `blockIdx.y`
+selects an isolated slot. Phase boundaries and within-draw reductions remain
+unchanged, transition kernels load an independent per-slot seed, and the Philox
+draw coordinate remains literal `0U`. A final partial chunk uses its actual
+active width rather than padding or dropping draws.
+
+This is default-off Gate-1 evidence code, not a production interface or
+permission for a numbered PRD. It is mutually exclusive with multi-backend
+workers, lockstep streams, and draw-delay controls. The adjacent sequential reference and fused capacities can be driven with:
+
+```sh
+cargo test --release --locked -p sembla-cli --features cuda \
+  --test gpu_differential \
+  fused_grid_y_sweep_matches_sequential_cuda_with_partial_tail \
+  -- --ignored --exact --nocapture
+
+python3 scripts/run-sweep-concurrency-spike.py \
+  --binary target/release/sembla \
+  --model <model.json> --population <state> \
+  --backend cuda --cuda-fused-grid-y \
+  --output-root <new-fused-evidence-dir> \
+  --workers 1 2 4 --draws 20 --ticks 24 --noise independent \
+  --repetitions 3
+
+# Corresponding independent-backend comparator; omit fused mode only.
+python3 scripts/run-sweep-concurrency-spike.py \
+  --binary target/release/sembla \
+  --model <model.json> --population <state> \
+  --backend cuda \
+  --output-root <new-independent-evidence-dir> \
+  --workers 1 2 4 --draws 20 --ticks 24 --noise independent \
+  --repetitions 3
+```
+
+The ignored hardware test covers both CRN and independent noise, grouped and
+contest output, capacities 1/2/4, and a partial tail. Hardware acceptance also
+requires explicit capacity outcomes and a repeated whole-sweep win over both
+the adjacent sequential and separately measured isolated-backend arms.
+One launch per logical phase must be confirmed with Nsight; launch reduction or
+occupancy alone is not success.
 
 **CPU arm**
 

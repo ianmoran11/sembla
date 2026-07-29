@@ -1,6 +1,9 @@
 use std::mem;
 
-use cudarc::driver::{CudaContext, CudaFunction, CudaSlice, LaunchConfig, PushKernelArg};
+use cudarc::driver::{
+    CudaContext, CudaEvent, CudaFunction, CudaSlice, DriverError, LaunchArgs, LaunchConfig,
+    PushKernelArg,
+};
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::eval::ParamEnv;
@@ -11,8 +14,9 @@ use sembla_runtime::state::{ColumnData, InputTable, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 use crate::codegen::{
-    decode_grouped_histogram, grouped_observation_layout, host_observation_fallback,
-    GroupedObservationLayout, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
+    decode_grouped_histogram, generate_fused_batch, grouped_observation_layout,
+    host_observation_fallback, FusedBuffer, GroupedObservationAxisLayout, GroupedObservationLayout,
+    FUSED_BUFFER_COUNT, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
 };
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
 
@@ -60,6 +64,8 @@ pub type ReusedCudaTickObservation = (
     CudaDeferredPerResourceTable,
     Option<CudaDeviceObservations>,
 );
+pub type FusedReusedCudaTickObservations = Vec<Result<ReusedCudaTickObservation, CudaError>>;
+
 pub type TimedReusedCudaTickObservation = (
     u32,
     CudaFiredPerBox,
@@ -163,13 +169,14 @@ fn finish_validation_reduction_pass(
     status: &mut CudaSlice<u64>,
     phase: u64,
     one: LaunchConfig,
+    batch: Option<&FusedBatchMeta>,
 ) -> Result<(), CudaError> {
     let function = if phase + 1 < VALIDATION_REDUCTION_PASSES {
         advance
     } else {
         commit
     };
-    let mut args = stream.launch_builder(function);
+    let mut args = fused_launch_builder(stream, function, batch);
     args.arg(status);
     unsafe { args.launch(one) }
         .map(|_| ())
@@ -195,6 +202,78 @@ struct Layout {
     aggregate_max_groups: usize,
     write_offsets: Vec<u64>,
     owner_count: usize,
+}
+
+#[derive(Debug)]
+struct FusedBatchMeta {
+    capacity: usize,
+    active_width: usize,
+    strides: CudaSlice<u64>,
+    strides_host: Vec<usize>,
+    active: CudaSlice<u8>,
+    active_host: Vec<u8>,
+    seeds: CudaSlice<u64>,
+    host_states: Vec<StateStore>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CudaFusedBatchMetadata {
+    pub capacity: usize,
+    pub active_width: usize,
+    pub contexts: usize,
+    pub modules: usize,
+    pub streams: usize,
+    pub nvrtc_compiles: usize,
+    pub generated_source_sha256: String,
+}
+
+fn checked_arena_len(per_slot: usize, slots: usize, label: &str) -> Result<usize, CudaError> {
+    per_slot.checked_mul(slots).ok_or_else(|| {
+        CudaError::InvalidInput(format!(
+            "fused CUDA {label} arena size overflow for capacity {slots}"
+        ))
+    })
+}
+
+struct FusedLaunchArgs<'a> {
+    inner: LaunchArgs<'a>,
+    grid_y: u32,
+}
+
+impl<'a> FusedLaunchArgs<'a> {
+    fn arg<T>(&mut self, arg: T) -> &mut Self
+    where
+        LaunchArgs<'a>: PushKernelArg<T>,
+    {
+        self.inner.arg(arg);
+        self
+    }
+
+    unsafe fn launch(
+        &mut self,
+        mut config: LaunchConfig,
+    ) -> Result<Option<(CudaEvent, CudaEvent)>, DriverError> {
+        config.grid_dim.1 = self.grid_y;
+        unsafe { self.inner.launch(config) }
+    }
+}
+
+fn fused_launch_builder<'a>(
+    stream: &'a std::sync::Arc<cudarc::driver::CudaStream>,
+    function: &'a CudaFunction,
+    batch: Option<&'a FusedBatchMeta>,
+) -> FusedLaunchArgs<'a> {
+    let mut inner = stream.launch_builder(function);
+    let grid_y = if let Some(batch) = batch {
+        inner
+            .arg(&batch.strides)
+            .arg(&batch.active)
+            .arg(&batch.seeds);
+        batch.active_width as u32
+    } else {
+        1
+    };
+    FusedLaunchArgs { inner, grid_y }
 }
 
 #[cfg(test)]
@@ -336,6 +415,7 @@ pub struct CudaBackend {
     hash_mode: HashMode,
     device_identity: CudaDeviceIdentity,
     host_state_current: bool,
+    fused_batch: Option<FusedBatchMeta>,
     // No public setter exists. The hardware unit test uses this private seam
     // to confirm the four validation launches under explicit geometries.
     #[cfg(test)]
@@ -363,7 +443,7 @@ impl CudaBackend {
         seed: u64,
         hash_mode: HashMode,
     ) -> Result<Self, CudaError> {
-        Self::new_with_stream_mode(model, initial_tables, params, seed, hash_mode, false)
+        Self::new_with_stream_mode(model, initial_tables, params, seed, hash_mode, false, None)
     }
 
     /// Experimental sweep-spike constructor using an explicitly non-blocking
@@ -376,7 +456,34 @@ impl CudaBackend {
         seed: u64,
         hash_mode: HashMode,
     ) -> Result<Self, CudaError> {
-        Self::new_with_stream_mode(model, initial_tables, params, seed, hash_mode, true)
+        Self::new_with_stream_mode(model, initial_tables, params, seed, hash_mode, true, None)
+    }
+
+    /// Hidden one-context/module/default-stream grid-y backend used only by
+    /// the fused sweep Gate-1 spike.
+    #[doc(hidden)]
+    pub fn new_fused_batch(
+        model: &ValidatedModel,
+        initial_tables: Vec<TableInit>,
+        params: &ParamEnv,
+        seed: u64,
+        capacity: usize,
+        hash_mode: HashMode,
+    ) -> Result<Self, CudaError> {
+        if !matches!(capacity, 1 | 2 | 4) {
+            return Err(CudaError::InvalidInput(format!(
+                "fused CUDA draw capacity must be one of 1, 2, or 4; got {capacity}"
+            )));
+        }
+        Self::new_with_stream_mode(
+            model,
+            initial_tables,
+            params,
+            seed,
+            hash_mode,
+            false,
+            Some(capacity),
+        )
     }
 
     fn new_with_stream_mode(
@@ -386,6 +493,7 @@ impl CudaBackend {
         seed: u64,
         hash_mode: HashMode,
         nonblocking_stream: bool,
+        fused_capacity: Option<usize>,
     ) -> Result<Self, CudaError> {
         let driver_library = unsafe { cudarc::driver::sys::is_culib_present() };
         if !driver_library {
@@ -404,7 +512,11 @@ impl CudaBackend {
         let host_state = StateStore::new(model, initial_tables.clone())
             .map_err(|error| CudaError::InvalidInput(error.to_string()))?;
 
-        let generated = generate(model)?;
+        let generated = if fused_capacity.is_some() {
+            generate_fused_batch(model)?
+        } else {
+            generate(model)?
+        };
         let dump_path = generated.dump_if_requested()?;
         let context = CudaContext::new(0).map_err(|error| CudaError::Driver(error.to_string()))?;
         let gpu_model = context
@@ -507,7 +619,13 @@ impl CudaBackend {
         let layout = build_layout(model, &initial_tables, &generated)?;
         let state_bytes = pack_initial_state(model, &initial_tables, &layout)?;
         let params_bytes = pack_params(model, params)?;
-        let state = stream.memcpy_stod(&state_bytes).map_err(driver_error)?;
+        let slot_count = fused_capacity.unwrap_or(1);
+        let arena_len =
+            |per_slot: usize, label: &str| checked_arena_len(per_slot, slot_count, label);
+        arena_len(state_bytes.len(), "state bytes")?;
+        let state = stream
+            .memcpy_stod(&state_bytes.repeat(slot_count))
+            .map_err(driver_error)?;
         let next_state = stream.clone_dtod(&state).map_err(driver_error)?;
         let pristine_state = stream.clone_dtod(&state).map_err(driver_error)?;
         let column_offsets = stream
@@ -519,34 +637,52 @@ impl CudaBackend {
         let resource_offsets = stream
             .memcpy_stod(&nonempty(&layout.resource_offsets))
             .map_err(driver_error)?;
-        let input_zeroes = vec![0_u8; layout.input_len.max(1)];
+        let input_zeroes = vec![0_u8; arena_len(layout.input_len.max(1), "inputs")?];
         let inputs = stream.memcpy_stod(&input_zeroes).map_err(driver_error)?;
         let next_inputs = stream.memcpy_stod(&input_zeroes).map_err(driver_error)?;
         let input_offsets = stream
             .memcpy_stod(&nonempty(&layout.input_offsets))
             .map_err(driver_error)?;
-        let input_count_zeroes = vec![0_u64; layout.ports.len().max(1)];
+        let input_count_zeroes = vec![0_u64; arena_len(layout.ports.len().max(1), "input counts")?];
         let input_counts = stream
             .memcpy_stod(&input_count_zeroes)
             .map_err(driver_error)?;
         let next_input_counts = stream
             .memcpy_stod(&input_count_zeroes)
             .map_err(driver_error)?;
-        let params = stream.memcpy_stod(&params_bytes).map_err(driver_error)?;
+        arena_len(params_bytes.len(), "parameter bytes")?;
+        let params = stream
+            .memcpy_stod(&params_bytes.repeat(slot_count))
+            .map_err(driver_error)?;
         let aggregates = stream
-            .memcpy_stod(&vec![0_u8; layout.aggregate_len.max(1)])
+            .memcpy_stod(&vec![
+                0_u8;
+                arena_len(layout.aggregate_len.max(1), "aggregates")?
+            ])
             .map_err(driver_error)?;
+        let aggregate_partials_stride =
+            layout.aggregate_len.max(1).checked_mul(2).ok_or_else(|| {
+                CudaError::InvalidInput("aggregate partial size overflow".to_owned())
+            })?;
         let aggregate_partials = stream
-            .memcpy_stod(&vec![0_u8; layout.aggregate_len.max(1) * 2])
+            .memcpy_stod(&vec![
+                0_u8;
+                arena_len(
+                    aggregate_partials_stride,
+                    "aggregate partials"
+                )?
+            ])
             .map_err(driver_error)?;
+        let aggregate_errors_stride = (layout.aggregate_max_groups + 2).max(2);
         let aggregate_errors = stream
-            .alloc_zeros::<u8>((layout.aggregate_max_groups + 2).max(2))
+            .alloc_zeros::<u8>(arena_len(aggregate_errors_stride, "aggregate errors")?)
             .map_err(driver_error)?;
+        let aggregate_meta_stride = generated.aggregate_group_tables.len().max(1);
         let aggregate_facts = stream
-            .alloc_zeros::<u8>(generated.aggregate_group_tables.len().max(1))
+            .alloc_zeros::<u8>(arena_len(aggregate_meta_stride, "aggregate facts")?)
             .map_err(driver_error)?;
         let aggregate_active = stream
-            .alloc_zeros::<u8>(generated.aggregate_group_tables.len().max(1))
+            .alloc_zeros::<u8>(arena_len(aggregate_meta_stride, "aggregate active")?)
             .map_err(driver_error)?;
         let aggregate_offsets = stream
             .memcpy_stod(&nonempty(&layout.aggregate_offsets))
@@ -559,94 +695,111 @@ impl CudaBackend {
             .map_err(driver_error)?;
         let candidate_len = layout.candidate_count.max(1);
         let enabled = stream
-            .alloc_zeros::<u8>(candidate_len)
+            .alloc_zeros::<u8>(arena_len(candidate_len, "enabled candidates")?)
             .map_err(driver_error)?;
         let times = stream
-            .alloc_zeros::<f64>(candidate_len)
+            .alloc_zeros::<f64>(arena_len(candidate_len, "candidate times")?)
             .map_err(driver_error)?;
         let candidate_error_len = candidate_len.checked_mul(2).ok_or_else(|| {
             CudaError::InvalidInput("candidate error buffer size overflow".to_owned())
         })?;
         let candidate_errors = stream
-            .alloc_zeros::<u8>(candidate_error_len)
+            .alloc_zeros::<u8>(arena_len(candidate_error_len, "candidate errors")?)
             .map_err(driver_error)?;
         let wins = stream
-            .alloc_zeros::<u8>(candidate_len)
+            .alloc_zeros::<u8>(arena_len(candidate_len, "candidate wins")?)
             .map_err(driver_error)?;
         let deferred_len = candidate_len
             .checked_mul(layout.row_counts.len().max(1))
             .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?;
         let deferred = stream
-            .alloc_zeros::<u8>(deferred_len)
+            .alloc_zeros::<u8>(arena_len(deferred_len, "deferred metadata")?)
             .map_err(driver_error)?;
+        let fired_counts_stride = layout.candidate_offsets.len().max(1);
         let fired_counts = stream
-            .alloc_zeros::<u64>(layout.candidate_offsets.len().max(1))
+            .alloc_zeros::<u64>(arena_len(fired_counts_stride, "fired counts")?)
             .map_err(driver_error)?;
+        let deferred_counts_stride = layout.row_counts.len().max(1);
         let deferred_counts = stream
-            .alloc_zeros::<u64>(layout.row_counts.len().max(1))
+            .alloc_zeros::<u64>(arena_len(deferred_counts_stride, "deferred counts")?)
             .map_err(driver_error)?;
         let claim_instance_len = layout.claim_instance_count.max(1);
+        let claim_arena_len = arena_len(claim_instance_len, "claim instances")?;
         let instance_resources = stream
-            .alloc_zeros::<u64>(claim_instance_len)
+            .alloc_zeros::<u64>(claim_arena_len)
             .map_err(driver_error)?;
         let instance_keys = stream
-            .alloc_zeros::<u64>(claim_instance_len)
+            .alloc_zeros::<u64>(claim_arena_len)
             .map_err(driver_error)?;
         let instance_rules = stream
-            .alloc_zeros::<u32>(claim_instance_len)
+            .alloc_zeros::<u32>(claim_arena_len)
             .map_err(driver_error)?;
         let instance_entities = stream
-            .alloc_zeros::<u32>(claim_instance_len)
+            .alloc_zeros::<u32>(claim_arena_len)
             .map_err(driver_error)?;
         let resource_len = layout.resource_count.max(1);
+        let resource_arena_len = arena_len(resource_len, "conflict winners")?;
         let winner_keys = stream
-            .alloc_zeros::<u64>(resource_len)
+            .alloc_zeros::<u64>(resource_arena_len)
             .map_err(driver_error)?;
         let winner_rules = stream
-            .alloc_zeros::<u32>(resource_len)
+            .alloc_zeros::<u32>(resource_arena_len)
             .map_err(driver_error)?;
         let winner_entities = stream
-            .alloc_zeros::<u32>(resource_len)
+            .alloc_zeros::<u32>(resource_arena_len)
             .map_err(driver_error)?;
         let winner_instances = stream
-            .alloc_zeros::<u64>(resource_len)
+            .alloc_zeros::<u64>(resource_arena_len)
             .map_err(driver_error)?;
         let write_offsets = stream
             .memcpy_stod(&nonempty(&layout.write_offsets))
             .map_err(driver_error)?;
+        let owner_stride = layout.owner_count.max(1);
         let owners = stream
-            .alloc_zeros::<i32>(layout.owner_count.max(1))
+            .alloc_zeros::<i32>(arena_len(owner_stride, "effect owners")?)
             .map_err(driver_error)?;
         let owner_values = stream
-            .alloc_zeros::<u64>(layout.owner_count.max(1))
+            .alloc_zeros::<u64>(arena_len(owner_stride, "effect values")?)
             .map_err(driver_error)?;
         let output_field_count = layout.input_offsets.len().max(1);
+        let output_partials_stride = output_field_count
+            .checked_mul(2)
+            .ok_or_else(|| CudaError::InvalidInput("output partial size overflow".to_owned()))?;
+        let output_errors_stride = output_field_count
+            .checked_mul(3)
+            .ok_or_else(|| CudaError::InvalidInput("output error size overflow".to_owned()))?;
         let output_partials = stream
-            .alloc_zeros::<u64>(output_field_count * 2)
+            .alloc_zeros::<u64>(arena_len(output_partials_stride, "output partials")?)
             .map_err(driver_error)?;
         let output_errors = stream
-            .alloc_zeros::<u8>(output_field_count * 3)
+            .alloc_zeros::<u8>(arena_len(output_errors_stride, "output errors")?)
             .map_err(driver_error)?;
+        let observation_values_stride = generated.observation_view_tables.len().max(1);
         let observation_values = stream
-            .alloc_zeros::<i64>(generated.observation_view_tables.len().max(1))
+            .alloc_zeros::<i64>(arena_len(observation_values_stride, "observation values")?)
             .map_err(driver_error)?;
         let grouped_extrema_len = generated
             .grouped_observation_band_axes
             .checked_mul(2)
             .ok_or_else(|| CudaError::InvalidInput("grouped extrema size overflow".to_owned()))?;
+        let grouped_extrema_stride = grouped_extrema_len.max(1);
         let grouped_extrema = stream
-            .alloc_zeros::<i64>(grouped_extrema_len.max(1))
+            .alloc_zeros::<i64>(arena_len(grouped_extrema_stride, "grouped extrema")?)
             .map_err(driver_error)?;
         let grouped_axis_count = generated
             .grouped_observation_views
             .iter()
             .try_fold(0_usize, |count, view| count.checked_add(view.axes.len()))
             .ok_or_else(|| CudaError::InvalidInput("grouped axis count overflow".to_owned()))?;
+        let grouped_axis_stride = grouped_axis_count.max(1);
         let grouped_axis_mins = stream
-            .alloc_zeros::<i64>(grouped_axis_count.max(1))
+            .alloc_zeros::<i64>(arena_len(grouped_axis_stride, "grouped axis minima")?)
             .map_err(driver_error)?;
         let grouped_axis_cardinalities = stream
-            .alloc_zeros::<u64>(grouped_axis_count.max(1))
+            .alloc_zeros::<u64>(arena_len(
+                grouped_axis_stride,
+                "grouped axis cardinalities",
+            )?)
             .map_err(driver_error)?;
         let grouped_histogram_len = if generated.grouped_observation_views.is_empty() {
             1
@@ -654,18 +807,97 @@ impl CudaBackend {
             GROUPED_OBSERVATION_KEY_SPACE_LIMIT
         };
         let grouped_histogram = stream
-            .alloc_zeros::<u64>(grouped_histogram_len)
+            .alloc_zeros::<u64>(arena_len(grouped_histogram_len, "grouped histogram")?)
             .map_err(driver_error)?;
+        let generic_enum_stride = generated.generic_enum_count.max(1);
         let generic_enum_counts = stream
-            .alloc_zeros::<u64>(generated.generic_enum_count.max(1))
+            .alloc_zeros::<u64>(arena_len(generic_enum_stride, "generic enum counts")?)
             .map_err(driver_error)?;
         // status[0..=3] is the committed diagnostic; status[4..=11] is the
         // per-launch validation-reduction scratch (phase, scan, ordering
         // identity, code, branch, and selected payload).
-        let status = stream.alloc_zeros::<u64>(12).map_err(driver_error)?;
-        let effect_active = stream
-            .alloc_zeros::<u32>(layout.candidate_offsets.len().max(1))
+        let status = stream
+            .alloc_zeros::<u64>(arena_len(12, "validation status")?)
             .map_err(driver_error)?;
+        let effect_active_stride = layout.candidate_offsets.len().max(1);
+        let effect_active = stream
+            .alloc_zeros::<u32>(arena_len(effect_active_stride, "effect active")?)
+            .map_err(driver_error)?;
+
+        let fused_batch = if let Some(capacity) = fused_capacity {
+            let mut strides = vec![0_u64; FUSED_BUFFER_COUNT];
+            macro_rules! stride {
+                ($slot:ident, $value:expr) => {
+                    strides[FusedBuffer::$slot as usize] = u64::try_from($value).map_err(|_| {
+                        CudaError::InvalidInput(format!(
+                            "fused CUDA {} stride exceeds u64",
+                            stringify!($slot)
+                        ))
+                    })?;
+                };
+            }
+            stride!(State, state_bytes.len().max(1));
+            stride!(NextState, state_bytes.len().max(1));
+            stride!(Inputs, layout.input_len.max(1));
+            stride!(NextInputs, layout.input_len.max(1));
+            stride!(InputCounts, layout.ports.len().max(1));
+            stride!(NextInputCounts, layout.ports.len().max(1));
+            stride!(Params, params_bytes.len().max(1));
+            stride!(Aggregates, layout.aggregate_len.max(1));
+            stride!(AggregatePartials, aggregate_partials_stride);
+            stride!(AggregateErrors, aggregate_errors_stride);
+            stride!(AggregateFacts, aggregate_meta_stride);
+            stride!(AggregateActive, aggregate_meta_stride);
+            stride!(Enabled, candidate_len);
+            stride!(Times, candidate_len);
+            stride!(CandidateErrors, candidate_error_len);
+            stride!(Wins, candidate_len);
+            stride!(Deferred, deferred_len);
+            stride!(FiredCounts, fired_counts_stride);
+            stride!(DeferredCounts, deferred_counts_stride);
+            stride!(InstanceResources, claim_instance_len);
+            stride!(InstanceKeys, claim_instance_len);
+            stride!(InstanceRules, claim_instance_len);
+            stride!(InstanceEntities, claim_instance_len);
+            stride!(WinnerKeys, resource_len);
+            stride!(WinnerRules, resource_len);
+            stride!(WinnerEntities, resource_len);
+            stride!(WinnerInstances, resource_len);
+            stride!(Owners, owner_stride);
+            stride!(OwnerValues, owner_stride);
+            stride!(OutputPartials, output_partials_stride);
+            stride!(OutputErrors, output_errors_stride);
+            stride!(ObservationValues, observation_values_stride);
+            stride!(GroupedExtrema, grouped_extrema_stride);
+            stride!(GroupedAxisMins, grouped_axis_stride);
+            stride!(GroupedAxisCardinalities, grouped_axis_stride);
+            stride!(GroupedHistogram, grouped_histogram_len);
+            stride!(GenericEnumCounts, generic_enum_stride);
+            stride!(EffectActive, effect_active_stride);
+            stride!(Status, 12);
+            let host_states = (0..capacity)
+                .map(|_| {
+                    StateStore::new(model, initial_tables.clone())
+                        .map_err(|error| CudaError::InvalidInput(error.to_string()))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let strides_host = strides
+                .iter()
+                .map(|stride| usize::try_from(*stride).expect("usize stride encoded as u64"))
+                .collect();
+            Some(FusedBatchMeta {
+                capacity,
+                active_width: 0,
+                strides: stream.memcpy_stod(&strides).map_err(driver_error)?,
+                strides_host,
+                active: stream.alloc_zeros::<u8>(capacity).map_err(driver_error)?,
+                active_host: vec![0_u8; capacity],
+                seeds: stream.alloc_zeros::<u64>(capacity).map_err(driver_error)?,
+                host_states,
+            })
+        } else {
+            None
+        };
 
         Ok(Self {
             model: model.clone(),
@@ -769,6 +1001,7 @@ impl CudaBackend {
             hash_mode,
             device_identity,
             host_state_current: true,
+            fused_batch,
             #[cfg(test)]
             validation_launch_override: None,
             #[cfg(test)]
@@ -855,6 +1088,145 @@ impl CudaBackend {
         Ok(())
     }
 
+    /// Resets one contiguous grid-y batch without rebuilding the CUDA module.
+    #[doc(hidden)]
+    pub fn reset_fused_batch(
+        &mut self,
+        params: &[ParamEnv],
+        seeds: &[u64],
+    ) -> Result<(), CudaError> {
+        let capacity = self
+            .fused_batch
+            .as_ref()
+            .ok_or_else(|| CudaError::InvalidInput("backend is not fused-batch CUDA".to_owned()))?
+            .capacity;
+        if params.is_empty() || params.len() > capacity || params.len() != seeds.len() {
+            return Err(CudaError::InvalidInput(format!(
+                "fused CUDA batch requires equal nonzero params/seeds lengths <= capacity {capacity}; got params={} seeds={}",
+                params.len(),
+                seeds.len()
+            )));
+        }
+        let mut params_arena = Vec::new();
+        for env in params {
+            params_arena.extend(pack_params(&self.model, env)?);
+        }
+        let params_stride = params_arena.len() / params.len();
+        params_arena.resize(checked_arena_len(params_stride, capacity, "parameters")?, 0);
+        let mut seed_arena = vec![0_u64; capacity];
+        seed_arena[..seeds.len()].copy_from_slice(seeds);
+        let mut active_host = vec![0_u8; capacity];
+        active_host[..params.len()].fill(1);
+
+        self.stream
+            .memcpy_dtod(&self.pristine_state, &mut self.state)
+            .map_err(driver_error)?;
+        self.stream
+            .memcpy_dtod(&self.pristine_state, &mut self.next_state)
+            .map_err(driver_error)?;
+        self.stream
+            .memcpy_htod(&params_arena, &mut self.params)
+            .map_err(driver_error)?;
+        macro_rules! zero {
+            ($($buffer:ident),+ $(,)?) => {
+                $(self.stream.memset_zeros(&mut self.$buffer).map_err(driver_error)?;)+
+            };
+        }
+        zero!(
+            inputs,
+            next_inputs,
+            input_counts,
+            next_input_counts,
+            aggregates,
+            aggregate_partials,
+            aggregate_errors,
+            aggregate_facts,
+            aggregate_active,
+            enabled,
+            times,
+            candidate_errors,
+            wins,
+            deferred,
+            fired_counts,
+            deferred_counts,
+            instance_resources,
+            instance_keys,
+            instance_rules,
+            instance_entities,
+            winner_keys,
+            winner_rules,
+            winner_entities,
+            winner_instances,
+            owners,
+            owner_values,
+            output_partials,
+            output_errors,
+            observation_values,
+            grouped_extrema,
+            grouped_axis_mins,
+            grouped_axis_cardinalities,
+            grouped_histogram,
+            generic_enum_counts,
+            effect_active,
+            status,
+        );
+        let batch = self.fused_batch.as_mut().expect("fused batch exists");
+        for state in &mut batch.host_states {
+            state
+                .reset_backend_draw(&self.model, &self.pristine_host_tables)
+                .map_err(|error| CudaError::InvalidInput(error.to_string()))?;
+        }
+        batch.active_width = params.len();
+        batch.active_host = active_host;
+        self.stream
+            .memcpy_htod(&batch.active_host, &mut batch.active)
+            .map_err(driver_error)?;
+        self.stream
+            .memcpy_htod(&seed_arena, &mut batch.seeds)
+            .map_err(driver_error)?;
+        self.stream.synchronize().map_err(driver_error)?;
+        self.next_tick = 0;
+        self.host_state_current = false;
+        Ok(())
+    }
+
+    #[doc(hidden)]
+    pub fn fused_batch_metadata(&self) -> Option<CudaFusedBatchMetadata> {
+        self.fused_batch
+            .as_ref()
+            .map(|batch| CudaFusedBatchMetadata {
+                capacity: batch.capacity,
+                active_width: batch.active_width,
+                contexts: 1,
+                modules: 1,
+                streams: 1,
+                nvrtc_compiles: 1,
+                generated_source_sha256: self.generated.source_sha256.clone(),
+            })
+    }
+
+    /// Deactivates one fused slot after a slot-local host-side error. Later
+    /// grid-y launches skip it while healthy peers continue in lockstep.
+    #[doc(hidden)]
+    pub fn deactivate_fused_slot(&mut self, slot: usize) -> Result<(), CudaError> {
+        let batch = self
+            .fused_batch
+            .as_mut()
+            .ok_or_else(|| CudaError::InvalidInput("backend is not fused-batch CUDA".to_owned()))?;
+        if slot >= batch.active_width {
+            return Err(CudaError::InvalidInput(format!(
+                "invalid fused CUDA slot {slot}"
+            )));
+        }
+        if batch.active_host[slot] != 0 {
+            batch.active_host[slot] = 0;
+            self.stream
+                .memcpy_htod(&batch.active_host, &mut batch.active)
+                .map_err(driver_error)?;
+        }
+        Ok(())
+    }
+
     /// Returns a current final host snapshot without consuming the retained
     /// backend. This is the sweep lifecycle's final-state/hash seam.
     #[doc(hidden)]
@@ -895,6 +1267,98 @@ impl CudaBackend {
             control_reports_from_counts(&self.model, &fired_counts, &deferred_counts)?;
         host_observation_fallback(views.is_none(), || self.download_state_store())?;
         Ok((tick, fired_per_box, deferred_per_resource_table, views))
+    }
+
+    /// Executes one grid-y tick for every active fused slot. Transport errors
+    /// fail the batch; semantic device errors remain isolated by slot.
+    #[doc(hidden)]
+    pub fn run_tick_observed_reused_fused(
+        &mut self,
+    ) -> Result<FusedReusedCudaTickObservations, CudaError> {
+        let active_width = self
+            .fused_batch
+            .as_ref()
+            .ok_or_else(|| CudaError::InvalidInput("backend is not fused-batch CUDA".to_owned()))?
+            .active_width;
+        if active_width == 0 {
+            return Err(CudaError::InvalidInput(
+                "fused batch must be reset with at least one active draw before execution"
+                    .to_owned(),
+            ));
+        }
+        let tick = self.next_tick;
+        let statuses = self.execute_tick_batch_statuses()?;
+        let views = self.observe_device_views_batch(tick)?;
+        let fired = self
+            .stream
+            .memcpy_dtov(&self.fired_counts)
+            .map_err(driver_error)?;
+        let deferred = self
+            .stream
+            .memcpy_dtov(&self.deferred_counts)
+            .map_err(driver_error)?;
+        let reconstruction = if !self.generated.observation_eligibility.eligible {
+            self.download_fused_state_stores()?
+        } else {
+            (0..active_width).map(|_| Ok(())).collect()
+        };
+        let batch = self
+            .fused_batch
+            .as_ref()
+            .ok_or_else(|| CudaError::InvalidInput("backend is not fused-batch CUDA".to_owned()))?;
+        let fired_stride = batch.strides_host[FusedBuffer::FiredCounts as usize];
+        let deferred_stride = batch.strides_host[FusedBuffer::DeferredCounts as usize];
+        let mut results = Vec::with_capacity(statuses.len());
+        for (slot, ((status, views), reconstruction)) in statuses
+            .into_iter()
+            .zip(views)
+            .zip(reconstruction)
+            .enumerate()
+        {
+            let result = (|| {
+                status?;
+                reconstruction?;
+                let views = views?;
+                let fired_begin = slot * fired_stride;
+                let deferred_begin = slot * deferred_stride;
+                let (fired_per_box, deferred_per_resource_table) = control_reports_from_counts(
+                    &self.model,
+                    &fired[fired_begin..fired_begin + self.layout.candidate_offsets.len()],
+                    &deferred[deferred_begin..deferred_begin + self.layout.row_counts.len()],
+                )?;
+                Ok((tick, fired_per_box, deferred_per_resource_table, views))
+            })();
+            if result.is_err() {
+                self.deactivate_fused_slot(slot)?;
+            }
+            results.push(result);
+        }
+        Ok(results)
+    }
+
+    #[doc(hidden)]
+    pub fn fused_observed_state(&self, slot: usize) -> Result<&StateStore, CudaError> {
+        self.fused_batch
+            .as_ref()
+            .and_then(|batch| batch.host_states.get(slot))
+            .ok_or_else(|| CudaError::InvalidInput(format!("invalid fused CUDA slot {slot}")))
+    }
+
+    #[doc(hidden)]
+    pub fn ensure_fused_observed_states(
+        &mut self,
+    ) -> Result<Vec<Result<Option<StateStore>, CudaError>>, CudaError> {
+        let reconstruction = self.download_fused_state_stores()?;
+        let batch = self.fused_batch.as_ref().expect("fused batch exists");
+        Ok(reconstruction
+            .into_iter()
+            .enumerate()
+            .map(|(slot, result)| {
+                result.map(|()| {
+                    (batch.active_host[slot] != 0).then(|| batch.host_states[slot].clone())
+                })
+            })
+            .collect())
     }
 
     /// Executes one observed CUDA tick and returns durations in this order:
@@ -996,6 +1460,399 @@ impl CudaBackend {
         Ok(self.host_state)
     }
 
+    fn observe_device_views_batch(
+        &mut self,
+        _tick: u32,
+    ) -> Result<Vec<Result<Option<CudaDeviceObservations>, CudaError>>, CudaError> {
+        let active_width = self
+            .fused_batch
+            .as_ref()
+            .ok_or_else(|| CudaError::InvalidInput("backend is not fused-batch CUDA".to_owned()))?
+            .active_width;
+        if !self.generated.observation_eligibility.eligible {
+            return Ok((0..active_width).map(|_| Ok(None)).collect());
+        }
+        let mut slot_errors = (0..active_width)
+            .map(|_| None)
+            .collect::<Vec<Option<CudaError>>>();
+        let strides = self
+            .fused_batch
+            .as_ref()
+            .expect("fused batch exists")
+            .strides_host
+            .clone();
+
+        let scalar_count =
+            u32::try_from(self.generated.observation_view_tables.len()).map_err(|_| {
+                CudaError::InvalidInput("observation view count exceeds u32".to_owned())
+            })?;
+        if scalar_count != 0 {
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_observations,
+                self.fused_batch.as_ref(),
+            );
+            init.arg(&mut self.observation_values).arg(&scalar_count);
+            unsafe { init.launch(LaunchConfig::for_num_elems(scalar_count)) }
+                .map_err(driver_error)?;
+        }
+        for (view_index, table) in self
+            .generated
+            .observation_view_tables
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            let rows = u32::try_from(self.layout.row_counts[table]).map_err(|_| {
+                CudaError::InvalidInput("observation row count exceeds u32".to_owned())
+            })?;
+            if rows == 0 {
+                continue;
+            }
+            let view_index = u32::try_from(view_index).map_err(|_| {
+                CudaError::InvalidInput("observation view index exceeds u32".to_owned())
+            })?;
+            let mut config = LaunchConfig::for_num_elems(rows);
+            config.grid_dim.0 = config.grid_dim.0.min(1024);
+            config.shared_mem_bytes = config.block_dim.0 * 8;
+            let mut observe =
+                fused_launch_builder(&self.stream, &self.observe_view, self.fused_batch.as_ref());
+            observe
+                .arg(&self.state)
+                .arg(&self.column_offsets)
+                .arg(&self.row_counts)
+                .arg(&self.params)
+                .arg(&mut self.observation_values)
+                .arg(&view_index);
+            unsafe { observe.launch(config) }.map_err(driver_error)?;
+        }
+        let scalar_arena = self
+            .stream
+            .memcpy_dtov(&self.observation_values)
+            .map_err(driver_error)?;
+        let scalar_stride = strides[FusedBuffer::ObservationValues as usize];
+        let scalar_names = self
+            .model
+            .model()
+            .boxes
+            .iter()
+            .flat_map(|model_box| {
+                model_box
+                    .views
+                    .iter()
+                    .map(move |view| (model_box.name.clone(), view.name.clone()))
+            })
+            .collect::<Vec<_>>();
+        let mut slot_views = (0..active_width)
+            .map(|slot| {
+                let begin = slot * scalar_stride;
+                scalar_names
+                    .iter()
+                    .cloned()
+                    .zip(
+                        scalar_arena[begin..begin + scalar_count as usize]
+                            .iter()
+                            .copied(),
+                    )
+                    .map(|((box_name, name), value)| ViewValue {
+                        box_name,
+                        name,
+                        value: ObservationValue::Int(value),
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let grouped_specs = self.generated.grouped_observation_views.clone();
+        let band_count = self.generated.grouped_observation_band_axes;
+        let band_arena = if band_count == 0 {
+            vec![0_i64; active_width]
+        } else {
+            let band_count_u32 = u32::try_from(band_count).map_err(|_| {
+                CudaError::InvalidInput("grouped band axis count exceeds u32".to_owned())
+            })?;
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_grouped_extrema,
+                self.fused_batch.as_ref(),
+            );
+            init.arg(&mut self.grouped_extrema).arg(&band_count_u32);
+            unsafe { init.launch(LaunchConfig::for_num_elems(band_count_u32)) }
+                .map_err(driver_error)?;
+            for (view_index, view) in grouped_specs.iter().enumerate() {
+                if !view.axes.iter().any(|axis| {
+                    matches!(
+                        axis,
+                        crate::codegen::GroupedObservationAxis::BandedInt { .. }
+                    )
+                }) {
+                    continue;
+                }
+                let rows = u32::try_from(self.layout.row_counts[view.table]).map_err(|_| {
+                    CudaError::InvalidInput("grouped observation row count exceeds u32".to_owned())
+                })?;
+                if rows == 0 {
+                    continue;
+                }
+                let view_index = u32::try_from(view_index).map_err(|_| {
+                    CudaError::InvalidInput("grouped observation view index exceeds u32".to_owned())
+                })?;
+                let mut config = LaunchConfig::for_num_elems(rows);
+                config.grid_dim.0 = config.grid_dim.0.min(1024);
+                let mut bound = fused_launch_builder(
+                    &self.stream,
+                    &self.bound_grouped_view,
+                    self.fused_batch.as_ref(),
+                );
+                bound
+                    .arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&mut self.grouped_extrema)
+                    .arg(&view_index);
+                unsafe { bound.launch(config) }.map_err(driver_error)?;
+            }
+            self.stream
+                .memcpy_dtov(&self.grouped_extrema)
+                .map_err(driver_error)?
+        };
+        let extrema_stride = strides[FusedBuffer::GroupedExtrema as usize];
+        let mut layouts = Vec::with_capacity(active_width);
+        for (slot, slot_error) in slot_errors.iter_mut().enumerate().take(active_width) {
+            let begin = slot * extrema_stride;
+            let result = grouped_specs
+                .iter()
+                .map(|view| {
+                    grouped_observation_layout(
+                        view,
+                        &self.layout.row_counts,
+                        &band_arena[begin..begin + band_count * 2],
+                    )
+                })
+                .collect::<Result<Vec<_>, CudaError>>();
+            match result {
+                Ok(slot_layouts) => layouts.push(slot_layouts),
+                Err(error) => {
+                    *slot_error = Some(error);
+                    layouts.push(
+                        grouped_specs
+                            .iter()
+                            .map(|view| GroupedObservationLayout {
+                                axes: view
+                                    .axes
+                                    .iter()
+                                    .map(|_| GroupedObservationAxisLayout {
+                                        minimum: 0,
+                                        cardinality: 0,
+                                    })
+                                    .collect(),
+                                key_space_size: 0,
+                            })
+                            .collect(),
+                    );
+                    self.deactivate_fused_slot(slot)?;
+                }
+            }
+        }
+        let axis_stride = strides[FusedBuffer::GroupedAxisMins as usize];
+        let capacity = self
+            .fused_batch
+            .as_ref()
+            .expect("fused batch exists")
+            .capacity;
+        let mut axis_mins = vec![0_i64; axis_stride * capacity];
+        let mut axis_cardinalities = vec![0_u64; axis_stride * capacity];
+        for (slot, slot_layouts) in layouts.iter().enumerate() {
+            let begin = slot * axis_stride;
+            let mins = slot_layouts
+                .iter()
+                .flat_map(|layout| layout.axes.iter().map(|axis| axis.minimum));
+            let cardinalities = slot_layouts
+                .iter()
+                .flat_map(|layout| layout.axes.iter().map(|axis| axis.cardinality));
+            for (index, value) in mins.enumerate() {
+                axis_mins[begin + index] = value;
+            }
+            for (index, value) in cardinalities.enumerate() {
+                axis_cardinalities[begin + index] = value;
+            }
+        }
+        if axis_stride != 0 {
+            self.stream
+                .memcpy_htod(&axis_mins, &mut self.grouped_axis_mins)
+                .map_err(driver_error)?;
+            self.stream
+                .memcpy_htod(&axis_cardinalities, &mut self.grouped_axis_cardinalities)
+                .map_err(driver_error)?;
+        }
+
+        let histogram_stride = strides[FusedBuffer::GroupedHistogram as usize];
+        let mut slot_grouped = vec![Vec::new(); active_width];
+        for (view_index, view) in grouped_specs.iter().enumerate() {
+            let max_key_space = layouts
+                .iter()
+                .map(|slot| slot[view_index].key_space_size)
+                .max()
+                .unwrap_or(0);
+            if max_key_space == 0 {
+                continue;
+            }
+            let key_space = u32::try_from(max_key_space)
+                .map_err(|_| CudaError::InvalidInput("grouped key space exceeds u32".to_owned()))?;
+            let key_space_u64 = u64::from(key_space);
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_grouped_histogram,
+                self.fused_batch.as_ref(),
+            );
+            init.arg(&mut self.grouped_histogram).arg(&key_space_u64);
+            unsafe { init.launch(LaunchConfig::for_num_elems(key_space)) }.map_err(driver_error)?;
+            let rows = u32::try_from(self.layout.row_counts[view.table]).map_err(|_| {
+                CudaError::InvalidInput("grouped observation row count exceeds u32".to_owned())
+            })?;
+            if rows != 0 {
+                let view_index_u32 = u32::try_from(view_index).map_err(|_| {
+                    CudaError::InvalidInput("grouped observation index exceeds u32".to_owned())
+                })?;
+                let mut config = LaunchConfig::for_num_elems(rows);
+                config.grid_dim.0 = config.grid_dim.0.min(1024);
+                let mut observe = fused_launch_builder(
+                    &self.stream,
+                    &self.observe_grouped_view,
+                    self.fused_batch.as_ref(),
+                );
+                observe
+                    .arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&self.params)
+                    .arg(&self.grouped_axis_mins)
+                    .arg(&self.grouped_axis_cardinalities)
+                    .arg(&mut self.grouped_histogram)
+                    .arg(&view_index_u32);
+                unsafe { observe.launch(config) }.map_err(driver_error)?;
+            }
+            let counters = self
+                .stream
+                .memcpy_dtov(&self.grouped_histogram)
+                .map_err(driver_error)?;
+            for slot in 0..active_width {
+                if slot_errors[slot].is_some() {
+                    continue;
+                }
+                let layout = &layouts[slot][view_index];
+                if layout.key_space_size == 0 {
+                    continue;
+                }
+                let begin = slot * histogram_stride;
+                match decode_grouped_histogram(
+                    view,
+                    layout,
+                    &counters[begin..begin + layout.key_space_size],
+                ) {
+                    Ok(values) => slot_grouped[slot].extend(values),
+                    Err(error) => {
+                        slot_errors[slot] = Some(error);
+                        self.deactivate_fused_slot(slot)?;
+                    }
+                }
+            }
+        }
+
+        let generic_count = self.generated.generic_enum_count;
+        let mut generic_by_slot = if generic_count == 0 {
+            let value = (self.generated.observation_view_tables.is_empty()
+                && !self.generated.grouped_observation_views.is_empty())
+            .then(Vec::new);
+            vec![value; active_width]
+        } else {
+            let count_u32 = u32::try_from(generic_count).map_err(|_| {
+                CudaError::InvalidInput("generic enum observation count exceeds u32".to_owned())
+            })?;
+            let count_u64 = u64::from(count_u32);
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_generic_enum_counts,
+                self.fused_batch.as_ref(),
+            );
+            init.arg(&mut self.generic_enum_counts).arg(&count_u64);
+            unsafe { init.launch(LaunchConfig::for_num_elems(count_u32)) }.map_err(driver_error)?;
+            for (index, observation) in self
+                .generated
+                .generic_enum_observations
+                .clone()
+                .iter()
+                .enumerate()
+            {
+                let rows =
+                    u32::try_from(self.layout.row_counts[observation.table]).map_err(|_| {
+                        CudaError::InvalidInput("generic enum row count exceeds u32".to_owned())
+                    })?;
+                if rows == 0 {
+                    continue;
+                }
+                let index = u32::try_from(index).map_err(|_| {
+                    CudaError::InvalidInput("generic enum index exceeds u32".to_owned())
+                })?;
+                let mut observe = fused_launch_builder(
+                    &self.stream,
+                    &self.observe_generic_enum,
+                    self.fused_batch.as_ref(),
+                );
+                observe
+                    .arg(&self.state)
+                    .arg(&self.column_offsets)
+                    .arg(&self.row_counts)
+                    .arg(&mut self.generic_enum_counts)
+                    .arg(&index);
+                unsafe { observe.launch(LaunchConfig::for_num_elems(rows)) }
+                    .map_err(driver_error)?;
+            }
+            let counts = self
+                .stream
+                .memcpy_dtov(&self.generic_enum_counts)
+                .map_err(driver_error)?;
+            let stride = strides[FusedBuffer::GenericEnumCounts as usize];
+            let mut by_slot = vec![None; active_width];
+            for slot in 0..active_width {
+                if slot_errors[slot].is_some() {
+                    continue;
+                }
+                let begin = slot * stride;
+                match counts[begin..begin + generic_count]
+                    .iter()
+                    .copied()
+                    .map(|count| {
+                        usize::try_from(count).map_err(|_| {
+                            CudaError::InvalidInput(
+                                "generic enum count exceeds host usize".to_owned(),
+                            )
+                        })
+                    })
+                    .collect::<Result<Vec<_>, CudaError>>()
+                {
+                    Ok(counts) => by_slot[slot] = Some(counts),
+                    Err(error) => {
+                        slot_errors[slot] = Some(error);
+                        self.deactivate_fused_slot(slot)?;
+                    }
+                }
+            }
+            by_slot
+        };
+
+        Ok((0..active_width)
+            .map(|slot| match slot_errors[slot].take() {
+                Some(error) => Err(error),
+                None => Ok(Some(CudaDeviceObservations {
+                    views: mem::take(&mut slot_views[slot]),
+                    grouped_views: mem::take(&mut slot_grouped[slot]),
+                    generic_enum_counts: generic_by_slot[slot].take(),
+                })),
+            })
+            .collect())
+    }
+
     fn observe_device_views(
         &mut self,
         tick: u32,
@@ -1009,7 +1866,11 @@ impl CudaBackend {
                 CudaError::InvalidInput("observation view count exceeds u32".to_owned())
             })?;
         if scalar_count != 0 {
-            let mut init = self.stream.launch_builder(&self.init_observations);
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_observations,
+                self.fused_batch.as_ref(),
+            );
             init.arg(&mut self.observation_values).arg(&scalar_count);
             unsafe { init.launch(LaunchConfig::for_num_elems(scalar_count)) }
                 .map_err(driver_error)?;
@@ -1034,7 +1895,8 @@ impl CudaBackend {
             let mut config = LaunchConfig::for_num_elems(rows);
             config.grid_dim.0 = config.grid_dim.0.min(1024);
             config.shared_mem_bytes = config.block_dim.0 * 8;
-            let mut observe = self.stream.launch_builder(&self.observe_view);
+            let mut observe =
+                fused_launch_builder(&self.stream, &self.observe_view, self.fused_batch.as_ref());
             observe
                 .arg(&self.state)
                 .arg(&self.column_offsets)
@@ -1074,7 +1936,11 @@ impl CudaBackend {
             let band_count_u32 = u32::try_from(band_count).map_err(|_| {
                 CudaError::InvalidInput("grouped band axis count exceeds u32".to_owned())
             })?;
-            let mut init = self.stream.launch_builder(&self.init_grouped_extrema);
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_grouped_extrema,
+                self.fused_batch.as_ref(),
+            );
             init.arg(&mut self.grouped_extrema).arg(&band_count_u32);
             unsafe { init.launch(LaunchConfig::for_num_elems(band_count_u32)) }
                 .map_err(driver_error)?;
@@ -1098,7 +1964,11 @@ impl CudaBackend {
                 })?;
                 let mut config = LaunchConfig::for_num_elems(rows);
                 config.grid_dim.0 = config.grid_dim.0.min(1024);
-                let mut bound = self.stream.launch_builder(&self.bound_grouped_view);
+                let mut bound = fused_launch_builder(
+                    &self.stream,
+                    &self.bound_grouped_view,
+                    self.fused_batch.as_ref(),
+                );
                 bound
                     .arg(&self.state)
                     .arg(&self.column_offsets)
@@ -1145,7 +2015,11 @@ impl CudaBackend {
             let key_space = u32::try_from(layout.key_space_size)
                 .map_err(|_| CudaError::InvalidInput("grouped key space exceeds u32".to_owned()))?;
             let key_space_u64 = u64::from(key_space);
-            let mut init = self.stream.launch_builder(&self.init_grouped_histogram);
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_grouped_histogram,
+                self.fused_batch.as_ref(),
+            );
             init.arg(&mut self.grouped_histogram).arg(&key_space_u64);
             unsafe { init.launch(LaunchConfig::for_num_elems(key_space)) }.map_err(driver_error)?;
 
@@ -1158,7 +2032,11 @@ impl CudaBackend {
                 })?;
                 let mut config = LaunchConfig::for_num_elems(rows);
                 config.grid_dim.0 = config.grid_dim.0.min(1024);
-                let mut observe = self.stream.launch_builder(&self.observe_grouped_view);
+                let mut observe = fused_launch_builder(
+                    &self.stream,
+                    &self.observe_grouped_view,
+                    self.fused_batch.as_ref(),
+                );
                 observe
                     .arg(&self.state)
                     .arg(&self.column_offsets)
@@ -1198,7 +2076,11 @@ impl CudaBackend {
                 CudaError::InvalidInput("generic enum observation count exceeds u32".to_owned())
             })?;
             let generic_enum_count_u64 = u64::from(generic_enum_count_u32);
-            let mut init = self.stream.launch_builder(&self.init_generic_enum_counts);
+            let mut init = fused_launch_builder(
+                &self.stream,
+                &self.init_generic_enum_counts,
+                self.fused_batch.as_ref(),
+            );
             init.arg(&mut self.generic_enum_counts)
                 .arg(&generic_enum_count_u64);
             unsafe { init.launch(LaunchConfig::for_num_elems(generic_enum_count_u32)) }
@@ -1220,7 +2102,11 @@ impl CudaBackend {
                 })?;
                 let mut config = LaunchConfig::for_num_elems(rows);
                 config.grid_dim.0 = config.grid_dim.0.min(1024);
-                let mut observe = self.stream.launch_builder(&self.observe_generic_enum);
+                let mut observe = fused_launch_builder(
+                    &self.stream,
+                    &self.observe_generic_enum,
+                    self.fused_batch.as_ref(),
+                );
                 observe
                     .arg(&self.state)
                     .arg(&self.column_offsets)
@@ -1382,6 +2268,13 @@ impl CudaBackend {
     }
 
     fn execute_tick(&mut self) -> Result<(), CudaError> {
+        self.execute_tick_batch_statuses()?
+            .into_iter()
+            .next()
+            .unwrap_or(Ok(()))
+    }
+
+    fn execute_tick_batch_statuses(&mut self) -> Result<Vec<Result<(), CudaError>>, CudaError> {
         let one = LaunchConfig {
             grid_dim: (1, 1, 1),
             block_dim: (1, 1, 1),
@@ -1389,7 +2282,8 @@ impl CudaBackend {
         };
         let aggregate_error_count = (self.layout.aggregate_max_groups + 2) as u64;
         {
-            let mut args = self.stream.launch_builder(&self.reset_status);
+            let mut args =
+                fused_launch_builder(&self.stream, &self.reset_status, self.fused_batch.as_ref());
             args.arg(&mut self.status)
                 .arg(&mut self.aggregate_errors)
                 .arg(&aggregate_error_count);
@@ -1397,7 +2291,11 @@ impl CudaBackend {
         }
         {
             let rule_count = self.layout.candidate_offsets.len() as u64;
-            let mut args = self.stream.launch_builder(&self.init_validation_scratch);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.init_validation_scratch,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&mut self.status)
                 .arg(&mut self.effect_active)
                 .arg(&rule_count);
@@ -1411,7 +2309,11 @@ impl CudaBackend {
             let group_table = self.generated.aggregate_group_tables[aggregate_slot];
             let aggregate_index = u32::try_from(aggregate_slot)
                 .map_err(|_| CudaError::InvalidInput("aggregate count exceeds u32".to_owned()))?;
-            let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.build_aggregate_partials,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&self.state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
@@ -1432,7 +2334,11 @@ impl CudaBackend {
                 CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
             })?;
             if groups != 0 {
-                let mut args = self.stream.launch_builder(&self.finish_aggregates);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.finish_aggregates,
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.aggregate_partials)
                     .arg(&self.row_counts)
                     .arg(&aggregate_index)
@@ -1445,7 +2351,11 @@ impl CudaBackend {
                     .map_err(driver_error)?;
             }
             let aggregate_identity = u64::from(aggregate_index);
-            let mut args = self.stream.launch_builder(&self.record_aggregate_errors);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.record_aggregate_errors,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&mut self.aggregate_errors)
                 .arg(&aggregate_error_count)
                 .arg(&aggregate_identity)
@@ -1488,7 +2398,11 @@ impl CudaBackend {
                 let validation_config = self.validation_launch_config(rows, one);
                 for phase in 0..VALIDATION_REDUCTION_PASSES {
                     {
-                        let mut args = self.stream.launch_builder(&self.validate_transition);
+                        let mut args = fused_launch_builder(
+                            &self.stream,
+                            &self.validate_transition,
+                            self.fused_batch.as_ref(),
+                        );
                         args.arg(&self.state)
                             .arg(&self.column_offsets)
                             .arg(&self.row_counts)
@@ -1511,6 +2425,7 @@ impl CudaBackend {
                         &mut self.status,
                         phase,
                         one,
+                        self.fused_batch.as_ref(),
                     )?;
                 }
 
@@ -1519,9 +2434,11 @@ impl CudaBackend {
                 }
                 let dt = self.model.model().dt;
                 let tick = self.next_tick;
-                let mut args = self
-                    .stream
-                    .launch_builder(&self.transition_functions[*index]);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.transition_functions[*index],
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.state)
                     .arg(&self.column_offsets)
                     .arg(&self.row_counts)
@@ -1548,7 +2465,11 @@ impl CudaBackend {
                 let candidate_count = u64::from(rows);
                 for phase in 0..VALIDATION_REDUCTION_PASSES {
                     {
-                        let mut args = self.stream.launch_builder(&self.check_errors);
+                        let mut args = fused_launch_builder(
+                            &self.stream,
+                            &self.check_errors,
+                            self.fused_batch.as_ref(),
+                        );
                         args.arg(&self.candidate_errors)
                             .arg(&candidate_begin)
                             .arg(&candidate_count)
@@ -1562,13 +2483,18 @@ impl CudaBackend {
                         &mut self.status,
                         phase,
                         one,
+                        self.fused_batch.as_ref(),
                     )?;
                 }
 
                 let claims_config = self.validation_launch_config(rows, one);
                 for phase in 0..VALIDATION_REDUCTION_PASSES {
                     {
-                        let mut args = self.stream.launch_builder(&self.validate_claims);
+                        let mut args = fused_launch_builder(
+                            &self.stream,
+                            &self.validate_claims,
+                            self.fused_batch.as_ref(),
+                        );
                         args.arg(&self.state)
                             .arg(&self.column_offsets)
                             .arg(&self.row_counts)
@@ -1591,6 +2517,7 @@ impl CudaBackend {
                         &mut self.status,
                         phase,
                         one,
+                        self.fused_batch.as_ref(),
                     )?;
                 }
             }
@@ -1598,9 +2525,11 @@ impl CudaBackend {
             let box_index_u32 = u32::try_from(box_index)
                 .map_err(|_| CudaError::InvalidInput("box count exceeds u32".to_owned()))?;
             {
-                let mut args = self
-                    .stream
-                    .launch_builder(&self.validate_claim_compatibility);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.validate_claim_compatibility,
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.state)
                     .arg(&self.column_offsets)
                     .arg(&self.row_counts)
@@ -1680,7 +2609,11 @@ impl CudaBackend {
                     let resource_config = self.conflict_launch_config(resource_launch_count, one);
                     let instance_config = self.conflict_launch_config(instance_launch_count, one);
 
-                    let mut args = self.stream.launch_builder(&self.init_conflict_winners);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.init_conflict_winners,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&resource_count)
                         .arg(&mut self.winner_keys)
                         .arg(&mut self.winner_rules)
@@ -1688,7 +2621,11 @@ impl CudaBackend {
                         .arg(&mut self.winner_instances);
                     unsafe { args.launch(resource_config) }.map_err(driver_error)?;
 
-                    let mut args = self.stream.launch_builder(&self.build_claim_instances);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.build_claim_instances,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&self.state)
                         .arg(&self.column_offsets)
                         .arg(&self.row_counts)
@@ -1712,7 +2649,11 @@ impl CudaBackend {
                         .arg(&self.status);
                     unsafe { args.launch(candidate_config) }.map_err(driver_error)?;
 
-                    let mut args = self.stream.launch_builder(&self.reduce_claim_keys);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.reduce_claim_keys,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&claim_instance_begin)
                         .arg(&claim_instance_count)
                         .arg(&self.instance_resources)
@@ -1720,7 +2661,11 @@ impl CudaBackend {
                         .arg(&mut self.winner_keys);
                     unsafe { args.launch(instance_config) }.map_err(driver_error)?;
 
-                    let mut args = self.stream.launch_builder(&self.reduce_claim_rules);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.reduce_claim_rules,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&claim_instance_begin)
                         .arg(&claim_instance_count)
                         .arg(&self.instance_resources)
@@ -1730,7 +2675,11 @@ impl CudaBackend {
                         .arg(&mut self.winner_rules);
                     unsafe { args.launch(instance_config) }.map_err(driver_error)?;
 
-                    let mut args = self.stream.launch_builder(&self.reduce_claim_entities);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.reduce_claim_entities,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&claim_instance_begin)
                         .arg(&claim_instance_count)
                         .arg(&self.instance_resources)
@@ -1742,7 +2691,11 @@ impl CudaBackend {
                         .arg(&mut self.winner_entities);
                     unsafe { args.launch(instance_config) }.map_err(driver_error)?;
 
-                    let mut args = self.stream.launch_builder(&self.reduce_claim_instances);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.reduce_claim_instances,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&claim_instance_begin)
                         .arg(&claim_instance_count)
                         .arg(&self.instance_resources)
@@ -1756,7 +2709,11 @@ impl CudaBackend {
                     unsafe { args.launch(instance_config) }.map_err(driver_error)?;
                 }
 
-                let mut args = self.stream.launch_builder(&self.resolve_conflicts);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.resolve_conflicts,
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.row_counts)
                     .arg(&self.candidate_offsets)
                     .arg(&self.claim_instance_offsets)
@@ -1803,7 +2760,11 @@ impl CudaBackend {
                 let candidate_begin = self.layout.candidate_offsets[rule_index];
                 let rule_id = transition.rule_id;
                 let candidate_count = u64::from(rows);
-                let mut args = self.stream.launch_builder(&self.mark_effect_active);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.mark_effect_active,
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.wins)
                     .arg(&candidate_begin)
                     .arg(&candidate_count)
@@ -1814,7 +2775,11 @@ impl CudaBackend {
             let effects_config = self.validation_launch_config(effects_rows, one);
             for phase in 0..VALIDATION_REDUCTION_PASSES {
                 {
-                    let mut args = self.stream.launch_builder(&self.validate_effects);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.validate_effects,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&self.state)
                         .arg(&self.column_offsets)
                         .arg(&self.row_counts)
@@ -1839,6 +2804,7 @@ impl CudaBackend {
                     &mut self.status,
                     phase,
                     one,
+                    self.fused_batch.as_ref(),
                 )?;
             }
         }
@@ -1850,7 +2816,11 @@ impl CudaBackend {
             CudaError::InvalidInput("write-owner count exceeds CUDA launch capacity".to_owned())
         })?;
         if owner_launch_count != 0 {
-            let mut args = self.stream.launch_builder(&self.init_effect_owners);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.init_effect_owners,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&mut self.owners).arg(&owner_count);
             unsafe { args.launch(LaunchConfig::for_num_elems(owner_launch_count)) }
                 .map_err(driver_error)?;
@@ -1879,7 +2849,11 @@ impl CudaBackend {
             let rule_id = transition.rule_id;
             for phase in 0..VALIDATION_REDUCTION_PASSES {
                 {
-                    let mut args = self.stream.launch_builder(&self.prepare_effects);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.prepare_effects,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&self.state)
                         .arg(&self.column_offsets)
                         .arg(&self.row_counts)
@@ -1906,12 +2880,14 @@ impl CudaBackend {
                     &mut self.status,
                     phase,
                     one,
+                    self.fused_batch.as_ref(),
                 )?;
             }
         }
         if self.layout.owner_count != 0 {
             let launch_count = owner_launch_count;
-            let mut args = self.stream.launch_builder(&self.apply_effects);
+            let mut args =
+                fused_launch_builder(&self.stream, &self.apply_effects, self.fused_batch.as_ref());
             args.arg(&mut self.next_state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
@@ -1930,7 +2906,11 @@ impl CudaBackend {
             let group_table = self.generated.aggregate_group_tables[aggregate_slot];
             let aggregate_index = u32::try_from(aggregate_slot)
                 .map_err(|_| CudaError::InvalidInput("aggregate count exceeds u32".to_owned()))?;
-            let mut args = self.stream.launch_builder(&self.build_aggregate_partials);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.build_aggregate_partials,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&self.next_state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
@@ -1951,7 +2931,11 @@ impl CudaBackend {
                 CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
             })?;
             if groups != 0 {
-                let mut args = self.stream.launch_builder(&self.finish_aggregates);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.finish_aggregates,
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.aggregate_partials)
                     .arg(&self.row_counts)
                     .arg(&aggregate_index)
@@ -1964,7 +2948,11 @@ impl CudaBackend {
                     .map_err(driver_error)?;
             }
             let aggregate_identity = u64::from(aggregate_index);
-            let mut args = self.stream.launch_builder(&self.record_aggregate_errors);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.record_aggregate_errors,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&mut self.aggregate_errors)
                 .arg(&aggregate_error_count)
                 .arg(&aggregate_identity)
@@ -2011,7 +2999,11 @@ impl CudaBackend {
             let output_config = self.validation_launch_config(output_rows, one);
             for phase in 0..VALIDATION_REDUCTION_PASSES {
                 {
-                    let mut args = self.stream.launch_builder(&self.validate_outputs);
+                    let mut args = fused_launch_builder(
+                        &self.stream,
+                        &self.validate_outputs,
+                        self.fused_batch.as_ref(),
+                    );
                     args.arg(&self.next_state)
                         .arg(&self.column_offsets)
                         .arg(&self.row_counts)
@@ -2032,6 +3024,7 @@ impl CudaBackend {
                     &mut self.status,
                     phase,
                     one,
+                    self.fused_batch.as_ref(),
                 )?;
             }
         }
@@ -2039,7 +3032,11 @@ impl CudaBackend {
             let port_count = self.layout.ports.len() as u64;
             let field_count = self.layout.input_offsets.len() as u64;
             let error_count = field_count.saturating_mul(3).max(3);
-            let mut args = self.stream.launch_builder(&self.prepare_outputs);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.prepare_outputs,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&mut self.next_input_counts)
                 .arg(&port_count)
                 .arg(&mut self.output_errors)
@@ -2052,7 +3049,11 @@ impl CudaBackend {
                     "output field count exceeds CUDA launch capacity".to_owned(),
                 )
             })?;
-            let mut args = self.stream.launch_builder(&self.build_output_partials);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.build_output_partials,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&self.next_state)
                 .arg(&self.column_offsets)
                 .arg(&self.row_counts)
@@ -2068,7 +3069,11 @@ impl CudaBackend {
             unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
                 .map_err(driver_error)?;
             let field_count_u64 = u64::from(field_count);
-            let mut args = self.stream.launch_builder(&self.finish_outputs);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.finish_outputs,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&self.output_partials)
                 .arg(&field_count_u64)
                 .arg(&mut self.next_inputs)
@@ -2076,7 +3081,11 @@ impl CudaBackend {
                 .arg(&mut self.output_errors);
             unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
                 .map_err(driver_error)?;
-            let mut args = self.stream.launch_builder(&self.check_output_errors);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.check_output_errors,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&self.output_errors)
                 .arg(&field_count_u64)
                 .arg(&mut self.status);
@@ -2092,7 +3101,11 @@ impl CudaBackend {
         let candidate_count = u64::try_from(self.layout.candidate_count)
             .map_err(|_| CudaError::InvalidInput("candidate count exceeds u64".to_owned()))?;
         {
-            let mut args = self.stream.launch_builder(&self.init_control_counts);
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.init_control_counts,
+                self.fused_batch.as_ref(),
+            );
             args.arg(&mut self.fired_counts)
                 .arg(&rule_count)
                 .arg(&mut self.deferred_counts)
@@ -2113,7 +3126,8 @@ impl CudaBackend {
             }
             let rule = u64::try_from(rule_index)
                 .map_err(|_| CudaError::InvalidInput("rule index exceeds u64".to_owned()))?;
-            let mut args = self.stream.launch_builder(&self.count_fired);
+            let mut args =
+                fused_launch_builder(&self.stream, &self.count_fired, self.fused_batch.as_ref());
             args.arg(&self.wins)
                 .arg(&self.candidate_offsets)
                 .arg(&candidate_count)
@@ -2126,7 +3140,11 @@ impl CudaBackend {
         if candidate_count != 0 {
             let config = control_count_launch_config(candidate_count);
             for table in 0..table_count {
-                let mut args = self.stream.launch_builder(&self.count_deferred);
+                let mut args = fused_launch_builder(
+                    &self.stream,
+                    &self.count_deferred,
+                    self.fused_batch.as_ref(),
+                );
                 args.arg(&self.deferred)
                     .arg(&candidate_count)
                     .arg(&table_count)
@@ -2140,8 +3158,35 @@ impl CudaBackend {
             .stream
             .memcpy_dtov(&self.status)
             .map_err(driver_error)?;
-        if status[0] != 0 {
-            return Err(device_status(&status));
+        let active_width = self
+            .fused_batch
+            .as_ref()
+            .map_or(1, |batch| batch.active_width);
+        let mut results = Vec::with_capacity(active_width);
+        let mut deactivate = false;
+        for slot in 0..active_width {
+            let begin = slot * 12;
+            let slot_status = &status[begin..begin + 12];
+            if slot_status[0] == 0 {
+                results.push(Ok(()));
+            } else {
+                results.push(Err(device_status(slot_status)));
+                if let Some(batch) = self.fused_batch.as_mut() {
+                    batch.active_host[slot] = 0;
+                    deactivate = true;
+                }
+            }
+        }
+        if deactivate {
+            let batch = self.fused_batch.as_mut().expect("fused batch exists");
+            self.stream
+                .memcpy_htod(&batch.active_host, &mut batch.active)
+                .map_err(driver_error)?;
+        }
+        if self.fused_batch.is_none() {
+            if let Some(error) = results.iter().find_map(|status| status.as_ref().err()) {
+                return Err(error.clone());
+            }
         }
         mem::swap(&mut self.state, &mut self.next_state);
         mem::swap(&mut self.inputs, &mut self.next_inputs);
@@ -2151,7 +3196,58 @@ impl CudaBackend {
             .checked_add(1)
             .ok_or_else(|| CudaError::DeviceExecution("tick coordinate overflow".to_owned()))?;
         self.host_state_current = false;
-        Ok(())
+        Ok(results)
+    }
+
+    fn download_fused_state_stores(&mut self) -> Result<Vec<Result<(), CudaError>>, CudaError> {
+        let (state, inputs, input_counts) = self.download_state_parts()?;
+        let batch = self
+            .fused_batch
+            .as_mut()
+            .ok_or_else(|| CudaError::InvalidInput("backend is not fused-batch CUDA".to_owned()))?;
+        let state_stride = batch.strides_host[FusedBuffer::State as usize];
+        let input_stride = batch.strides_host[FusedBuffer::Inputs as usize];
+        let count_stride = batch.strides_host[FusedBuffer::InputCounts as usize];
+        let mut results = Vec::with_capacity(batch.active_width);
+        let mut deactivate = false;
+        for slot in 0..batch.active_width {
+            if batch.active_host[slot] == 0 {
+                results.push(Ok(()));
+                continue;
+            }
+            let result = (|| {
+                let mut tables = self.pristine_host_tables.clone();
+                let state_begin = slot * state_stride;
+                let input_begin = slot * input_stride;
+                let count_begin = slot * count_stride;
+                unpack_state_into(
+                    &self.model,
+                    &self.layout,
+                    &state[state_begin..state_begin + state_stride],
+                    &mut tables,
+                )?;
+                let input_tables = unpack_inputs(
+                    &self.model,
+                    &self.layout,
+                    &inputs[input_begin..input_begin + input_stride],
+                    &input_counts[count_begin..count_begin + count_stride],
+                );
+                batch.host_states[slot]
+                    .refresh_backend_snapshot(&self.model, &tables, input_tables)
+                    .map_err(|error| CudaError::DeviceExecution(error.to_string()))
+            })();
+            if result.is_err() {
+                batch.active_host[slot] = 0;
+                deactivate = true;
+            }
+            results.push(result);
+        }
+        if deactivate {
+            self.stream
+                .memcpy_htod(&batch.active_host, &mut batch.active)
+                .map_err(driver_error)?;
+        }
+        Ok(results)
     }
 
     fn download_state_store(&mut self) -> Result<(), CudaError> {

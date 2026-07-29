@@ -25,6 +25,7 @@ from typing import Any
 SCHEMA = "sembla-sweep-concurrency-spike/v1"
 WORKERS_ENV = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS"
 CUDA_LOCKSTEP_ENV = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"
+CUDA_FUSED_ENV = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS"
 
 
 def sha256(path: Path) -> str:
@@ -107,8 +108,14 @@ def monitor_process(
         time.sleep(0.25)
 
 
-def run_arm(args: argparse.Namespace, workers: int, repetition: int) -> dict[str, Any]:
-    arm = args.output_root / f"workers-{workers}" / f"rep-{repetition}"
+def run_arm(
+    args: argparse.Namespace,
+    workers: int,
+    repetition: int,
+    sequential_reference: bool = False,
+) -> dict[str, Any]:
+    label = "sequential-reference" if sequential_reference else f"workers-{workers}"
+    arm = args.output_root / label / f"rep-{repetition}"
     output = arm / "output"
     timing = arm / "timing.json"
     pairs = arm / "pairs.csv" if args.export_pairs else None
@@ -145,7 +152,11 @@ def run_arm(args: argparse.Namespace, workers: int, repetition: int) -> dict[str
         command.extend(["--enable", feature])
 
     environment = os.environ.copy()
-    environment[WORKERS_ENV] = str(workers)
+    environment[WORKERS_ENV] = "1" if args.cuda_fused_grid_y else str(workers)
+    if args.cuda_fused_grid_y and not sequential_reference:
+        environment[CUDA_FUSED_ENV] = str(workers)
+    else:
+        environment.pop(CUDA_FUSED_ENV, None)
     if args.cuda_lockstep_streams and workers > 1:
         environment[CUDA_LOCKSTEP_ENV] = "1"
     else:
@@ -173,8 +184,13 @@ def run_arm(args: argparse.Namespace, workers: int, repetition: int) -> dict[str
     record: dict[str, Any] = {
         "workers": workers,
         "repetition": repetition,
+        "arm_kind": "sequential-reference" if sequential_reference else "candidate",
         "eval_threads_per_draw": eval_threads,
         "cuda_lockstep_streams": args.cuda_lockstep_streams and workers > 1,
+        "cuda_fused_grid_y": args.cuda_fused_grid_y and not sequential_reference,
+        "requested_fused_capacity": (
+            workers if args.cuda_fused_grid_y and not sequential_reference else None
+        ),
         "command": command,
         "return_code": return_code,
         "external_wall_time_ms": wall_ms,
@@ -236,6 +252,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--params", type=Path)
     parser.add_argument("--export-pairs", action="store_true")
     parser.add_argument("--cuda-lockstep-streams", action="store_true")
+    parser.add_argument("--cuda-fused-grid-y", action="store_true")
     parser.add_argument("--enable", action="append", default=[])
     args = parser.parse_args()
     if args.draws <= 0 or args.ticks <= 0 or args.repetitions <= 0:
@@ -250,6 +267,12 @@ def parse_args() -> argparse.Namespace:
         parser.error("--theta-file conflicts with --draws")
     if args.backend == "cpu" and not args.cpu_total_threads:
         parser.error("--cpu-total-threads is required for --backend cpu")
+    if args.cuda_lockstep_streams and args.cuda_fused_grid_y:
+        parser.error("--cuda-lockstep-streams conflicts with --cuda-fused-grid-y")
+    if args.cuda_fused_grid_y and args.backend != "cuda":
+        parser.error("--cuda-fused-grid-y requires --backend cuda")
+    if args.cuda_fused_grid_y and any(workers not in (1, 2, 4) for workers in args.workers):
+        parser.error("--cuda-fused-grid-y capacities must be 1, 2, or 4")
     if args.cuda_lockstep_streams and args.backend != "cuda":
         parser.error("--cuda-lockstep-streams requires --backend cuda")
     if args.cuda_lockstep_streams and args.theta_file:
@@ -299,12 +322,21 @@ def main() -> int:
         "repetitions": args.repetitions,
         "cpu_total_threads": args.cpu_total_threads,
         "cuda_lockstep_streams": args.cuda_lockstep_streams,
+        "cuda_fused_grid_y": args.cuda_fused_grid_y,
         "enabled_features": args.enable,
         "runs": [],
     }
     summary_path = args.output_root / "summary.json"
     try:
         for repetition in range(args.repetitions):
+            if args.cuda_fused_grid_y:
+                reference = run_arm(args, 1, repetition, sequential_reference=True)
+                document["runs"].append(reference)
+                summary_path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n")
+                if reference["return_code"] != 0:
+                    raise RuntimeError(
+                        f"sequential reference repetition={repetition} failed; see {summary_path}"
+                    )
             for workers in args.workers:
                 record = run_arm(args, workers, repetition)
                 document["runs"].append(record)
@@ -317,7 +349,11 @@ def main() -> int:
         references = {
             run["repetition"]: run
             for run in document["runs"]
-            if run["workers"] == 1
+            if (
+                run["arm_kind"] == "sequential-reference"
+                if args.cuda_fused_grid_y
+                else run["workers"] == 1
+            )
         }
         comparisons = []
         for run in document["runs"]:
@@ -327,6 +363,7 @@ def main() -> int:
                 {
                     "repetition": run["repetition"],
                     "workers": run["workers"],
+                    "arm_kind": run["arm_kind"],
                     **comparison,
                 }
             )
@@ -336,7 +373,9 @@ def main() -> int:
                 )
         document["comparisons"] = comparisons
 
-        reference_arm = args.output_root / "workers-1" / "rep-0"
+        reference_arm = args.output_root / (
+            "sequential-reference" if args.cuda_fused_grid_y else "workers-1"
+        ) / "rep-0"
         document["negative_control"] = negative_control(
             reference_arm / "output", args.output_root
         )

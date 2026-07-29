@@ -632,6 +632,82 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
         );
     }
 
+    for (label, backend, capacity, workers, lockstep, expected) in [
+        (
+            "fused-zero",
+            "cuda",
+            "0",
+            None,
+            false,
+            "must be one of 1, 2, or 4",
+        ),
+        (
+            "fused-three",
+            "cuda",
+            "3",
+            None,
+            false,
+            "must be one of 1, 2, or 4",
+        ),
+        (
+            "fused-cpu",
+            "cpu",
+            "2",
+            None,
+            false,
+            "requires --backend cuda",
+        ),
+        (
+            "fused-workers",
+            "cuda",
+            "2",
+            Some("2"),
+            false,
+            "incompatible with SEMBLA_SWEEP_SPIKE_DRAW_WORKERS>1",
+        ),
+        (
+            "fused-lockstep",
+            "cuda",
+            "2",
+            Some("2"),
+            true,
+            "incompatible with the lockstep-stream",
+        ),
+    ] {
+        let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+        process
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "4",
+                "--ticks",
+                "1",
+                "--backend",
+                backend,
+                "--out",
+            ])
+            .arg(temp.join(label))
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", capacity);
+        if let Some(workers) = workers {
+            process.env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", workers);
+        }
+        if lockstep {
+            process.env("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1");
+        }
+        let output = process.output().unwrap();
+        assert!(!output.status.success(), "{label}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{label}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
     if !cfg!(feature = "cuda") {
         let unavailable = Command::new(env!("CARGO_BIN_EXE_sembla"))
             .arg("sweep")
@@ -659,6 +735,34 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
             String::from_utf8_lossy(&unavailable.stderr).contains("cuda backend unavailable"),
             "{}",
             String::from_utf8_lossy(&unavailable.stderr)
+        );
+
+        let fused_unavailable = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "3",
+                "--ticks",
+                "1",
+                "--backend",
+                "cuda",
+                "--out",
+            ])
+            .arg(temp.join("fused-unavailable"))
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", "2")
+            .output()
+            .unwrap();
+        assert!(!fused_unavailable.status.success());
+        assert!(
+            String::from_utf8_lossy(&fused_unavailable.stderr)
+                .contains("cuda fused-draw spike unavailable"),
+            "{}",
+            String::from_utf8_lossy(&fused_unavailable.stderr)
         );
     }
     std::fs::remove_dir_all(temp).unwrap();

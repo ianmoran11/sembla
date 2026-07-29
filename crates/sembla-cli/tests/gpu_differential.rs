@@ -143,6 +143,112 @@ fn lockstep_nonblocking_stream_sweep_matches_sequential_cuda() {
 }
 
 #[test]
+#[ignore = "requires a CUDA GPU; run explicitly as fused-grid-y hardware evidence"]
+fn fused_grid_y_sweep_matches_sequential_cuda_with_partial_tail() {
+    let temp = temp_dir("fused-grid-y-sweep");
+    let model = repository_path("fixtures/demographic/demographic_slots.json");
+    let population = repository_path("fixtures/state/demographic_slots.state");
+    for noise in ["crn", "independent"] {
+        let sequential = temp.join(format!("{noise}-sequential"));
+        let common = [
+            "--seed",
+            "7",
+            "--draws",
+            "5",
+            "--ticks",
+            "2",
+            "--noise",
+            noise,
+            "--backend",
+            "cuda",
+            "--enable",
+            sembla_ir::GROUPED_OBSERVATIONS_FEATURE,
+        ];
+        let sequential_output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(&model)
+            .arg("--population")
+            .arg(&population)
+            .args(common)
+            .arg("--out")
+            .arg(&sequential)
+            .output()
+            .unwrap();
+        assert_success(&sequential_output);
+        for width in [1, 2, 4] {
+            let fused = temp.join(format!("{noise}-fused-{width}"));
+            let timing = temp.join(format!("{noise}-fused-{width}-timing.json"));
+            let fused_output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+                .arg("sweep")
+                .arg(&model)
+                .arg("--population")
+                .arg(&population)
+                .args(common)
+                .arg("--timing-json")
+                .arg(&timing)
+                .arg("--out")
+                .arg(&fused)
+                .env("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", width.to_string())
+                .output()
+                .unwrap();
+            assert_success(&fused_output);
+            assert_eq!(output_files(&fused), output_files(&sequential));
+            let document: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&timing).unwrap()).unwrap();
+            assert_eq!(document["schema"], "sembla-cuda-fused-draw-spike-timing-v1");
+            assert_eq!(document["requested_capacity"], width);
+            assert_eq!(document["maximum_active_slots"], width);
+            let active_slots = document["chunks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|chunk| chunk["active_slots"].as_u64().unwrap())
+                .collect::<Vec<_>>();
+            let expected = match width {
+                1 => vec![1, 1, 1, 1, 1],
+                2 => vec![2, 2, 1],
+                4 => vec![4, 1],
+                _ => unreachable!(),
+            };
+            assert_eq!(active_slots, expected);
+        }
+    }
+
+    let single_timing = temp.join("single-draw-width-four-timing.json");
+    let single_output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("sweep")
+        .arg(&model)
+        .arg("--population")
+        .arg(&population)
+        .args([
+            "--seed",
+            "7",
+            "--draws",
+            "1",
+            "--ticks",
+            "1",
+            "--backend",
+            "cuda",
+            "--enable",
+            sembla_ir::GROUPED_OBSERVATIONS_FEATURE,
+            "--timing-json",
+        ])
+        .arg(&single_timing)
+        .arg("--out")
+        .arg(temp.join("single-draw-width-four"))
+        .env("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", "4")
+        .output()
+        .unwrap();
+    assert_success(&single_output);
+    let document: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&single_timing).unwrap()).unwrap();
+    assert_eq!(document["requested_capacity"], 4);
+    assert_eq!(document["maximum_active_slots"], 1);
+    assert_eq!(document["chunks"][0]["active_slots"], 1);
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
 #[ignore = "requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh"]
 fn eligible_views_take_device_observation_differential_path() {
     let output = Command::new(env!("CARGO_BIN_EXE_sembla"))

@@ -13,6 +13,8 @@ mod backend;
 mod backend_stub;
 
 pub use availability::CudaAvailability;
+#[doc(hidden)]
+pub use codegen::generate_fused_batch;
 pub use codegen::{generate, GeneratedCuda, DUMP_ENV};
 pub use error::CudaError;
 
@@ -45,7 +47,10 @@ impl PhiloxCoordinate {
 }
 
 #[cfg(feature = "cuda")]
-pub use backend::{CudaBackend, CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
+pub use backend::{
+    CudaBackend, CudaDeviceIdentity, CudaFusedBatchMetadata, CudaRunResult, CudaTickObservation,
+    FusedReusedCudaTickObservations, HashMode,
+};
 #[cfg(not(feature = "cuda"))]
 pub use backend_stub::{
     CudaBackend, CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode,

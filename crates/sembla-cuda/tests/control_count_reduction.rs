@@ -94,14 +94,16 @@ fn tick_path_downloads_only_compact_counts_and_reuses_resident_offsets() {
     let tick = section(
         backend,
         "    fn execute_tick(&mut self)",
-        "\n    fn download_state_store(&mut self)",
+        "\n    fn download_fused_state_stores(&mut self)",
     );
-    assert!(tick.contains("launch_builder(&self.count_fired)"));
-    assert!(tick.contains("launch_builder(&self.count_deferred)"));
+    assert!(tick.contains("&self.count_fired,"));
+    assert!(tick.contains("&self.count_deferred,"));
     assert!(tick.contains(".arg(&self.candidate_offsets)"));
-    assert!(!tick.contains("memcpy_htod"));
+    assert_eq!(tick.matches("memcpy_htod").count(), 1);
+    assert!(tick.contains("&batch.active_host"));
+    assert!(tick.contains("&mut batch.active"));
     assert!(
-        tick.find("launch_builder(&self.count_deferred)").unwrap()
+        tick.find("&self.count_deferred,").unwrap()
             < tick.find("memcpy_dtov(&self.status)").unwrap()
     );
 }
@@ -112,7 +114,7 @@ fn timed_and_untimed_paths_share_compact_readback_and_report_conversion() {
     let untimed = section(
         backend,
         "    pub fn run_tick_observed_reused(&mut self)",
-        "\n    /// Executes one observed CUDA tick and returns durations",
+        "\n    /// Executes one grid-y tick for every active fused slot.",
     );
     let timed = section(
         backend,

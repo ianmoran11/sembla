@@ -1672,6 +1672,7 @@ fn params_from_theta_assignment(
 const SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV: &str = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS";
 const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS";
 const SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS";
+const SWEEP_CUDA_FUSED_DRAWS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS";
 
 #[derive(Clone)]
 struct SweepPreparedDraw {
@@ -1760,6 +1761,34 @@ fn sweep_concurrency_spike_cuda_lockstep(
         ));
     }
     Ok(true)
+}
+
+fn sweep_cuda_fused_draw_capacity(backend: BackendSelection) -> Result<Option<usize>, String> {
+    let Some(raw) = std::env::var_os(SWEEP_CUDA_FUSED_DRAWS_ENV) else {
+        return Ok(None);
+    };
+    let raw = raw.to_string_lossy();
+    let capacity = raw.parse::<usize>().map_err(|_| {
+        format!("{SWEEP_CUDA_FUSED_DRAWS_ENV} must be one of 1, 2, or 4, found '{raw}'")
+    })?;
+    if !matches!(capacity, 1 | 2 | 4) {
+        return Err(format!(
+            "{SWEEP_CUDA_FUSED_DRAWS_ENV} must be one of 1, 2, or 4, found '{raw}'"
+        ));
+    }
+    if backend != BackendSelection::Cuda {
+        return Err(format!(
+            "{SWEEP_CUDA_FUSED_DRAWS_ENV} requires --backend cuda"
+        ));
+    }
+    if std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV).is_some()
+        || std::env::var_os(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV).is_some()
+    {
+        return Err(format!(
+            "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with the lockstep-stream and draw-delay spike controls"
+        ));
+    }
+    Ok(Some(capacity))
 }
 
 fn sweep_concurrency_spike_draw_zero_delay() -> Result<Duration, String> {
@@ -1982,6 +2011,260 @@ fn run_concurrent_sweep_spike(
     })
 }
 
+fn fused_publishable_prefix(
+    statuses: &[(usize, bool)],
+    expected_draws: usize,
+) -> Result<usize, String> {
+    for (position, (index, _)) in statuses.iter().enumerate() {
+        if *index != position {
+            return Err(format!(
+                "fused CUDA spike returned draw index {index} at position {position}"
+            ));
+        }
+    }
+    if let Some(position) = statuses.iter().position(|(_, failed)| *failed) {
+        return Ok(position);
+    }
+    if statuses.len() != expected_draws {
+        return Err(format!(
+            "fused CUDA spike returned {} successful draws, expected {expected_draws}",
+            statuses.len()
+        ));
+    }
+    Ok(statuses.len())
+}
+
+#[cfg(feature = "cuda")]
+fn run_fused_sweep_spike(
+    model: &sembla_ir::ValidatedModel,
+    initial_tables: &[TableInit],
+    construction_params: &ParamEnv,
+    options: &SweepOptions,
+    capacity: usize,
+    prepared: &[SweepPreparedDraw],
+) -> Result<SweepConcurrentExecution, String> {
+    let setup_started = Instant::now();
+    let mut backend = sembla_cuda::CudaBackend::new_fused_batch(
+        model,
+        initial_tables.to_vec(),
+        construction_params,
+        options.seed,
+        capacity,
+        HashMode::FinalOnly,
+    )
+    .map_err(|error| error.to_string())?;
+    report_cuda_observation_eligibility(backend.observation_eligibility());
+    let device = backend.device_identity();
+    let identity = manifest::BackendIdentity::cuda_native_f64(
+        device.gpu_model.clone(),
+        device.driver_version.clone(),
+    );
+    let setup_elapsed = setup_started.elapsed();
+    let execution_started = Instant::now();
+    let mut completed = Vec::with_capacity(prepared.len());
+    'chunks: for chunk in prepared.chunks(capacity) {
+        let params = chunk
+            .iter()
+            .map(|draw| draw.params.clone())
+            .collect::<Vec<_>>();
+        let seeds = chunk
+            .iter()
+            .map(|draw| draw.execution_seed)
+            .collect::<Vec<_>>();
+        let chunk_start = execution_started.elapsed();
+        let started = Instant::now();
+        if let Err(error) = backend.reset_fused_batch(&params, &seeds) {
+            let elapsed = started.elapsed();
+            let finish_offset = execution_started.elapsed();
+            for (slot, draw) in chunk.iter().enumerate() {
+                completed.push(SweepConcurrentCompletedDraw {
+                    index: usize::try_from(draw.k).expect("draw index is u32"),
+                    lane: slot,
+                    start_offset: chunk_start,
+                    finish_offset,
+                    elapsed,
+                    execution: Err(error.to_string()),
+                });
+            }
+            break;
+        }
+        let mut failures = (0..chunk.len())
+            .map(|_| None)
+            .collect::<Vec<Option<String>>>();
+        let mut outputs = Vec::with_capacity(chunk.len());
+        let mut batch_transport_failed = false;
+        for (slot, draw) in chunk.iter().enumerate() {
+            match RunOutputAccumulator::new(model, &draw.params, options.ticks) {
+                Ok(output) => outputs.push(Some(output)),
+                Err(error) => {
+                    failures[slot] = Some(error);
+                    outputs.push(None);
+                    if let Err(error) = backend.deactivate_fused_slot(slot) {
+                        let error = error.to_string();
+                        for failure in &mut failures {
+                            failure.get_or_insert_with(|| error.clone());
+                        }
+                        batch_transport_failed = true;
+                        break;
+                    }
+                }
+            }
+        }
+        outputs.resize_with(chunk.len(), || None);
+        for tick in 0..options.ticks {
+            if batch_transport_failed || failures.iter().all(Option::is_some) {
+                break;
+            }
+            let observations = match backend.run_tick_observed_reused_fused() {
+                Ok(observations) => observations,
+                Err(error) => {
+                    let error = error.to_string();
+                    for failure in &mut failures {
+                        failure.get_or_insert_with(|| error.clone());
+                    }
+                    batch_transport_failed = true;
+                    break;
+                }
+            };
+            for (slot, observation) in observations.into_iter().enumerate() {
+                if failures[slot].is_some() {
+                    continue;
+                }
+                let processed = (|| -> Result<(), String> {
+                    let (observed_tick, fired, deferred, device_views) =
+                        observation.map_err(|error| error.to_string())?;
+                    debug_assert_eq!(observed_tick, tick);
+                    let (views, grouped_views, generic_enum_counts) = match device_views {
+                        Some(observation) => (
+                            observation.views,
+                            observation.grouped_views,
+                            observation.generic_enum_counts,
+                        ),
+                        None => {
+                            let state = backend
+                                .fused_observed_state(slot)
+                                .map_err(|error| error.to_string())?;
+                            (
+                                executor::observe_views(model, state, &chunk[slot].params)
+                                    .map_err(|error| error.to_string())?,
+                                executor::observe_grouped_views(model, state, &chunk[slot].params)
+                                    .map_err(|error| error.to_string())?,
+                                None,
+                            )
+                        }
+                    };
+                    let report =
+                        cuda_tick_report(model, tick, fired, deferred, views, grouped_views);
+                    outputs[slot]
+                        .as_mut()
+                        .expect("healthy fused slot has an output accumulator")
+                        .push_tick_with_enum_counts(
+                            backend
+                                .fused_observed_state(slot)
+                                .map_err(|error| error.to_string())?,
+                            tick,
+                            report,
+                            generic_enum_counts.as_deref(),
+                        )
+                })();
+                if let Err(error) = processed {
+                    failures[slot] = Some(format!("tick {tick}: {error}"));
+                    if let Err(error) = backend.deactivate_fused_slot(slot) {
+                        let error = error.to_string();
+                        for failure in &mut failures {
+                            failure.get_or_insert_with(|| error.clone());
+                        }
+                        batch_transport_failed = true;
+                        break;
+                    }
+                }
+            }
+            if batch_transport_failed {
+                break;
+            }
+        }
+        let mut states = vec![None; chunk.len()];
+        if failures.iter().any(Option::is_none) {
+            match backend.ensure_fused_observed_states() {
+                Ok(results) => {
+                    for (slot, result) in results.into_iter().enumerate() {
+                        if failures[slot].is_some() {
+                            continue;
+                        }
+                        match result {
+                            Ok(Some(state)) => states[slot] = Some(state),
+                            Ok(None) => {
+                                failures[slot] = Some(
+                                    "healthy fused slot has no reconstructed final state"
+                                        .to_owned(),
+                                );
+                            }
+                            Err(error) => failures[slot] = Some(error.to_string()),
+                        }
+                    }
+                }
+                Err(error) => {
+                    let error = error.to_string();
+                    for failure in &mut failures {
+                        failure.get_or_insert_with(|| error.clone());
+                    }
+                    batch_transport_failed = true;
+                }
+            }
+        }
+        let elapsed = started.elapsed();
+        let finish_offset = execution_started.elapsed();
+        for (slot, draw) in chunk.iter().enumerate() {
+            let execution = if let Some(error) = failures[slot].take() {
+                Err(error)
+            } else {
+                outputs[slot]
+                    .take()
+                    .expect("healthy fused slot has an output accumulator")
+                    .finish(model, None)
+                    .and_then(|output| {
+                        let state = states[slot]
+                            .as_ref()
+                            .ok_or_else(|| "healthy fused slot has no final state".to_owned())?;
+                        Ok(SweepDrawOutput {
+                            output,
+                            final_state_hash: state.state_hash(),
+                        })
+                    })
+            };
+            completed.push(SweepConcurrentCompletedDraw {
+                index: usize::try_from(draw.k).expect("draw index is u32"),
+                lane: slot,
+                start_offset: chunk_start,
+                finish_offset,
+                elapsed,
+                execution,
+            });
+        }
+        if batch_transport_failed {
+            break 'chunks;
+        }
+    }
+    Ok(SweepConcurrentExecution {
+        setup_elapsed,
+        execution_window_elapsed: execution_started.elapsed(),
+        identity,
+        draws: completed,
+    })
+}
+
+#[cfg(not(feature = "cuda"))]
+fn run_fused_sweep_spike(
+    _model: &sembla_ir::ValidatedModel,
+    _initial_tables: &[TableInit],
+    _construction_params: &ParamEnv,
+    _options: &SweepOptions,
+    _capacity: usize,
+    _prepared: &[SweepPreparedDraw],
+) -> Result<SweepConcurrentExecution, String> {
+    Err("cuda fused-draw spike unavailable: crate built without the 'cuda' feature".to_owned())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn publish_sweep_draw(
     draw: u32,
@@ -2073,6 +2356,15 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         (None, Some(draws)) => draws,
         _ => unreachable!("sweep option exclusivity was checked while parsing"),
     };
+    let fused_capacity = sweep_cuda_fused_draw_capacity(options.backend)?;
+    let draw_workers = sweep_concurrency_spike_workers(draw_count, options.backend)?;
+    let cuda_lockstep =
+        sweep_concurrency_spike_cuda_lockstep(draw_count, draw_workers, options.backend)?;
+    if fused_capacity.is_some() && draw_workers != 1 {
+        return Err(format!(
+            "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
+        ));
+    }
 
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
@@ -2212,14 +2504,107 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     // Construction values are placeholders only: draw zero also follows the
     // same explicit reset and reseed path as every later draw.
     let construction_params = ParamEnv::defaults(&model);
-    let draw_workers = sweep_concurrency_spike_workers(draw_count, options.backend)?;
-    let cuda_lockstep =
-        sweep_concurrency_spike_cuda_lockstep(draw_count, draw_workers, options.backend)?;
     let mut draw_durations = Vec::with_capacity(draw_count as usize);
     let mut concurrency_spike_timing = None;
+    let mut fused_spike_timing = None;
     let setup_elapsed;
 
-    if draw_workers == 1 {
+    if let Some(capacity) = fused_capacity {
+        eprintln!(
+            "EXPERIMENTAL CUDA fused grid-y spike: capacity {capacity}; default sweep behavior remains sequential"
+        );
+        let mut prepared = Vec::with_capacity(draw_count as usize);
+        for draw in 0..draw_count {
+            let params = match &theta_file {
+                Some(theta) => params_from_theta_assignment(
+                    &model,
+                    options.theta_file.as_deref().expect("theta path exists"),
+                    draw,
+                    &theta.assignments[draw as usize],
+                    &pinned,
+                )?,
+                None => sample_parameters_for_draw(&model, options.seed, draw, &pinned)
+                    .map_err(|error| format!("draw {draw}: {error}"))?,
+            };
+            csv_manifest.push_str(&draw.to_string());
+            for (_, value) in params.values() {
+                csv_manifest.push(',');
+                csv_manifest.push_str(&param_value_csv(value));
+            }
+            csv_manifest.push('\n');
+            let execution_seed = match options.noise_mode {
+                manifest::NoiseMode::Crn => options.seed,
+                manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
+            };
+            prepared.push(SweepPreparedDraw {
+                k: draw,
+                params,
+                execution_seed,
+            });
+        }
+        let fused = run_fused_sweep_spike(
+            &model,
+            &initial_tables,
+            &construction_params,
+            &options,
+            capacity,
+            &prepared,
+        )?;
+        setup_elapsed = fused.setup_elapsed;
+        run_manifest.backend_identity = Some(fused.identity);
+        let completion_statuses = fused
+            .draws
+            .iter()
+            .map(|draw| (draw.index, draw.execution.is_err()))
+            .collect::<Vec<_>>();
+        let publishable_prefix = fused_publishable_prefix(&completion_statuses, prepared.len())?;
+        let publication_started = Instant::now();
+        let timing_chunks = fused
+            .draws
+            .chunks(capacity)
+            .enumerate()
+            .map(|(chunk_index, chunk)| SweepFusedSpikeTimingChunk {
+                chunk_index,
+                first_k: prepared[chunk[0].index].k,
+                active_slots: chunk.len(),
+                capacity,
+                start_offset_ms: duration_ms(chunk[0].start_offset),
+                finish_offset_ms: duration_ms(chunk[0].finish_offset),
+                shared_chunk_wall_time_ms: duration_ms(chunk[0].elapsed),
+            })
+            .collect::<Vec<_>>();
+        for (position, completed) in fused.draws.into_iter().enumerate() {
+            let prepared_draw = &prepared[completed.index];
+            draw_durations.push(completed.elapsed);
+            if position == publishable_prefix {
+                if let Err(error) = completed.execution {
+                    return Err(format!("draw {}: {error}", prepared_draw.k));
+                }
+                unreachable!("publishable prefix stops at the first failed draw");
+            }
+            let execution = completed
+                .execution
+                .expect("draw before fused publishable prefix succeeded");
+            all_series.push(publish_sweep_draw(
+                prepared_draw.k,
+                &prepared_draw.params,
+                prepared_draw.execution_seed,
+                execution,
+                &mut reported_columns,
+                &mut pairs_csv,
+                &parameter_columns,
+                &summary_columns,
+                &mut run_manifest,
+                out,
+                options.export_pairs.is_some(),
+            )?);
+        }
+        fused_spike_timing = Some((
+            fused.execution_window_elapsed,
+            publication_started.elapsed(),
+            timing_chunks,
+        ));
+    } else if draw_workers == 1 {
         let setup_started = Instant::now();
         let mut backend = SweepBackend::new(
             &model,
@@ -2402,52 +2787,73 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         };
         let repository_commit = repository_commit()?;
         let binary_sha256 = current_binary_sha256()?;
-        let mut json =
-            if let Some((execution_window, publication, timing_draws)) = concurrency_spike_timing {
-                serde_json::to_string_pretty(&SweepConcurrencySpikeTimingDocument {
-                    schema: "sembla-sweep-concurrency-spike-timing-v1",
-                    backend,
-                    draws: draw_count,
-                    ticks_per_draw: options.ticks,
-                    requested_draw_workers: draw_workers,
-                    effective_draw_workers: draw_workers,
-                    execution_mode: if cuda_lockstep {
-                        "cuda-lockstep-nonblocking-streams"
-                    } else {
-                        "independent-backends"
-                    },
-                    setup_wall_time_ms: duration_ms(setup_elapsed),
-                    execution_window_wall_time_ms: duration_ms(execution_window),
-                    publication_wall_time_ms: duration_ms(publication),
-                    draw_timings: timing_draws,
-                    whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
-                    repository_commit,
-                    binary_sha256,
-                })
-            } else {
-                serde_json::to_string_pretty(&SweepTimingDocument {
-                    schema: "sembla-sweep-timing-v1",
-                    backend,
-                    draws: draw_count,
-                    ticks_per_draw: options.ticks,
-                    setup_wall_time_ms: duration_ms(setup_elapsed),
-                    draw_zero_including_setup_wall_time_ms: duration_ms(
-                        setup_elapsed + draw_durations[0],
-                    ),
-                    draw_timings: draw_durations
-                        .into_iter()
-                        .enumerate()
-                        .map(|(k, elapsed)| SweepTimingDraw {
-                            k: u32::try_from(k).expect("draw count is u32"),
-                            wall_time_ms: duration_ms(elapsed),
-                        })
-                        .collect(),
-                    whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
-                    repository_commit,
-                    binary_sha256,
-                })
-            }
-            .map_err(|error| format!("could not serialize sweep timing JSON: {error}"))?;
+        let mut json = if let Some((execution_window, publication, chunks)) = fused_spike_timing {
+            let maximum_active_slots = chunks
+                .iter()
+                .map(|chunk| chunk.active_slots)
+                .max()
+                .unwrap_or(0);
+            serde_json::to_string_pretty(&SweepFusedSpikeTimingDocument {
+                schema: "sembla-cuda-fused-draw-spike-timing-v1",
+                backend,
+                draws: draw_count,
+                ticks_per_draw: options.ticks,
+                requested_capacity: fused_capacity.expect("fused timing has a capacity"),
+                maximum_active_slots,
+                setup_wall_time_ms: duration_ms(setup_elapsed),
+                execution_window_wall_time_ms: duration_ms(execution_window),
+                publication_wall_time_ms: duration_ms(publication),
+                chunks,
+                whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
+                repository_commit,
+                binary_sha256,
+            })
+        } else if let Some((execution_window, publication, timing_draws)) = concurrency_spike_timing
+        {
+            serde_json::to_string_pretty(&SweepConcurrencySpikeTimingDocument {
+                schema: "sembla-sweep-concurrency-spike-timing-v1",
+                backend,
+                draws: draw_count,
+                ticks_per_draw: options.ticks,
+                requested_draw_workers: draw_workers,
+                effective_draw_workers: draw_workers,
+                execution_mode: if cuda_lockstep {
+                    "cuda-lockstep-nonblocking-streams"
+                } else {
+                    "independent-backends"
+                },
+                setup_wall_time_ms: duration_ms(setup_elapsed),
+                execution_window_wall_time_ms: duration_ms(execution_window),
+                publication_wall_time_ms: duration_ms(publication),
+                draw_timings: timing_draws,
+                whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
+                repository_commit,
+                binary_sha256,
+            })
+        } else {
+            serde_json::to_string_pretty(&SweepTimingDocument {
+                schema: "sembla-sweep-timing-v1",
+                backend,
+                draws: draw_count,
+                ticks_per_draw: options.ticks,
+                setup_wall_time_ms: duration_ms(setup_elapsed),
+                draw_zero_including_setup_wall_time_ms: duration_ms(
+                    setup_elapsed + draw_durations[0],
+                ),
+                draw_timings: draw_durations
+                    .into_iter()
+                    .enumerate()
+                    .map(|(k, elapsed)| SweepTimingDraw {
+                        k: u32::try_from(k).expect("draw count is u32"),
+                        wall_time_ms: duration_ms(elapsed),
+                    })
+                    .collect(),
+                whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
+                repository_commit,
+                binary_sha256,
+            })
+        }
+        .map_err(|error| format!("could not serialize sweep timing JSON: {error}"))?;
         json.push('\n');
         std::fs::write(path, json).map_err(|error| format!("{path}: {error}"))?;
     }
@@ -3285,6 +3691,34 @@ struct SweepTimingDocument {
     setup_wall_time_ms: f64,
     draw_zero_including_setup_wall_time_ms: f64,
     draw_timings: Vec<SweepTimingDraw>,
+    whole_sweep_wall_time_ms: f64,
+    repository_commit: String,
+    binary_sha256: String,
+}
+
+#[derive(Serialize)]
+struct SweepFusedSpikeTimingChunk {
+    chunk_index: usize,
+    first_k: u32,
+    active_slots: usize,
+    capacity: usize,
+    start_offset_ms: f64,
+    finish_offset_ms: f64,
+    shared_chunk_wall_time_ms: f64,
+}
+
+#[derive(Serialize)]
+struct SweepFusedSpikeTimingDocument {
+    schema: &'static str,
+    backend: &'static str,
+    draws: u32,
+    ticks_per_draw: u32,
+    requested_capacity: usize,
+    maximum_active_slots: usize,
+    setup_wall_time_ms: f64,
+    execution_window_wall_time_ms: f64,
+    publication_wall_time_ms: f64,
+    chunks: Vec<SweepFusedSpikeTimingChunk>,
     whole_sweep_wall_time_ms: f64,
     repository_commit: String,
     binary_sha256: String,
@@ -5571,10 +6005,10 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, initialize_population,
-        parse_backend, parse_diff_options, run, run_file_result, run_results_output,
-        run_results_output_with_features, sweep_file_result, BackendSelection, HashMode,
-        RunOptions, SweepOptions, SWEEP_BACKEND_CONSTRUCTIONS, VERSION,
+        collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, fused_publishable_prefix,
+        initialize_population, parse_backend, parse_diff_options, run, run_file_result,
+        run_results_output, run_results_output_with_features, sweep_file_result, BackendSelection,
+        HashMode, RunOptions, SweepOptions, SWEEP_BACKEND_CONSTRUCTIONS, VERSION,
     };
     use sembla_runtime::{eval::ParamEnv, state::StateStore};
 
@@ -5625,6 +6059,28 @@ mod tests {
             4
         );
         std::fs::remove_dir_all(out).unwrap();
+    }
+
+    #[test]
+    fn fused_publication_stops_at_the_lowest_failed_k() {
+        assert_eq!(
+            fused_publishable_prefix(
+                &[(0, false), (1, false), (2, true), (3, false), (4, true)],
+                5,
+            )
+            .unwrap(),
+            2
+        );
+        assert_eq!(
+            fused_publishable_prefix(&[(0, false), (1, false), (2, false)], 3).unwrap(),
+            3
+        );
+        assert!(fused_publishable_prefix(&[(0, false), (2, true)], 3)
+            .unwrap_err()
+            .contains("draw index 2 at position 1"));
+        assert!(fused_publishable_prefix(&[(0, false), (1, false)], 3)
+            .unwrap_err()
+            .contains("returned 2 successful draws"));
     }
 
     #[test]
