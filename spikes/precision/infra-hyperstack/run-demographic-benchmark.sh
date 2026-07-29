@@ -40,6 +40,11 @@
 #                                 barriers on explicitly non-blocking CUDA
 #                                 streams; combines independent scheduling
 #                                 with real kernel-overlap potential
+#   BENCH_CONCURRENCY_CRN=1     - run the concurrency matrix with CRN noise
+#                                 and one repetition as the correctness arm;
+#                                 timing claims remain with the
+#                                 independent-noise arm. Skips the schedule
+#                                 control and Nsight trace.
 #   BENCH_CONCURRENCY_FUSED=1    - batch draw slots in grid.y inside each CUDA
 #                                 phase; runs a capacity-4/two-draw shakedown
 #                                 before the 1M/10M matrix
@@ -125,6 +130,11 @@ fi
 if [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" \
       && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
   echo 'BENCH_CONCURRENCY_FREE_STREAMS=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
+if [[ "${BENCH_CONCURRENCY_CRN:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
+  echo 'BENCH_CONCURRENCY_CRN=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
   exit 2
 fi
 if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
@@ -446,6 +456,7 @@ printf 'export BENCH_CONCURRENCY_SPIKE=%q\n' "${BENCH_CONCURRENCY_SPIKE:-0}" >> 
 printf 'export BENCH_CONCURRENCY_LOCKSTEP=%q\n' "${BENCH_CONCURRENCY_LOCKSTEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_FUSED=%q\n' "${BENCH_CONCURRENCY_FUSED:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_FREE_STREAMS=%q\n' "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_CRN=%q\n' "${BENCH_CONCURRENCY_CRN:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE_ONLY=%q\n' "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
@@ -818,6 +829,14 @@ PY
     echo 'mode: independently scheduled default-stream backends'
   fi
 
+  concurrency_noise=independent
+  concurrency_reps=3
+  if [[ "${BENCH_CONCURRENCY_CRN:-0}" == "1" ]]; then
+    echo 'correctness arm: CRN noise, one repetition (timing claims stay with the independent-noise arm)'
+    concurrency_noise=crn
+    concurrency_reps=1
+  fi
+
   for concurrency_scale in 1000000 10000000; do
     scale_dir="$CONCURRENCY_DIR/$concurrency_scale"
     mkdir -p "$scale_dir"
@@ -835,13 +854,14 @@ PY
     python3 scripts/run-sweep-concurrency-spike.py \
       --binary "$BIN" --model "$concurrency_model" \
       --population "$concurrency_state" --backend cuda \
-      --output-root "$scale_dir/cuda" --workers 1 2 4 --repetitions 3 \
-      --draws 20 --ticks 24 --seed "$SEED" --noise independent \
+      --output-root "$scale_dir/cuda" --workers 1 2 4 \
+      --repetitions "$concurrency_reps" \
+      --draws 20 --ticks 24 --seed "$SEED" --noise "$concurrency_noise" \
       --export-pairs --enable grouped-observations \
       "${concurrency_driver_args[@]}" \
       2>&1 | tee "$scale_dir/cuda-driver.log"
 
-    if [[ "$concurrency_scale" == "1000000" ]]; then
+    if [[ "$concurrency_scale" == "1000000" && "${BENCH_CONCURRENCY_CRN:-0}" != "1" ]]; then
       # Exercise the selected scheduler directly and require the ordinary
       # sequential scientific output tree. The independent mode also forces a
       # completion inversion; lockstep mode instead verifies its explicit
@@ -1505,18 +1525,31 @@ assert all(doc["assertions"].values())
 )
 PY
 else
+  if [[ "${BENCH_CONCURRENCY_CRN:-0}" == "1" ]]; then
+    noise_description='CRN noise with one repetition (correctness arm; timing claims remain with the independent-noise arm)'
+    repetitions_description='one repetition'
+    nsys_description=''
+    schedule_assertion='PASS CRN correctness arm; schedule control and Nsight covered by the independent-noise timing arm'
+    nsys_assertion=''
+  else
+    noise_description='independent noise with three repetitions (timing arm)'
+    repetitions_description='three repetitions'
+    nsys_description=' and a 1M Nsight Systems CUDA trace exported as CSV'
+    nsys_assertion='PASS Nsight Systems CUDA trace exported for overlap analysis'
+    schedule_assertion=''
+  fi
   if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
     mode_description='fused grid-y draw slots in one CUDA phase launch'
-    schedule_assertion='PASS complete fused chunk timing metadata preserved ordered publication'
+    [[ -z "$schedule_assertion" ]] && schedule_assertion='PASS complete fused chunk timing metadata preserved ordered publication'
   elif [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" ]]; then
     mode_description='free-running non-blocking CUDA streams without tick barriers'
-    schedule_assertion='PASS free-stream execution mode and forced completion inversion preserved ordered publication'
+    [[ -z "$schedule_assertion" ]] && schedule_assertion='PASS free-stream execution mode and forced completion inversion preserved ordered publication'
   elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
     mode_description='synchronized tick boundaries on explicitly non-blocking CUDA streams'
-    schedule_assertion='PASS lockstep-stream timing identity preserved ordered publication'
+    [[ -z "$schedule_assertion" ]] && schedule_assertion='PASS lockstep-stream timing identity preserved ordered publication'
   else
     mode_description='independently scheduled complete CUDA backends'
-    schedule_assertion='PASS forced completion inversion preserved ordered publication'
+    [[ -z "$schedule_assertion" ]] && schedule_assertion='PASS forced completion inversion preserved ordered publication'
   fi
   cat > "$OUT_ROOT/README.md" <<EOF
 # Concurrent CUDA sweep-draw spike evidence
@@ -1525,21 +1558,21 @@ This targeted paid session ran only the direct concurrency spike at repository
 commit \`$COMMIT_BEFORE\`. It did not rerun the unrelated frozen §L4 gate.
 
 Execution mode: $mode_description.
+Noise/repetition protocol: $noise_description.
 
-The \`sweep-concurrency/\` tree contains workers 1/2/4, three repetitions at 1M
-and 10M, complete output-tree hashes and comparisons, resource samples, a
-negative comparator control, a schedule control, and a 1M Nsight Systems CUDA
-trace exported as CSV. Fused mode additionally requires a capacity-four,
-two-active-slot compute-sanitizer shakedown before starting the matrix.
+The \`sweep-concurrency/\` tree contains workers 1/2/4, $repetitions_description
+at 1M and 10M, complete output-tree hashes and comparisons, resource samples,
+and a negative comparator control$nsys_description. Fused mode additionally
+requires a capacity-four, two-active-slot compute-sanitizer shakedown before
+starting the matrix.
 EOF
   printf '%s\n' \
     'PASS targeted concurrency-only payload selected' \
-    'PASS workers 1/2/4 completed three repetitions at 1M and 10M' \
+    "PASS workers 1/2/4 completed $repetitions_description at 1M and 10M" \
     'PASS complete output trees matched their sequential references' \
     'PASS negative comparator controls rejected a deliberate perturbation' \
-    "$schedule_assertion" \
-    'PASS Nsight Systems CUDA trace exported for overlap analysis' \
-    > "$OUT_ROOT/assertions.txt"
+    "$schedule_assertion" > "$OUT_ROOT/assertions.txt"
+  [[ -n "$nsys_assertion" ]] && printf '%s\n' "$nsys_assertion" >> "$OUT_ROOT/assertions.txt"
 fi
 
 rm -rf "$WORK"
