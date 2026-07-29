@@ -35,6 +35,9 @@
 #   BENCH_CONCURRENCY_LOCKSTEP=1
 #                               - synchronize lane groups at tick boundaries and
 #                                 use explicitly non-blocking CUDA streams
+#   BENCH_CONCURRENCY_FUSED=1    - batch draw slots in grid.y inside each CUDA
+#                                 phase; runs a capacity-4/two-draw shakedown
+#                                 before the 1M/10M matrix
 #   BENCH_CONCURRENCY_SPIKE_ONLY=1
 #                               - package the concurrency spike without running
 #                                 the unrelated frozen §L4 gate; requires
@@ -107,6 +110,16 @@ fi
 if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
       && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
   echo 'BENCH_CONCURRENCY_LOCKSTEP=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
+if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
+  echo 'BENCH_CONCURRENCY_FUSED=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
+if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
+  echo 'BENCH_CONCURRENCY_LOCKSTEP and BENCH_CONCURRENCY_FUSED are mutually exclusive' >&2
   exit 2
 fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
@@ -415,6 +428,7 @@ printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE=%q\n' "${BENCH_CONCURRENCY_SPIKE:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_LOCKSTEP=%q\n' "${BENCH_CONCURRENCY_LOCKSTEP:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_FUSED=%q\n' "${BENCH_CONCURRENCY_FUSED:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE_ONLY=%q\n' "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
@@ -712,7 +726,70 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
     --format=csv,noheader > "$CONCURRENCY_DIR/gpu.txt"
   concurrency_driver_args=()
   concurrency_env=()
-  if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
+  if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
+    echo 'mode: fused grid-y draw slots in one CUDA phase launch'
+    concurrency_driver_args=(--cuda-fused-grid-y)
+    concurrency_env=(SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS=2)
+
+    # Fail cheaply before the full matrix. Capacity four with exactly two draws
+    # proves NVRTC compilation, hidden launch-argument order, typed rebasing,
+    # active-tail masking, and exact sequential parity under memcheck.
+    shakedown_dir="$CONCURRENCY_DIR/shakedown-capacity-4-active-2"
+    mkdir -p "$shakedown_dir"
+    shakedown_state="$WORK/fused-shakedown.state"
+    "$BIN" synth-state \
+      --model fixtures/demographic/benchmark/demographic_slots.full.json \
+      --slots 100000 --areas "$AREAS" \
+      --present-fraction "$PRESENT_FRACTION" --streams "$STREAMS" \
+      --seed "$SEED" --out "$shakedown_state" \
+      > "$shakedown_dir/synth.stdout" 2> "$shakedown_dir/synth.stderr"
+    shakedown_model="$shakedown_state.model.json"
+    "$BIN" sweep "$shakedown_model" \
+      --population "$shakedown_state" --backend cuda \
+      --seed "$SEED" --draws 2 --ticks 2 --noise independent \
+      --enable grouped-observations \
+      --out "$shakedown_dir/sequential-output" \
+      > "$shakedown_dir/sequential.stdout" \
+      2> "$shakedown_dir/sequential.stderr"
+    command -v compute-sanitizer >/dev/null
+    env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=1 \
+      SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS=4 \
+      compute-sanitizer --tool memcheck --target-processes all \
+        --error-exitcode 99 \
+        "$BIN" sweep "$shakedown_model" \
+          --population "$shakedown_state" --backend cuda \
+          --seed "$SEED" --draws 2 --ticks 2 --noise independent \
+          --enable grouped-observations \
+          --timing-json "$shakedown_dir/fused-timing.json" \
+          --out "$shakedown_dir/fused-output" \
+          > "$shakedown_dir/fused.stdout" \
+          2> "$shakedown_dir/fused.stderr"
+    diff -qr "$shakedown_dir/sequential-output" "$shakedown_dir/fused-output" \
+      > "$shakedown_dir/output-diff.txt"
+    python3 - "$shakedown_dir/fused-timing.json" \
+      "$shakedown_dir/assertions.txt" <<'PY'
+import json, pathlib, sys
+source, report = map(pathlib.Path, sys.argv[1:3])
+doc = json.loads(source.read_text())
+assert doc["schema"] == "sembla-cuda-fused-draw-spike-timing-v1"
+assert doc["backend"] == "cuda"
+assert doc["draws"] == 2
+assert doc["ticks_per_draw"] == 2
+assert doc["requested_capacity"] == 4
+assert doc["maximum_active_slots"] == 2
+assert len(doc["chunks"]) == 1
+chunk = doc["chunks"][0]
+assert chunk["chunk_index"] == 0
+assert chunk["first_k"] == 0
+assert chunk["active_slots"] == 2
+assert chunk["capacity"] == 4
+report.write_text(
+    "PASS capacity 4 with two active slots matched sequential output under "
+    "compute-sanitizer memcheck\n"
+)
+PY
+    rm -f "$shakedown_state" "$shakedown_model"
+  elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
     echo 'mode: synchronized tick boundaries on non-blocking CUDA streams'
     concurrency_driver_args=(--cuda-lockstep-streams)
     concurrency_env=(SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS=1)
@@ -749,10 +826,15 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
       # completion inversion; lockstep mode instead verifies its explicit
       # timing identity because tick barriers intentionally prevent that shape.
       schedule_env=("${concurrency_env[@]}")
-      if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" != "1" ]]; then
+      schedule_workers=2
+      reference_arm=workers-1
+      if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
+        schedule_workers=1
+        reference_arm=sequential-reference
+      elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" != "1" ]]; then
         schedule_env+=(SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS=2000)
       fi
-      env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 "${schedule_env[@]}" \
+      env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS="$schedule_workers" "${schedule_env[@]}" \
         "$BIN" sweep "$concurrency_model" \
           --population "$concurrency_state" --backend cuda \
           --seed "$SEED" --draws 20 --ticks 24 --noise independent \
@@ -762,18 +844,35 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
           --out "$scale_dir/schedule-control-output" \
           > "$scale_dir/schedule-control.stdout" \
           2> "$scale_dir/schedule-control.stderr"
-      diff -qr "$scale_dir/cuda/workers-1/rep-0/output" \
+      diff -qr "$scale_dir/cuda/$reference_arm/rep-0/output" \
         "$scale_dir/schedule-control-output" \
         > "$scale_dir/schedule-control-diff.txt"
       python3 - "$scale_dir/schedule-control-timing.json" \
         "$scale_dir/schedule-control-check.txt" \
-        "${BENCH_CONCURRENCY_LOCKSTEP:-0}" <<'PY'
+        "${BENCH_CONCURRENCY_LOCKSTEP:-0}" \
+        "${BENCH_CONCURRENCY_FUSED:-0}" <<'PY'
 import json, pathlib, sys
 source, report = map(pathlib.Path, sys.argv[1:3])
 lockstep = sys.argv[3] == "1"
+fused = sys.argv[4] == "1"
 doc = json.loads(source.read_text())
-draws = doc["draw_timings"]
-assert [draw["k"] for draw in draws] == list(range(20))
+if fused:
+    assert doc["schema"] == "sembla-cuda-fused-draw-spike-timing-v1"
+    assert doc["backend"] == "cuda"
+    assert doc["draws"] == 20
+    assert doc["ticks_per_draw"] == 24
+    assert doc["requested_capacity"] == 2
+    assert doc["maximum_active_slots"] == 2
+    assert len(doc["chunks"]) == 10
+    for index, chunk in enumerate(doc["chunks"]):
+        assert chunk["chunk_index"] == index
+        assert chunk["first_k"] == index * 2
+        assert chunk["active_slots"] == 2
+        assert chunk["capacity"] == 2
+    message = "PASS: complete fused chunk timing metadata and byte-identical publication\n"
+else:
+    draws = doc["draw_timings"]
+    assert [draw["k"] for draw in draws] == list(range(20))
 if lockstep:
     assert doc["execution_mode"] == "cuda-lockstep-nonblocking-streams"
     assert all(draw["lane"] == draw["k"] % 2 for draw in draws)
@@ -786,7 +885,7 @@ if lockstep:
         "PASS: deterministic lane assignment, overlapping lane intervals, "
         "lockstep timing identity, and byte-identical publication\n"
     )
-else:
+elif not fused:
     assert draws[1]["finish_offset_ms"] < draws[0]["finish_offset_ms"]
     message = "PASS: completion inversion and byte-identical publication\n"
 report.write_text(message)
@@ -801,7 +900,7 @@ PY
       fi
       (
         cd "$scale_dir"
-        env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 "${concurrency_env[@]}" \
+        env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS="$schedule_workers" "${concurrency_env[@]}" \
           nsys profile --trace=cuda --force-overwrite=true \
             -o cuda-workers-2-trace \
             "$BIN" sweep "$concurrency_model" \
@@ -1376,7 +1475,10 @@ assert all(doc["assertions"].values())
 )
 PY
 else
-  if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
+  if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
+    mode_description='fused grid-y draw slots in one CUDA phase launch'
+    schedule_assertion='PASS complete fused chunk timing metadata preserved ordered publication'
+  elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
     mode_description='synchronized tick boundaries on explicitly non-blocking CUDA streams'
     schedule_assertion='PASS lockstep-stream timing identity preserved ordered publication'
   else
@@ -1394,7 +1496,8 @@ Execution mode: $mode_description.
 The \`sweep-concurrency/\` tree contains workers 1/2/4, three repetitions at 1M
 and 10M, complete output-tree hashes and comparisons, resource samples, a
 negative comparator control, a schedule control, and a 1M Nsight Systems CUDA
-trace exported as CSV.
+trace exported as CSV. Fused mode additionally requires a capacity-four,
+two-active-slot compute-sanitizer shakedown before starting the matrix.
 EOF
   printf '%s\n' \
     'PASS targeted concurrency-only payload selected' \
