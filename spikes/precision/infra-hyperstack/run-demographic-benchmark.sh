@@ -1797,3 +1797,6 @@ echo "Evidence written to: $ARTIFACT_DIR"
 for f in "$ARTIFACT_DIR/README.md" "$ARTIFACT_DIR/bench-results.md"; do
   [[ -f "$f" ]] && { echo; echo "--- $f ---"; cat "$f"; }
 done
+# A concurrency-only payload intentionally has no bench-results.md. Do not let
+# the final optional-file probe turn a verified, destroyed session into rc=1.
+exit 0

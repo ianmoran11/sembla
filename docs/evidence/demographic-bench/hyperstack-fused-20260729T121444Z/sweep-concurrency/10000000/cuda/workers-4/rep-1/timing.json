@@ -1,0 +1,61 @@
+{
+  "schema": "sembla-cuda-fused-draw-spike-timing-v1",
+  "backend": "cuda",
+  "draws": 20,
+  "ticks_per_draw": 24,
+  "requested_capacity": 4,
+  "maximum_active_slots": 4,
+  "setup_wall_time_ms": 6894.835691,
+  "execution_window_wall_time_ms": 46796.486479,
+  "publication_wall_time_ms": 4.801385,
+  "chunks": [
+    {
+      "chunk_index": 0,
+      "first_k": 0,
+      "active_slots": 4,
+      "capacity": 4,
+      "start_offset_ms": 0.003576,
+      "finish_offset_ms": 8274.641212,
+      "shared_chunk_wall_time_ms": 8274.637406
+    },
+    {
+      "chunk_index": 1,
+      "first_k": 4,
+      "active_slots": 4,
+      "capacity": 4,
+      "start_offset_ms": 10852.531077,
+      "finish_offset_ms": 19140.441891,
+      "shared_chunk_wall_time_ms": 8287.910243
+    },
+    {
+      "chunk_index": 2,
+      "first_k": 8,
+      "active_slots": 4,
+      "capacity": 4,
+      "start_offset_ms": 21679.071566000002,
+      "finish_offset_ms": 27522.084293,
+      "shared_chunk_wall_time_ms": 5843.012157
+    },
+    {
+      "chunk_index": 3,
+      "first_k": 12,
+      "active_slots": 4,
+      "capacity": 4,
+      "start_offset_ms": 30096.091213,
+      "finish_offset_ms": 35912.399097,
+      "shared_chunk_wall_time_ms": 5816.3073030000005
+    },
+    {
+      "chunk_index": 4,
+      "first_k": 16,
+      "active_slots": 4,
+      "capacity": 4,
+      "start_offset_ms": 38461.593434,
+      "finish_offset_ms": 44253.606538,
+      "shared_chunk_wall_time_ms": 5792.012463
+    }
+  ],
+  "whole_sweep_wall_time_ms": 56424.270755000005,
+  "repository_commit": "133f87b8dd31bce9254a1be31fe3a3d3bb772443",
+  "binary_sha256": "ed79123752a69fd1b906e5caecb2d19c1715b61c6ce8c25ba39c4546261d41c1"
+}

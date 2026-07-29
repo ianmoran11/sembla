@@ -309,6 +309,21 @@ the adjacent sequential and separately measured isolated-backend arms.
 One launch per logical phase must be confirmed with Nsight; launch reduction or
 occupancy alone is not success.
 
+The completed fused arm is recorded in
+[`hyperstack-fused-20260729T121444Z`](../evidence/demographic-bench/hyperstack-fused-20260729T121444Z/).
+The capacity-four/two-active-draw compute-sanitizer shakedown reports zero errors,
+and every complete output-tree comparison passes. Nsight confirms 19,776 kernel
+launches with `gridDim.y = 2`, one context, and one stream—half the corresponding
+four-draw complete-backend launch count. Correctness and actual fused execution
+are therefore established.
+
+Performance is decisively negative. At 1M, sequential/fused-1/fused-2/fused-4
+median wall times are 5.161/7.754/7.466/13.439 seconds. At 10M they are
+37.268/56.501/56.173/64.576 seconds. Capacity two is 44.7% and 50.7% slower than
+sequential, while capacity four reaches 22,697 MiB VRAM and 10,150,528 KiB RSS.
+It is also substantially slower than the prior isolated-backend and lockstep
+arms. Fused grid-y batching is closed as a production candidate.
+
 **CPU arm**
 
 - Use isolated retained CPU backends for active draws.
@@ -353,9 +368,10 @@ The outcome is recorded independently for CPU and CUDA as one of:
 3. blocked — compilation/module/state separation must be measured first.
 
 Do not choose a universal worker count or an `auto` policy from one scale.
-The complete-backend/default-stream and complete-backend/lockstep-stream CUDA
-mechanisms are both negative and closed. CUDA remains blocked unless a distinct
-fused draw-dimension spike produces positive direct evidence.
+The complete-backend/default-stream, complete-backend/lockstep-stream, and
+fused grid-y CUDA mechanisms are all negative and closed. No measured CUDA
+concurrent-draw design advances to a numbered PRD. CPU Gate 1 remains separate
+and open.
 
 ### Binding contract for future PRDs
 

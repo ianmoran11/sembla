@@ -1,0 +1,4 @@
+# parameter_status,birth_rate=sampled,mortality_young=sampled,mortality_adult=sampled,mortality_old=sampled,overseas_arrival_rate=sampled,emigration_rate=sampled,internal_departure_rate=sampled,internal_arrival_rate=sampled
+k,birth_rate,mortality_young,mortality_adult,mortality_old,overseas_arrival_rate,emigration_rate,internal_departure_rate,internal_arrival_rate
+0,0.022852405903835728,0.0008058945980804724,0.0022923946717845413,0.008103557305181036,0.02048758904545381,0.00143514541211536,0.001872906120365134,0.01770345047137392
+1,0.019332769045104285,0.0012531578224408066,0.003621381021217677,0.00954162610282416,0.018980801878903546,0.0019327609377041716,0.0020491118888102894,0.01640326179967746

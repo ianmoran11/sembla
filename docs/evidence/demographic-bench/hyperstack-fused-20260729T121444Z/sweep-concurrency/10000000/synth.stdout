@@ -1,0 +1,1 @@
+slots=10000000 areas=4 state=/home/ubuntu/demographic-bench/work/concurrency-10000000.state companion_model=/home/ubuntu/demographic-bench/work/concurrency-10000000.state.model.json
