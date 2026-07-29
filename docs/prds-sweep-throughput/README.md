@@ -142,9 +142,13 @@ against the PRD where it currently lives.
   the negative comparator control, and final checksums are recorded in
   [`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/).
 
-No later numbered PRD is ready to draft yet. The concurrent-draw candidate is
-scoped below so the measurement can answer the architectural questions before
-an implementation specification freezes them.
+- `0004-run-cuda-draws-concurrently` — drafted 2026-07-29 after CUDA Gate 1
+  passed for the free-running non-blocking-stream design; see the sequence
+  status below.
+
+The concurrent-draw candidate was scoped below so the measurement could answer
+the architectural questions before an implementation specification froze them;
+that measurement is now complete and `0004` is the result.
 
 ## Concurrent-draw track — scoped, not yet drafted
 
@@ -456,21 +460,34 @@ The expected order is:
    arm wins: thread an explicit inner-worker budget through runtime execution,
    retain one resettable `StateStore` per lane, prevent nested oversubscription,
    and prove bit identity across outer/inner partitions.
-3. **CUDA fused draw slots — conditional.** Only if a future fused arm wins:
-   compile/load once, keep every mutable allocation and reduction draw-indexed,
-   launch the draw dimension explicitly, and preflight checked VRAM
-   requirements. The measured complete-backend stream-slot design must not be
-   repackaged as this PRD. If `cudarc` cannot express the required lifetimes and
-   launches without broad `unsafe` code or a dependency change, stop and report
-   the boundary rather than hiding recompilation or serialization.
+3. **CUDA fused draw slots — closed.** The fused grid-y arm measured
+   negative (slower than sequential at every capacity), so this conditional
+   entry is retired; the measured free-running non-blocking-stream design is
+   the CUDA mechanism instead, specified in `0004`.
 4. **Measured defaults and publication — conditional.** Decide whether the
    option remains explicit or gains an `auto` policy only after repeated
    multi-shape evidence. Dynamic throttling is not part of the first delivery.
 
 Do not manufacture a mechanism PRD when its prerequisite measurement is
-negative. In particular, do not draft a CUDA concurrency PRD from either
-complete-backend arm; only a positive fused draw-dimension spike can reopen that
-conditional track.
+negative. The complete-backend/default-stream, complete-backend/lockstep-stream,
+and fused grid-y arms were all measured negative and remain closed; none of
+them may be repackaged into a concurrency PRD.
+
+**Sequence status (2026-07-29).** The free-running non-blocking-stream arm
+passed Gate 1, so the CUDA track proceeds and the CPU track is parked by
+operator decision (CUDA-capable production):
+
+- `0002-bounded-ordered-draw-scheduler` — **deferred**. The scheduler contract
+  (dynamic admission, isolated results, ascending-`k` publication, truthful
+  timing) is subsumed into `0004` for the CUDA track; a standalone scheduler
+  PRD returns only if the CPU track reopens.
+- `0003-control-cpu-draw-resources` — **deferred** pending CPU Gate 1.
+- [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
+  **drafted**. Self-contained for the CUDA track: supported `--draw-workers`
+  interface, bounded capacity preflight, per-lane non-blocking streams, and
+  the scheduler contract, on the measured free-streams mechanism.
+- `0005-publish-concurrency-defaults` — **conditional** as written: any
+  default or `auto` policy waits for repeated multi-shape evidence.
 
 ### Required acceptance evidence shape
 
