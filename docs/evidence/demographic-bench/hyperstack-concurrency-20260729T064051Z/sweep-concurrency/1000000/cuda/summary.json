@@ -1,0 +1,3610 @@
+{
+  "backend": "cuda",
+  "binary": "/home/ubuntu/sembla/target/release/sembla",
+  "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+  "comparisons": [
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 1
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 2
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 4
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 1,
+      "workers": 1
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 1,
+      "workers": 2
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 1,
+      "workers": 4
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 2,
+      "workers": 1
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 2,
+      "workers": 2
+    },
+    {
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 2,
+      "workers": 4
+    }
+  ],
+  "cpu_total_threads": null,
+  "draws": 20,
+  "enabled_features": [
+    "grouped-observations"
+  ],
+  "model": "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+  "model_sha256": "e3ab8287f97b9c8a766075cbec29e290c234d2614394baea9f60665d2a2a3024",
+  "negative_control": {
+    "comparison": {
+      "changed": [
+        "draw_0.grouped.deaths_cells.csv"
+      ],
+      "equal": false,
+      "extra": [],
+      "missing": []
+    },
+    "target": "draw_0.grouped.deaths_cells.csv"
+  },
+  "noise": "independent",
+  "passed": true,
+  "population": "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+  "population_sha256": "896e0062228b74ba24df95e53e28ca368df510f957ed03ef2f49160590a6922b",
+  "repetitions": 3,
+  "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+  "runs": [
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-0/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-0/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 5159.707262,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 1033,
+      "peak_gpu_utilization_percent": 83,
+      "peak_process_rss_kib": 429896,
+      "repetition": 0,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.912446,
+          "process_rss_kib": 21952
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 284.258607,
+          "process_rss_kib": 58140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 2,
+          "offset_ms": 603.771782,
+          "process_rss_kib": 331392
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 887.132308,
+          "process_rss_kib": 331840
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1171.423539,
+          "process_rss_kib": 336544
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 13,
+          "offset_ms": 1454.680147,
+          "process_rss_kib": 383780
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 48,
+          "offset_ms": 1739.364225,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 81,
+          "offset_ms": 2023.219162,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 32,
+          "offset_ms": 2307.747654,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 12,
+          "offset_ms": 2591.227741,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 57,
+          "offset_ms": 2875.394268,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 77,
+          "offset_ms": 3160.267805,
+          "process_rss_kib": 429896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 26,
+          "offset_ms": 3444.202423,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 36,
+          "offset_ms": 3729.22751,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 83,
+          "offset_ms": 4013.2574,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 60,
+          "offset_ms": 4297.126365,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 25,
+          "offset_ms": 4581.764985,
+          "process_rss_kib": 383976
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 381,
+          "gpu_utilization_percent": 47,
+          "offset_ms": 4865.563598,
+          "process_rss_kib": 188040
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "c2222175325852ef95bf49292e9616752c008b25b089ca234cbd40d118c5504a",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "k": 0,
+            "wall_time_ms": 178.216298
+          },
+          {
+            "k": 1,
+            "wall_time_ms": 174.45341200000001
+          },
+          {
+            "k": 2,
+            "wall_time_ms": 174.622001
+          },
+          {
+            "k": 3,
+            "wall_time_ms": 174.857612
+          },
+          {
+            "k": 4,
+            "wall_time_ms": 204.129079
+          },
+          {
+            "k": 5,
+            "wall_time_ms": 202.944531
+          },
+          {
+            "k": 6,
+            "wall_time_ms": 174.88731199999998
+          },
+          {
+            "k": 7,
+            "wall_time_ms": 174.95997
+          },
+          {
+            "k": 8,
+            "wall_time_ms": 174.52036700000002
+          },
+          {
+            "k": 9,
+            "wall_time_ms": 175.286707
+          },
+          {
+            "k": 10,
+            "wall_time_ms": 175.975254
+          },
+          {
+            "k": 11,
+            "wall_time_ms": 176.16263099999998
+          },
+          {
+            "k": 12,
+            "wall_time_ms": 174.65456300000002
+          },
+          {
+            "k": 13,
+            "wall_time_ms": 175.042539
+          },
+          {
+            "k": 14,
+            "wall_time_ms": 174.942351
+          },
+          {
+            "k": 15,
+            "wall_time_ms": 174.987022
+          },
+          {
+            "k": 16,
+            "wall_time_ms": 174.94061299999998
+          },
+          {
+            "k": 17,
+            "wall_time_ms": 186.994329
+          },
+          {
+            "k": 18,
+            "wall_time_ms": 223.130456
+          },
+          {
+            "k": 19,
+            "wall_time_ms": 174.587341
+          }
+        ],
+        "draw_zero_including_setup_wall_time_ms": 1171.131562,
+        "draws": 20,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "schema": "sembla-sweep-timing-v1",
+        "setup_wall_time_ms": 992.915264,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 4963.133708
+      },
+      "workers": 1
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-0/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-0/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 4071.433954,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 1611,
+      "peak_gpu_utilization_percent": 95,
+      "peak_process_rss_kib": 680692,
+      "repetition": 0,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.676805,
+          "process_rss_kib": 21280
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.965293,
+          "process_rss_kib": 151628
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 633.242016,
+          "process_rss_kib": 565768
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 916.863787,
+          "process_rss_kib": 566440
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1198.708281,
+          "process_rss_kib": 568904
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 95,
+          "offset_ms": 1482.074655,
+          "process_rss_kib": 628696
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 1766.963248,
+          "process_rss_kib": 641660
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 68,
+          "offset_ms": 2053.458444,
+          "process_rss_kib": 641856
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 89,
+          "offset_ms": 2341.143607,
+          "process_rss_kib": 641940
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 73,
+          "offset_ms": 2627.542981,
+          "process_rss_kib": 650132
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 73,
+          "offset_ms": 2912.451464,
+          "process_rss_kib": 653812
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 73,
+          "offset_ms": 3198.326284,
+          "process_rss_kib": 641940
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 76,
+          "offset_ms": 3485.476709,
+          "process_rss_kib": 680692
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 3769.162749,
+          "process_rss_kib": 0
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "890f7cbbbf1fb94fd7301686c91c342cd3ba681443b58b69d83cd7edc8b185eb",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 291.407612,
+            "k": 0,
+            "lane": 0,
+            "start_offset_ms": 0.033868999999999996,
+            "wall_time_ms": 291.373582
+          },
+          {
+            "finish_offset_ms": 318.180474,
+            "k": 1,
+            "lane": 1,
+            "start_offset_ms": 0.039789,
+            "wall_time_ms": 318.140545
+          },
+          {
+            "finish_offset_ms": 532.283968,
+            "k": 2,
+            "lane": 0,
+            "start_offset_ms": 291.409425,
+            "wall_time_ms": 240.87424299999998
+          },
+          {
+            "finish_offset_ms": 584.061025,
+            "k": 3,
+            "lane": 1,
+            "start_offset_ms": 318.182226,
+            "wall_time_ms": 265.878589
+          },
+          {
+            "finish_offset_ms": 743.606939,
+            "k": 4,
+            "lane": 0,
+            "start_offset_ms": 532.284669,
+            "wall_time_ms": 211.32188
+          },
+          {
+            "finish_offset_ms": 823.4751719999999,
+            "k": 5,
+            "lane": 1,
+            "start_offset_ms": 584.061776,
+            "wall_time_ms": 239.413186
+          },
+          {
+            "finish_offset_ms": 952.48912,
+            "k": 6,
+            "lane": 0,
+            "start_offset_ms": 743.60763,
+            "wall_time_ms": 208.881179
+          },
+          {
+            "finish_offset_ms": 1047.969855,
+            "k": 7,
+            "lane": 1,
+            "start_offset_ms": 823.4758129999999,
+            "wall_time_ms": 224.493821
+          },
+          {
+            "finish_offset_ms": 1170.0134440000002,
+            "k": 8,
+            "lane": 0,
+            "start_offset_ms": 952.489931,
+            "wall_time_ms": 217.52318100000002
+          },
+          {
+            "finish_offset_ms": 1270.710494,
+            "k": 9,
+            "lane": 1,
+            "start_offset_ms": 1047.9704860000002,
+            "wall_time_ms": 222.739678
+          },
+          {
+            "finish_offset_ms": 1395.688239,
+            "k": 10,
+            "lane": 0,
+            "start_offset_ms": 1170.015617,
+            "wall_time_ms": 225.672202
+          },
+          {
+            "finish_offset_ms": 1499.868172,
+            "k": 11,
+            "lane": 1,
+            "start_offset_ms": 1270.7121670000001,
+            "wall_time_ms": 229.155794
+          },
+          {
+            "finish_offset_ms": 1615.708591,
+            "k": 12,
+            "lane": 0,
+            "start_offset_ms": 1395.68902,
+            "wall_time_ms": 220.01927099999997
+          },
+          {
+            "finish_offset_ms": 1723.011692,
+            "k": 13,
+            "lane": 1,
+            "start_offset_ms": 1499.871627,
+            "wall_time_ms": 223.139735
+          },
+          {
+            "finish_offset_ms": 1827.003995,
+            "k": 14,
+            "lane": 0,
+            "start_offset_ms": 1615.7093229999998,
+            "wall_time_ms": 211.294343
+          },
+          {
+            "finish_offset_ms": 1940.314365,
+            "k": 15,
+            "lane": 1,
+            "start_offset_ms": 1723.012452,
+            "wall_time_ms": 217.301692
+          },
+          {
+            "finish_offset_ms": 2051.617305,
+            "k": 16,
+            "lane": 0,
+            "start_offset_ms": 1827.004676,
+            "wall_time_ms": 224.612208
+          },
+          {
+            "finish_offset_ms": 2161.9221629999997,
+            "k": 17,
+            "lane": 1,
+            "start_offset_ms": 1940.3151759999998,
+            "wall_time_ms": 221.606776
+          },
+          {
+            "finish_offset_ms": 2270.0080749999997,
+            "k": 18,
+            "lane": 0,
+            "start_offset_ms": 2051.621431,
+            "wall_time_ms": 218.386242
+          },
+          {
+            "finish_offset_ms": 2375.8044680000003,
+            "k": 19,
+            "lane": 1,
+            "start_offset_ms": 2161.9257479999997,
+            "wall_time_ms": 213.87851
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 2,
+        "execution_window_wall_time_ms": 2455.5513379999998,
+        "publication_wall_time_ms": 5.017199,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "requested_draw_workers": 2,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 1044.913077,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 3756.224145
+      },
+      "workers": 2
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-0/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-0/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 4051.734861,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 2731,
+      "peak_gpu_utilization_percent": 74,
+      "peak_process_rss_kib": 1111500,
+      "repetition": 0,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.725077,
+          "process_rss_kib": 22400
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.549424,
+          "process_rss_kib": 245360
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 628.872655,
+          "process_rss_kib": 941352
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 915.952101,
+          "process_rss_kib": 942248
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 521,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1202.569738,
+          "process_rss_kib": 957256
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 47,
+          "offset_ms": 1489.581418,
+          "process_rss_kib": 1033576
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 64,
+          "offset_ms": 1773.535618,
+          "process_rss_kib": 1037160
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 2056.388386,
+          "process_rss_kib": 1064096
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 67,
+          "offset_ms": 2339.527431,
+          "process_rss_kib": 1064488
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 65,
+          "offset_ms": 2623.69257,
+          "process_rss_kib": 1111500
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 69,
+          "offset_ms": 2911.474032,
+          "process_rss_kib": 1064684
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 71,
+          "offset_ms": 3198.84588,
+          "process_rss_kib": 1064684
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 74,
+          "offset_ms": 3483.067228,
+          "process_rss_kib": 1108140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 31,
+          "offset_ms": 3767.491578,
+          "process_rss_kib": 1017968
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "c9e5af671ef2ed44e7cf29f62603f6c68ba021b21b24ec3f6487271337ccb8c7",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 392.89097899999996,
+            "k": 0,
+            "lane": 1,
+            "start_offset_ms": 0.052518,
+            "wall_time_ms": 392.838211
+          },
+          {
+            "finish_offset_ms": 578.7953289999999,
+            "k": 1,
+            "lane": 3,
+            "start_offset_ms": 0.052327000000000005,
+            "wall_time_ms": 578.742742
+          },
+          {
+            "finish_offset_ms": 451.070058,
+            "k": 2,
+            "lane": 2,
+            "start_offset_ms": 0.064585,
+            "wall_time_ms": 451.004972
+          },
+          {
+            "finish_offset_ms": 493.70627299999995,
+            "k": 3,
+            "lane": 0,
+            "start_offset_ms": 0.068191,
+            "wall_time_ms": 493.637742
+          },
+          {
+            "finish_offset_ms": 789.109693,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 392.892611,
+            "wall_time_ms": 396.216781
+          },
+          {
+            "finish_offset_ms": 949.699205,
+            "k": 5,
+            "lane": 2,
+            "start_offset_ms": 451.072111,
+            "wall_time_ms": 498.62658300000004
+          },
+          {
+            "finish_offset_ms": 891.037789,
+            "k": 6,
+            "lane": 0,
+            "start_offset_ms": 493.707515,
+            "wall_time_ms": 397.329974
+          },
+          {
+            "finish_offset_ms": 1124.542626,
+            "k": 7,
+            "lane": 3,
+            "start_offset_ms": 578.7973010000001,
+            "wall_time_ms": 545.745104
+          },
+          {
+            "finish_offset_ms": 1260.5329430000002,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 789.110414,
+            "wall_time_ms": 471.422228
+          },
+          {
+            "finish_offset_ms": 1343.54903,
+            "k": 9,
+            "lane": 0,
+            "start_offset_ms": 891.0385,
+            "wall_time_ms": 452.510229
+          },
+          {
+            "finish_offset_ms": 1467.750938,
+            "k": 10,
+            "lane": 2,
+            "start_offset_ms": 949.700146,
+            "wall_time_ms": 518.050572
+          },
+          {
+            "finish_offset_ms": 1514.252377,
+            "k": 11,
+            "lane": 3,
+            "start_offset_ms": 1124.543287,
+            "wall_time_ms": 389.70886
+          },
+          {
+            "finish_offset_ms": 1755.980199,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 1260.544139,
+            "wall_time_ms": 495.43575899999996
+          },
+          {
+            "finish_offset_ms": 1822.293575,
+            "k": 13,
+            "lane": 0,
+            "start_offset_ms": 1343.549621,
+            "wall_time_ms": 478.74374400000005
+          },
+          {
+            "finish_offset_ms": 2053.354593,
+            "k": 14,
+            "lane": 2,
+            "start_offset_ms": 1467.751679,
+            "wall_time_ms": 585.602624
+          },
+          {
+            "finish_offset_ms": 1967.669534,
+            "k": 15,
+            "lane": 3,
+            "start_offset_ms": 1514.263353,
+            "wall_time_ms": 453.40596
+          },
+          {
+            "finish_offset_ms": 2121.719548,
+            "k": 16,
+            "lane": 1,
+            "start_offset_ms": 1755.980951,
+            "wall_time_ms": 365.738196
+          },
+          {
+            "finish_offset_ms": 2204.5073230000003,
+            "k": 17,
+            "lane": 0,
+            "start_offset_ms": 1822.294236,
+            "wall_time_ms": 382.21278600000005
+          },
+          {
+            "finish_offset_ms": 2337.514901,
+            "k": 18,
+            "lane": 3,
+            "start_offset_ms": 1967.677136,
+            "wall_time_ms": 369.837535
+          },
+          {
+            "finish_offset_ms": 2412.66671,
+            "k": 19,
+            "lane": 2,
+            "start_offset_ms": 2053.355274,
+            "wall_time_ms": 359.311246
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 4,
+        "execution_window_wall_time_ms": 2494.203346,
+        "publication_wall_time_ms": 5.323788,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "requested_draw_workers": 4,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 1194.7385370000002,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 3939.153534
+      },
+      "workers": 4
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-1/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-1/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-1/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 5151.070272,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 1033,
+      "peak_gpu_utilization_percent": 84,
+      "peak_process_rss_kib": 430728,
+      "repetition": 1,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 0.709573,
+          "process_rss_kib": 22400
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.934097,
+          "process_rss_kib": 58072
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 607.132897,
+          "process_rss_kib": 330880
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 891.010805,
+          "process_rss_kib": 332000
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1174.150157,
+          "process_rss_kib": 334464
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 8,
+          "offset_ms": 1457.37711,
+          "process_rss_kib": 383716
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 60,
+          "offset_ms": 1741.649115,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 68,
+          "offset_ms": 2024.851855,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 46,
+          "offset_ms": 2309.001334,
+          "process_rss_kib": 430728
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 25,
+          "offset_ms": 2592.675536,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 75,
+          "offset_ms": 2877.277808,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 53,
+          "offset_ms": 3161.810672,
+          "process_rss_kib": 390632
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 11,
+          "offset_ms": 3445.777523,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 60,
+          "offset_ms": 3730.230657,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 69,
+          "offset_ms": 4014.320787,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 84,
+          "offset_ms": 4298.384287,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4582.82649,
+          "process_rss_kib": 383912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 81,
+          "offset_ms": 4867.403445,
+          "process_rss_kib": 383912
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "c2222175325852ef95bf49292e9616752c008b25b089ca234cbd40d118c5504a",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "k": 0,
+            "wall_time_ms": 179.151287
+          },
+          {
+            "k": 1,
+            "wall_time_ms": 174.994863
+          },
+          {
+            "k": 2,
+            "wall_time_ms": 174.768783
+          },
+          {
+            "k": 3,
+            "wall_time_ms": 175.26453
+          },
+          {
+            "k": 4,
+            "wall_time_ms": 205.713485
+          },
+          {
+            "k": 5,
+            "wall_time_ms": 205.438816
+          },
+          {
+            "k": 6,
+            "wall_time_ms": 176.47928399999998
+          },
+          {
+            "k": 7,
+            "wall_time_ms": 176.23140700000002
+          },
+          {
+            "k": 8,
+            "wall_time_ms": 175.593653
+          },
+          {
+            "k": 9,
+            "wall_time_ms": 177.42435500000002
+          },
+          {
+            "k": 10,
+            "wall_time_ms": 176.68039
+          },
+          {
+            "k": 11,
+            "wall_time_ms": 176.083743
+          },
+          {
+            "k": 12,
+            "wall_time_ms": 176.701209
+          },
+          {
+            "k": 13,
+            "wall_time_ms": 176.40224099999998
+          },
+          {
+            "k": 14,
+            "wall_time_ms": 176.266471
+          },
+          {
+            "k": 15,
+            "wall_time_ms": 177.28269999999998
+          },
+          {
+            "k": 16,
+            "wall_time_ms": 175.304229
+          },
+          {
+            "k": 17,
+            "wall_time_ms": 208.64777
+          },
+          {
+            "k": 18,
+            "wall_time_ms": 205.278134
+          },
+          {
+            "k": 19,
+            "wall_time_ms": 176.555624
+          }
+        ],
+        "draw_zero_including_setup_wall_time_ms": 1180.0060669999998,
+        "draws": 20,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "schema": "sembla-sweep-timing-v1",
+        "setup_wall_time_ms": 1000.85478,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 4993.381971
+      },
+      "workers": 1
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-1/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-1/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-1/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 4043.637244,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 1611,
+      "peak_gpu_utilization_percent": 95,
+      "peak_process_rss_kib": 688736,
+      "repetition": 1,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.684907,
+          "process_rss_kib": 22624
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.686725,
+          "process_rss_kib": 151856
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 625.360245,
+          "process_rss_kib": 565924
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 908.661742,
+          "process_rss_kib": 566372
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1191.652168,
+          "process_rss_kib": 577572
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 95,
+          "offset_ms": 1474.474374,
+          "process_rss_kib": 638036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 1760.863566,
+          "process_rss_kib": 641712
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 71,
+          "offset_ms": 2044.14608,
+          "process_rss_kib": 641920
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 2334.30936,
+          "process_rss_kib": 641920
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 74,
+          "offset_ms": 2618.690411,
+          "process_rss_kib": 641920
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 71,
+          "offset_ms": 2902.849433,
+          "process_rss_kib": 641920
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 89,
+          "offset_ms": 3187.186779,
+          "process_rss_kib": 688736
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 73,
+          "offset_ms": 3475.536059,
+          "process_rss_kib": 641920
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 5,
+          "offset_ms": 3759.045962,
+          "process_rss_kib": 490236
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "b30c943b8435cb1467d0c192ecd533444b0a48d5d11a78f846df70f2976b2992",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 325.485523,
+            "k": 0,
+            "lane": 1,
+            "start_offset_ms": 0.029703999999999998,
+            "wall_time_ms": 325.455669
+          },
+          {
+            "finish_offset_ms": 295.242451,
+            "k": 1,
+            "lane": 0,
+            "start_offset_ms": 0.031197,
+            "wall_time_ms": 295.211084
+          },
+          {
+            "finish_offset_ms": 529.55844,
+            "k": 2,
+            "lane": 0,
+            "start_offset_ms": 295.24431400000003,
+            "wall_time_ms": 234.313795
+          },
+          {
+            "finish_offset_ms": 592.548585,
+            "k": 3,
+            "lane": 1,
+            "start_offset_ms": 325.487166,
+            "wall_time_ms": 267.061208
+          },
+          {
+            "finish_offset_ms": 729.0195940000001,
+            "k": 4,
+            "lane": 0,
+            "start_offset_ms": 529.559271,
+            "wall_time_ms": 199.460013
+          },
+          {
+            "finish_offset_ms": 830.659142,
+            "k": 5,
+            "lane": 1,
+            "start_offset_ms": 592.549206,
+            "wall_time_ms": 238.109696
+          },
+          {
+            "finish_offset_ms": 953.579214,
+            "k": 6,
+            "lane": 0,
+            "start_offset_ms": 729.020275,
+            "wall_time_ms": 224.558639
+          },
+          {
+            "finish_offset_ms": 1061.231228,
+            "k": 7,
+            "lane": 1,
+            "start_offset_ms": 830.659653,
+            "wall_time_ms": 230.57129400000002
+          },
+          {
+            "finish_offset_ms": 1175.516979,
+            "k": 8,
+            "lane": 0,
+            "start_offset_ms": 953.579916,
+            "wall_time_ms": 221.93675299999998
+          },
+          {
+            "finish_offset_ms": 1293.825179,
+            "k": 9,
+            "lane": 1,
+            "start_offset_ms": 1061.2317790000002,
+            "wall_time_ms": 232.593189
+          },
+          {
+            "finish_offset_ms": 1397.244871,
+            "k": 10,
+            "lane": 0,
+            "start_offset_ms": 1175.5205150000002,
+            "wall_time_ms": 221.724055
+          },
+          {
+            "finish_offset_ms": 1545.467507,
+            "k": 11,
+            "lane": 1,
+            "start_offset_ms": 1293.827372,
+            "wall_time_ms": 251.63991400000003
+          },
+          {
+            "finish_offset_ms": 1638.164874,
+            "k": 12,
+            "lane": 0,
+            "start_offset_ms": 1397.245552,
+            "wall_time_ms": 240.91903200000002
+          },
+          {
+            "finish_offset_ms": 1751.1455360000002,
+            "k": 13,
+            "lane": 1,
+            "start_offset_ms": 1545.468378,
+            "wall_time_ms": 205.676928
+          },
+          {
+            "finish_offset_ms": 1859.204134,
+            "k": 14,
+            "lane": 0,
+            "start_offset_ms": 1638.1655859999998,
+            "wall_time_ms": 221.038237
+          },
+          {
+            "finish_offset_ms": 1978.936619,
+            "k": 15,
+            "lane": 1,
+            "start_offset_ms": 1751.146047,
+            "wall_time_ms": 227.790361
+          },
+          {
+            "finish_offset_ms": 2080.9404379999996,
+            "k": 16,
+            "lane": 0,
+            "start_offset_ms": 1859.204835,
+            "wall_time_ms": 221.735293
+          },
+          {
+            "finish_offset_ms": 2207.972342,
+            "k": 17,
+            "lane": 1,
+            "start_offset_ms": 1978.9371500000002,
+            "wall_time_ms": 229.034922
+          },
+          {
+            "finish_offset_ms": 2305.0101720000002,
+            "k": 18,
+            "lane": 0,
+            "start_offset_ms": 2080.9446340000004,
+            "wall_time_ms": 224.065247
+          },
+          {
+            "finish_offset_ms": 2416.7259529999997,
+            "k": 19,
+            "lane": 1,
+            "start_offset_ms": 2207.976088,
+            "wall_time_ms": 208.74965500000002
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 2,
+        "execution_window_wall_time_ms": 2495.747164,
+        "publication_wall_time_ms": 5.043155,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "requested_draw_workers": 2,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 1034.955899,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 3781.064636
+      },
+      "workers": 2
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-1/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-1/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-1/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 4050.880534,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 2731,
+      "peak_gpu_utilization_percent": 94,
+      "peak_process_rss_kib": 1111336,
+      "repetition": 1,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.802263,
+          "process_rss_kib": 22400
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.28817,
+          "process_rss_kib": 245488
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 632.443853,
+          "process_rss_kib": 941236
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 918.821471,
+          "process_rss_kib": 942132
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1200.959659,
+          "process_rss_kib": 948628
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 5,
+          "offset_ms": 1486.997482,
+          "process_rss_kib": 1033236
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 94,
+          "offset_ms": 1772.95674,
+          "process_rss_kib": 1048244
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 94,
+          "offset_ms": 2056.572298,
+          "process_rss_kib": 1064128
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 57,
+          "offset_ms": 2341.095184,
+          "process_rss_kib": 1072712
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 2627.42159,
+          "process_rss_kib": 1064520
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 65,
+          "offset_ms": 2911.952693,
+          "process_rss_kib": 1111336
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 71,
+          "offset_ms": 3199.34589,
+          "process_rss_kib": 1092072
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 69,
+          "offset_ms": 3482.695156,
+          "process_rss_kib": 1064716
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 58,
+          "offset_ms": 3766.676252,
+          "process_rss_kib": 1027104
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "1a391cadc82ed8a951ff7a4fae8d157a29a62db431d4f2e62b5950e20f93b660",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 429.467687,
+            "k": 0,
+            "lane": 3,
+            "start_offset_ms": 0.08069,
+            "wall_time_ms": 429.386646
+          },
+          {
+            "finish_offset_ms": 589.9867680000001,
+            "k": 1,
+            "lane": 0,
+            "start_offset_ms": 0.081031,
+            "wall_time_ms": 589.905296
+          },
+          {
+            "finish_offset_ms": 499.917893,
+            "k": 2,
+            "lane": 1,
+            "start_offset_ms": 0.08686,
+            "wall_time_ms": 499.830903
+          },
+          {
+            "finish_offset_ms": 458.61454000000003,
+            "k": 3,
+            "lane": 2,
+            "start_offset_ms": 0.09510199999999999,
+            "wall_time_ms": 458.519288
+          },
+          {
+            "finish_offset_ms": 847.628609,
+            "k": 4,
+            "lane": 3,
+            "start_offset_ms": 429.469961,
+            "wall_time_ms": 418.158348
+          },
+          {
+            "finish_offset_ms": 899.209037,
+            "k": 5,
+            "lane": 2,
+            "start_offset_ms": 458.616494,
+            "wall_time_ms": 440.59221199999996
+          },
+          {
+            "finish_offset_ms": 998.773036,
+            "k": 6,
+            "lane": 1,
+            "start_offset_ms": 499.919435,
+            "wall_time_ms": 498.85340099999996
+          },
+          {
+            "finish_offset_ms": 1093.051719,
+            "k": 7,
+            "lane": 0,
+            "start_offset_ms": 589.988651,
+            "wall_time_ms": 503.06284800000003
+          },
+          {
+            "finish_offset_ms": 1398.3662729999999,
+            "k": 8,
+            "lane": 3,
+            "start_offset_ms": 847.62926,
+            "wall_time_ms": 550.736803
+          },
+          {
+            "finish_offset_ms": 1257.519992,
+            "k": 9,
+            "lane": 2,
+            "start_offset_ms": 899.209828,
+            "wall_time_ms": 358.309854
+          },
+          {
+            "finish_offset_ms": 1487.221472,
+            "k": 10,
+            "lane": 1,
+            "start_offset_ms": 998.773496,
+            "wall_time_ms": 488.447745
+          },
+          {
+            "finish_offset_ms": 1585.715641,
+            "k": 11,
+            "lane": 0,
+            "start_offset_ms": 1093.0524699999999,
+            "wall_time_ms": 492.66297
+          },
+          {
+            "finish_offset_ms": 1768.298792,
+            "k": 12,
+            "lane": 2,
+            "start_offset_ms": 1257.520894,
+            "wall_time_ms": 510.777429
+          },
+          {
+            "finish_offset_ms": 1888.029486,
+            "k": 13,
+            "lane": 3,
+            "start_offset_ms": 1398.37079,
+            "wall_time_ms": 489.658366
+          },
+          {
+            "finish_offset_ms": 1946.395244,
+            "k": 14,
+            "lane": 1,
+            "start_offset_ms": 1487.2219229999998,
+            "wall_time_ms": 459.172941
+          },
+          {
+            "finish_offset_ms": 2088.823457,
+            "k": 15,
+            "lane": 0,
+            "start_offset_ms": 1585.716382,
+            "wall_time_ms": 503.106865
+          },
+          {
+            "finish_offset_ms": 2190.752196,
+            "k": 16,
+            "lane": 2,
+            "start_offset_ms": 1768.30391,
+            "wall_time_ms": 422.44804600000003
+          },
+          {
+            "finish_offset_ms": 2304.594598,
+            "k": 17,
+            "lane": 3,
+            "start_offset_ms": 1888.030177,
+            "wall_time_ms": 416.564111
+          },
+          {
+            "finish_offset_ms": 2386.720841,
+            "k": 18,
+            "lane": 1,
+            "start_offset_ms": 1946.395916,
+            "wall_time_ms": 440.324655
+          },
+          {
+            "finish_offset_ms": 2444.862602,
+            "k": 19,
+            "lane": 0,
+            "start_offset_ms": 2088.8240379999997,
+            "wall_time_ms": 356.038244
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 4,
+        "execution_window_wall_time_ms": 2533.268982,
+        "publication_wall_time_ms": 5.262373,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "requested_draw_workers": 4,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 1160.9273230000001,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 3948.477659
+      },
+      "workers": 4
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-2/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-2/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-1/rep-2/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 5142.392147,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 1033,
+      "peak_gpu_utilization_percent": 84,
+      "peak_process_rss_kib": 426904,
+      "repetition": 2,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 0.650797,
+          "process_rss_kib": 22400
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.049665,
+          "process_rss_kib": 58056
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 602.40444,
+          "process_rss_kib": 330864
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 885.863658,
+          "process_rss_kib": 331984
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1168.523758,
+          "process_rss_kib": 334448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 36,
+          "offset_ms": 1451.036068,
+          "process_rss_kib": 383700
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 57,
+          "offset_ms": 1734.847162,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 10,
+          "offset_ms": 2018.123823,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 65,
+          "offset_ms": 2301.991161,
+          "process_rss_kib": 426904
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 17,
+          "offset_ms": 2585.206221,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 46,
+          "offset_ms": 2870.249351,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 84,
+          "offset_ms": 3154.057656,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 74,
+          "offset_ms": 3437.290485,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 59,
+          "offset_ms": 3721.361462,
+          "process_rss_kib": 408340
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 12,
+          "offset_ms": 4004.472424,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 53,
+          "offset_ms": 4289.007703,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 25,
+          "offset_ms": 4573.330616,
+          "process_rss_kib": 383896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1033,
+          "gpu_utilization_percent": 44,
+          "offset_ms": 4858.109121,
+          "process_rss_kib": 383896
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "c2222175325852ef95bf49292e9616752c008b25b089ca234cbd40d118c5504a",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "k": 0,
+            "wall_time_ms": 178.922091
+          },
+          {
+            "k": 1,
+            "wall_time_ms": 176.201918
+          },
+          {
+            "k": 2,
+            "wall_time_ms": 176.48097700000002
+          },
+          {
+            "k": 3,
+            "wall_time_ms": 177.148829
+          },
+          {
+            "k": 4,
+            "wall_time_ms": 207.211844
+          },
+          {
+            "k": 5,
+            "wall_time_ms": 205.752885
+          },
+          {
+            "k": 6,
+            "wall_time_ms": 174.96175499999998
+          },
+          {
+            "k": 7,
+            "wall_time_ms": 175.688202
+          },
+          {
+            "k": 8,
+            "wall_time_ms": 175.875161
+          },
+          {
+            "k": 9,
+            "wall_time_ms": 176.550354
+          },
+          {
+            "k": 10,
+            "wall_time_ms": 175.055261
+          },
+          {
+            "k": 11,
+            "wall_time_ms": 174.87509300000002
+          },
+          {
+            "k": 12,
+            "wall_time_ms": 174.709148
+          },
+          {
+            "k": 13,
+            "wall_time_ms": 175.177908
+          },
+          {
+            "k": 14,
+            "wall_time_ms": 174.890701
+          },
+          {
+            "k": 15,
+            "wall_time_ms": 177.367114
+          },
+          {
+            "k": 16,
+            "wall_time_ms": 176.417572
+          },
+          {
+            "k": 17,
+            "wall_time_ms": 201.637194
+          },
+          {
+            "k": 18,
+            "wall_time_ms": 211.07768499999997
+          },
+          {
+            "k": 19,
+            "wall_time_ms": 176.11024
+          }
+        ],
+        "draw_zero_including_setup_wall_time_ms": 1182.130928,
+        "draws": 20,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "schema": "sembla-sweep-timing-v1",
+        "setup_wall_time_ms": 1003.2088370000001,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 4990.845436
+      },
+      "workers": 1
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-2/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-2/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-2/rep-2/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 4038.641803,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 1611,
+      "peak_gpu_utilization_percent": 95,
+      "peak_process_rss_kib": 658440,
+      "repetition": 2,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.774501,
+          "process_rss_kib": 23520
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.954882,
+          "process_rss_kib": 151752
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 2,
+          "offset_ms": 629.657816,
+          "process_rss_kib": 565956
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 912.565933,
+          "process_rss_kib": 566404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1195.217299,
+          "process_rss_kib": 578500
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 95,
+          "offset_ms": 1485.117417,
+          "process_rss_kib": 643220
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 95,
+          "offset_ms": 1768.942843,
+          "process_rss_kib": 641856
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 2052.776951,
+          "process_rss_kib": 642052
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 74,
+          "offset_ms": 2336.827282,
+          "process_rss_kib": 642052
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 74,
+          "offset_ms": 2620.348117,
+          "process_rss_kib": 658440
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 80,
+          "offset_ms": 2904.793407,
+          "process_rss_kib": 642056
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 73,
+          "offset_ms": 3187.412613,
+          "process_rss_kib": 642056
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1611,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 3471.88083,
+          "process_rss_kib": 642056
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 3755.566034,
+          "process_rss_kib": 490176
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "eac859f58690d262571c0d2f06ee453e5027becbbff3e960762e081b07010c3c",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 283.831502,
+            "k": 0,
+            "lane": 1,
+            "start_offset_ms": 0.03476,
+            "wall_time_ms": 283.79648099999997
+          },
+          {
+            "finish_offset_ms": 316.580924,
+            "k": 1,
+            "lane": 0,
+            "start_offset_ms": 0.036523,
+            "wall_time_ms": 316.54405099999997
+          },
+          {
+            "finish_offset_ms": 522.913628,
+            "k": 2,
+            "lane": 1,
+            "start_offset_ms": 283.833415,
+            "wall_time_ms": 239.079902
+          },
+          {
+            "finish_offset_ms": 578.719368,
+            "k": 3,
+            "lane": 0,
+            "start_offset_ms": 316.582937,
+            "wall_time_ms": 262.136101
+          },
+          {
+            "finish_offset_ms": 735.037363,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 522.914169,
+            "wall_time_ms": 212.12298399999997
+          },
+          {
+            "finish_offset_ms": 816.3859190000001,
+            "k": 5,
+            "lane": 0,
+            "start_offset_ms": 578.7204489999999,
+            "wall_time_ms": 237.66517000000002
+          },
+          {
+            "finish_offset_ms": 946.410662,
+            "k": 6,
+            "lane": 1,
+            "start_offset_ms": 735.037774,
+            "wall_time_ms": 211.372588
+          },
+          {
+            "finish_offset_ms": 1042.679838,
+            "k": 7,
+            "lane": 0,
+            "start_offset_ms": 816.38661,
+            "wall_time_ms": 226.29290799999998
+          },
+          {
+            "finish_offset_ms": 1168.157651,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 946.411183,
+            "wall_time_ms": 221.746248
+          },
+          {
+            "finish_offset_ms": 1265.430116,
+            "k": 9,
+            "lane": 0,
+            "start_offset_ms": 1042.68068,
+            "wall_time_ms": 222.749116
+          },
+          {
+            "finish_offset_ms": 1387.229947,
+            "k": 10,
+            "lane": 1,
+            "start_offset_ms": 1168.1597639999998,
+            "wall_time_ms": 219.069963
+          },
+          {
+            "finish_offset_ms": 1508.547803,
+            "k": 11,
+            "lane": 0,
+            "start_offset_ms": 1265.4333499999998,
+            "wall_time_ms": 243.114152
+          },
+          {
+            "finish_offset_ms": 1621.639514,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 1387.230418,
+            "wall_time_ms": 234.408876
+          },
+          {
+            "finish_offset_ms": 1713.6422819999998,
+            "k": 13,
+            "lane": 0,
+            "start_offset_ms": 1508.55926,
+            "wall_time_ms": 205.08261099999999
+          },
+          {
+            "finish_offset_ms": 1841.280197,
+            "k": 14,
+            "lane": 1,
+            "start_offset_ms": 1621.6400439999998,
+            "wall_time_ms": 219.63993200000002
+          },
+          {
+            "finish_offset_ms": 1938.837245,
+            "k": 15,
+            "lane": 0,
+            "start_offset_ms": 1713.643153,
+            "wall_time_ms": 225.193762
+          },
+          {
+            "finish_offset_ms": 2063.984729,
+            "k": 16,
+            "lane": 1,
+            "start_offset_ms": 1841.291303,
+            "wall_time_ms": 222.693206
+          },
+          {
+            "finish_offset_ms": 2161.521274,
+            "k": 17,
+            "lane": 0,
+            "start_offset_ms": 1938.837876,
+            "wall_time_ms": 222.682978
+          },
+          {
+            "finish_offset_ms": 2282.9194190000003,
+            "k": 18,
+            "lane": 1,
+            "start_offset_ms": 2063.9886349999997,
+            "wall_time_ms": 218.930564
+          },
+          {
+            "finish_offset_ms": 2382.7349839999997,
+            "k": 19,
+            "lane": 0,
+            "start_offset_ms": 2161.525851,
+            "wall_time_ms": 221.208813
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 2,
+        "execution_window_wall_time_ms": 2471.065037,
+        "publication_wall_time_ms": 5.1435200000000005,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "requested_draw_workers": 2,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 1048.588023,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 3774.079729
+      },
+      "workers": 2
+    },
+    {
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-1000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "independent",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-2/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-2/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/workers-4/rep-2/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 4029.730647,
+      "output_hashes": {
+        "__external__/pairs.csv": "fe1db7077476a455e7ed826d3de9e33fe13f7adb63b6a37b57b2371ee6783282",
+        "__external__/pairs.csv.meta.json": "ff6106061f24efd1ca90b77dc6d8638ab21222d30b1c4479ee64e3c2ad5b1436",
+        "draw_0.csv": "591fe62f1a84704ee042fb0888eb368c49ba201d1dc69cfd6eb13676a9c1a3c4",
+        "draw_0.csv.summaries.csv": "2b8f93c8feafcbc9d00b0ab20719f779d7e1c1b69b7235f45692c6de8c46fcd3",
+        "draw_0.grouped.deaths_cells.csv": "bae32290ff5f0a93813adb32390472e7bfc28d871a4d1b093e729d8f0d6cb41d",
+        "draw_0.grouped.population_cells.csv": "456e1a758bf1e32dd24ebdda1be4b936413d5bea0299a9de74205923fb676dcb",
+        "draw_0.grouped.vacancy_cells.csv": "584f301fa1c1ea7bc65de6447cbd9d93c059f1332b9233254569f2b3d6d88a57",
+        "draw_1.csv": "86ab8e81038fc578297f7419eb00e54e271a83e89d693fe1a2bef8b042bb57a8",
+        "draw_1.csv.summaries.csv": "2daf4fe0ddc8e8b91613eb351f0c143a03819e11ba046114c58e1b5f33b63d40",
+        "draw_1.grouped.deaths_cells.csv": "deb9c0e58b99f917624836da8567ac5020bcf33a164d73ec645eef92d9bc6ea4",
+        "draw_1.grouped.population_cells.csv": "dd9a0165a709b890961d02562763f62e3e7721fca8c73a8abcee3da6eb4c02be",
+        "draw_1.grouped.vacancy_cells.csv": "f1493775098d2baf985d3211a4a91652d9cc95d40b2de7ed04b6b4d73d5de722",
+        "draw_10.csv": "b10f3c8d5444fc85b575b76cccb3e37403935db28be3aff9d36a90c980c16d15",
+        "draw_10.csv.summaries.csv": "65c13176adde94fff2712f7b2e7112ca44269ca43fabef0cd1687bc143342731",
+        "draw_10.grouped.deaths_cells.csv": "1279534612333a145ff29d199015f92df469b1b8a9b0e998afe13127953710d1",
+        "draw_10.grouped.population_cells.csv": "0a542adbf3ca8d7fb4fc4d4456260d6606054ccc029441beae6ee229220fa4e7",
+        "draw_10.grouped.vacancy_cells.csv": "0cdcbacfb5940916c357699b0016fbb0e2a4ca7bc17b112d4e512efd4349ba82",
+        "draw_11.csv": "799ead456dd6d6bbc8d42461efefd56f19cea822a1b6c883edb84ca9fc2fd04f",
+        "draw_11.csv.summaries.csv": "5bdfc09fa80267557487bfe377b9669c1b1665a3aad9cab12ca6fbc3a4f781da",
+        "draw_11.grouped.deaths_cells.csv": "e2a7bc0c576d130183155d4e2e8d73526a8c4924f601003aa15a691303201b1a",
+        "draw_11.grouped.population_cells.csv": "cb465a7de2e15b5ba4c8634acf030f1b9f98d6a8c6ce250509b45a338687e852",
+        "draw_11.grouped.vacancy_cells.csv": "27b2fe7ba3116924e5b535797644c4c159301b471a3861e256498f0e86aa6371",
+        "draw_12.csv": "292f8fe9109891b8e33530cc6b5789acde88add8087cf2c5cb8c35d926470898",
+        "draw_12.csv.summaries.csv": "ccafe880df1cc8cf4c0022c0abac4e62a3029b4985b9d22206996ac257ffe029",
+        "draw_12.grouped.deaths_cells.csv": "535a96cd6e8d4394211187728da6a39615123250fd8cca18054c26d09a0e4818",
+        "draw_12.grouped.population_cells.csv": "86290b693d69295f8bf3aaf8711028be57d41604baee5e6131a844ea1bf55edf",
+        "draw_12.grouped.vacancy_cells.csv": "2ef6fc051da9fa20cac42d59b47f0ba0ec9f44ed9d4d74ddec397523c925df31",
+        "draw_13.csv": "a984b41248d5d5f4000b0ce99a98665089a88f449dabc6eb9e6af33eab130d5e",
+        "draw_13.csv.summaries.csv": "86e74eda318f50a80f723db0cb7b23d48c57fc78aa3ed2e6d0140337766f3990",
+        "draw_13.grouped.deaths_cells.csv": "00d052fa8efc389097033cd607ed261788dd7d4979d409c4aa540a874d6c89b4",
+        "draw_13.grouped.population_cells.csv": "e5dba78f8db1f1ffd0f65cc1731f9dd0a724af8abf7f617e63cdb16c25da7277",
+        "draw_13.grouped.vacancy_cells.csv": "ceb77f9acee533d5f487a285e17e844586b9ef347753b4cfe1a9fb3ba10a93ec",
+        "draw_14.csv": "15cf0cf857d6fc0754e5ceefc0a7028126d2214135ea4ad762074dfd0a227a40",
+        "draw_14.csv.summaries.csv": "9ca64f84e04d1d3e039d44631cf0de063ed9bfbf972e8a8cd79d563b86370f18",
+        "draw_14.grouped.deaths_cells.csv": "8bdf26a47b583d0128a317bbe56cabd30c93b7e19827658dcd24fbb07e432068",
+        "draw_14.grouped.population_cells.csv": "7670ba72d1e7cb71a32a0f3f7f1e91346f0a185cce17e1494bebfc6f645b34b5",
+        "draw_14.grouped.vacancy_cells.csv": "297298aca020ddecd04bd85bf960dba29737884b6748a4b9755277a77b9f7465",
+        "draw_15.csv": "74d342e6529cd48ece145c8251615cd6eaeba4f4dee5a607cc2bfa88ab34a20e",
+        "draw_15.csv.summaries.csv": "18200dfea3c6d117dcb61cea9e1c8f3da6df4219f77934421bcd8a972f59345f",
+        "draw_15.grouped.deaths_cells.csv": "0df2fe427f9c1e094bb1924226059d039456877dbd26a5aa6e54c05fbe1a96c0",
+        "draw_15.grouped.population_cells.csv": "bd82b18f79c2aea3faa261e5ea2afaadf486c32e6346c4d91c1649dd88deb109",
+        "draw_15.grouped.vacancy_cells.csv": "34e0278aaf5925a2eaf8bdd1ebc3c80eb9d666b723ec2318560ef909d62c0fd5",
+        "draw_16.csv": "085874614da3630f3d61fee906b958996b8fe0259496727b1e55f090ee7019d4",
+        "draw_16.csv.summaries.csv": "059a0e755fca26d96a235169188845dc59e063b8bc046302fdd75c75697036e0",
+        "draw_16.grouped.deaths_cells.csv": "b400c6429fcde93475371ec92c53d35f4353a7adea8092ae26e8278e65584c4f",
+        "draw_16.grouped.population_cells.csv": "aabe472ae7bbac97fde76620d6809186086c86caaf3e439bbf84925bd139d3f2",
+        "draw_16.grouped.vacancy_cells.csv": "e0007b872dbfaf21e05da6ce829b3469e241093d729e53a7aec05cbedf954359",
+        "draw_17.csv": "b466e21b9da59676c779d99b53c7b8193336972cfc8cd0290596f2f9e30e82eb",
+        "draw_17.csv.summaries.csv": "e11ff806fc72e0df1b31e963afd3fe47edb587eeedc4426052ebc431ca682941",
+        "draw_17.grouped.deaths_cells.csv": "f9d1118c66cfb6dc9c9193c5c9306bf77e1ec9ce526f74e78882c35ec391e5d1",
+        "draw_17.grouped.population_cells.csv": "25616d6cb7555ab9bdbff94a9b423a9922d29d83fb6ec87f07e05320693970c8",
+        "draw_17.grouped.vacancy_cells.csv": "d7ed810b615c7a37226eb888093b0af8c777fc8c8090c87c695ed32212355e4c",
+        "draw_18.csv": "a505a1fb8bf0ea84ca6f35f302b396bcfe6b7ce3822d6e95abd19c4fe9fe3b10",
+        "draw_18.csv.summaries.csv": "5b1317e4111ad82edca8c50a1a5df6c2a29eccebfebc358dafff37686daea842",
+        "draw_18.grouped.deaths_cells.csv": "e226f8bf814debd6da666faf87fc080f6e1c79bb783eb080b7d217457d53eced",
+        "draw_18.grouped.population_cells.csv": "9d3162ad3bded48ba050d3076e7c9952ca3e26bc0a4af70ec906a36f0b7c9aea",
+        "draw_18.grouped.vacancy_cells.csv": "b3300b7f041d91a98b51d42ecf9f5ee3911eb4d9f1a44c007d41b8a7bc82f4e0",
+        "draw_19.csv": "d58507a22b216a20049eb66caa442e9d4f1c58495f0e8a38c4a5fe462051ef5c",
+        "draw_19.csv.summaries.csv": "054ccee3e9229115e78a2022e44fb80ba65c688b8b7b5d076ffbf23e283c9614",
+        "draw_19.grouped.deaths_cells.csv": "d241f01ac3616959c3ff19200dd766ae58da4bed4a1e746fdd7c7551309298d1",
+        "draw_19.grouped.population_cells.csv": "22fd1da8b7a9728d6f2282b7274ccaa3b542fccef9b20e1bef872300dab0c201",
+        "draw_19.grouped.vacancy_cells.csv": "2de202c90b16ccde9ea0484446fa44d9ec4a2ee863e8a981f060dd0c40a65354",
+        "draw_2.csv": "8b8fa781fa718f86fb7dfdcfa2573a628cfaead1edde8e06d13d33bf98fc9448",
+        "draw_2.csv.summaries.csv": "f03f8667196f200abfb4e5695fcd7acf0d653395f803ac1e172e65fbeebbf486",
+        "draw_2.grouped.deaths_cells.csv": "d84c039e8e3f1efbfe8e86e7e10d513c5747551379d46a604599fb69f8a937f0",
+        "draw_2.grouped.population_cells.csv": "837676558d9c037b635807d419ed6b7234157d2d12f3dac2be6aebfc0648ac45",
+        "draw_2.grouped.vacancy_cells.csv": "dfa85dcf4a31ee9faf09c1d95e0eb8a0b41773a5d0a7d9e278de982eb3ea4d74",
+        "draw_3.csv": "8d777038d2e6c43bf68c9c7738c9db8da4342b7090e513f657e0976191b04cf4",
+        "draw_3.csv.summaries.csv": "3e8b3c977840b007a6c33a5508ca4369f44d9c6327a3c4a7532e2c1f68951e43",
+        "draw_3.grouped.deaths_cells.csv": "8ccfc8ab0ef86f07bbb0dfd000c7821ac243b11fa01520a3bb588aec71dcebaa",
+        "draw_3.grouped.population_cells.csv": "83ee51c7a0fbcbb6217c54dd2963a477af144ef13b6bcd22939404a93d0fc048",
+        "draw_3.grouped.vacancy_cells.csv": "e96ba2ae1374655ad11198d67e4ee19d9a64c2e4dc6c51fcf81473e39d53001e",
+        "draw_4.csv": "d1fa06dfac04174c4db3ee29c5f1e97e67a5f1f51d9fd486977367dbdd156815",
+        "draw_4.csv.summaries.csv": "803b1d02bed755c24761ba320d7924418710fcda37d45e555b2c168d6fdf83c0",
+        "draw_4.grouped.deaths_cells.csv": "6e6573e05d95d5c1ab021a10ea58ff0a5eb765675ca3d15bc28bfc3164a6c5db",
+        "draw_4.grouped.population_cells.csv": "4d84fb79620f3e31c9a03bc24b5044d2ffa9a4af291fd5ae3b7c46f9c6812990",
+        "draw_4.grouped.vacancy_cells.csv": "f9d715d6e6d3dc6997ff014f2aa09f5e0db9cdb4407b86a3bd12f93858ca8005",
+        "draw_5.csv": "b182c9d4f586a627be3e01793363348f786439e6ec2d3002c7dab7b28d17f939",
+        "draw_5.csv.summaries.csv": "33c2d073af4d7943ee43e2850f5c051847c1a8f6d2f744bb5d31b9bb33f75bb7",
+        "draw_5.grouped.deaths_cells.csv": "b07a98c0975d2f4e07c621ea216b21026e4112c1d67bd88858782be5d8ec0da4",
+        "draw_5.grouped.population_cells.csv": "d050bc07ef151ea967a4afa9ca1b46499f6450421ba1fc2e6e517b286e6d408d",
+        "draw_5.grouped.vacancy_cells.csv": "f87049f55ddf269dd36e787230ba5879ba8314fc88263de8f7cd7e488a9d5120",
+        "draw_6.csv": "873590e94cdef9076a81d23acee189abae1ec4f4c27c96a436ad4e218b445f64",
+        "draw_6.csv.summaries.csv": "5673b669715f60d8e47044f123a204115d45befd9e307f8c6f2d23327241c4e7",
+        "draw_6.grouped.deaths_cells.csv": "2765c266eda80fdd7bd6d2cf5ff64c17910b957d0d1b30cdd2a7ed395e6cd6e2",
+        "draw_6.grouped.population_cells.csv": "555e0a318ec0fd5277ee40046337dc494f4b41a3be473c0b3803365586d05f4b",
+        "draw_6.grouped.vacancy_cells.csv": "70b9106595cdbe4b2e239f7e0c3701b48cc08403758b4b2ef9f57efa96a0154f",
+        "draw_7.csv": "58d7a7ad3f0e4f09e40812949af691fe5f0ea3c8ad8999e2379082154371b2fb",
+        "draw_7.csv.summaries.csv": "81c9e6fc6ff75577089a18ea6ea00a75bd5093989c47b4b5da9c8b243eea266d",
+        "draw_7.grouped.deaths_cells.csv": "c5a44351584d4a4670d9bf49fcb48f0fcbc3015530dbc28de76350fa1c09d017",
+        "draw_7.grouped.population_cells.csv": "623ccde2cc532dd0d852981eed8c97a0dbb7e011ad7fa1bcc4b94ea274747d4c",
+        "draw_7.grouped.vacancy_cells.csv": "fd5447d25ef18f1484dd9d5012ee76d009f8a4bffb8f8e08f3765b3f85203f36",
+        "draw_8.csv": "50fbf2ea3018db6eac506e83c5a063ad7ff5b50609ba318463b5b72b5c7ec1d7",
+        "draw_8.csv.summaries.csv": "bc583ad462b1260b4a9f44f7dfb26c47235d4592f9541400d258e627a74f76c6",
+        "draw_8.grouped.deaths_cells.csv": "f3a998cb748136fd716f27053356aeb0b90be0f93dec7f5e8153fc35b58c0427",
+        "draw_8.grouped.population_cells.csv": "9683844b28ee9f885a2e7127401e5674da5058ff20133f8717b961f1fb3e8cb9",
+        "draw_8.grouped.vacancy_cells.csv": "197109c5eeb5b23e12a052900d4412f89e891144001fb788e13fe64f57a07068",
+        "draw_9.csv": "f2183cf839c8b540a7d0b695678e8554fa6cb61b31aebae893311c40f89a56ae",
+        "draw_9.csv.summaries.csv": "61a3702d944ce6a686640e1e265fac635098c4bc1c8aee59f99b83c16b94ef16",
+        "draw_9.grouped.deaths_cells.csv": "0435d47df0c257f9cf8cd285eb99ff918342f666134ba3577b283c3b73e532a2",
+        "draw_9.grouped.population_cells.csv": "ec203a3fe2f6f0071e4bd12bffb6a8f0adca44f1765074722abc52800ff91315",
+        "draw_9.grouped.vacancy_cells.csv": "e1b543929c058ade71323400ebe053d33ad22901f0901028fff5d69c1600e7b3",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "2829dc3e721ddfc585e13e4d9edc6577c9c1102a472c88f6e39d2bbdca8bf23d",
+        "summary.csv": "0bc20fd8a49ca90db7ce12345f998c14fe68af5e93c03abee0f672a9d14da083"
+      },
+      "peak_gpu_memory_used_mib": 2731,
+      "peak_gpu_utilization_percent": 94,
+      "peak_process_rss_kib": 1111408,
+      "repetition": 2,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.687102,
+          "process_rss_kib": 21952
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.941114,
+          "process_rss_kib": 245256
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 627.53681,
+          "process_rss_kib": 941472
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 910.29638,
+          "process_rss_kib": 942368
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1192.973087,
+          "process_rss_kib": 945504
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 57,
+          "offset_ms": 1480.500907,
+          "process_rss_kib": 1033484
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 68,
+          "offset_ms": 1766.155695,
+          "process_rss_kib": 1056332
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 94,
+          "offset_ms": 2049.871731,
+          "process_rss_kib": 1064004
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 72,
+          "offset_ms": 2332.774373,
+          "process_rss_kib": 1111240
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 71,
+          "offset_ms": 2615.941705,
+          "process_rss_kib": 1081392
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 71,
+          "offset_ms": 2898.836783,
+          "process_rss_kib": 1064592
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 89,
+          "offset_ms": 3181.825139,
+          "process_rss_kib": 1064592
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 49,
+          "offset_ms": 3465.084455,
+          "process_rss_kib": 1111408
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 2731,
+          "gpu_utilization_percent": 13,
+          "offset_ms": 3747.704346,
+          "process_rss_kib": 971060
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "087eac0e603bba5f706570b2d5bc7ae5c7682a14946271e2e940b0e6d7249e9e",
+      "stdout_sha256": "2b3bb69db65ce0626195d66b19b30ca2a01b343c3db030c247d03f1df536201c",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 574.9447749999999,
+            "k": 0,
+            "lane": 3,
+            "start_offset_ms": 0.030925,
+            "wall_time_ms": 574.9136599999999
+          },
+          {
+            "finish_offset_ms": 386.348296,
+            "k": 1,
+            "lane": 1,
+            "start_offset_ms": 0.032417,
+            "wall_time_ms": 386.315518
+          },
+          {
+            "finish_offset_ms": 453.005235,
+            "k": 2,
+            "lane": 0,
+            "start_offset_ms": 0.046789000000000004,
+            "wall_time_ms": 452.958286
+          },
+          {
+            "finish_offset_ms": 501.266322,
+            "k": 3,
+            "lane": 2,
+            "start_offset_ms": 0.053228,
+            "wall_time_ms": 501.21274299999993
+          },
+          {
+            "finish_offset_ms": 782.103415,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 386.350259,
+            "wall_time_ms": 395.752866
+          },
+          {
+            "finish_offset_ms": 859.4666100000001,
+            "k": 5,
+            "lane": 0,
+            "start_offset_ms": 453.006708,
+            "wall_time_ms": 406.459482
+          },
+          {
+            "finish_offset_ms": 997.255135,
+            "k": 6,
+            "lane": 2,
+            "start_offset_ms": 501.26757499999997,
+            "wall_time_ms": 495.98713
+          },
+          {
+            "finish_offset_ms": 1081.909392,
+            "k": 7,
+            "lane": 3,
+            "start_offset_ms": 574.946137,
+            "wall_time_ms": 506.962943
+          },
+          {
+            "finish_offset_ms": 1224.56657,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 782.104206,
+            "wall_time_ms": 442.461863
+          },
+          {
+            "finish_offset_ms": 1307.9264420000002,
+            "k": 9,
+            "lane": 0,
+            "start_offset_ms": 859.467271,
+            "wall_time_ms": 448.458869
+          },
+          {
+            "finish_offset_ms": 1428.031162,
+            "k": 10,
+            "lane": 2,
+            "start_offset_ms": 997.255736,
+            "wall_time_ms": 430.775084
+          },
+          {
+            "finish_offset_ms": 1538.462634,
+            "k": 11,
+            "lane": 3,
+            "start_offset_ms": 1081.910113,
+            "wall_time_ms": 456.55221
+          },
+          {
+            "finish_offset_ms": 1695.767791,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 1224.5790789999999,
+            "wall_time_ms": 471.188211
+          },
+          {
+            "finish_offset_ms": 1732.5673319999999,
+            "k": 13,
+            "lane": 0,
+            "start_offset_ms": 1307.926972,
+            "wall_time_ms": 424.639838
+          },
+          {
+            "finish_offset_ms": 1941.623267,
+            "k": 14,
+            "lane": 2,
+            "start_offset_ms": 1428.031912,
+            "wall_time_ms": 513.5910339999999
+          },
+          {
+            "finish_offset_ms": 2081.45917,
+            "k": 15,
+            "lane": 3,
+            "start_offset_ms": 1538.4635250000001,
+            "wall_time_ms": 542.9952949999999
+          },
+          {
+            "finish_offset_ms": 2205.706262,
+            "k": 16,
+            "lane": 1,
+            "start_offset_ms": 1695.768462,
+            "wall_time_ms": 509.93730800000003
+          },
+          {
+            "finish_offset_ms": 2166.812633,
+            "k": 17,
+            "lane": 0,
+            "start_offset_ms": 1732.568023,
+            "wall_time_ms": 434.24431000000004
+          },
+          {
+            "finish_offset_ms": 2336.5092870000003,
+            "k": 18,
+            "lane": 2,
+            "start_offset_ms": 1941.624099,
+            "wall_time_ms": 394.884879
+          },
+          {
+            "finish_offset_ms": 2379.574151,
+            "k": 19,
+            "lane": 3,
+            "start_offset_ms": 2081.459981,
+            "wall_time_ms": 298.11386899999997
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 4,
+        "execution_window_wall_time_ms": 2470.218285,
+        "publication_wall_time_ms": 5.789432,
+        "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+        "requested_draw_workers": 4,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 1163.0839330000001,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 3886.014609
+      },
+      "workers": 4
+    }
+  ],
+  "schema": "sembla-sweep-concurrency-spike/v1",
+  "seed": 9009,
+  "theta_file": null,
+  "ticks": 24,
+  "workers": [
+    1,
+    2,
+    4
+  ],
+  "worktree_status": []
+}

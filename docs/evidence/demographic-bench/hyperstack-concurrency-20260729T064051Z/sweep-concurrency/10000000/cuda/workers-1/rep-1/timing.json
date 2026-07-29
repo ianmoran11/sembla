@@ -1,0 +1,93 @@
+{
+  "schema": "sembla-sweep-timing-v1",
+  "backend": "cuda",
+  "draws": 20,
+  "ticks_per_draw": 24,
+  "setup_wall_time_ms": 2302.620119,
+  "draw_zero_including_setup_wall_time_ms": 3884.540047,
+  "draw_timings": [
+    {
+      "k": 0,
+      "wall_time_ms": 1581.919928
+    },
+    {
+      "k": 1,
+      "wall_time_ms": 1555.300912
+    },
+    {
+      "k": 2,
+      "wall_time_ms": 1663.2281340000002
+    },
+    {
+      "k": 3,
+      "wall_time_ms": 1545.918652
+    },
+    {
+      "k": 4,
+      "wall_time_ms": 1547.572836
+    },
+    {
+      "k": 5,
+      "wall_time_ms": 1593.156515
+    },
+    {
+      "k": 6,
+      "wall_time_ms": 1611.793721
+    },
+    {
+      "k": 7,
+      "wall_time_ms": 1665.001736
+    },
+    {
+      "k": 8,
+      "wall_time_ms": 1542.514173
+    },
+    {
+      "k": 9,
+      "wall_time_ms": 1653.027974
+    },
+    {
+      "k": 10,
+      "wall_time_ms": 1554.8994409999998
+    },
+    {
+      "k": 11,
+      "wall_time_ms": 1544.738543
+    },
+    {
+      "k": 12,
+      "wall_time_ms": 1573.6916399999998
+    },
+    {
+      "k": 13,
+      "wall_time_ms": 1618.971407
+    },
+    {
+      "k": 14,
+      "wall_time_ms": 1617.1114659999998
+    },
+    {
+      "k": 15,
+      "wall_time_ms": 1551.5942009999999
+    },
+    {
+      "k": 16,
+      "wall_time_ms": 1599.306522
+    },
+    {
+      "k": 17,
+      "wall_time_ms": 1589.0456419999998
+    },
+    {
+      "k": 18,
+      "wall_time_ms": 1545.4706
+    },
+    {
+      "k": 19,
+      "wall_time_ms": 1518.7469930000002
+    }
+  ],
+  "whole_sweep_wall_time_ms": 36469.843024,
+  "repository_commit": "7eb21efd029b09303e7b7d1aede4ccc9c3b30cb5",
+  "binary_sha256": "b86f69051c3f4e308ecdfdde807bbce6b21ca7ad11293f5c6fa8722dc30cfc5a"
+}

@@ -1,0 +1,13 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running tests/gpu_differential.rs (target/release/deps/gpu_differential-ab816b40e525be0f)
+
+running 6 tests
+test ineligible_views_take_state_download_differential_fallback ... ok
+test eligible_views_take_device_observation_differential_path ... ok
+test grouped_demographic_configuration_uses_device_histograms_differentially ... ok
+test cuda_manifest_verify_and_level_a_bytes_round_trip ... ok
+test differential_corpus_passes ... ok
+test supported_composition_plan_differential_corpus_passes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 30.73s
+
