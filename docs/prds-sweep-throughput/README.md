@@ -369,24 +369,31 @@ The outcome is recorded independently for CPU and CUDA as one of:
 
 Do not choose a universal worker count or an `auto` policy from one scale.
 The complete-backend/default-stream, complete-backend/lockstep-stream, and
-fused grid-y CUDA mechanisms are all negative and closed. One quadrant remains
-untested: **free-running non-blocking streams**. The completed experiments
-covered default-stream independent scheduling (kernels serialized, host
-pipelining helped) and lockstep non-blocking streams (real overlap but
-tick-barrier gaps made it slower), but never independent scheduling *on*
-non-blocking streams. The hidden `SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS=1`
-spike fills that quadrant: each lane constructs, uses, and drops an isolated
-retained `CudaBackend::new_nonblocking_stream` on its worker thread, draws are
-claimed dynamically with no tick barriers, and publication stays ascending `k`.
-It is default-off Gate-1 evidence code, mutually exclusive with the lockstep
-and fused controls, imposes no draw-count divisibility requirement, and keeps
-the draw-zero delay seam for completion-inversion checks. Its timing record
-uses `execution_mode = "cuda-free-nonblocking-streams"`. Drive it with the
-collector's `--cuda-free-streams` flag under the same workers 1/2/4, three
-repetitions, exact-parity, negative-control, and Nsight protocol as the other
-CUDA arms. No measured CUDA concurrent-draw design advances to a numbered PRD
-yet; this is the last scheduling/stream quadrant before the CUDA track is
-fully closed. CPU Gate 1 remains separate and open.
+fused grid-y CUDA mechanisms are all negative and closed. The fourth and final
+scheduling/stream quadrant — **free-running non-blocking streams** — is
+recorded in
+[`hyperstack-freestream-20260729T152534Z`](../evidence/demographic-bench/hyperstack-freestream-20260729T152534Z/):
+`SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS=1` gives each lane an isolated retained
+backend on an explicitly non-blocking stream, claims draws dynamically with no
+tick barriers, and publishes ascending `k`.
+
+The result is **conditionally positive**. All 18 complete-tree comparisons
+are byte-equal, negative controls are rejected, and the schedule control
+proves `cuda-free-nonblocking-streams` with a forced completion inversion.
+Nsight shows 39,552 kernels split evenly across non-default streams 13/14
+with 29.470 ms of real overlap (max concurrency 2) and no barrier gaps.
+Median whole-sweep speedups over workers 1 are 1.266x/1.270x at 1M and
+**1.598x/1.745x at 10M** — the fastest measured CUDA design at 10M and
+effectively tied with isolated default-stream backends at 1M (10M: isolated
+1.487x/1.658x, lockstep 1.296x/1.405x, fused negative). Memory
+remains draw-major: 22,701 MiB VRAM and 9,161,224 KiB RSS at 10M/four lanes.
+
+The gate is not fully discharged: like the lockstep arm, this matrix used
+independent noise only, and the gate requires CRN as a correctness case.
+`0004-run-cuda-draws-concurrently` may be drafted only after a CRN hardware
+correctness arm passes for this design, and any production form needs explicit
+capacity admission rather than an `auto` worker count. CPU Gate 1 remains
+separate and open.
 
 ### Binding contract for future PRDs
 
