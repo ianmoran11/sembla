@@ -1,0 +1,2900 @@
+{
+  "backend": "cuda",
+  "binary": "/home/ubuntu/sembla/target/release/sembla",
+  "binary_sha256": "1eec28780d2a9246ef7da2bb4f7bca46d67d9282ac76b2f082ce4daecda3cbfc",
+  "comparisons": [
+    {
+      "arm_kind": "candidate",
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 1
+    },
+    {
+      "arm_kind": "candidate",
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 2
+    },
+    {
+      "arm_kind": "candidate",
+      "changed": [],
+      "equal": true,
+      "extra": [],
+      "missing": [],
+      "repetition": 0,
+      "workers": 4
+    }
+  ],
+  "cpu_total_threads": null,
+  "cuda_free_streams": true,
+  "cuda_fused_grid_y": false,
+  "cuda_lockstep_streams": false,
+  "draws": 20,
+  "enabled_features": [
+    "grouped-observations"
+  ],
+  "model": "/home/ubuntu/demographic-bench/work/concurrency-10000000.state.model.json",
+  "model_sha256": "f492ffbfa32f457e1845b7eecacaebd0af5b335cc1b0db4189be674d40701012",
+  "negative_control": {
+    "comparison": {
+      "changed": [
+        "draw_0.grouped.deaths_cells.csv"
+      ],
+      "equal": false,
+      "extra": [],
+      "missing": []
+    },
+    "target": "draw_0.grouped.deaths_cells.csv"
+  },
+  "noise": "crn",
+  "passed": true,
+  "population": "/home/ubuntu/demographic-bench/work/concurrency-10000000.state",
+  "population_sha256": "02934c1f4161ced37395e82dacf64039cdb99f1d12434e83c5a87f0b07c9b57c",
+  "repetitions": 1,
+  "repository_commit": "8ace75c83755b7bc767ef07c6e7eef05d3c2036b",
+  "runs": [
+    {
+      "arm_kind": "candidate",
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-10000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-10000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "crn",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-1/rep-0/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-1/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-1/rep-0/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "cuda_free_streams": false,
+      "cuda_fused_grid_y": false,
+      "cuda_lockstep_streams": false,
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 36559.234214,
+      "output_hashes": {
+        "__external__/pairs.csv": "e5505a2545aad89fa978f100196d47bbe7502805870f2b6dffd7034802b68193",
+        "__external__/pairs.csv.meta.json": "c47a55e1e0b4347810cf1ff88d38c2b4f748c3168c0118db45d97aa3d756a0b2",
+        "draw_0.csv": "828756da87e1130dbab764a37b3b0e7be61661d41b1ccd03da843479af22471f",
+        "draw_0.csv.summaries.csv": "46f06d106e05972302133b7eb22ee5b57d7d9f2eb0ef6b6e98ad144bc2f76f99",
+        "draw_0.grouped.deaths_cells.csv": "cba0821172df45165497f52370aa6143e714da6d53de51572182c22d9dd3fe5a",
+        "draw_0.grouped.population_cells.csv": "57579b5e47db4fe61ab103cdaa5e35cc41620eaf2a18b9a7f1d71ca07182f2fc",
+        "draw_0.grouped.vacancy_cells.csv": "b97346ebc5feca77e3570b3b9074f208d188658c3bea63f3892a8a7cec233336",
+        "draw_1.csv": "a3d7d428913f2043a94d10e895e4df159392b34d6749f03d1d72b86acef167c0",
+        "draw_1.csv.summaries.csv": "f2c17d9683b20fba42c8d43a3670b41881278b517c5efa18dd551e2b47e79787",
+        "draw_1.grouped.deaths_cells.csv": "02b56baa3e4947fed9a63d2ebb6b35bf4185689fde118190de38e48b9492b798",
+        "draw_1.grouped.population_cells.csv": "f58c4ec0cfe274e45676311b657637e3305ec6b8f59dbfad8863c304a7ab52c5",
+        "draw_1.grouped.vacancy_cells.csv": "88cb4e430f72683bff3f807382dfd55f0765faa95972cbfaf36e33a83304a6e5",
+        "draw_10.csv": "8d5139d6f34e78354f3447ac86e45479bfd26c490f96c07c83f4901576addcd6",
+        "draw_10.csv.summaries.csv": "47a41dc88b361774e02ed3273c5a69144b1164b68c71c9986247d5811b162616",
+        "draw_10.grouped.deaths_cells.csv": "5627972bec67edbca556dcaf85d58263810ff10c0686387adda09322fa9d4925",
+        "draw_10.grouped.population_cells.csv": "cfd2d08ab6ee5cf1957721551222aa5f17ffde17bc475039020f00edab73c3c2",
+        "draw_10.grouped.vacancy_cells.csv": "8530c2fb9932afa12951ed82d71921b0b06f79b07cfadf3f69837c201f9ac67d",
+        "draw_11.csv": "d75c8cbd9ffbcb2feb5aa3141759f5fcce201ee847eb22adeee9e4c21f3730ea",
+        "draw_11.csv.summaries.csv": "0e59fd4e9b312c37a3d7e0c362b037acd0279b78935d75f792705e808ef7aa6d",
+        "draw_11.grouped.deaths_cells.csv": "e0f3e8550533787b345ef0175afbbdbacd6ef7ddc8775a79e2ecec8343124ae6",
+        "draw_11.grouped.population_cells.csv": "6a02d33e25e6743759f858fdc57630120597f579758b09e89f51bb805a929017",
+        "draw_11.grouped.vacancy_cells.csv": "982854fdffc4cbdba0e69add6000aa1bb10b84bf3ba0d325dd25fd3840202950",
+        "draw_12.csv": "4bec02d2d812b86881dcf5aa6aa995227bba4f9f1cc78700ab7ce03647417dcb",
+        "draw_12.csv.summaries.csv": "9b27418cf3ade908bff6a6d45499e78d2cd6c109ef80dd804d0de71febc26d4e",
+        "draw_12.grouped.deaths_cells.csv": "e3c49c2bf032eac5bba4999383daecf0457bf90225879faf3341293e4b4bea53",
+        "draw_12.grouped.population_cells.csv": "4c50e4f43f4938e18d66c3bd6cf7b33811fbc202c899ce0d96555989fb5a6f38",
+        "draw_12.grouped.vacancy_cells.csv": "22562244ecb481ac6033a6417ef758963bbee06b862f117df447a9b261b86892",
+        "draw_13.csv": "f1ea1eec6f9139e0604b5c00bcec5710a0e2bb57167acbb3f8e2e3f0afb89c41",
+        "draw_13.csv.summaries.csv": "373b912c05a0231ef9221c0b9cb707c7bf30de602be61f07d9844f459f485d50",
+        "draw_13.grouped.deaths_cells.csv": "d654a57b6e24eead6860515f6d9ff6c96ad2439bc3e6e430a5a1448d5650105f",
+        "draw_13.grouped.population_cells.csv": "1fe25ebf1770f34e4a6030262ababe59810ffd4ea4b0265d880b377b23d05479",
+        "draw_13.grouped.vacancy_cells.csv": "db46d9824b356b36e427cc16db295394ccaed2a33b75b8a6d0f916a60159e9f8",
+        "draw_14.csv": "66018902b5206f71f07c2a5bc6ccecb4a4aa0d1c77791b1fbca5100366b6aa76",
+        "draw_14.csv.summaries.csv": "b5294f7f71c1af7bd286e17336ddf42190f0ac64e0b201626487c99e06cf32e2",
+        "draw_14.grouped.deaths_cells.csv": "9eca4c7f4ee5575e5e6e14f46a69c3afe4ee0f2e2ab2b06179a458c3dbc25851",
+        "draw_14.grouped.population_cells.csv": "723db2fcb94791748d59e46285d014a13978e0e44d4d20d20a73a5dea325d01a",
+        "draw_14.grouped.vacancy_cells.csv": "be316bc73159e3cc9a3ee56351b0121dac6aae44d6e1ed947ecbfc69140b19e8",
+        "draw_15.csv": "a1d9aa30fe8549fe09027798d269fa75104d8aac57d0c1e0940abf3c97a03e1f",
+        "draw_15.csv.summaries.csv": "8f98d404c5c27f28f8a15c00870e8ebd0f777b02449262db146da47d6232cc35",
+        "draw_15.grouped.deaths_cells.csv": "4c565c46f7bbc503dd9a8a09b58c1e145c3efc303e40fce506c7a8ba435a5055",
+        "draw_15.grouped.population_cells.csv": "f826de738a8847b194e86dc2641d6abcfbfe353ec72ba41ad902fc3020d7f2c6",
+        "draw_15.grouped.vacancy_cells.csv": "5c9b52ced4b021e10620d41436378d029d0236a72bd65600469893acc8946f97",
+        "draw_16.csv": "4cc99a675ce7c727319d460c06ec9b4c6bc0eba2cc6a95d860ec1b0d6c2231f7",
+        "draw_16.csv.summaries.csv": "7eff091cd6a6f9bcecc5394d9b8890f49ef291d3cf5ab446197d2158de9bb334",
+        "draw_16.grouped.deaths_cells.csv": "271334ecad678da1beca612be6c1b5b241d50d91bcf3ba2d3447b50e205febf5",
+        "draw_16.grouped.population_cells.csv": "685d53774841c08328847930dd1e7bc46af13e70fe6a5ab4c08995146fc80471",
+        "draw_16.grouped.vacancy_cells.csv": "b5c83468c2ed739e518482b49305e6e81ca35f14e55551c8faa576243da02b13",
+        "draw_17.csv": "acacd399085a05cca296f6de2d1644b95d7c548e8c7fdaf366701f31418e6fc2",
+        "draw_17.csv.summaries.csv": "892e782cf506b3c33e6c2b8f5adec02ea3dda8099fd6c2c6fc0c4a2ade224ada",
+        "draw_17.grouped.deaths_cells.csv": "91b6bb383a3613ee7a1df1d4a1b6bee3e0944ea4efa58ed37663e628db120c80",
+        "draw_17.grouped.population_cells.csv": "704bf642ee74e5ffade033b75b2659429777c89e10c943f1ad8c67929c845868",
+        "draw_17.grouped.vacancy_cells.csv": "bc6b11576a270adee01a447f488423c3c31345aaf67276c622e0e5f624efa3a0",
+        "draw_18.csv": "b77e0f7ae50cf7d7723d306e0423d5b0a809fc1d1a84f42894d8fd066463cf51",
+        "draw_18.csv.summaries.csv": "142febe81b947bbecedbc0f73db403f5ff5a0899edd72bb10306b2fec1304d43",
+        "draw_18.grouped.deaths_cells.csv": "88280c649aa503f4be4ca4a6fd9605ad56cffdce56b9711b3ec9bd3cc090cab7",
+        "draw_18.grouped.population_cells.csv": "12f572176839f9b6e52b1fe3a81cfe17a035a2a9cba1166a28e4ee80264e7fbc",
+        "draw_18.grouped.vacancy_cells.csv": "e67818afcf5a9917fe6902b3c26479ddb47faa819c9163ff4025813c05e59719",
+        "draw_19.csv": "b6ee7181e1094804eab314da5f928d9526e792ff94d876082597af1d992fee1b",
+        "draw_19.csv.summaries.csv": "f1bdc2f6fce9ddc451b2fb74557ee676e3ecd0ac90a79a7aed8e839542164b8a",
+        "draw_19.grouped.deaths_cells.csv": "15ab87e3de58c46aeeec670689ad72aeca62905848ff39c39bcb7aa61a487701",
+        "draw_19.grouped.population_cells.csv": "bf9cc4127e3757bc8a9d56565232e6c587eb6ac157202bc6fe3d73e7c3df9732",
+        "draw_19.grouped.vacancy_cells.csv": "c901bd2f2bcf054da39b1b52b305b3e7304dc567ca3c3f4f6e8c51da622902f9",
+        "draw_2.csv": "cc15e0259c9a6b95719d60c1fb0c25fd574957113da2299a0b19f5f7aa855230",
+        "draw_2.csv.summaries.csv": "58ea02b7bc0a640bb085e4bcc7fc932e1ef8c3138c70e1e48889151b15da9efd",
+        "draw_2.grouped.deaths_cells.csv": "3b61779c6febc054e4f083c97ddd398fd35d7c22900d37806dabe9cd692b82ed",
+        "draw_2.grouped.population_cells.csv": "b85d1ddf44022ea1b1b8bee22d76f34fcd854c406e40213fc827cae456588aa1",
+        "draw_2.grouped.vacancy_cells.csv": "183f37871ca8c3a97d6ef4aa1ba4083a3347498ea3f9cd027605884f2be141f2",
+        "draw_3.csv": "7f714fa73b3701645ccd1a080fdbfac1e9375393d32ca3eece83d387d42cf59a",
+        "draw_3.csv.summaries.csv": "65547ebcd397a3500362355f2ee34afa48417261902b39c45af9b728ba0c45d0",
+        "draw_3.grouped.deaths_cells.csv": "5c6b0fc6ee3e045fb26973066a74d4d80df87a156f9c232d836ebf631113cd43",
+        "draw_3.grouped.population_cells.csv": "752819c3a15e858dd1794e0c115bdef32f32da43714a6bd155baffef09dce776",
+        "draw_3.grouped.vacancy_cells.csv": "cb429f822e4fd044c51e1e92ccab83f3c1d22e43c4f868883c86dd5cf9c14d39",
+        "draw_4.csv": "70ebcb8263d16398eb53138748e744a68fe7fc893fa9edb48933860a5e7f1e70",
+        "draw_4.csv.summaries.csv": "185fd8815451d243e7101a5b0652879be62cd98b990e4332e68d03c9dda73076",
+        "draw_4.grouped.deaths_cells.csv": "38a12277a15f3faf046383243a78cd97d40e83998fb88ebff07dbc5191311b1a",
+        "draw_4.grouped.population_cells.csv": "24859fc4f6105fb23926da50d5d4337499af827be8e0421992afdb74a47d89f3",
+        "draw_4.grouped.vacancy_cells.csv": "a4025ba6facddf8f0dae63e3e8119a9e9aea91e34e3a24cebe3a37ad959e55ee",
+        "draw_5.csv": "aabaa5404f9f8f4ad2f0705f5c7be0073e976c4ef882004734f960bbbb8cf8af",
+        "draw_5.csv.summaries.csv": "2ea8b5489a07b8e486ba210c9096512b94c26c9d387ef7c1505b863aabb41eba",
+        "draw_5.grouped.deaths_cells.csv": "078eab7888b841897535d3bb4a6a99db0c1cfd8482e93e58de6ac7c9635fec4d",
+        "draw_5.grouped.population_cells.csv": "440a655ff4bdcb959a8ab66427f46f0b7feea4093cbe0768af45e26120b0c838",
+        "draw_5.grouped.vacancy_cells.csv": "19a1a7635ab214f2f292bd57a397e83101b0597264d5fa11a2ee6932650ce6cc",
+        "draw_6.csv": "c53fec0471bb5deb8a069ff3532912744858b0355874a58770697e664a276946",
+        "draw_6.csv.summaries.csv": "c5e87127d0abc1ba22384f287a1548f4c28a52c628eac158af237b436fd2d3b1",
+        "draw_6.grouped.deaths_cells.csv": "1b7aa64a9d12ea2a3c4cd3a9205b81bb8b94e9c93d06b3c1103953a78926218f",
+        "draw_6.grouped.population_cells.csv": "c3f31f451d60454c373fea981c251e1720845a319558152cd21a31228cb6542f",
+        "draw_6.grouped.vacancy_cells.csv": "6c3802047632c5b7a082334ee06c2141ea999275f08ce8bd3049c58b82ebbafd",
+        "draw_7.csv": "3390bc262d71ba84897bd6b94a1dd746c763cf57d6e2daa313f34fcc351d8941",
+        "draw_7.csv.summaries.csv": "c90b1a392e66fc4ddd430f0c42ceacabc32387f7a2d09447beb3f8cd610915fb",
+        "draw_7.grouped.deaths_cells.csv": "ab25ef9846007f16cb272886ebd21810e70325ac026677067ac3000f794eedee",
+        "draw_7.grouped.population_cells.csv": "6970bed308027a265c1d63af449080d456dc7787c98bbb5022c635ae6560b89b",
+        "draw_7.grouped.vacancy_cells.csv": "cff06a559eb3f526e1cedde1f8b57cddf3cf38e7ff6371b9ac310492bd07a16c",
+        "draw_8.csv": "8d3dcf6addbbf35d04b32bbd7f88205acde0c0365855c584c8f56c3d48b72e87",
+        "draw_8.csv.summaries.csv": "b679b3839479bd8f3e4714d49f65bb034237c0cb6f984741445ab11fa67bc6d3",
+        "draw_8.grouped.deaths_cells.csv": "eab23f3b248cde663254ef2495fc54fc6d8b83dd5f3bedfef041dd4f1a8866fa",
+        "draw_8.grouped.population_cells.csv": "2a0b90565683864d968fa6fc5328ad17bfc052171385382be3d75cdf1b04d0f4",
+        "draw_8.grouped.vacancy_cells.csv": "5852b4e53023b4630a6a96814b4ded5dbaa7cac60f98b6f639bc262af40a7bac",
+        "draw_9.csv": "c69afed1a9a87a79e2e997ec59bada8d827a0ccddd880ebece13f2b298ac3a77",
+        "draw_9.csv.summaries.csv": "e93c8e15a7bd8cee4cc84830854a13b3eac4cbb7d61cdb16e9bbc0c29a5b6854",
+        "draw_9.grouped.deaths_cells.csv": "e32a087bf9c51acb17ab587288f69af1d22a5548986cf6fb6830b9e6095c5ff7",
+        "draw_9.grouped.population_cells.csv": "851b9b70f59720dbc66a2571b3eecfbaab5c9093db71be5545918eb2cfbd504d",
+        "draw_9.grouped.vacancy_cells.csv": "d569138b2a9093e0834df1a2073ee1b381b3e28d00f498fb66baf3b073e07f6b",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "ab0b86b3591e1ff087b52f4a183732e50facda8d0a49bb44d1ff578188bc7da4",
+        "summary.csv": "371c2bda723f4d28172ee5dcb1addee59fd44ffcedb5de2df544cfe768382b97"
+      },
+      "peak_gpu_memory_used_mib": 6025,
+      "peak_gpu_utilization_percent": 99,
+      "peak_process_rss_kib": 2552036,
+      "repetition": 0,
+      "requested_fused_capacity": null,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.979958,
+          "process_rss_kib": 25984
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 287.75674,
+          "process_rss_kib": 473088
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 574.047364,
+          "process_rss_kib": 151320
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 860.134347,
+          "process_rss_kib": 227480
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1146.245826,
+          "process_rss_kib": 849752
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1432.116266,
+          "process_rss_kib": 898072
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1718.439652,
+          "process_rss_kib": 1489880
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2004.41318,
+          "process_rss_kib": 1411112
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2290.536139,
+          "process_rss_kib": 480204
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2690.717772,
+          "process_rss_kib": 949452
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2976.984298,
+          "process_rss_kib": 1519308
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 27,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3263.091786,
+          "process_rss_kib": 1556752
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3551.128093,
+          "process_rss_kib": 1628880
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3835.425271,
+          "process_rss_kib": 1631568
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4118.99438,
+          "process_rss_kib": 1995568
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 937,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4401.99713,
+          "process_rss_kib": 2551984
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4686.253308,
+          "process_rss_kib": 2477368
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 4970.353753,
+          "process_rss_kib": 2063896
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 97,
+          "offset_ms": 5256.120643,
+          "process_rss_kib": 2064120
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 2,
+          "offset_ms": 5540.698312,
+          "process_rss_kib": 2532504
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 5825.274259,
+          "process_rss_kib": 2139428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 6109.084489,
+          "process_rss_kib": 2148964
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 6392.716172,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 6676.436057,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 55,
+          "offset_ms": 6962.024228,
+          "process_rss_kib": 2187140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 7246.414145,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 7530.805795,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 7814.425729,
+          "process_rss_kib": 2095076
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 11,
+          "offset_ms": 8098.241985,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 8383.550728,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 8669.268833,
+          "process_rss_kib": 2404644
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 8954.239306,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 9238.303693,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 9522.132556,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 9805.843453,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 10091.758527,
+          "process_rss_kib": 2104708
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 10376.386225,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 10660.45828,
+          "process_rss_kib": 2150404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 10944.145145,
+          "process_rss_kib": 2083972
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 16,
+          "offset_ms": 11228.069136,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 11513.520714,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 11799.51781,
+          "process_rss_kib": 2481924
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 12083.910056,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 12367.946321,
+          "process_rss_kib": 2097092
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 12651.751089,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 12935.574001,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 13221.760572,
+          "process_rss_kib": 2176612
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 2,
+          "offset_ms": 13506.32256,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 13790.70537,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 14074.801945,
+          "process_rss_kib": 2122404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 60,
+          "offset_ms": 14358.496098,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 14646.12725,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 14934.754228,
+          "process_rss_kib": 2430852
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 15219.246802,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 15503.398636,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 15787.040136,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 16070.705564,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 77,
+          "offset_ms": 16356.586923,
+          "process_rss_kib": 2129572
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 16641.043038,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 16927.103831,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 17210.416597,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 17494.166087,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 17780.997243,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 18066.575323,
+          "process_rss_kib": 2379556
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 18350.986959,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 18635.524372,
+          "process_rss_kib": 2155780
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 18919.149764,
+          "process_rss_kib": 2122404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 19202.838529,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 19488.472248,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 19773.519479,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 20057.529366,
+          "process_rss_kib": 2159364
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 20341.033117,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 20624.870948,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 20909.549933,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 50,
+          "offset_ms": 21195.171029,
+          "process_rss_kib": 2257028
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 21479.60151,
+          "process_rss_kib": 2396772
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 21763.624522,
+          "process_rss_kib": 2090148
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 22047.513571,
+          "process_rss_kib": 2109860
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 73,
+          "offset_ms": 22331.120922,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 22617.33042,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 22903.115256,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 23187.14499,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 23470.836769,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 23754.951551,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 24040.866279,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 76,
+          "offset_ms": 24326.223774,
+          "process_rss_kib": 2265764
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 24610.481631,
+          "process_rss_kib": 2086676
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 24894.576989,
+          "process_rss_kib": 2112772
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 25178.404061,
+          "process_rss_kib": 2122404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 25462.018015,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 25747.58853,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 26033.359183,
+          "process_rss_kib": 2505220
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 26317.64229,
+          "process_rss_kib": 2153540
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 26601.364927,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 26885.268727,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 98,
+          "offset_ms": 27168.867559,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 46,
+          "offset_ms": 27454.092187,
+          "process_rss_kib": 2183108
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 27738.468043,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 28022.570585,
+          "process_rss_kib": 2127332
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 28306.254846,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 33,
+          "offset_ms": 28590.212895,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 28875.639767,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 29161.374389,
+          "process_rss_kib": 2413604
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 29445.574901,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 29729.828744,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 30013.303295,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 30296.988094,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 95,
+          "offset_ms": 30582.833531,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 30867.449136,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 31151.881484,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 31435.573804,
+          "process_rss_kib": 2103588
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 31720.10522,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 32005.839334,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 34,
+          "offset_ms": 32291.427052,
+          "process_rss_kib": 2282340
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 32575.87922,
+          "process_rss_kib": 2164260
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 32860.024887,
+          "process_rss_kib": 2110756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 33143.582142,
+          "process_rss_kib": 2122404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 87,
+          "offset_ms": 33427.608909,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 33714.24008,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 33998.757176,
+          "process_rss_kib": 2552036
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 34283.234157,
+          "process_rss_kib": 2100676
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 34567.038189,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 56,
+          "offset_ms": 34850.84764,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 35136.725627,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 8,
+          "offset_ms": 35422.382744,
+          "process_rss_kib": 2376644
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 35706.910329,
+          "process_rss_kib": 2083428
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 35991.636705,
+          "process_rss_kib": 2161380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6025,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 36275.27896,
+          "process_rss_kib": 2005844
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "7a675ed3301f385bb23fa2d2997decf70e5157a724d3b0cdf92afa6f63b728ed",
+      "stdout_sha256": "b00e252c7c2ee9d89cba3330006eb2e85c96678f23236235f0c78482f1d03ea1",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "1eec28780d2a9246ef7da2bb4f7bca46d67d9282ac76b2f082ce4daecda3cbfc",
+        "draw_timings": [
+          {
+            "k": 0,
+            "wall_time_ms": 1508.349083
+          },
+          {
+            "k": 1,
+            "wall_time_ms": 1720.8891689999998
+          },
+          {
+            "k": 2,
+            "wall_time_ms": 1561.669294
+          },
+          {
+            "k": 3,
+            "wall_time_ms": 1549.332473
+          },
+          {
+            "k": 4,
+            "wall_time_ms": 1513.590941
+          },
+          {
+            "k": 5,
+            "wall_time_ms": 1585.7061730000003
+          },
+          {
+            "k": 6,
+            "wall_time_ms": 1593.4311060000002
+          },
+          {
+            "k": 7,
+            "wall_time_ms": 1619.748258
+          },
+          {
+            "k": 8,
+            "wall_time_ms": 1560.847004
+          },
+          {
+            "k": 9,
+            "wall_time_ms": 1623.6199089999998
+          },
+          {
+            "k": 10,
+            "wall_time_ms": 1538.5689409999998
+          },
+          {
+            "k": 11,
+            "wall_time_ms": 1550.433746
+          },
+          {
+            "k": 12,
+            "wall_time_ms": 1569.6098080000002
+          },
+          {
+            "k": 13,
+            "wall_time_ms": 1605.687395
+          },
+          {
+            "k": 14,
+            "wall_time_ms": 1616.60753
+          },
+          {
+            "k": 15,
+            "wall_time_ms": 1580.425691
+          },
+          {
+            "k": 16,
+            "wall_time_ms": 1620.9892830000001
+          },
+          {
+            "k": 17,
+            "wall_time_ms": 1543.524651
+          },
+          {
+            "k": 18,
+            "wall_time_ms": 1530.512747
+          },
+          {
+            "k": 19,
+            "wall_time_ms": 1562.0528259999999
+          }
+        ],
+        "draw_zero_including_setup_wall_time_ms": 3972.609157,
+        "draws": 20,
+        "repository_commit": "8ace75c83755b7bc767ef07c6e7eef05d3c2036b",
+        "schema": "sembla-sweep-timing-v1",
+        "setup_wall_time_ms": 2464.2600740000003,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 36492.532705000005
+      },
+      "workers": 1
+    },
+    {
+      "arm_kind": "candidate",
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-10000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-10000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "crn",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-2/rep-0/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-2/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-2/rep-0/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "cuda_free_streams": true,
+      "cuda_fused_grid_y": false,
+      "cuda_lockstep_streams": false,
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 23116.899999,
+      "output_hashes": {
+        "__external__/pairs.csv": "e5505a2545aad89fa978f100196d47bbe7502805870f2b6dffd7034802b68193",
+        "__external__/pairs.csv.meta.json": "c47a55e1e0b4347810cf1ff88d38c2b4f748c3168c0118db45d97aa3d756a0b2",
+        "draw_0.csv": "828756da87e1130dbab764a37b3b0e7be61661d41b1ccd03da843479af22471f",
+        "draw_0.csv.summaries.csv": "46f06d106e05972302133b7eb22ee5b57d7d9f2eb0ef6b6e98ad144bc2f76f99",
+        "draw_0.grouped.deaths_cells.csv": "cba0821172df45165497f52370aa6143e714da6d53de51572182c22d9dd3fe5a",
+        "draw_0.grouped.population_cells.csv": "57579b5e47db4fe61ab103cdaa5e35cc41620eaf2a18b9a7f1d71ca07182f2fc",
+        "draw_0.grouped.vacancy_cells.csv": "b97346ebc5feca77e3570b3b9074f208d188658c3bea63f3892a8a7cec233336",
+        "draw_1.csv": "a3d7d428913f2043a94d10e895e4df159392b34d6749f03d1d72b86acef167c0",
+        "draw_1.csv.summaries.csv": "f2c17d9683b20fba42c8d43a3670b41881278b517c5efa18dd551e2b47e79787",
+        "draw_1.grouped.deaths_cells.csv": "02b56baa3e4947fed9a63d2ebb6b35bf4185689fde118190de38e48b9492b798",
+        "draw_1.grouped.population_cells.csv": "f58c4ec0cfe274e45676311b657637e3305ec6b8f59dbfad8863c304a7ab52c5",
+        "draw_1.grouped.vacancy_cells.csv": "88cb4e430f72683bff3f807382dfd55f0765faa95972cbfaf36e33a83304a6e5",
+        "draw_10.csv": "8d5139d6f34e78354f3447ac86e45479bfd26c490f96c07c83f4901576addcd6",
+        "draw_10.csv.summaries.csv": "47a41dc88b361774e02ed3273c5a69144b1164b68c71c9986247d5811b162616",
+        "draw_10.grouped.deaths_cells.csv": "5627972bec67edbca556dcaf85d58263810ff10c0686387adda09322fa9d4925",
+        "draw_10.grouped.population_cells.csv": "cfd2d08ab6ee5cf1957721551222aa5f17ffde17bc475039020f00edab73c3c2",
+        "draw_10.grouped.vacancy_cells.csv": "8530c2fb9932afa12951ed82d71921b0b06f79b07cfadf3f69837c201f9ac67d",
+        "draw_11.csv": "d75c8cbd9ffbcb2feb5aa3141759f5fcce201ee847eb22adeee9e4c21f3730ea",
+        "draw_11.csv.summaries.csv": "0e59fd4e9b312c37a3d7e0c362b037acd0279b78935d75f792705e808ef7aa6d",
+        "draw_11.grouped.deaths_cells.csv": "e0f3e8550533787b345ef0175afbbdbacd6ef7ddc8775a79e2ecec8343124ae6",
+        "draw_11.grouped.population_cells.csv": "6a02d33e25e6743759f858fdc57630120597f579758b09e89f51bb805a929017",
+        "draw_11.grouped.vacancy_cells.csv": "982854fdffc4cbdba0e69add6000aa1bb10b84bf3ba0d325dd25fd3840202950",
+        "draw_12.csv": "4bec02d2d812b86881dcf5aa6aa995227bba4f9f1cc78700ab7ce03647417dcb",
+        "draw_12.csv.summaries.csv": "9b27418cf3ade908bff6a6d45499e78d2cd6c109ef80dd804d0de71febc26d4e",
+        "draw_12.grouped.deaths_cells.csv": "e3c49c2bf032eac5bba4999383daecf0457bf90225879faf3341293e4b4bea53",
+        "draw_12.grouped.population_cells.csv": "4c50e4f43f4938e18d66c3bd6cf7b33811fbc202c899ce0d96555989fb5a6f38",
+        "draw_12.grouped.vacancy_cells.csv": "22562244ecb481ac6033a6417ef758963bbee06b862f117df447a9b261b86892",
+        "draw_13.csv": "f1ea1eec6f9139e0604b5c00bcec5710a0e2bb57167acbb3f8e2e3f0afb89c41",
+        "draw_13.csv.summaries.csv": "373b912c05a0231ef9221c0b9cb707c7bf30de602be61f07d9844f459f485d50",
+        "draw_13.grouped.deaths_cells.csv": "d654a57b6e24eead6860515f6d9ff6c96ad2439bc3e6e430a5a1448d5650105f",
+        "draw_13.grouped.population_cells.csv": "1fe25ebf1770f34e4a6030262ababe59810ffd4ea4b0265d880b377b23d05479",
+        "draw_13.grouped.vacancy_cells.csv": "db46d9824b356b36e427cc16db295394ccaed2a33b75b8a6d0f916a60159e9f8",
+        "draw_14.csv": "66018902b5206f71f07c2a5bc6ccecb4a4aa0d1c77791b1fbca5100366b6aa76",
+        "draw_14.csv.summaries.csv": "b5294f7f71c1af7bd286e17336ddf42190f0ac64e0b201626487c99e06cf32e2",
+        "draw_14.grouped.deaths_cells.csv": "9eca4c7f4ee5575e5e6e14f46a69c3afe4ee0f2e2ab2b06179a458c3dbc25851",
+        "draw_14.grouped.population_cells.csv": "723db2fcb94791748d59e46285d014a13978e0e44d4d20d20a73a5dea325d01a",
+        "draw_14.grouped.vacancy_cells.csv": "be316bc73159e3cc9a3ee56351b0121dac6aae44d6e1ed947ecbfc69140b19e8",
+        "draw_15.csv": "a1d9aa30fe8549fe09027798d269fa75104d8aac57d0c1e0940abf3c97a03e1f",
+        "draw_15.csv.summaries.csv": "8f98d404c5c27f28f8a15c00870e8ebd0f777b02449262db146da47d6232cc35",
+        "draw_15.grouped.deaths_cells.csv": "4c565c46f7bbc503dd9a8a09b58c1e145c3efc303e40fce506c7a8ba435a5055",
+        "draw_15.grouped.population_cells.csv": "f826de738a8847b194e86dc2641d6abcfbfe353ec72ba41ad902fc3020d7f2c6",
+        "draw_15.grouped.vacancy_cells.csv": "5c9b52ced4b021e10620d41436378d029d0236a72bd65600469893acc8946f97",
+        "draw_16.csv": "4cc99a675ce7c727319d460c06ec9b4c6bc0eba2cc6a95d860ec1b0d6c2231f7",
+        "draw_16.csv.summaries.csv": "7eff091cd6a6f9bcecc5394d9b8890f49ef291d3cf5ab446197d2158de9bb334",
+        "draw_16.grouped.deaths_cells.csv": "271334ecad678da1beca612be6c1b5b241d50d91bcf3ba2d3447b50e205febf5",
+        "draw_16.grouped.population_cells.csv": "685d53774841c08328847930dd1e7bc46af13e70fe6a5ab4c08995146fc80471",
+        "draw_16.grouped.vacancy_cells.csv": "b5c83468c2ed739e518482b49305e6e81ca35f14e55551c8faa576243da02b13",
+        "draw_17.csv": "acacd399085a05cca296f6de2d1644b95d7c548e8c7fdaf366701f31418e6fc2",
+        "draw_17.csv.summaries.csv": "892e782cf506b3c33e6c2b8f5adec02ea3dda8099fd6c2c6fc0c4a2ade224ada",
+        "draw_17.grouped.deaths_cells.csv": "91b6bb383a3613ee7a1df1d4a1b6bee3e0944ea4efa58ed37663e628db120c80",
+        "draw_17.grouped.population_cells.csv": "704bf642ee74e5ffade033b75b2659429777c89e10c943f1ad8c67929c845868",
+        "draw_17.grouped.vacancy_cells.csv": "bc6b11576a270adee01a447f488423c3c31345aaf67276c622e0e5f624efa3a0",
+        "draw_18.csv": "b77e0f7ae50cf7d7723d306e0423d5b0a809fc1d1a84f42894d8fd066463cf51",
+        "draw_18.csv.summaries.csv": "142febe81b947bbecedbc0f73db403f5ff5a0899edd72bb10306b2fec1304d43",
+        "draw_18.grouped.deaths_cells.csv": "88280c649aa503f4be4ca4a6fd9605ad56cffdce56b9711b3ec9bd3cc090cab7",
+        "draw_18.grouped.population_cells.csv": "12f572176839f9b6e52b1fe3a81cfe17a035a2a9cba1166a28e4ee80264e7fbc",
+        "draw_18.grouped.vacancy_cells.csv": "e67818afcf5a9917fe6902b3c26479ddb47faa819c9163ff4025813c05e59719",
+        "draw_19.csv": "b6ee7181e1094804eab314da5f928d9526e792ff94d876082597af1d992fee1b",
+        "draw_19.csv.summaries.csv": "f1bdc2f6fce9ddc451b2fb74557ee676e3ecd0ac90a79a7aed8e839542164b8a",
+        "draw_19.grouped.deaths_cells.csv": "15ab87e3de58c46aeeec670689ad72aeca62905848ff39c39bcb7aa61a487701",
+        "draw_19.grouped.population_cells.csv": "bf9cc4127e3757bc8a9d56565232e6c587eb6ac157202bc6fe3d73e7c3df9732",
+        "draw_19.grouped.vacancy_cells.csv": "c901bd2f2bcf054da39b1b52b305b3e7304dc567ca3c3f4f6e8c51da622902f9",
+        "draw_2.csv": "cc15e0259c9a6b95719d60c1fb0c25fd574957113da2299a0b19f5f7aa855230",
+        "draw_2.csv.summaries.csv": "58ea02b7bc0a640bb085e4bcc7fc932e1ef8c3138c70e1e48889151b15da9efd",
+        "draw_2.grouped.deaths_cells.csv": "3b61779c6febc054e4f083c97ddd398fd35d7c22900d37806dabe9cd692b82ed",
+        "draw_2.grouped.population_cells.csv": "b85d1ddf44022ea1b1b8bee22d76f34fcd854c406e40213fc827cae456588aa1",
+        "draw_2.grouped.vacancy_cells.csv": "183f37871ca8c3a97d6ef4aa1ba4083a3347498ea3f9cd027605884f2be141f2",
+        "draw_3.csv": "7f714fa73b3701645ccd1a080fdbfac1e9375393d32ca3eece83d387d42cf59a",
+        "draw_3.csv.summaries.csv": "65547ebcd397a3500362355f2ee34afa48417261902b39c45af9b728ba0c45d0",
+        "draw_3.grouped.deaths_cells.csv": "5c6b0fc6ee3e045fb26973066a74d4d80df87a156f9c232d836ebf631113cd43",
+        "draw_3.grouped.population_cells.csv": "752819c3a15e858dd1794e0c115bdef32f32da43714a6bd155baffef09dce776",
+        "draw_3.grouped.vacancy_cells.csv": "cb429f822e4fd044c51e1e92ccab83f3c1d22e43c4f868883c86dd5cf9c14d39",
+        "draw_4.csv": "70ebcb8263d16398eb53138748e744a68fe7fc893fa9edb48933860a5e7f1e70",
+        "draw_4.csv.summaries.csv": "185fd8815451d243e7101a5b0652879be62cd98b990e4332e68d03c9dda73076",
+        "draw_4.grouped.deaths_cells.csv": "38a12277a15f3faf046383243a78cd97d40e83998fb88ebff07dbc5191311b1a",
+        "draw_4.grouped.population_cells.csv": "24859fc4f6105fb23926da50d5d4337499af827be8e0421992afdb74a47d89f3",
+        "draw_4.grouped.vacancy_cells.csv": "a4025ba6facddf8f0dae63e3e8119a9e9aea91e34e3a24cebe3a37ad959e55ee",
+        "draw_5.csv": "aabaa5404f9f8f4ad2f0705f5c7be0073e976c4ef882004734f960bbbb8cf8af",
+        "draw_5.csv.summaries.csv": "2ea8b5489a07b8e486ba210c9096512b94c26c9d387ef7c1505b863aabb41eba",
+        "draw_5.grouped.deaths_cells.csv": "078eab7888b841897535d3bb4a6a99db0c1cfd8482e93e58de6ac7c9635fec4d",
+        "draw_5.grouped.population_cells.csv": "440a655ff4bdcb959a8ab66427f46f0b7feea4093cbe0768af45e26120b0c838",
+        "draw_5.grouped.vacancy_cells.csv": "19a1a7635ab214f2f292bd57a397e83101b0597264d5fa11a2ee6932650ce6cc",
+        "draw_6.csv": "c53fec0471bb5deb8a069ff3532912744858b0355874a58770697e664a276946",
+        "draw_6.csv.summaries.csv": "c5e87127d0abc1ba22384f287a1548f4c28a52c628eac158af237b436fd2d3b1",
+        "draw_6.grouped.deaths_cells.csv": "1b7aa64a9d12ea2a3c4cd3a9205b81bb8b94e9c93d06b3c1103953a78926218f",
+        "draw_6.grouped.population_cells.csv": "c3f31f451d60454c373fea981c251e1720845a319558152cd21a31228cb6542f",
+        "draw_6.grouped.vacancy_cells.csv": "6c3802047632c5b7a082334ee06c2141ea999275f08ce8bd3049c58b82ebbafd",
+        "draw_7.csv": "3390bc262d71ba84897bd6b94a1dd746c763cf57d6e2daa313f34fcc351d8941",
+        "draw_7.csv.summaries.csv": "c90b1a392e66fc4ddd430f0c42ceacabc32387f7a2d09447beb3f8cd610915fb",
+        "draw_7.grouped.deaths_cells.csv": "ab25ef9846007f16cb272886ebd21810e70325ac026677067ac3000f794eedee",
+        "draw_7.grouped.population_cells.csv": "6970bed308027a265c1d63af449080d456dc7787c98bbb5022c635ae6560b89b",
+        "draw_7.grouped.vacancy_cells.csv": "cff06a559eb3f526e1cedde1f8b57cddf3cf38e7ff6371b9ac310492bd07a16c",
+        "draw_8.csv": "8d3dcf6addbbf35d04b32bbd7f88205acde0c0365855c584c8f56c3d48b72e87",
+        "draw_8.csv.summaries.csv": "b679b3839479bd8f3e4714d49f65bb034237c0cb6f984741445ab11fa67bc6d3",
+        "draw_8.grouped.deaths_cells.csv": "eab23f3b248cde663254ef2495fc54fc6d8b83dd5f3bedfef041dd4f1a8866fa",
+        "draw_8.grouped.population_cells.csv": "2a0b90565683864d968fa6fc5328ad17bfc052171385382be3d75cdf1b04d0f4",
+        "draw_8.grouped.vacancy_cells.csv": "5852b4e53023b4630a6a96814b4ded5dbaa7cac60f98b6f639bc262af40a7bac",
+        "draw_9.csv": "c69afed1a9a87a79e2e997ec59bada8d827a0ccddd880ebece13f2b298ac3a77",
+        "draw_9.csv.summaries.csv": "e93c8e15a7bd8cee4cc84830854a13b3eac4cbb7d61cdb16e9bbc0c29a5b6854",
+        "draw_9.grouped.deaths_cells.csv": "e32a087bf9c51acb17ab587288f69af1d22a5548986cf6fb6830b9e6095c5ff7",
+        "draw_9.grouped.population_cells.csv": "851b9b70f59720dbc66a2571b3eecfbaab5c9093db71be5545918eb2cfbd504d",
+        "draw_9.grouped.vacancy_cells.csv": "d569138b2a9093e0834df1a2073ee1b381b3e28d00f498fb66baf3b073e07f6b",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "ab0b86b3591e1ff087b52f4a183732e50facda8d0a49bb44d1ff578188bc7da4",
+        "summary.csv": "371c2bda723f4d28172ee5dcb1addee59fd44ffcedb5de2df544cfe768382b97"
+      },
+      "peak_gpu_memory_used_mib": 11597,
+      "peak_gpu_utilization_percent": 100,
+      "peak_process_rss_kib": 4993760,
+      "repetition": 0,
+      "requested_fused_capacity": null,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 0.88752,
+          "process_rss_kib": 21952
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 283.808535,
+          "process_rss_kib": 473088
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 566.577608,
+          "process_rss_kib": 76504
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 849.339011,
+          "process_rss_kib": 87928
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1132.191769,
+          "process_rss_kib": 652856
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1414.752674,
+          "process_rss_kib": 703864
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1697.42544,
+          "process_rss_kib": 1243704
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1982.731193,
+          "process_rss_kib": 1857016
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2267.99978,
+          "process_rss_kib": 1411112
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2553.515665,
+          "process_rss_kib": 1251992
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2840.226681,
+          "process_rss_kib": 1621344
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3126.970336,
+          "process_rss_kib": 2561024
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3413.801595,
+          "process_rss_kib": 3618304
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 21,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3700.214091,
+          "process_rss_kib": 3510208
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3992.277135,
+          "process_rss_kib": 3582560
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4276.142312,
+          "process_rss_kib": 3583232
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 461,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4559.695769,
+          "process_rss_kib": 4034368
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 461,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4846.209873,
+          "process_rss_kib": 4993760
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 20,
+          "offset_ms": 5129.982018,
+          "process_rss_kib": 4808380
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 5414.528716,
+          "process_rss_kib": 4427616
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 5698.625893,
+          "process_rss_kib": 4427616
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 5984.055969,
+          "process_rss_kib": 4427616
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 6273.703898,
+          "process_rss_kib": 4427616
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 6559.826297,
+          "process_rss_kib": 4863744
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 6844.044643,
+          "process_rss_kib": 4905408
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 7128.638331,
+          "process_rss_kib": 4603008
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 7412.129119,
+          "process_rss_kib": 4498444
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 7696.123624,
+          "process_rss_kib": 4447148
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 7981.787692,
+          "process_rss_kib": 4447148
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 8267.759974,
+          "process_rss_kib": 4494860
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 10,
+          "offset_ms": 8551.747895,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 8837.506642,
+          "process_rss_kib": 4856396
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 9122.023376,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 39,
+          "offset_ms": 9405.876929,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 9691.413848,
+          "process_rss_kib": 4447148
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 9979.445206,
+          "process_rss_kib": 4768812
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 10263.369868,
+          "process_rss_kib": 4499332
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 10548.579823,
+          "process_rss_kib": 4614028
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 2,
+          "offset_ms": 10833.356267,
+          "process_rss_kib": 4954732
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 84,
+          "offset_ms": 11117.939793,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 11402.985404,
+          "process_rss_kib": 4476044
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 20,
+          "offset_ms": 11688.901683,
+          "process_rss_kib": 4884844
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 11973.063121,
+          "process_rss_kib": 4455212
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 58,
+          "offset_ms": 12265.039394,
+          "process_rss_kib": 4748652
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 12549.425893,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 12834.088448,
+          "process_rss_kib": 4447692
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 94,
+          "offset_ms": 13119.567296,
+          "process_rss_kib": 4536524
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 66,
+          "offset_ms": 13404.572436,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 13691.108274,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 13976.798584,
+          "process_rss_kib": 4902316
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 14261.360251,
+          "process_rss_kib": 4522412
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 14546.671588,
+          "process_rss_kib": 4459692
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 14832.154352,
+          "process_rss_kib": 4807564
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 15118.282282,
+          "process_rss_kib": 4458488
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 44,
+          "offset_ms": 15406.91545,
+          "process_rss_kib": 4657260
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 15691.289907,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 15975.637083,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 16261.485559,
+          "process_rss_kib": 4534060
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 49,
+          "offset_ms": 16546.184296,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 16832.54217,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 17118.144813,
+          "process_rss_kib": 4914636
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 36,
+          "offset_ms": 17402.259497,
+          "process_rss_kib": 4489932
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 17687.265769,
+          "process_rss_kib": 4447148
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 17973.515616,
+          "process_rss_kib": 4757612
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 18258.45574,
+          "process_rss_kib": 4461484
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 18544.343708,
+          "process_rss_kib": 4611564
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 3,
+          "offset_ms": 18829.170636,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 19113.349091,
+          "process_rss_kib": 4525100
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 82,
+          "offset_ms": 19399.406756,
+          "process_rss_kib": 4578860
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 74,
+          "offset_ms": 19686.898813,
+          "process_rss_kib": 4915756
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 19972.808498,
+          "process_rss_kib": 4447692
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 20258.283242,
+          "process_rss_kib": 4857516
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 20543.36467,
+          "process_rss_kib": 4477836
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 20829.517463,
+          "process_rss_kib": 4447148
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 21117.330976,
+          "process_rss_kib": 4732300
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 21402.08783,
+          "process_rss_kib": 4466636
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 63,
+          "offset_ms": 21688.055088,
+          "process_rss_kib": 4549516
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11597,
+          "gpu_utilization_percent": 1,
+          "offset_ms": 21973.47742,
+          "process_rss_kib": 4947564
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6061,
+          "gpu_utilization_percent": 15,
+          "offset_ms": 22258.338121,
+          "process_rss_kib": 2883560
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6061,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 22543.066867,
+          "process_rss_kib": 2904168
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 16,
+          "gpu_utilization_percent": 15,
+          "offset_ms": 22826.185409,
+          "process_rss_kib": 1188760
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "1d7d1e31c3a103854b4cbbc2ad66e527c3169933635f72c50cdd075ca1212fa1",
+      "stdout_sha256": "b00e252c7c2ee9d89cba3330006eb2e85c96678f23236235f0c78482f1d03ea1",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "1eec28780d2a9246ef7da2bb4f7bca46d67d9282ac76b2f082ce4daecda3cbfc",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 2255.946378,
+            "k": 0,
+            "lane": 0,
+            "start_offset_ms": 0.027762,
+            "wall_time_ms": 2255.918366
+          },
+          {
+            "finish_offset_ms": 2072.593832,
+            "k": 1,
+            "lane": 1,
+            "start_offset_ms": 0.026319,
+            "wall_time_ms": 2072.567262
+          },
+          {
+            "finish_offset_ms": 3924.1676720000005,
+            "k": 2,
+            "lane": 1,
+            "start_offset_ms": 2072.604356,
+            "wall_time_ms": 1851.562725
+          },
+          {
+            "finish_offset_ms": 4347.404794,
+            "k": 3,
+            "lane": 0,
+            "start_offset_ms": 2255.949213,
+            "wall_time_ms": 2091.455061
+          },
+          {
+            "finish_offset_ms": 5579.15002,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 3924.168384,
+            "wall_time_ms": 1654.981217
+          },
+          {
+            "finish_offset_ms": 6160.051225,
+            "k": 5,
+            "lane": 0,
+            "start_offset_ms": 4347.405515,
+            "wall_time_ms": 1812.645209
+          },
+          {
+            "finish_offset_ms": 7184.4808760000005,
+            "k": 6,
+            "lane": 1,
+            "start_offset_ms": 5579.150732,
+            "wall_time_ms": 1605.329623
+          },
+          {
+            "finish_offset_ms": 7826.800929,
+            "k": 7,
+            "lane": 0,
+            "start_offset_ms": 6160.0519460000005,
+            "wall_time_ms": 1666.748471
+          },
+          {
+            "finish_offset_ms": 8759.763251999999,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 7184.481627,
+            "wall_time_ms": 1575.2810940000002
+          },
+          {
+            "finish_offset_ms": 9413.839697,
+            "k": 9,
+            "lane": 0,
+            "start_offset_ms": 7826.80167,
+            "wall_time_ms": 1587.0374969999998
+          },
+          {
+            "finish_offset_ms": 10331.060266999999,
+            "k": 10,
+            "lane": 1,
+            "start_offset_ms": 8759.766437,
+            "wall_time_ms": 1571.293298
+          },
+          {
+            "finish_offset_ms": 10981.485062000002,
+            "k": 11,
+            "lane": 0,
+            "start_offset_ms": 9413.843523000001,
+            "wall_time_ms": 1567.641139
+          },
+          {
+            "finish_offset_ms": 11914.099822,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 10331.061008,
+            "wall_time_ms": 1583.0382730000001
+          },
+          {
+            "finish_offset_ms": 12570.883679999999,
+            "k": 13,
+            "lane": 0,
+            "start_offset_ms": 10981.485723,
+            "wall_time_ms": 1589.397325
+          },
+          {
+            "finish_offset_ms": 13487.579326000001,
+            "k": 14,
+            "lane": 1,
+            "start_offset_ms": 11914.100574,
+            "wall_time_ms": 1573.478173
+          },
+          {
+            "finish_offset_ms": 14190.538542,
+            "k": 15,
+            "lane": 0,
+            "start_offset_ms": 12570.884560999999,
+            "wall_time_ms": 1619.6534689999999
+          },
+          {
+            "finish_offset_ms": 15081.549814,
+            "k": 16,
+            "lane": 1,
+            "start_offset_ms": 13487.580058000001,
+            "wall_time_ms": 1593.9692160000002
+          },
+          {
+            "finish_offset_ms": 15725.612038,
+            "k": 17,
+            "lane": 0,
+            "start_offset_ms": 14190.539333,
+            "wall_time_ms": 1535.072204
+          },
+          {
+            "finish_offset_ms": 16676.670472,
+            "k": 18,
+            "lane": 1,
+            "start_offset_ms": 15081.554451,
+            "wall_time_ms": 1595.1155999999999
+          },
+          {
+            "finish_offset_ms": 17320.163625999998,
+            "k": 19,
+            "lane": 0,
+            "start_offset_ms": 15725.616754,
+            "wall_time_ms": 1594.546351
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 2,
+        "execution_mode": "cuda-free-nonblocking-streams",
+        "execution_window_wall_time_ms": 17534.061713,
+        "publication_wall_time_ms": 5.102339,
+        "repository_commit": "8ace75c83755b7bc767ef07c6e7eef05d3c2036b",
+        "requested_draw_workers": 2,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 3000.985463,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 22890.616013
+      },
+      "workers": 2
+    },
+    {
+      "arm_kind": "candidate",
+      "command": [
+        "/home/ubuntu/sembla/target/release/sembla",
+        "sweep",
+        "/home/ubuntu/demographic-bench/work/concurrency-10000000.state.model.json",
+        "--population",
+        "/home/ubuntu/demographic-bench/work/concurrency-10000000.state",
+        "--seed",
+        "9009",
+        "--ticks",
+        "24",
+        "--noise",
+        "crn",
+        "--backend",
+        "cuda",
+        "--out",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-4/rep-0/output",
+        "--timing-json",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-4/rep-0/timing.json",
+        "--draws",
+        "20",
+        "--export-pairs",
+        "/home/ubuntu/demographic-bench/sweep-concurrency/10000000/cuda/workers-4/rep-0/pairs.csv",
+        "--enable",
+        "grouped-observations"
+      ],
+      "cuda_free_streams": true,
+      "cuda_fused_grid_y": false,
+      "cuda_lockstep_streams": false,
+      "eval_threads_per_draw": null,
+      "external_wall_time_ms": 20766.010594,
+      "output_hashes": {
+        "__external__/pairs.csv": "e5505a2545aad89fa978f100196d47bbe7502805870f2b6dffd7034802b68193",
+        "__external__/pairs.csv.meta.json": "c47a55e1e0b4347810cf1ff88d38c2b4f748c3168c0118db45d97aa3d756a0b2",
+        "draw_0.csv": "828756da87e1130dbab764a37b3b0e7be61661d41b1ccd03da843479af22471f",
+        "draw_0.csv.summaries.csv": "46f06d106e05972302133b7eb22ee5b57d7d9f2eb0ef6b6e98ad144bc2f76f99",
+        "draw_0.grouped.deaths_cells.csv": "cba0821172df45165497f52370aa6143e714da6d53de51572182c22d9dd3fe5a",
+        "draw_0.grouped.population_cells.csv": "57579b5e47db4fe61ab103cdaa5e35cc41620eaf2a18b9a7f1d71ca07182f2fc",
+        "draw_0.grouped.vacancy_cells.csv": "b97346ebc5feca77e3570b3b9074f208d188658c3bea63f3892a8a7cec233336",
+        "draw_1.csv": "a3d7d428913f2043a94d10e895e4df159392b34d6749f03d1d72b86acef167c0",
+        "draw_1.csv.summaries.csv": "f2c17d9683b20fba42c8d43a3670b41881278b517c5efa18dd551e2b47e79787",
+        "draw_1.grouped.deaths_cells.csv": "02b56baa3e4947fed9a63d2ebb6b35bf4185689fde118190de38e48b9492b798",
+        "draw_1.grouped.population_cells.csv": "f58c4ec0cfe274e45676311b657637e3305ec6b8f59dbfad8863c304a7ab52c5",
+        "draw_1.grouped.vacancy_cells.csv": "88cb4e430f72683bff3f807382dfd55f0765faa95972cbfaf36e33a83304a6e5",
+        "draw_10.csv": "8d5139d6f34e78354f3447ac86e45479bfd26c490f96c07c83f4901576addcd6",
+        "draw_10.csv.summaries.csv": "47a41dc88b361774e02ed3273c5a69144b1164b68c71c9986247d5811b162616",
+        "draw_10.grouped.deaths_cells.csv": "5627972bec67edbca556dcaf85d58263810ff10c0686387adda09322fa9d4925",
+        "draw_10.grouped.population_cells.csv": "cfd2d08ab6ee5cf1957721551222aa5f17ffde17bc475039020f00edab73c3c2",
+        "draw_10.grouped.vacancy_cells.csv": "8530c2fb9932afa12951ed82d71921b0b06f79b07cfadf3f69837c201f9ac67d",
+        "draw_11.csv": "d75c8cbd9ffbcb2feb5aa3141759f5fcce201ee847eb22adeee9e4c21f3730ea",
+        "draw_11.csv.summaries.csv": "0e59fd4e9b312c37a3d7e0c362b037acd0279b78935d75f792705e808ef7aa6d",
+        "draw_11.grouped.deaths_cells.csv": "e0f3e8550533787b345ef0175afbbdbacd6ef7ddc8775a79e2ecec8343124ae6",
+        "draw_11.grouped.population_cells.csv": "6a02d33e25e6743759f858fdc57630120597f579758b09e89f51bb805a929017",
+        "draw_11.grouped.vacancy_cells.csv": "982854fdffc4cbdba0e69add6000aa1bb10b84bf3ba0d325dd25fd3840202950",
+        "draw_12.csv": "4bec02d2d812b86881dcf5aa6aa995227bba4f9f1cc78700ab7ce03647417dcb",
+        "draw_12.csv.summaries.csv": "9b27418cf3ade908bff6a6d45499e78d2cd6c109ef80dd804d0de71febc26d4e",
+        "draw_12.grouped.deaths_cells.csv": "e3c49c2bf032eac5bba4999383daecf0457bf90225879faf3341293e4b4bea53",
+        "draw_12.grouped.population_cells.csv": "4c50e4f43f4938e18d66c3bd6cf7b33811fbc202c899ce0d96555989fb5a6f38",
+        "draw_12.grouped.vacancy_cells.csv": "22562244ecb481ac6033a6417ef758963bbee06b862f117df447a9b261b86892",
+        "draw_13.csv": "f1ea1eec6f9139e0604b5c00bcec5710a0e2bb57167acbb3f8e2e3f0afb89c41",
+        "draw_13.csv.summaries.csv": "373b912c05a0231ef9221c0b9cb707c7bf30de602be61f07d9844f459f485d50",
+        "draw_13.grouped.deaths_cells.csv": "d654a57b6e24eead6860515f6d9ff6c96ad2439bc3e6e430a5a1448d5650105f",
+        "draw_13.grouped.population_cells.csv": "1fe25ebf1770f34e4a6030262ababe59810ffd4ea4b0265d880b377b23d05479",
+        "draw_13.grouped.vacancy_cells.csv": "db46d9824b356b36e427cc16db295394ccaed2a33b75b8a6d0f916a60159e9f8",
+        "draw_14.csv": "66018902b5206f71f07c2a5bc6ccecb4a4aa0d1c77791b1fbca5100366b6aa76",
+        "draw_14.csv.summaries.csv": "b5294f7f71c1af7bd286e17336ddf42190f0ac64e0b201626487c99e06cf32e2",
+        "draw_14.grouped.deaths_cells.csv": "9eca4c7f4ee5575e5e6e14f46a69c3afe4ee0f2e2ab2b06179a458c3dbc25851",
+        "draw_14.grouped.population_cells.csv": "723db2fcb94791748d59e46285d014a13978e0e44d4d20d20a73a5dea325d01a",
+        "draw_14.grouped.vacancy_cells.csv": "be316bc73159e3cc9a3ee56351b0121dac6aae44d6e1ed947ecbfc69140b19e8",
+        "draw_15.csv": "a1d9aa30fe8549fe09027798d269fa75104d8aac57d0c1e0940abf3c97a03e1f",
+        "draw_15.csv.summaries.csv": "8f98d404c5c27f28f8a15c00870e8ebd0f777b02449262db146da47d6232cc35",
+        "draw_15.grouped.deaths_cells.csv": "4c565c46f7bbc503dd9a8a09b58c1e145c3efc303e40fce506c7a8ba435a5055",
+        "draw_15.grouped.population_cells.csv": "f826de738a8847b194e86dc2641d6abcfbfe353ec72ba41ad902fc3020d7f2c6",
+        "draw_15.grouped.vacancy_cells.csv": "5c9b52ced4b021e10620d41436378d029d0236a72bd65600469893acc8946f97",
+        "draw_16.csv": "4cc99a675ce7c727319d460c06ec9b4c6bc0eba2cc6a95d860ec1b0d6c2231f7",
+        "draw_16.csv.summaries.csv": "7eff091cd6a6f9bcecc5394d9b8890f49ef291d3cf5ab446197d2158de9bb334",
+        "draw_16.grouped.deaths_cells.csv": "271334ecad678da1beca612be6c1b5b241d50d91bcf3ba2d3447b50e205febf5",
+        "draw_16.grouped.population_cells.csv": "685d53774841c08328847930dd1e7bc46af13e70fe6a5ab4c08995146fc80471",
+        "draw_16.grouped.vacancy_cells.csv": "b5c83468c2ed739e518482b49305e6e81ca35f14e55551c8faa576243da02b13",
+        "draw_17.csv": "acacd399085a05cca296f6de2d1644b95d7c548e8c7fdaf366701f31418e6fc2",
+        "draw_17.csv.summaries.csv": "892e782cf506b3c33e6c2b8f5adec02ea3dda8099fd6c2c6fc0c4a2ade224ada",
+        "draw_17.grouped.deaths_cells.csv": "91b6bb383a3613ee7a1df1d4a1b6bee3e0944ea4efa58ed37663e628db120c80",
+        "draw_17.grouped.population_cells.csv": "704bf642ee74e5ffade033b75b2659429777c89e10c943f1ad8c67929c845868",
+        "draw_17.grouped.vacancy_cells.csv": "bc6b11576a270adee01a447f488423c3c31345aaf67276c622e0e5f624efa3a0",
+        "draw_18.csv": "b77e0f7ae50cf7d7723d306e0423d5b0a809fc1d1a84f42894d8fd066463cf51",
+        "draw_18.csv.summaries.csv": "142febe81b947bbecedbc0f73db403f5ff5a0899edd72bb10306b2fec1304d43",
+        "draw_18.grouped.deaths_cells.csv": "88280c649aa503f4be4ca4a6fd9605ad56cffdce56b9711b3ec9bd3cc090cab7",
+        "draw_18.grouped.population_cells.csv": "12f572176839f9b6e52b1fe3a81cfe17a035a2a9cba1166a28e4ee80264e7fbc",
+        "draw_18.grouped.vacancy_cells.csv": "e67818afcf5a9917fe6902b3c26479ddb47faa819c9163ff4025813c05e59719",
+        "draw_19.csv": "b6ee7181e1094804eab314da5f928d9526e792ff94d876082597af1d992fee1b",
+        "draw_19.csv.summaries.csv": "f1bdc2f6fce9ddc451b2fb74557ee676e3ecd0ac90a79a7aed8e839542164b8a",
+        "draw_19.grouped.deaths_cells.csv": "15ab87e3de58c46aeeec670689ad72aeca62905848ff39c39bcb7aa61a487701",
+        "draw_19.grouped.population_cells.csv": "bf9cc4127e3757bc8a9d56565232e6c587eb6ac157202bc6fe3d73e7c3df9732",
+        "draw_19.grouped.vacancy_cells.csv": "c901bd2f2bcf054da39b1b52b305b3e7304dc567ca3c3f4f6e8c51da622902f9",
+        "draw_2.csv": "cc15e0259c9a6b95719d60c1fb0c25fd574957113da2299a0b19f5f7aa855230",
+        "draw_2.csv.summaries.csv": "58ea02b7bc0a640bb085e4bcc7fc932e1ef8c3138c70e1e48889151b15da9efd",
+        "draw_2.grouped.deaths_cells.csv": "3b61779c6febc054e4f083c97ddd398fd35d7c22900d37806dabe9cd692b82ed",
+        "draw_2.grouped.population_cells.csv": "b85d1ddf44022ea1b1b8bee22d76f34fcd854c406e40213fc827cae456588aa1",
+        "draw_2.grouped.vacancy_cells.csv": "183f37871ca8c3a97d6ef4aa1ba4083a3347498ea3f9cd027605884f2be141f2",
+        "draw_3.csv": "7f714fa73b3701645ccd1a080fdbfac1e9375393d32ca3eece83d387d42cf59a",
+        "draw_3.csv.summaries.csv": "65547ebcd397a3500362355f2ee34afa48417261902b39c45af9b728ba0c45d0",
+        "draw_3.grouped.deaths_cells.csv": "5c6b0fc6ee3e045fb26973066a74d4d80df87a156f9c232d836ebf631113cd43",
+        "draw_3.grouped.population_cells.csv": "752819c3a15e858dd1794e0c115bdef32f32da43714a6bd155baffef09dce776",
+        "draw_3.grouped.vacancy_cells.csv": "cb429f822e4fd044c51e1e92ccab83f3c1d22e43c4f868883c86dd5cf9c14d39",
+        "draw_4.csv": "70ebcb8263d16398eb53138748e744a68fe7fc893fa9edb48933860a5e7f1e70",
+        "draw_4.csv.summaries.csv": "185fd8815451d243e7101a5b0652879be62cd98b990e4332e68d03c9dda73076",
+        "draw_4.grouped.deaths_cells.csv": "38a12277a15f3faf046383243a78cd97d40e83998fb88ebff07dbc5191311b1a",
+        "draw_4.grouped.population_cells.csv": "24859fc4f6105fb23926da50d5d4337499af827be8e0421992afdb74a47d89f3",
+        "draw_4.grouped.vacancy_cells.csv": "a4025ba6facddf8f0dae63e3e8119a9e9aea91e34e3a24cebe3a37ad959e55ee",
+        "draw_5.csv": "aabaa5404f9f8f4ad2f0705f5c7be0073e976c4ef882004734f960bbbb8cf8af",
+        "draw_5.csv.summaries.csv": "2ea8b5489a07b8e486ba210c9096512b94c26c9d387ef7c1505b863aabb41eba",
+        "draw_5.grouped.deaths_cells.csv": "078eab7888b841897535d3bb4a6a99db0c1cfd8482e93e58de6ac7c9635fec4d",
+        "draw_5.grouped.population_cells.csv": "440a655ff4bdcb959a8ab66427f46f0b7feea4093cbe0768af45e26120b0c838",
+        "draw_5.grouped.vacancy_cells.csv": "19a1a7635ab214f2f292bd57a397e83101b0597264d5fa11a2ee6932650ce6cc",
+        "draw_6.csv": "c53fec0471bb5deb8a069ff3532912744858b0355874a58770697e664a276946",
+        "draw_6.csv.summaries.csv": "c5e87127d0abc1ba22384f287a1548f4c28a52c628eac158af237b436fd2d3b1",
+        "draw_6.grouped.deaths_cells.csv": "1b7aa64a9d12ea2a3c4cd3a9205b81bb8b94e9c93d06b3c1103953a78926218f",
+        "draw_6.grouped.population_cells.csv": "c3f31f451d60454c373fea981c251e1720845a319558152cd21a31228cb6542f",
+        "draw_6.grouped.vacancy_cells.csv": "6c3802047632c5b7a082334ee06c2141ea999275f08ce8bd3049c58b82ebbafd",
+        "draw_7.csv": "3390bc262d71ba84897bd6b94a1dd746c763cf57d6e2daa313f34fcc351d8941",
+        "draw_7.csv.summaries.csv": "c90b1a392e66fc4ddd430f0c42ceacabc32387f7a2d09447beb3f8cd610915fb",
+        "draw_7.grouped.deaths_cells.csv": "ab25ef9846007f16cb272886ebd21810e70325ac026677067ac3000f794eedee",
+        "draw_7.grouped.population_cells.csv": "6970bed308027a265c1d63af449080d456dc7787c98bbb5022c635ae6560b89b",
+        "draw_7.grouped.vacancy_cells.csv": "cff06a559eb3f526e1cedde1f8b57cddf3cf38e7ff6371b9ac310492bd07a16c",
+        "draw_8.csv": "8d3dcf6addbbf35d04b32bbd7f88205acde0c0365855c584c8f56c3d48b72e87",
+        "draw_8.csv.summaries.csv": "b679b3839479bd8f3e4714d49f65bb034237c0cb6f984741445ab11fa67bc6d3",
+        "draw_8.grouped.deaths_cells.csv": "eab23f3b248cde663254ef2495fc54fc6d8b83dd5f3bedfef041dd4f1a8866fa",
+        "draw_8.grouped.population_cells.csv": "2a0b90565683864d968fa6fc5328ad17bfc052171385382be3d75cdf1b04d0f4",
+        "draw_8.grouped.vacancy_cells.csv": "5852b4e53023b4630a6a96814b4ded5dbaa7cac60f98b6f639bc262af40a7bac",
+        "draw_9.csv": "c69afed1a9a87a79e2e997ec59bada8d827a0ccddd880ebece13f2b298ac3a77",
+        "draw_9.csv.summaries.csv": "e93c8e15a7bd8cee4cc84830854a13b3eac4cbb7d61cdb16e9bbc0c29a5b6854",
+        "draw_9.grouped.deaths_cells.csv": "e32a087bf9c51acb17ab587288f69af1d22a5548986cf6fb6830b9e6095c5ff7",
+        "draw_9.grouped.population_cells.csv": "851b9b70f59720dbc66a2571b3eecfbaab5c9093db71be5545918eb2cfbd504d",
+        "draw_9.grouped.vacancy_cells.csv": "d569138b2a9093e0834df1a2073ee1b381b3e28d00f498fb66baf3b073e07f6b",
+        "manifest.csv": "c9d75d815cd7e3c49e5bc47d258e8317910de1509d860079d482e7e2fbb8a260",
+        "run-manifest.json": "ab0b86b3591e1ff087b52f4a183732e50facda8d0a49bb44d1ff578188bc7da4",
+        "summary.csv": "371c2bda723f4d28172ee5dcb1addee59fd44ffcedb5de2df544cfe768382b97"
+      },
+      "peak_gpu_memory_used_mib": 22701,
+      "peak_gpu_utilization_percent": 100,
+      "peak_process_rss_kib": 10012880,
+      "repetition": 0,
+      "requested_fused_capacity": null,
+      "resource_samples": [
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 0.74706,
+          "process_rss_kib": 24192
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 284.637323,
+          "process_rss_kib": 473312
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 568.509667,
+          "process_rss_kib": 113912
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 850.982784,
+          "process_rss_kib": 136088
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1133.90077,
+          "process_rss_kib": 732824
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1418.015993,
+          "process_rss_kib": 772408
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1701.692699,
+          "process_rss_kib": 1337112
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 1988.533799,
+          "process_rss_kib": 1411112
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 0,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2275.059769,
+          "process_rss_kib": 653904
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 1,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 2562.558257,
+          "process_rss_kib": 2302104
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3008.531588,
+          "process_rss_kib": 4055744
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3294.445103,
+          "process_rss_kib": 5807872
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 4,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 3580.154393,
+          "process_rss_kib": 7662144
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 2,
+          "offset_ms": 3869.6304,
+          "process_rss_kib": 6551408
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 457,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4153.887442,
+          "process_rss_kib": 6551856
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 461,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4437.348224,
+          "process_rss_kib": 6582096
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 461,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 4720.144029,
+          "process_rss_kib": 8169360
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 941,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 5004.129218,
+          "process_rss_kib": 10012880
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 5288.550221,
+          "process_rss_kib": 9509676
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 5575.196682,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 5865.836941,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 6154.310191,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 6439.754032,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 6728.092043,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 7013.172168,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 7301.701858,
+          "process_rss_kib": 8217448
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 6,
+          "offset_ms": 7590.326781,
+          "process_rss_kib": 8733320
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 7874.59983,
+          "process_rss_kib": 8868168
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 8158.917875,
+          "process_rss_kib": 8998848
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 8442.651889,
+          "process_rss_kib": 8878704
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 8732.292808,
+          "process_rss_kib": 8369596
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 9017.538428,
+          "process_rss_kib": 8315164
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 9302.784489,
+          "process_rss_kib": 8276188
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 9588.042991,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 9874.063685,
+          "process_rss_kib": 8354140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 10160.265402,
+          "process_rss_kib": 8298812
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 58,
+          "offset_ms": 10447.783464,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 86,
+          "offset_ms": 10735.787504,
+          "process_rss_kib": 8516404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 11019.932549,
+          "process_rss_kib": 8831572
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 11304.138616,
+          "process_rss_kib": 8822748
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 11589.660067,
+          "process_rss_kib": 8706332
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 69,
+          "offset_ms": 11874.910071,
+          "process_rss_kib": 8456060
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 90,
+          "offset_ms": 12160.128859,
+          "process_rss_kib": 8783772
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 12449.682457,
+          "process_rss_kib": 8348540
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 24,
+          "offset_ms": 12737.960013,
+          "process_rss_kib": 8756220
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 13023.635057,
+          "process_rss_kib": 8279996
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 13312.600896,
+          "process_rss_kib": 8354140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 13601.519575,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 13893.635629,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 14183.343702,
+          "process_rss_kib": 9108348
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 14468.500493,
+          "process_rss_kib": 9213404
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 14757.393937,
+          "process_rss_kib": 8955356
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 79,
+          "offset_ms": 15046.716474,
+          "process_rss_kib": 9213948
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 15334.847046,
+          "process_rss_kib": 9058748
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 15619.37066,
+          "process_rss_kib": 8432540
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 15908.271637,
+          "process_rss_kib": 8330620
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 31,
+          "offset_ms": 16193.415361,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 16479.308862,
+          "process_rss_kib": 8354140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 16765.276192,
+          "process_rss_kib": 8354140
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 17054.088198,
+          "process_rss_kib": 8276188
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 100,
+          "offset_ms": 17345.502198,
+          "process_rss_kib": 8276188
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 17633.686425,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 17922.580797,
+          "process_rss_kib": 8732924
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 76,
+          "offset_ms": 18209.424064,
+          "process_rss_kib": 8522452
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 75,
+          "offset_ms": 18494.523217,
+          "process_rss_kib": 8744796
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 22701,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 18780.02883,
+          "process_rss_kib": 7979732
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 17197,
+          "gpu_utilization_percent": 99,
+          "offset_ms": 19064.549055,
+          "process_rss_kib": 6576816
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11757,
+          "gpu_utilization_percent": 56,
+          "offset_ms": 19350.390572,
+          "process_rss_kib": 4991368
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 11757,
+          "gpu_utilization_percent": 4,
+          "offset_ms": 19633.909319,
+          "process_rss_kib": 5287904
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6155,
+          "gpu_utilization_percent": 15,
+          "offset_ms": 19917.320372,
+          "process_rss_kib": 3105424
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 6155,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 20200.621753,
+          "process_rss_kib": 3081456
+        },
+        {
+          "gpu_memory_total_mib": 81559,
+          "gpu_memory_used_mib": 387,
+          "gpu_utilization_percent": 0,
+          "offset_ms": 20482.948403,
+          "process_rss_kib": 1406316
+        }
+      ],
+      "return_code": 0,
+      "stderr_sha256": "a6c51ea0bc2980cfcd2a4c69a87eb7244e9b81f399d801138e3fc9579a88da53",
+      "stdout_sha256": "b00e252c7c2ee9d89cba3330006eb2e85c96678f23236235f0c78482f1d03ea1",
+      "timing": {
+        "backend": "cuda",
+        "binary_sha256": "1eec28780d2a9246ef7da2bb4f7bca46d67d9282ac76b2f082ce4daecda3cbfc",
+        "draw_timings": [
+          {
+            "finish_offset_ms": 3364.934847,
+            "k": 0,
+            "lane": 0,
+            "start_offset_ms": 0.03977,
+            "wall_time_ms": 3364.8948170000003
+          },
+          {
+            "finish_offset_ms": 3614.927221,
+            "k": 1,
+            "lane": 3,
+            "start_offset_ms": 0.046360000000000005,
+            "wall_time_ms": 3614.880521
+          },
+          {
+            "finish_offset_ms": 3135.8954080000003,
+            "k": 2,
+            "lane": 2,
+            "start_offset_ms": 0.048473,
+            "wall_time_ms": 3135.846565
+          },
+          {
+            "finish_offset_ms": 2923.101134,
+            "k": 3,
+            "lane": 1,
+            "start_offset_ms": 0.057647,
+            "wall_time_ms": 2923.0430370000004
+          },
+          {
+            "finish_offset_ms": 4897.167893,
+            "k": 4,
+            "lane": 1,
+            "start_offset_ms": 2923.103838,
+            "wall_time_ms": 1974.063433
+          },
+          {
+            "finish_offset_ms": 5719.0184,
+            "k": 5,
+            "lane": 2,
+            "start_offset_ms": 3135.897681,
+            "wall_time_ms": 2583.1202279999998
+          },
+          {
+            "finish_offset_ms": 6208.332764,
+            "k": 6,
+            "lane": 0,
+            "start_offset_ms": 3364.93686,
+            "wall_time_ms": 2843.395212
+          },
+          {
+            "finish_offset_ms": 6760.870471,
+            "k": 7,
+            "lane": 3,
+            "start_offset_ms": 3614.929865,
+            "wall_time_ms": 3145.939885
+          },
+          {
+            "finish_offset_ms": 7502.5638309999995,
+            "k": 8,
+            "lane": 1,
+            "start_offset_ms": 4897.168754,
+            "wall_time_ms": 2605.3945670000003
+          },
+          {
+            "finish_offset_ms": 8092.351925999999,
+            "k": 9,
+            "lane": 2,
+            "start_offset_ms": 5719.0190410000005,
+            "wall_time_ms": 2373.332434
+          },
+          {
+            "finish_offset_ms": 9841.396572000001,
+            "k": 10,
+            "lane": 0,
+            "start_offset_ms": 6208.341527,
+            "wall_time_ms": 3633.054455
+          },
+          {
+            "finish_offset_ms": 10485.568280000001,
+            "k": 11,
+            "lane": 3,
+            "start_offset_ms": 6760.871233,
+            "wall_time_ms": 3724.696726
+          },
+          {
+            "finish_offset_ms": 10321.534714,
+            "k": 12,
+            "lane": 1,
+            "start_offset_ms": 7502.564612,
+            "wall_time_ms": 2818.969451
+          },
+          {
+            "finish_offset_ms": 10656.480899,
+            "k": 13,
+            "lane": 2,
+            "start_offset_ms": 8092.352567000001,
+            "wall_time_ms": 2564.127991
+          },
+          {
+            "finish_offset_ms": 11441.366974999999,
+            "k": 14,
+            "lane": 0,
+            "start_offset_ms": 9841.397453000001,
+            "wall_time_ms": 1599.968831
+          },
+          {
+            "finish_offset_ms": 12940.53274,
+            "k": 15,
+            "lane": 1,
+            "start_offset_ms": 10321.535494999998,
+            "wall_time_ms": 2618.996564
+          },
+          {
+            "finish_offset_ms": 13273.781359,
+            "k": 16,
+            "lane": 3,
+            "start_offset_ms": 10485.569010000001,
+            "wall_time_ms": 2788.211887
+          },
+          {
+            "finish_offset_ms": 13659.796013,
+            "k": 17,
+            "lane": 2,
+            "start_offset_ms": 10656.481530000001,
+            "wall_time_ms": 3003.314032
+          },
+          {
+            "finish_offset_ms": 14166.139298999999,
+            "k": 18,
+            "lane": 0,
+            "start_offset_ms": 11441.367866,
+            "wall_time_ms": 2724.770812
+          },
+          {
+            "finish_offset_ms": 14911.243304,
+            "k": 19,
+            "lane": 1,
+            "start_offset_ms": 12940.549626,
+            "wall_time_ms": 1970.6930570000002
+          }
+        ],
+        "draws": 20,
+        "effective_draw_workers": 4,
+        "execution_mode": "cuda-free-nonblocking-streams",
+        "execution_window_wall_time_ms": 15109.083245000002,
+        "publication_wall_time_ms": 5.8343989999999994,
+        "repository_commit": "8ace75c83755b7bc767ef07c6e7eef05d3c2036b",
+        "requested_draw_workers": 4,
+        "schema": "sembla-sweep-concurrency-spike-timing-v1",
+        "setup_wall_time_ms": 3178.02813,
+        "ticks_per_draw": 24,
+        "whole_sweep_wall_time_ms": 20598.41234
+      },
+      "workers": 4
+    }
+  ],
+  "schema": "sembla-sweep-concurrency-spike/v1",
+  "seed": 9009,
+  "theta_file": null,
+  "ticks": 24,
+  "workers": [
+    1,
+    2,
+    4
+  ],
+  "worktree_status": []
+}

@@ -1,0 +1,5 @@
+PASS targeted concurrency-only payload selected
+PASS workers 1/2/4 completed one repetition at 1M and 10M
+PASS complete output trees matched their sequential references
+PASS negative comparator controls rejected a deliberate perturbation
+PASS CRN correctness arm; schedule control and Nsight covered by the independent-noise timing arm

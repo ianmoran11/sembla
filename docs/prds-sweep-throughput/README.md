@@ -395,6 +395,18 @@ correctness arm passes for this design, and any production form needs explicit
 capacity admission rather than an `auto` worker count. CPU Gate 1 remains
 separate and open.
 
+**Gate 1 discharged (CUDA).** The CRN correctness arm is recorded in
+[`hyperstack-crn-20260729T221234Z`](../evidence/demographic-bench/hyperstack-crn-20260729T221234Z/):
+workers 1/2/4 at 1M and 10M under CRN noise, one repetition per scale, every
+complete output-tree comparison byte-equal, both negative controls rejected.
+With independent noise as the timing case and both noise modes as correctness
+cases, all Gate-1 requirements measured to date pass for the free-running
+non-blocking-stream design. Drafting `0004-run-cuda-draws-concurrently` under
+the conditional sequence below is now justified, subject to the binding
+contract (bounded explicit admission, isolated per-lane state, `k`-derived
+seeds, ascending-`k` publication, default-off). CPU Gate 1 remains separate
+and open.
+
 ### Binding contract for future PRDs
 
 Any numbered PRD drafted after Gate 1 inherits these constraints:
