@@ -733,6 +733,7 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
           --population "$concurrency_state" --backend cuda \
           --seed "$SEED" --draws 20 --ticks 24 --noise independent \
           --enable grouped-observations \
+          --export-pairs "$scale_dir/forced-inversion-pairs.csv" \
           --timing-json "$scale_dir/forced-inversion-timing.json" \
           --out "$scale_dir/forced-inversion-output" \
           > "$scale_dir/forced-inversion.stdout" \
