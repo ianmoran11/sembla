@@ -1,0 +1,25 @@
+{
+  "schema": "sembla-cuda-fused-draw-spike-timing-v1",
+  "backend": "cuda",
+  "draws": 2,
+  "ticks_per_draw": 2,
+  "requested_capacity": 4,
+  "maximum_active_slots": 2,
+  "setup_wall_time_ms": 2027.9978939999999,
+  "execution_window_wall_time_ms": 294.911765,
+  "publication_wall_time_ms": 0.317407,
+  "chunks": [
+    {
+      "chunk_index": 0,
+      "first_k": 0,
+      "active_slots": 2,
+      "capacity": 4,
+      "start_offset_ms": 0.001823,
+      "finish_offset_ms": 286.773508,
+      "shared_chunk_wall_time_ms": 286.771465
+    }
+  ],
+  "whole_sweep_wall_time_ms": 2454.880239,
+  "repository_commit": "133f87b8dd31bce9254a1be31fe3a3d3bb772443",
+  "binary_sha256": "ed79123752a69fd1b906e5caecb2d19c1715b61c6ce8c25ba39c4546261d41c1"
+}

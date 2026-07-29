@@ -1,0 +1,196 @@
+{
+  "schema": "sembla-cuda-fused-draw-spike-timing-v1",
+  "backend": "cuda",
+  "draws": 20,
+  "ticks_per_draw": 24,
+  "requested_capacity": 1,
+  "maximum_active_slots": 1,
+  "setup_wall_time_ms": 1176.4625930000002,
+  "execution_window_wall_time_ms": 5960.529979000001,
+  "publication_wall_time_ms": 4.477669,
+  "chunks": [
+    {
+      "chunk_index": 0,
+      "first_k": 0,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 0.0034249999999999997,
+      "finish_offset_ms": 246.247812,
+      "shared_chunk_wall_time_ms": 246.244155
+    },
+    {
+      "chunk_index": 1,
+      "first_k": 1,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 296.35366200000004,
+      "finish_offset_ms": 539.204064,
+      "shared_chunk_wall_time_ms": 242.849892
+    },
+    {
+      "chunk_index": 2,
+      "first_k": 2,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 593.4192499999999,
+      "finish_offset_ms": 861.240356,
+      "shared_chunk_wall_time_ms": 267.820325
+    },
+    {
+      "chunk_index": 3,
+      "first_k": 3,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 911.32053,
+      "finish_offset_ms": 1156.3194409999999,
+      "shared_chunk_wall_time_ms": 244.99841
+    },
+    {
+      "chunk_index": 4,
+      "first_k": 4,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 1206.419654,
+      "finish_offset_ms": 1450.603225,
+      "shared_chunk_wall_time_ms": 244.182959
+    },
+    {
+      "chunk_index": 5,
+      "first_k": 5,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 1500.730157,
+      "finish_offset_ms": 1767.305498,
+      "shared_chunk_wall_time_ms": 266.574729
+    },
+    {
+      "chunk_index": 6,
+      "first_k": 6,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 1829.049329,
+      "finish_offset_ms": 2075.5944510000004,
+      "shared_chunk_wall_time_ms": 246.544601
+    },
+    {
+      "chunk_index": 7,
+      "first_k": 7,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 2125.863538,
+      "finish_offset_ms": 2369.2569099999996,
+      "shared_chunk_wall_time_ms": 243.392811
+    },
+    {
+      "chunk_index": 8,
+      "first_k": 8,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 2419.418006,
+      "finish_offset_ms": 2663.4966019999997,
+      "shared_chunk_wall_time_ms": 244.078084
+    },
+    {
+      "chunk_index": 9,
+      "first_k": 9,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 2713.739673,
+      "finish_offset_ms": 2959.5950479999997,
+      "shared_chunk_wall_time_ms": 245.85485300000002
+    },
+    {
+      "chunk_index": 10,
+      "first_k": 10,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 3009.8152250000003,
+      "finish_offset_ms": 3253.314113,
+      "shared_chunk_wall_time_ms": 243.498416
+    },
+    {
+      "chunk_index": 11,
+      "first_k": 11,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 3303.4673890000004,
+      "finish_offset_ms": 3548.05767,
+      "shared_chunk_wall_time_ms": 244.589499
+    },
+    {
+      "chunk_index": 12,
+      "first_k": 12,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 3598.312019,
+      "finish_offset_ms": 3843.279353,
+      "shared_chunk_wall_time_ms": 244.966934
+    },
+    {
+      "chunk_index": 13,
+      "first_k": 13,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 3893.773504,
+      "finish_offset_ms": 4138.656222,
+      "shared_chunk_wall_time_ms": 244.882246
+    },
+    {
+      "chunk_index": 14,
+      "first_k": 14,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 4188.8877,
+      "finish_offset_ms": 4434.751636,
+      "shared_chunk_wall_time_ms": 245.863445
+    },
+    {
+      "chunk_index": 15,
+      "first_k": 15,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 4484.980551,
+      "finish_offset_ms": 4730.191787,
+      "shared_chunk_wall_time_ms": 245.21077599999998
+    },
+    {
+      "chunk_index": 16,
+      "first_k": 16,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 4780.490279000001,
+      "finish_offset_ms": 5023.986254,
+      "shared_chunk_wall_time_ms": 243.495463
+    },
+    {
+      "chunk_index": 17,
+      "first_k": 17,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 5074.230155,
+      "finish_offset_ms": 5320.138419,
+      "shared_chunk_wall_time_ms": 245.90783199999998
+    },
+    {
+      "chunk_index": 18,
+      "first_k": 18,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 5370.437271,
+      "finish_offset_ms": 5614.365447,
+      "shared_chunk_wall_time_ms": 243.927746
+    },
+    {
+      "chunk_index": 19,
+      "first_k": 19,
+      "active_slots": 1,
+      "capacity": 1,
+      "start_offset_ms": 5664.585407,
+      "finish_offset_ms": 5910.185463000001,
+      "shared_chunk_wall_time_ms": 245.599536
+    }
+  ],
+  "whole_sweep_wall_time_ms": 7477.650355,
+  "repository_commit": "133f87b8dd31bce9254a1be31fe3a3d3bb772443",
+  "binary_sha256": "ed79123752a69fd1b906e5caecb2d19c1715b61c6ce8c25ba39c4546261d41c1"
+}

@@ -1,0 +1,5 @@
+# params={"birth_rate":0.022852405903835728,"mortality_young":0.0008058945980804724,"mortality_adult":0.0022923946717845413,"mortality_old":0.008103557305181036,"overseas_arrival_rate":0.02048758904545381,"emigration_rate":0.00143514541211536,"internal_departure_rate":0.001872906120365134,"internal_arrival_rate":0.01770345047137392}
+# dt=1
+tick,population,invalid_age,males,females,age_00_04,age_20_24,age_65_69,age_85_plus,births_this_tick,deaths_this_tick,overseas_arrivals_this_tick,overseas_departures_this_tick,internal_arrivals_this_tick,internal_departures_this_tick,locked_out,vacant_birth_slots,vacant_overseas_slots,vacant_internal_slots,max_generation,fired_age_monthly,fired_clear_event,fired_birth_activate,fired_overseas_arrive,fired_internal_arrive,fired_die_young,fired_die_adult,fired_die_old,fired_emigrate,fired_internal_depart,deferred_total
+0,79899,0,39770,40129,4646,4395,4365,4438,259,280,124,114,56,146,439,11741,4876,2944,1,80000,0,259,124,56,13,98,169,114,146,1
+1,79784,0,39707,40077,4792,4380,4323,4468,250,259,94,102,47,145,391,12031,4782,2897,1,79899,979,250,94,47,18,70,171,102,145,0

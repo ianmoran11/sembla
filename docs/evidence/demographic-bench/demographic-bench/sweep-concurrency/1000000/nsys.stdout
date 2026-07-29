@@ -1,0 +1,6 @@
+manifest_sha256=b5c66506ed2b3a36b6e289944ed11cd395fbbaf6d601aca36853fe90490a6e5e summary_sha256=ae21fc7607709d8bf6f579c6a57ee461ce0e8b4bac665cfa0ecf687a4d3c39f0
+Collecting data...
+Generating '/tmp/nsys-report-d2fc.qdstrm'
+[1/1] [0%                          ] cuda-workers-2-trace.nsys-rep[1/1] [0%                          ] cuda-workers-2-trace.nsys-rep[1/1] [=====32%                    ] cuda-workers-2-trace.nsys-rep[1/1] [==============63%           ] cuda-workers-2-trace.nsys-rep[1/1] [==================76%       ] cuda-workers-2-trace.nsys-rep[1/1] [========================100%] cuda-workers-2-trace.nsys-rep[1/1] [========================100%] cuda-workers-2-trace.nsys-rep
+Generated:
+    /home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda-workers-2-trace.nsys-rep
