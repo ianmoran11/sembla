@@ -2,9 +2,10 @@
 """Run direct sequential/concurrent sweep arms and prove output-tree equality.
 
 This is an evidence spike, not a production concurrency interface. It drives the
-hidden SEMBLA_SWEEP_SPIKE_DRAW_WORKERS seam, keeps timing outside scientific
-output directories, captures resource samples, compares every output byte, and
-proves the comparator with one deliberate perturbation.
+hidden SEMBLA_SWEEP_SPIKE_DRAW_WORKERS seam and optional synchronized CUDA
+non-blocking-stream mode, keeps timing outside scientific output directories,
+captures resource samples, compares every output byte, and proves the comparator
+with one deliberate perturbation.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from typing import Any
 
 SCHEMA = "sembla-sweep-concurrency-spike/v1"
 WORKERS_ENV = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS"
+CUDA_LOCKSTEP_ENV = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"
 
 
 def sha256(path: Path) -> str:
@@ -144,6 +146,10 @@ def run_arm(args: argparse.Namespace, workers: int, repetition: int) -> dict[str
 
     environment = os.environ.copy()
     environment[WORKERS_ENV] = str(workers)
+    if args.cuda_lockstep_streams and workers > 1:
+        environment[CUDA_LOCKSTEP_ENV] = "1"
+    else:
+        environment.pop(CUDA_LOCKSTEP_ENV, None)
     eval_threads = None
     if args.backend == "cpu":
         if args.cpu_total_threads is None:
@@ -168,6 +174,7 @@ def run_arm(args: argparse.Namespace, workers: int, repetition: int) -> dict[str
         "workers": workers,
         "repetition": repetition,
         "eval_threads_per_draw": eval_threads,
+        "cuda_lockstep_streams": args.cuda_lockstep_streams and workers > 1,
         "command": command,
         "return_code": return_code,
         "external_wall_time_ms": wall_ms,
@@ -228,6 +235,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cpu-total-threads", type=int)
     parser.add_argument("--params", type=Path)
     parser.add_argument("--export-pairs", action="store_true")
+    parser.add_argument("--cuda-lockstep-streams", action="store_true")
     parser.add_argument("--enable", action="append", default=[])
     args = parser.parse_args()
     if args.draws <= 0 or args.ticks <= 0 or args.repetitions <= 0:
@@ -242,6 +250,14 @@ def parse_args() -> argparse.Namespace:
         parser.error("--theta-file conflicts with --draws")
     if args.backend == "cpu" and not args.cpu_total_threads:
         parser.error("--cpu-total-threads is required for --backend cpu")
+    if args.cuda_lockstep_streams and args.backend != "cuda":
+        parser.error("--cuda-lockstep-streams requires --backend cuda")
+    if args.cuda_lockstep_streams and args.theta_file:
+        parser.error("--cuda-lockstep-streams does not support --theta-file in this spike")
+    if args.cuda_lockstep_streams and any(
+        args.draws % workers for workers in args.workers if workers > 1
+    ):
+        parser.error("--draws must be divisible by every lockstep worker count")
     if args.output_root.exists():
         parser.error(f"--output-root already exists: {args.output_root}")
     for path in [args.binary, args.model, args.population, args.theta_file, args.params]:
@@ -282,6 +298,7 @@ def main() -> int:
         "workers": args.workers,
         "repetitions": args.repetitions,
         "cpu_total_threads": args.cpu_total_threads,
+        "cuda_lockstep_streams": args.cuda_lockstep_streams,
         "enabled_features": args.enable,
         "runs": [],
     }

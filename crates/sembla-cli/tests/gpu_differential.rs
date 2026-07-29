@@ -1,5 +1,6 @@
 #![cfg(feature = "cuda")]
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -27,6 +28,25 @@ fn assert_success(output: &Output) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+fn output_files(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+    fn visit(root: &Path, directory: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                visit(root, &path, files);
+            } else {
+                files.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    std::fs::read(path).unwrap(),
+                );
+            }
+        }
+    }
+    let mut files = BTreeMap::new();
+    visit(root, root, &mut files);
+    files
 }
 
 fn plan_fixture_paths() -> Vec<PathBuf> {
@@ -58,6 +78,68 @@ fn plan_uses_grouped_views(path: &Path) -> bool {
         .boxes
         .iter()
         .any(|model_box| !model_box.grouped_views.is_empty())
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run explicitly as lockstep-stream hardware evidence"]
+fn lockstep_nonblocking_stream_sweep_matches_sequential_cuda() {
+    let temp = temp_dir("lockstep-stream-sweep");
+    let model = repository_path("fixtures/demographic/demographic_slots.json");
+    let population = repository_path("fixtures/state/demographic_slots.state");
+    for noise in ["crn", "independent"] {
+        let sequential = temp.join(format!("{noise}-sequential"));
+        let lockstep = temp.join(format!("{noise}-lockstep"));
+        let timing = temp.join(format!("{noise}-lockstep-timing.json"));
+        let common = [
+            "--seed",
+            "7",
+            "--draws",
+            "4",
+            "--ticks",
+            "2",
+            "--noise",
+            noise,
+            "--backend",
+            "cuda",
+            "--enable",
+            sembla_ir::GROUPED_OBSERVATIONS_FEATURE,
+        ];
+        let sequential_output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(&model)
+            .arg("--population")
+            .arg(&population)
+            .args(common)
+            .arg("--out")
+            .arg(&sequential)
+            .output()
+            .unwrap();
+        assert_success(&sequential_output);
+
+        let lockstep_output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(&model)
+            .arg("--population")
+            .arg(&population)
+            .args(common)
+            .arg("--timing-json")
+            .arg(&timing)
+            .arg("--out")
+            .arg(&lockstep)
+            .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", "2")
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1")
+            .output()
+            .unwrap();
+        assert_success(&lockstep_output);
+        assert_eq!(output_files(&lockstep), output_files(&sequential));
+        let document: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&timing).unwrap()).unwrap();
+        assert_eq!(
+            document["execution_mode"],
+            "cuda-lockstep-nonblocking-streams"
+        );
+    }
+    std::fs::remove_dir_all(temp).unwrap();
 }
 
 #[test]

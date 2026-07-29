@@ -31,7 +31,10 @@
 #   BENCH_SWEEP_BASELINE_COMMIT - exact clean baseline commit for before/after
 #   BENCH_CONCURRENCY_SPIKE=1   - run CUDA sweep-draw workers 1/2/4 at 1M and
 #                                 10M, three repetitions, exact output parity,
-#                                 forced completion inversion, and an nsys trace
+#                                 schedule checks, and an nsys trace
+#   BENCH_CONCURRENCY_LOCKSTEP=1
+#                               - synchronize lane groups at tick boundaries and
+#                                 use explicitly non-blocking CUDA streams
 #   BENCH_CONCURRENCY_SPIKE_ONLY=1
 #                               - package the concurrency spike without running
 #                                 the unrelated frozen §L4 gate; requires
@@ -99,6 +102,11 @@ done
 if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" == "1" \
       && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
   echo 'BENCH_CONCURRENCY_SPIKE_ONLY=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
+if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
+  echo 'BENCH_CONCURRENCY_LOCKSTEP=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
   exit 2
 fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
@@ -406,6 +414,7 @@ printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE=%q\n' "${BENCH_CONCURRENCY_SPIKE:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_LOCKSTEP=%q\n' "${BENCH_CONCURRENCY_LOCKSTEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE_ONLY=%q\n' "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
@@ -701,6 +710,15 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
   mkdir -p "$CONCURRENCY_DIR"
   nvidia-smi --query-gpu=name,uuid,driver_version,memory.total \
     --format=csv,noheader > "$CONCURRENCY_DIR/gpu.txt"
+  concurrency_driver_args=()
+  concurrency_env=()
+  if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
+    echo 'mode: synchronized tick boundaries on non-blocking CUDA streams'
+    concurrency_driver_args=(--cuda-lockstep-streams)
+    concurrency_env=(SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS=1)
+  else
+    echo 'mode: independently scheduled default-stream backends'
+  fi
 
   for concurrency_scale in 1000000 10000000; do
     scale_dir="$CONCURRENCY_DIR/$concurrency_scale"
@@ -722,36 +740,56 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
       --output-root "$scale_dir/cuda" --workers 1 2 4 --repetitions 3 \
       --draws 20 --ticks 24 --seed "$SEED" --noise independent \
       --export-pairs --enable grouped-observations \
+      "${concurrency_driver_args[@]}" \
       2>&1 | tee "$scale_dir/cuda-driver.log"
 
     if [[ "$concurrency_scale" == "1000000" ]]; then
-      # Force draw 1 to complete before draw 0. Publication must still be the
-      # exact ascending-k tree produced by the sequential reference.
-      SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 \
-      SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS=2000 \
+      # Exercise the selected scheduler directly and require the ordinary
+      # sequential scientific output tree. The independent mode also forces a
+      # completion inversion; lockstep mode instead verifies its explicit
+      # timing identity because tick barriers intentionally prevent that shape.
+      schedule_env=("${concurrency_env[@]}")
+      if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" != "1" ]]; then
+        schedule_env+=(SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS=2000)
+      fi
+      env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 "${schedule_env[@]}" \
         "$BIN" sweep "$concurrency_model" \
           --population "$concurrency_state" --backend cuda \
           --seed "$SEED" --draws 20 --ticks 24 --noise independent \
           --enable grouped-observations \
-          --export-pairs "$scale_dir/forced-inversion-pairs.csv" \
-          --timing-json "$scale_dir/forced-inversion-timing.json" \
-          --out "$scale_dir/forced-inversion-output" \
-          > "$scale_dir/forced-inversion.stdout" \
-          2> "$scale_dir/forced-inversion.stderr"
+          --export-pairs "$scale_dir/schedule-control-pairs.csv" \
+          --timing-json "$scale_dir/schedule-control-timing.json" \
+          --out "$scale_dir/schedule-control-output" \
+          > "$scale_dir/schedule-control.stdout" \
+          2> "$scale_dir/schedule-control.stderr"
       diff -qr "$scale_dir/cuda/workers-1/rep-0/output" \
-        "$scale_dir/forced-inversion-output" \
-        > "$scale_dir/forced-inversion-diff.txt"
-      python3 - "$scale_dir/forced-inversion-timing.json" \
-        "$scale_dir/forced-inversion-check.txt" <<'PY'
+        "$scale_dir/schedule-control-output" \
+        > "$scale_dir/schedule-control-diff.txt"
+      python3 - "$scale_dir/schedule-control-timing.json" \
+        "$scale_dir/schedule-control-check.txt" \
+        "${BENCH_CONCURRENCY_LOCKSTEP:-0}" <<'PY'
 import json, pathlib, sys
-source, report = map(pathlib.Path, sys.argv[1:])
+source, report = map(pathlib.Path, sys.argv[1:3])
+lockstep = sys.argv[3] == "1"
 doc = json.loads(source.read_text())
 draws = doc["draw_timings"]
 assert [draw["k"] for draw in draws] == list(range(20))
-assert draws[1]["finish_offset_ms"] < draws[0]["finish_offset_ms"]
-report.write_text(
-    "PASS: draw 1 completed before draw 0; publication remained byte-identical\n"
-)
+if lockstep:
+    assert doc["execution_mode"] == "cuda-lockstep-nonblocking-streams"
+    assert all(draw["lane"] == draw["k"] % 2 for draw in draws)
+    for offset in range(0, len(draws), 2):
+        pair = draws[offset:offset + 2]
+        assert max(draw["start_offset_ms"] for draw in pair) <= min(
+            draw["finish_offset_ms"] for draw in pair
+        )
+    message = (
+        "PASS: deterministic lane assignment, overlapping lane intervals, "
+        "lockstep timing identity, and byte-identical publication\n"
+    )
+else:
+    assert draws[1]["finish_offset_ms"] < draws[0]["finish_offset_ms"]
+    message = "PASS: completion inversion and byte-identical publication\n"
+report.write_text(message)
 PY
 
       # One short Nsight Systems arm retains kernel start/duration/stream detail.
@@ -763,7 +801,7 @@ PY
       fi
       (
         cd "$scale_dir"
-        SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 \
+        env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=2 "${concurrency_env[@]}" \
           nsys profile --trace=cuda --force-overwrite=true \
             -o cuda-workers-2-trace \
             "$BIN" sweep "$concurrency_model" \
@@ -1338,23 +1376,32 @@ assert all(doc["assertions"].values())
 )
 PY
 else
+  if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
+    mode_description='synchronized tick boundaries on explicitly non-blocking CUDA streams'
+    schedule_assertion='PASS lockstep-stream timing identity preserved ordered publication'
+  else
+    mode_description='independently scheduled complete CUDA backends'
+    schedule_assertion='PASS forced completion inversion preserved ordered publication'
+  fi
   cat > "$OUT_ROOT/README.md" <<EOF
 # Concurrent CUDA sweep-draw spike evidence
 
 This targeted paid session ran only the direct concurrency spike at repository
 commit \`$COMMIT_BEFORE\`. It did not rerun the unrelated frozen §L4 gate.
 
+Execution mode: $mode_description.
+
 The \`sweep-concurrency/\` tree contains workers 1/2/4, three repetitions at 1M
 and 10M, complete output-tree hashes and comparisons, resource samples, a
-negative comparator control, a forced completion inversion, and a 1M Nsight
-Systems CUDA trace exported as CSV.
+negative comparator control, a schedule control, and a 1M Nsight Systems CUDA
+trace exported as CSV.
 EOF
   printf '%s\n' \
     'PASS targeted concurrency-only payload selected' \
     'PASS workers 1/2/4 completed three repetitions at 1M and 10M' \
     'PASS complete output trees matched their sequential references' \
     'PASS negative comparator controls rejected a deliberate perturbation' \
-    'PASS forced completion inversion preserved ordered publication' \
+    "$schedule_assertion" \
     'PASS Nsight Systems CUDA trace exported for overlap analysis' \
     > "$OUT_ROOT/assertions.txt"
 fi

@@ -431,6 +431,7 @@ without paying to rerun the unrelated frozen §L4 gate:
 
 ```bash
 BENCH_CONCURRENCY_SPIKE=1 \
+BENCH_CONCURRENCY_LOCKSTEP=1 \
 BENCH_CONCURRENCY_SPIKE_ONLY=1 \
   bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
 ```
@@ -438,15 +439,18 @@ BENCH_CONCURRENCY_SPIKE_ONLY=1 \
 The stage runs worker counts 1, 2, and 4 at 1M and 10M slots, with three
 repetitions per count, 20 draws, 24 ticks, independent noise, exported pairs,
 and grouped observations. Each repetition compares the complete output tree to
-its sequential reference. It also runs a deliberately failing comparator
-control, forces draw 1 to finish before draw 0 while requiring identical ordered
-publication, records RSS/VRAM/utilization samples, and exports a 1M Nsight
-Systems CUDA trace as CSV for actual overlap analysis.
+its sequential reference. With `BENCH_CONCURRENCY_LOCKSTEP=1`, lane groups use
+explicitly non-blocking streams and wait at every tick boundary. The stage also
+runs a deliberately failing comparator control, requires deterministic `k % workers` lane assignment and overlapping
+per-round lane timing intervals, records RSS/VRAM/utilization samples, and exports a 1M Nsight Systems
+CUDA trace as CSV for actual overlap analysis.
 
-`BENCH_CONCURRENCY_SPIKE_ONLY=1` is rejected unless the stage itself is enabled.
-Both flags are included in the immutable remote payload hash. The production
-sweep default remains sequential; only child benchmark processes receive the
-hidden experimental environment variables.
+`BENCH_CONCURRENCY_SPIKE_ONLY=1` and `BENCH_CONCURRENCY_LOCKSTEP=1` are each
+rejected unless the stage itself is enabled. All three flags are included in the
+immutable remote payload hash. The production sweep default remains sequential;
+only child benchmark processes receive the hidden experimental environment
+variables. Omit `BENCH_CONCURRENCY_LOCKSTEP` only to reproduce the already
+recorded independent/default-stream lower-bound arm.
 
 ## Retained-backend sweep stage
 

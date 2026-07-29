@@ -512,6 +512,10 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
     assert_eq!(concurrent_document["requested_draw_workers"], 2);
     assert_eq!(concurrent_document["effective_draw_workers"], 2);
     assert_eq!(
+        concurrent_document["execution_mode"],
+        "independent-backends"
+    );
+    assert_eq!(
         concurrent_document["draw_timings"]
             .as_array()
             .unwrap()
@@ -580,6 +584,81 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
             String::from_utf8_lossy(&output.stderr).contains(expected),
             "{label}: {}",
             String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    for (label, backend, workers, expected) in [
+        ("lockstep-cpu", "cpu", "2", "requires --backend cuda"),
+        (
+            "lockstep-one-worker",
+            "cuda",
+            "1",
+            "requires SEMBLA_SWEEP_SPIKE_DRAW_WORKERS>1",
+        ),
+        (
+            "lockstep-nondivisible",
+            "cuda",
+            "2",
+            "draw count 3 to be divisible by worker count 2",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "3",
+                "--ticks",
+                "1",
+                "--backend",
+                backend,
+                "--out",
+            ])
+            .arg(temp.join(label))
+            .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", workers)
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1")
+            .env("SEMBLA_EVAL_THREADS", "1")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{label}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{label}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    if !cfg!(feature = "cuda") {
+        let unavailable = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "4",
+                "--ticks",
+                "1",
+                "--backend",
+                "cuda",
+                "--out",
+            ])
+            .arg(temp.join("lockstep-unavailable"))
+            .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", "2")
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1")
+            .output()
+            .unwrap();
+        assert!(!unavailable.status.success());
+        assert!(
+            String::from_utf8_lossy(&unavailable.stderr).contains("cuda backend unavailable"),
+            "{}",
+            String::from_utf8_lossy(&unavailable.stderr)
         );
     }
     std::fs::remove_dir_all(temp).unwrap();

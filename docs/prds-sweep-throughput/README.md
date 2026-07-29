@@ -240,6 +240,30 @@ serialize. This closes the complete-default-stream design and triggers the
 scoped shared-context/non-blocking-stream prototype; CUDA Gate 1 is not complete
 until that direct arm is measured.
 
+The next runnable arm is the synchronized lockstep-stream spike selected after
+that trace. `--cuda-lockstep-streams` makes every active lane own an explicitly
+non-blocking CUDA stream and advances equal-sized lane groups through tick
+boundaries together. It is still hidden, default-off evidence code: production
+sweeps remain sequential, and this arm intentionally retains complete backends
+so it can answer the stream-overlap question before introducing shared-program
+lifetime abstractions.
+
+```sh
+python3 scripts/run-sweep-concurrency-spike.py \
+  --binary target/release/sembla \
+  --model <model.json> --population <state> \
+  --backend cuda --cuda-lockstep-streams \
+  --output-root <new-evidence-dir> \
+  --workers 1 2 4 --draws 20 --ticks 24 --noise independent
+```
+
+Nsight must show whether synchronized non-blocking streams produce overlapping
+kernel intervals and whether that overlap improves whole-sweep wall. If streams
+still serialize or contend, the remaining experiment is a fused grid-y batch:
+one kernel launch with draw as an explicit dimension. That is a broader codegen
+and draw-major-buffer spike, so it is justified only by the smaller direct arm;
+it is not silently folded into a numbered PRD.
+
 **CPU arm**
 
 - Use isolated retained CPU backends for active draws.

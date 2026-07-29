@@ -363,6 +363,30 @@ impl CudaBackend {
         seed: u64,
         hash_mode: HashMode,
     ) -> Result<Self, CudaError> {
+        Self::new_with_stream_mode(model, initial_tables, params, seed, hash_mode, false)
+    }
+
+    /// Experimental sweep-spike constructor using an explicitly non-blocking
+    /// stream. Ordinary CUDA execution continues to use the default stream.
+    #[doc(hidden)]
+    pub fn new_nonblocking_stream(
+        model: &ValidatedModel,
+        initial_tables: Vec<TableInit>,
+        params: &ParamEnv,
+        seed: u64,
+        hash_mode: HashMode,
+    ) -> Result<Self, CudaError> {
+        Self::new_with_stream_mode(model, initial_tables, params, seed, hash_mode, true)
+    }
+
+    fn new_with_stream_mode(
+        model: &ValidatedModel,
+        initial_tables: Vec<TableInit>,
+        params: &ParamEnv,
+        seed: u64,
+        hash_mode: HashMode,
+        nonblocking_stream: bool,
+    ) -> Result<Self, CudaError> {
         let driver_library = unsafe { cudarc::driver::sys::is_culib_present() };
         if !driver_library {
             return Err(CudaError::DriverMissing);
@@ -417,7 +441,13 @@ impl CudaBackend {
         let module = context
             .load_module(ptx)
             .map_err(|error| CudaError::Driver(error.to_string()))?;
-        let stream = context.default_stream();
+        let stream = if nonblocking_stream {
+            context
+                .new_stream()
+                .map_err(|error| CudaError::Driver(error.to_string()))?
+        } else {
+            context.default_stream()
+        };
 
         let transition_functions = generated
             .transition_kernels

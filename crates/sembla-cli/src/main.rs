@@ -1671,6 +1671,7 @@ fn params_from_theta_assignment(
 
 const SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV: &str = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS";
 const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS";
+const SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS";
 
 #[derive(Clone)]
 struct SweepPreparedDraw {
@@ -1728,6 +1729,39 @@ fn sweep_concurrency_spike_workers(
     Ok(workers)
 }
 
+fn sweep_concurrency_spike_cuda_lockstep(
+    draw_count: u32,
+    workers: usize,
+    backend: BackendSelection,
+) -> Result<bool, String> {
+    let Some(raw) = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV) else {
+        return Ok(false);
+    };
+    let raw = raw.to_string_lossy();
+    if raw != "1" {
+        return Err(format!(
+            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV} must be 1 when set, found '{raw}'"
+        ));
+    }
+    if backend != BackendSelection::Cuda {
+        return Err(format!(
+            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}=1 requires --backend cuda"
+        ));
+    }
+    if workers <= 1 {
+        return Err(format!(
+            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}=1 requires {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
+        ));
+    }
+    let draw_count = usize::try_from(draw_count).expect("draw count is u32");
+    if draw_count % workers != 0 {
+        return Err(format!(
+            "lockstep CUDA spike requires draw count {draw_count} to be divisible by worker count {workers}"
+        ));
+    }
+    Ok(true)
+}
+
 fn sweep_concurrency_spike_draw_zero_delay() -> Result<Duration, String> {
     let Some(raw) = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV) else {
         return Ok(Duration::ZERO);
@@ -1748,20 +1782,25 @@ fn run_concurrent_sweep_spike(
     options: &SweepOptions,
     workers: usize,
     prepared: &[SweepPreparedDraw],
+    cuda_lockstep: bool,
 ) -> Result<SweepConcurrentExecution, String> {
     let setup_started = Instant::now();
     let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
     let next_draw = std::sync::atomic::AtomicUsize::new(0);
+    let lane_construction_failed = std::sync::atomic::AtomicBool::new(false);
     let ready = std::sync::Barrier::new(workers + 1);
     let start = std::sync::Barrier::new(workers + 1);
+    let lockstep_tick = std::sync::Barrier::new(workers);
     let execution_started = std::sync::OnceLock::<Instant>::new();
-    let (lanes, setup_elapsed, execution_window_elapsed) =
-        std::thread::scope(|scope| -> Result<(Vec<_>, Duration, Duration), String> {
+    let (lanes, setup_elapsed, execution_window_elapsed) = std::thread::scope(
+        |scope| -> Result<(Vec<_>, Duration, Duration), String> {
             let handles = (0..workers)
                 .map(|lane| {
                     let next_draw = &next_draw;
+                    let lane_construction_failed = &lane_construction_failed;
                     let ready = &ready;
                     let start = &start;
+                    let lockstep_tick = &lockstep_tick;
                     let execution_started = &execution_started;
                     scope.spawn(move || -> Result<_, String> {
                         // CUDA contexts are thread-current. Constructing a backend on
@@ -1769,50 +1808,111 @@ fn run_concurrent_sweep_spike(
                         // CUDA_ERROR_INVALID_CONTEXT on the first driver operation.
                         // Each isolated lane therefore owns and uses its backend on
                         // one worker thread for its complete lifetime.
-                        let backend = SweepBackend::new(
-                            model,
-                            initial_tables.to_vec(),
-                            construction_params,
-                            options.seed,
-                            options.backend,
-                        );
+                        let backend = std::panic::catch_unwind(
+                            std::panic::AssertUnwindSafe(|| -> Result<_, String> {
+                                let backend = SweepBackend::new_concurrency_lane(
+                                    model,
+                                    initial_tables.to_vec(),
+                                    construction_params,
+                                    options.seed,
+                                    options.backend,
+                                    cuda_lockstep,
+                                )?;
+                                let identity = backend.identity();
+                                Ok((identity, backend))
+                            }),
+                        )
+                        .unwrap_or_else(|_| {
+                            Err("sweep concurrency spike worker panicked during backend construction"
+                                .to_owned())
+                        });
+                        if backend.is_err() {
+                            lane_construction_failed
+                                .store(true, std::sync::atomic::Ordering::Release);
+                        }
                         // Both barriers must be reached even if construction failed,
                         // otherwise one failed lane would deadlock every healthy lane.
                         ready.wait();
                         start.wait();
-                        let mut backend = backend?;
+                        if lane_construction_failed.load(std::sync::atomic::Ordering::Acquire) {
+                            return match backend {
+                                Err(error) => Err(error),
+                                Ok(_) => {
+                                    Err("sweep concurrency spike peer backend construction failed"
+                                        .to_owned())
+                                }
+                            };
+                        }
+                        let (identity, mut backend) = backend?;
                         let execution_started = *execution_started
                             .get()
                             .expect("coordinator sets execution start before release");
-                        let identity = backend.identity();
                         let mut completed = Vec::new();
-                        loop {
-                            let index =
-                                next_draw.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            let Some(draw) = prepared.get(index) else {
-                                break;
-                            };
-                            let start_offset = execution_started.elapsed();
-                            let started = Instant::now();
-                            if draw.k == 0 && !draw_zero_delay.is_zero() {
-                                std::thread::sleep(draw_zero_delay);
+                        if cuda_lockstep {
+                            for index in (lane..prepared.len()).step_by(workers) {
+                                let draw = &prepared[index];
+                                let start_offset = execution_started.elapsed();
+                                let started = Instant::now();
+                                if draw.k == 0 && !draw_zero_delay.is_zero() {
+                                    std::thread::sleep(draw_zero_delay);
+                                }
+                                let execution = std::panic::catch_unwind(
+                                    std::panic::AssertUnwindSafe(|| {
+                                        backend.run_draw_lockstep(
+                                            model,
+                                            &draw.params,
+                                            draw.execution_seed,
+                                            options.ticks,
+                                            &options.enabled_features,
+                                            lockstep_tick,
+                                        )
+                                    }),
+                                )
+                                .unwrap_or_else(|_| {
+                                    Err(format!(
+                                        "draw {}: lockstep worker panicked after entering the barrier protocol",
+                                        draw.k
+                                    ))
+                                });
+                                let elapsed = started.elapsed();
+                                completed.push(SweepConcurrentCompletedDraw {
+                                    index,
+                                    lane,
+                                    start_offset,
+                                    finish_offset: execution_started.elapsed(),
+                                    elapsed,
+                                    execution,
+                                });
                             }
-                            let execution = backend.run_draw(
-                                model,
-                                &draw.params,
-                                draw.execution_seed,
-                                options.ticks,
-                                &options.enabled_features,
-                            );
-                            let elapsed = started.elapsed();
-                            completed.push(SweepConcurrentCompletedDraw {
-                                index,
-                                lane,
-                                start_offset,
-                                finish_offset: execution_started.elapsed(),
-                                elapsed,
-                                execution,
-                            });
+                        } else {
+                            loop {
+                                let index =
+                                    next_draw.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                let Some(draw) = prepared.get(index) else {
+                                    break;
+                                };
+                                let start_offset = execution_started.elapsed();
+                                let started = Instant::now();
+                                if draw.k == 0 && !draw_zero_delay.is_zero() {
+                                    std::thread::sleep(draw_zero_delay);
+                                }
+                                let execution = backend.run_draw(
+                                    model,
+                                    &draw.params,
+                                    draw.execution_seed,
+                                    options.ticks,
+                                    &options.enabled_features,
+                                );
+                                let elapsed = started.elapsed();
+                                completed.push(SweepConcurrentCompletedDraw {
+                                    index,
+                                    lane,
+                                    start_offset,
+                                    finish_offset: execution_started.elapsed(),
+                                    elapsed,
+                                    execution,
+                                });
+                            }
                         }
                         Ok((identity, completed))
                     })
@@ -1827,13 +1927,28 @@ fn run_concurrent_sweep_spike(
             start.wait();
 
             let mut lanes = Vec::with_capacity(workers);
-            for handle in handles {
-                lanes.push(handle.join().map_err(|_| {
-                    "sweep concurrency spike worker panicked before returning its draws".to_owned()
-                })??);
+            let mut errors = Vec::new();
+            for (lane, handle) in handles.into_iter().enumerate() {
+                match handle.join() {
+                    Ok(Ok(result)) => lanes.push(result),
+                    Ok(Err(error)) => errors.push((lane, error)),
+                    Err(_) => errors.push((
+                        lane,
+                        "sweep concurrency spike worker panicked before returning its draws"
+                            .to_owned(),
+                    )),
+                }
+            }
+            if !errors.is_empty() {
+                let selected = errors
+                    .iter()
+                    .find(|(_, error)| !error.contains("peer backend construction failed"))
+                    .unwrap_or(&errors[0]);
+                return Err(format!("concurrency lane {}: {}", selected.0, selected.1));
             }
             Ok((lanes, setup_elapsed, execution_start.elapsed()))
-        })?;
+        },
+    )?;
     let identity = lanes
         .first()
         .expect("concurrency spike has at least one backend")
@@ -2098,6 +2213,8 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     // same explicit reset and reseed path as every later draw.
     let construction_params = ParamEnv::defaults(&model);
     let draw_workers = sweep_concurrency_spike_workers(draw_count, options.backend)?;
+    let cuda_lockstep =
+        sweep_concurrency_spike_cuda_lockstep(draw_count, draw_workers, options.backend)?;
     let mut draw_durations = Vec::with_capacity(draw_count as usize);
     let mut concurrency_spike_timing = None;
     let setup_elapsed;
@@ -2163,10 +2280,16 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             )?);
         }
     } else {
-        eprintln!(
-            "EXPERIMENTAL sweep concurrency spike: {draw_workers} isolated {:?} backends; default sweep behavior remains sequential",
-            options.backend
-        );
+        if cuda_lockstep {
+            eprintln!(
+                "EXPERIMENTAL CUDA lockstep-stream spike: {draw_workers} draw lanes on non-blocking streams; default sweep behavior remains sequential"
+            );
+        } else {
+            eprintln!(
+                "EXPERIMENTAL sweep concurrency spike: {draw_workers} isolated {:?} backends; default sweep behavior remains sequential",
+                options.backend
+            );
+        }
         let mut prepared = Vec::with_capacity(draw_count as usize);
         for draw in 0..draw_count {
             let params = match &theta_file {
@@ -2204,6 +2327,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             &options,
             draw_workers,
             &prepared,
+            cuda_lockstep,
         )?;
         setup_elapsed = concurrent.setup_elapsed;
         run_manifest.backend_identity = Some(concurrent.identity);
@@ -2287,6 +2411,11 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                     ticks_per_draw: options.ticks,
                     requested_draw_workers: draw_workers,
                     effective_draw_workers: draw_workers,
+                    execution_mode: if cuda_lockstep {
+                        "cuda-lockstep-nonblocking-streams"
+                    } else {
+                        "independent-backends"
+                    },
                     setup_wall_time_ms: duration_ms(setup_elapsed),
                     execution_window_wall_time_ms: duration_ms(execution_window),
                     publication_wall_time_ms: duration_ms(publication),
@@ -2741,6 +2870,49 @@ impl SweepBackend {
         }
     }
 
+    fn new_concurrency_lane(
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        initial_params: &ParamEnv,
+        seed: u64,
+        backend: BackendSelection,
+        cuda_lockstep: bool,
+    ) -> Result<Self, String> {
+        if !cuda_lockstep {
+            return Self::new(model, initial, initial_params, seed, backend);
+        }
+        #[cfg(test)]
+        SWEEP_BACKEND_CONSTRUCTIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        match backend {
+            BackendSelection::Cuda => {
+                #[cfg(feature = "cuda")]
+                {
+                    let backend = CudaBackend::new_nonblocking_stream(
+                        model,
+                        initial,
+                        initial_params,
+                        seed,
+                        HashMode::FinalOnly,
+                    )
+                    .map_err(|error| error.to_string())?;
+                    report_cuda_observation_eligibility(backend.observation_eligibility());
+                    Ok(Self::Cuda(backend))
+                }
+                #[cfg(not(feature = "cuda"))]
+                {
+                    let _ = (model, initial, initial_params, seed);
+                    Err(
+                        "cuda backend unavailable: crate built without the 'cuda' feature"
+                            .to_owned(),
+                    )
+                }
+            }
+            BackendSelection::Cpu => {
+                Err("CUDA lockstep-stream spike requires --backend cuda".to_owned())
+            }
+        }
+    }
+
     fn identity(&self) -> manifest::BackendIdentity {
         match self {
             Self::Cpu { .. } => manifest::BackendIdentity::cpu_oracle(),
@@ -2829,6 +3001,142 @@ impl SweepBackend {
                     )?;
                 }
                 let output = output.finish(model, None)?;
+                let final_state_hash = backend
+                    .ensure_observed_state()
+                    .map_err(|error| error.to_string())?
+                    .state_hash();
+                Ok(SweepDrawOutput {
+                    output,
+                    final_state_hash,
+                })
+            }
+        }
+    }
+
+    fn run_draw_lockstep(
+        &mut self,
+        model: &sembla_ir::ValidatedModel,
+        params: &ParamEnv,
+        seed: u64,
+        ticks: u32,
+        _enabled_features: &FeatureSet,
+        tick_barrier: &std::sync::Barrier,
+    ) -> Result<SweepDrawOutput, String> {
+        #[cfg(not(feature = "cuda"))]
+        let _ = (model, params, seed);
+        match self {
+            Self::Cpu { .. } => {
+                // Preserve the barrier protocol even on an impossible route so
+                // a validation error cannot strand CUDA peers.
+                tick_barrier.wait();
+                for _ in 0..ticks {
+                    tick_barrier.wait();
+                }
+                Err("CUDA lockstep-stream spike requires --backend cuda".to_owned())
+            }
+            #[cfg(feature = "cuda")]
+            Self::Cuda(backend) => {
+                let reset = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    backend
+                        .reset_draw(params, seed)
+                        .map_err(|error| error.to_string())
+                }))
+                .unwrap_or_else(|_| {
+                    Err("lockstep worker panicked while resetting its draw".to_owned())
+                });
+                let mut failure = reset.err();
+                let mut output = if failure.is_none() {
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        RunOutputAccumulator::new(model, params, ticks)
+                    }))
+                    .unwrap_or_else(|_| {
+                        Err(
+                            "lockstep worker panicked while creating its output accumulator"
+                                .to_owned(),
+                        )
+                    }) {
+                        Ok(output) => Some(output),
+                        Err(error) => {
+                            failure = Some(error);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // All lanes finish reset before tick zero. Every lane reaches
+                // every later barrier even after a local error, so one failing
+                // draw cannot deadlock its peers.
+                tick_barrier.wait();
+                for tick in 0..ticks {
+                    if failure.is_none() {
+                        let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                            || -> Result<(), String> {
+                                let (
+                                    observed_tick,
+                                    fired_per_box,
+                                    deferred_per_resource_table,
+                                    device_views,
+                                ) = backend
+                                    .run_tick_observed_reused()
+                                    .map_err(|error| format!("tick {tick}: {error}"))?;
+                                debug_assert_eq!(observed_tick, tick);
+                                let (views, grouped_views, generic_enum_counts) = match device_views
+                                {
+                                    Some(observation) => (
+                                        observation.views,
+                                        observation.grouped_views,
+                                        observation.generic_enum_counts,
+                                    ),
+                                    None => {
+                                        let views = executor::observe_views(
+                                            model,
+                                            backend.observed_state(),
+                                            params,
+                                        )
+                                        .map_err(|error| format!("tick {tick}: {error}"))?;
+                                        let grouped_views = executor::observe_grouped_views(
+                                            model,
+                                            backend.observed_state(),
+                                            params,
+                                        )
+                                        .map_err(|error| format!("tick {tick}: {error}"))?;
+                                        (views, grouped_views, None)
+                                    }
+                                };
+                                let report = cuda_tick_report(
+                                    model,
+                                    tick,
+                                    fired_per_box,
+                                    deferred_per_resource_table,
+                                    views,
+                                    grouped_views,
+                                );
+                                output
+                                    .as_mut()
+                                    .expect("output exists while lockstep draw is healthy")
+                                    .push_tick_with_enum_counts(
+                                        backend.observed_state(),
+                                        tick,
+                                        report,
+                                        generic_enum_counts.as_deref(),
+                                    )
+                            },
+                        ))
+                        .unwrap_or_else(|_| Err(format!("tick {tick}: lockstep worker panicked")));
+                        if let Err(error) = tick_result {
+                            failure = Some(error);
+                        }
+                    }
+                    tick_barrier.wait();
+                }
+                if let Some(error) = failure {
+                    return Err(error);
+                }
+                let output = output
+                    .expect("healthy lockstep draw has an accumulator")
+                    .finish(model, None)?;
                 let final_state_hash = backend
                     .ensure_observed_state()
                     .map_err(|error| error.to_string())?
@@ -2999,6 +3307,7 @@ struct SweepConcurrencySpikeTimingDocument {
     ticks_per_draw: u32,
     requested_draw_workers: usize,
     effective_draw_workers: usize,
+    execution_mode: &'static str,
     setup_wall_time_ms: f64,
     execution_window_wall_time_ms: f64,
     publication_wall_time_ms: f64,

@@ -42,6 +42,24 @@ fn cuda_backend_retains_and_refreshes_one_host_state_store() {
 }
 
 #[test]
+fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
+    let backend = include_str!("../src/backend.rs");
+    let constructor = section(backend, "    pub fn new(", "\n    pub fn generated(&self)");
+    assert!(constructor.contains("Self::new_with_stream_mode("));
+    assert!(constructor.contains("hash_mode, false"));
+    assert!(constructor.contains("pub fn new_nonblocking_stream("));
+    assert!(constructor.contains("hash_mode, true"));
+    assert!(constructor.contains(".new_stream()"));
+    assert!(constructor.contains("context.default_stream()"));
+
+    let cli = include_str!("../../sembla-cli/src/main.rs");
+    assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"));
+    assert!(cli.contains("CudaBackend::new_nonblocking_stream("));
+    assert!(cli.contains("backend.run_draw_lockstep("));
+    assert!(cli.contains("let lockstep_tick = std::sync::Barrier::new(workers);"));
+}
+
+#[test]
 fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
     let backend = include_str!("../src/backend.rs");
     let reused = section(
