@@ -35,6 +35,11 @@
 #   BENCH_CONCURRENCY_LOCKSTEP=1
 #                               - synchronize lane groups at tick boundaries and
 #                                 use explicitly non-blocking CUDA streams
+#   BENCH_CONCURRENCY_FREE_STREAMS=1
+#                               - schedule lanes dynamically with no tick
+#                                 barriers on explicitly non-blocking CUDA
+#                                 streams; combines independent scheduling
+#                                 with real kernel-overlap potential
 #   BENCH_CONCURRENCY_FUSED=1    - batch draw slots in grid.y inside each CUDA
 #                                 phase; runs a capacity-4/two-draw shakedown
 #                                 before the 1M/10M matrix
@@ -117,9 +122,20 @@ if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" \
   echo 'BENCH_CONCURRENCY_FUSED=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
   exit 2
 fi
+if [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
+  echo 'BENCH_CONCURRENCY_FREE_STREAMS=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
 if [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
       && "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
   echo 'BENCH_CONCURRENCY_LOCKSTEP and BENCH_CONCURRENCY_FUSED are mutually exclusive' >&2
+  exit 2
+fi
+if [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" \
+      && ( "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
+           || "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ) ]]; then
+  echo 'BENCH_CONCURRENCY_FREE_STREAMS is mutually exclusive with LOCKSTEP and FUSED' >&2
   exit 2
 fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
@@ -429,6 +445,7 @@ printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:
 printf 'export BENCH_CONCURRENCY_SPIKE=%q\n' "${BENCH_CONCURRENCY_SPIKE:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_LOCKSTEP=%q\n' "${BENCH_CONCURRENCY_LOCKSTEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_FUSED=%q\n' "${BENCH_CONCURRENCY_FUSED:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_FREE_STREAMS=%q\n' "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE_ONLY=%q\n' "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" >> "$REMOTE_SCRIPT"
 cat >> "$REMOTE_SCRIPT" <<'REMOTE_EOF'
 set -Eeuo pipefail
@@ -789,6 +806,10 @@ report.write_text(
 )
 PY
     rm -f "$shakedown_state" "$shakedown_model"
+  elif [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" ]]; then
+    echo 'mode: free-running non-blocking CUDA streams without tick barriers'
+    concurrency_driver_args=(--cuda-free-streams)
+    concurrency_env=(SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS=1)
   elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
     echo 'mode: synchronized tick boundaries on non-blocking CUDA streams'
     concurrency_driver_args=(--cuda-lockstep-streams)
@@ -850,11 +871,13 @@ PY
       python3 - "$scale_dir/schedule-control-timing.json" \
         "$scale_dir/schedule-control-check.txt" \
         "${BENCH_CONCURRENCY_LOCKSTEP:-0}" \
-        "${BENCH_CONCURRENCY_FUSED:-0}" <<'PY'
+        "${BENCH_CONCURRENCY_FUSED:-0}" \
+        "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" <<'PY'
 import json, pathlib, sys
 source, report = map(pathlib.Path, sys.argv[1:3])
 lockstep = sys.argv[3] == "1"
 fused = sys.argv[4] == "1"
+free = sys.argv[5] == "1"
 doc = json.loads(source.read_text())
 if fused:
     assert doc["schema"] == "sembla-cuda-fused-draw-spike-timing-v1"
@@ -886,8 +909,15 @@ if lockstep:
         "lockstep timing identity, and byte-identical publication\n"
     )
 elif not fused:
+    if free:
+        assert doc["execution_mode"] == "cuda-free-nonblocking-streams"
+        message = (
+            "PASS: free-stream execution mode, completion inversion, and "
+            "byte-identical publication\n"
+        )
+    else:
+        message = "PASS: completion inversion and byte-identical publication\n"
     assert draws[1]["finish_offset_ms"] < draws[0]["finish_offset_ms"]
-    message = "PASS: completion inversion and byte-identical publication\n"
 report.write_text(message)
 PY
 
@@ -1478,6 +1508,9 @@ else
   if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
     mode_description='fused grid-y draw slots in one CUDA phase launch'
     schedule_assertion='PASS complete fused chunk timing metadata preserved ordered publication'
+  elif [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" ]]; then
+    mode_description='free-running non-blocking CUDA streams without tick barriers'
+    schedule_assertion='PASS free-stream execution mode and forced completion inversion preserved ordered publication'
   elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" ]]; then
     mode_description='synchronized tick boundaries on explicitly non-blocking CUDA streams'
     schedule_assertion='PASS lockstep-stream timing identity preserved ordered publication'

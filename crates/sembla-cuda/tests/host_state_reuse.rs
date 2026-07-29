@@ -108,6 +108,35 @@ fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
 }
 
 #[test]
+fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
+    let cli = include_str!("../../sembla-cli/src/main.rs");
+    assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS"));
+    assert!(cli.contains("SweepConcurrencyMode::CudaFreeNonblocking"));
+
+    // Only the lockstep mode enters the tick-barrier branch; free-running
+    // non-blocking lanes share the dynamic claim-based scheduler with the
+    // ordinary independent mode.
+    assert!(cli.contains("if mode == SweepConcurrencyMode::CudaLockstepNonblocking {"));
+    let scheduler = section(
+        cli,
+        "if mode == SweepConcurrencyMode::CudaLockstepNonblocking {",
+        "Ok((identity, completed))",
+    );
+    assert!(scheduler.contains("} else {"));
+    assert!(scheduler.contains("next_draw.fetch_add("));
+    assert!(scheduler.contains("backend.run_draw("));
+
+    // Both CUDA stream modes share the non-blocking constructor; independent
+    // mode keeps the default stream.
+    let lane_ctor = section(cli, "    fn new_concurrency_lane(", "\n    fn identity(");
+    assert!(lane_ctor.contains("if mode == SweepConcurrencyMode::IndependentDefaultStreams {"));
+    assert!(lane_ctor.contains("CudaBackend::new_nonblocking_stream("));
+    assert!(cli.contains("\"cuda-free-nonblocking-streams\""));
+    assert!(cli.contains("\"cuda-lockstep-nonblocking-streams\""));
+    assert!(cli.contains("\"independent-backends\""));
+}
+
+#[test]
 fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
     let backend = include_str!("../src/backend.rs");
     let reused = section(

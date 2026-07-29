@@ -632,13 +632,83 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
         );
     }
 
-    for (label, backend, capacity, workers, lockstep, expected) in [
+    for (label, backend, workers, free_value, expected) in [
+        ("free-invalid-value", "cuda", "2", "2", "must be 1 when set"),
+        ("free-cpu", "cpu", "2", "1", "requires --backend cuda"),
+        (
+            "free-one-worker",
+            "cuda",
+            "1",
+            "1",
+            "requires SEMBLA_SWEEP_SPIKE_DRAW_WORKERS>1",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "3",
+                "--ticks",
+                "1",
+                "--backend",
+                backend,
+                "--out",
+            ])
+            .arg(temp.join(label))
+            .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", workers)
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS", free_value)
+            .env("SEMBLA_EVAL_THREADS", "1")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{label}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{label}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let free_lockstep_conflict = Command::new(env!("CARGO_BIN_EXE_sembla"))
+        .arg("sweep")
+        .arg(repository_path("examples/sir.json"))
+        .arg("--population")
+        .arg(&population)
+        .args([
+            "--seed",
+            "19",
+            "--draws",
+            "3",
+            "--ticks",
+            "1",
+            "--backend",
+            "cuda",
+            "--out",
+        ])
+        .arg(temp.join("free-lockstep-conflict"))
+        .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", "2")
+        .env("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1")
+        .env("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS", "1")
+        .output()
+        .unwrap();
+    assert!(!free_lockstep_conflict.status.success());
+    assert!(
+        String::from_utf8_lossy(&free_lockstep_conflict.stderr).contains("mutually exclusive"),
+        "{}",
+        String::from_utf8_lossy(&free_lockstep_conflict.stderr)
+    );
+
+    for (label, backend, capacity, workers, conflicting_env, expected) in [
         (
             "fused-zero",
             "cuda",
             "0",
             None,
-            false,
+            None,
             "must be one of 1, 2, or 4",
         ),
         (
@@ -646,7 +716,7 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
             "cuda",
             "3",
             None,
-            false,
+            None,
             "must be one of 1, 2, or 4",
         ),
         (
@@ -654,7 +724,7 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
             "cpu",
             "2",
             None,
-            false,
+            None,
             "requires --backend cuda",
         ),
         (
@@ -662,7 +732,7 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
             "cuda",
             "2",
             Some("2"),
-            false,
+            None,
             "incompatible with SEMBLA_SWEEP_SPIKE_DRAW_WORKERS>1",
         ),
         (
@@ -670,8 +740,16 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
             "cuda",
             "2",
             Some("2"),
-            true,
+            Some("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"),
             "incompatible with the lockstep-stream",
+        ),
+        (
+            "fused-free-stream",
+            "cuda",
+            "2",
+            Some("2"),
+            Some("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS"),
+            "incompatible with the lockstep-stream, free-stream",
         ),
     ] {
         let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
@@ -696,8 +774,8 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
         if let Some(workers) = workers {
             process.env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", workers);
         }
-        if lockstep {
-            process.env("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1");
+        if let Some(conflicting_env) = conflicting_env {
+            process.env(conflicting_env, "1");
         }
         let output = process.output().unwrap();
         assert!(!output.status.success(), "{label}");
@@ -763,6 +841,36 @@ fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
                 .contains("cuda fused-draw spike unavailable"),
             "{}",
             String::from_utf8_lossy(&fused_unavailable.stderr)
+        );
+        let free_unavailable = Command::new(env!("CARGO_BIN_EXE_sembla"))
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "3",
+                "--ticks",
+                "1",
+                "--backend",
+                "cuda",
+                "--out",
+            ])
+            .arg(temp.join("free-unavailable"))
+            .env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", "2")
+            .env("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS", "1")
+            .output()
+            .unwrap();
+        // Reaching backend construction with a non-divisible draw count (3
+        // draws, 2 workers) proves the free mode has no lockstep divisibility
+        // requirement before it fails on the missing CUDA feature.
+        assert!(!free_unavailable.status.success());
+        assert!(
+            String::from_utf8_lossy(&free_unavailable.stderr).contains("cuda backend unavailable"),
+            "{}",
+            String::from_utf8_lossy(&free_unavailable.stderr)
         );
     }
     std::fs::remove_dir_all(temp).unwrap();

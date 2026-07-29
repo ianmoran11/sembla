@@ -3,7 +3,8 @@
 
 This is an evidence spike, not a production concurrency interface. It drives the
 hidden SEMBLA_SWEEP_SPIKE_DRAW_WORKERS seam and optional synchronized CUDA
-non-blocking-stream mode, keeps timing outside scientific output directories,
+non-blocking-stream, free-running CUDA non-blocking-stream, or fused grid-y
+modes, keeps timing outside scientific output directories,
 captures resource samples, compares every output byte, and proves the comparator
 with one deliberate perturbation.
 """
@@ -25,6 +26,7 @@ from typing import Any
 SCHEMA = "sembla-sweep-concurrency-spike/v1"
 WORKERS_ENV = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS"
 CUDA_LOCKSTEP_ENV = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"
+CUDA_FREE_ENV = "SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS"
 CUDA_FUSED_ENV = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS"
 
 
@@ -161,6 +163,10 @@ def run_arm(
         environment[CUDA_LOCKSTEP_ENV] = "1"
     else:
         environment.pop(CUDA_LOCKSTEP_ENV, None)
+    if args.cuda_free_streams and workers > 1:
+        environment[CUDA_FREE_ENV] = "1"
+    else:
+        environment.pop(CUDA_FREE_ENV, None)
     eval_threads = None
     if args.backend == "cpu":
         if args.cpu_total_threads is None:
@@ -187,6 +193,7 @@ def run_arm(
         "arm_kind": "sequential-reference" if sequential_reference else "candidate",
         "eval_threads_per_draw": eval_threads,
         "cuda_lockstep_streams": args.cuda_lockstep_streams and workers > 1,
+        "cuda_free_streams": args.cuda_free_streams and workers > 1,
         "cuda_fused_grid_y": args.cuda_fused_grid_y and not sequential_reference,
         "requested_fused_capacity": (
             workers if args.cuda_fused_grid_y and not sequential_reference else None
@@ -252,6 +259,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--params", type=Path)
     parser.add_argument("--export-pairs", action="store_true")
     parser.add_argument("--cuda-lockstep-streams", action="store_true")
+    parser.add_argument("--cuda-free-streams", action="store_true")
     parser.add_argument("--cuda-fused-grid-y", action="store_true")
     parser.add_argument("--enable", action="append", default=[])
     args = parser.parse_args()
@@ -269,6 +277,12 @@ def parse_args() -> argparse.Namespace:
         parser.error("--cpu-total-threads is required for --backend cpu")
     if args.cuda_lockstep_streams and args.cuda_fused_grid_y:
         parser.error("--cuda-lockstep-streams conflicts with --cuda-fused-grid-y")
+    if args.cuda_free_streams and args.cuda_lockstep_streams:
+        parser.error("--cuda-free-streams conflicts with --cuda-lockstep-streams")
+    if args.cuda_free_streams and args.cuda_fused_grid_y:
+        parser.error("--cuda-free-streams conflicts with --cuda-fused-grid-y")
+    if args.cuda_free_streams and args.backend != "cuda":
+        parser.error("--cuda-free-streams requires --backend cuda")
     if args.cuda_fused_grid_y and args.backend != "cuda":
         parser.error("--cuda-fused-grid-y requires --backend cuda")
     if args.cuda_fused_grid_y and any(workers not in (1, 2, 4) for workers in args.workers):
@@ -322,6 +336,7 @@ def main() -> int:
         "repetitions": args.repetitions,
         "cpu_total_threads": args.cpu_total_threads,
         "cuda_lockstep_streams": args.cuda_lockstep_streams,
+        "cuda_free_streams": args.cuda_free_streams,
         "cuda_fused_grid_y": args.cuda_fused_grid_y,
         "enabled_features": args.enable,
         "runs": [],

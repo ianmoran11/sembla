@@ -369,9 +369,24 @@ The outcome is recorded independently for CPU and CUDA as one of:
 
 Do not choose a universal worker count or an `auto` policy from one scale.
 The complete-backend/default-stream, complete-backend/lockstep-stream, and
-fused grid-y CUDA mechanisms are all negative and closed. No measured CUDA
-concurrent-draw design advances to a numbered PRD. CPU Gate 1 remains separate
-and open.
+fused grid-y CUDA mechanisms are all negative and closed. One quadrant remains
+untested: **free-running non-blocking streams**. The completed experiments
+covered default-stream independent scheduling (kernels serialized, host
+pipelining helped) and lockstep non-blocking streams (real overlap but
+tick-barrier gaps made it slower), but never independent scheduling *on*
+non-blocking streams. The hidden `SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS=1`
+spike fills that quadrant: each lane constructs, uses, and drops an isolated
+retained `CudaBackend::new_nonblocking_stream` on its worker thread, draws are
+claimed dynamically with no tick barriers, and publication stays ascending `k`.
+It is default-off Gate-1 evidence code, mutually exclusive with the lockstep
+and fused controls, imposes no draw-count divisibility requirement, and keeps
+the draw-zero delay seam for completion-inversion checks. Its timing record
+uses `execution_mode = "cuda-free-nonblocking-streams"`. Drive it with the
+collector's `--cuda-free-streams` flag under the same workers 1/2/4, three
+repetitions, exact-parity, negative-control, and Nsight protocol as the other
+CUDA arms. No measured CUDA concurrent-draw design advances to a numbered PRD
+yet; this is the last scheduling/stream quadrant before the CUDA track is
+fully closed. CPU Gate 1 remains separate and open.
 
 ### Binding contract for future PRDs
 

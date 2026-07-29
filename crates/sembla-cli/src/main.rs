@@ -1672,7 +1672,20 @@ fn params_from_theta_assignment(
 const SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV: &str = "SEMBLA_SWEEP_SPIKE_DRAW_WORKERS";
 const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS";
 const SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS";
+const SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS";
 const SWEEP_CUDA_FUSED_DRAWS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SweepConcurrencyMode {
+    /// Isolated retained backends on default streams, dynamically scheduled.
+    IndependentDefaultStreams,
+    /// Isolated retained backends on non-blocking streams with tick barriers.
+    CudaLockstepNonblocking,
+    /// Isolated retained backends on non-blocking streams, dynamically
+    /// scheduled with no tick barriers: lanes advance as fast as their own
+    /// readbacks complete.
+    CudaFreeNonblocking,
+}
 
 #[derive(Clone)]
 struct SweepPreparedDraw {
@@ -1730,37 +1743,65 @@ fn sweep_concurrency_spike_workers(
     Ok(workers)
 }
 
-fn sweep_concurrency_spike_cuda_lockstep(
+fn sweep_concurrency_mode(
     draw_count: u32,
     workers: usize,
     backend: BackendSelection,
-) -> Result<bool, String> {
-    let Some(raw) = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV) else {
-        return Ok(false);
-    };
-    let raw = raw.to_string_lossy();
-    if raw != "1" {
+) -> Result<SweepConcurrencyMode, String> {
+    let lockstep_raw = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV);
+    let free_raw = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV);
+    if lockstep_raw.is_some() && free_raw.is_some() {
         return Err(format!(
-            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV} must be 1 when set, found '{raw}'"
+            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV} and {SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV} are mutually exclusive"
         ));
     }
-    if backend != BackendSelection::Cuda {
-        return Err(format!(
-            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}=1 requires --backend cuda"
-        ));
+    if let Some(raw) = free_raw {
+        let raw = raw.to_string_lossy();
+        if raw != "1" {
+            return Err(format!(
+                "{SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV} must be 1 when set, found '{raw}'"
+            ));
+        }
+        if backend != BackendSelection::Cuda {
+            return Err(format!(
+                "{SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV}=1 requires --backend cuda"
+            ));
+        }
+        if workers <= 1 {
+            return Err(format!(
+                "{SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV}=1 requires {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
+            ));
+        }
+        // Dynamic scheduling claims draws one at a time, so uneven draw counts
+        // are fine; no lockstep divisibility requirement applies.
+        return Ok(SweepConcurrencyMode::CudaFreeNonblocking);
     }
-    if workers <= 1 {
-        return Err(format!(
-            "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}=1 requires {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
-        ));
+    if let Some(raw) = lockstep_raw {
+        let raw = raw.to_string_lossy();
+        if raw != "1" {
+            return Err(format!(
+                "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV} must be 1 when set, found '{raw}'"
+            ));
+        }
+        if backend != BackendSelection::Cuda {
+            return Err(format!(
+                "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}=1 requires --backend cuda"
+            ));
+        }
+        if workers <= 1 {
+            return Err(format!(
+                "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}=1 requires {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
+            ));
+        }
+        let draw_count = usize::try_from(draw_count).expect("draw count is u32");
+        if draw_count % workers != 0 {
+            return Err(format!(
+                "lockstep CUDA spike requires draw count {draw_count} to be divisible by worker count {workers}"
+            ));
+        }
+        return Ok(SweepConcurrencyMode::CudaLockstepNonblocking);
     }
-    let draw_count = usize::try_from(draw_count).expect("draw count is u32");
-    if draw_count % workers != 0 {
-        return Err(format!(
-            "lockstep CUDA spike requires draw count {draw_count} to be divisible by worker count {workers}"
-        ));
-    }
-    Ok(true)
+    Ok(SweepConcurrencyMode::IndependentDefaultStreams)
 }
 
 fn sweep_cuda_fused_draw_capacity(backend: BackendSelection) -> Result<Option<usize>, String> {
@@ -1782,10 +1823,11 @@ fn sweep_cuda_fused_draw_capacity(backend: BackendSelection) -> Result<Option<us
         ));
     }
     if std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV).is_some()
+        || std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV).is_some()
         || std::env::var_os(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV).is_some()
     {
         return Err(format!(
-            "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with the lockstep-stream and draw-delay spike controls"
+            "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with the lockstep-stream, free-stream, and draw-delay spike controls"
         ));
     }
     Ok(Some(capacity))
@@ -1811,7 +1853,7 @@ fn run_concurrent_sweep_spike(
     options: &SweepOptions,
     workers: usize,
     prepared: &[SweepPreparedDraw],
-    cuda_lockstep: bool,
+    mode: SweepConcurrencyMode,
 ) -> Result<SweepConcurrentExecution, String> {
     let setup_started = Instant::now();
     let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
@@ -1845,7 +1887,7 @@ fn run_concurrent_sweep_spike(
                                     construction_params,
                                     options.seed,
                                     options.backend,
-                                    cuda_lockstep,
+                                    mode,
                                 )?;
                                 let identity = backend.identity();
                                 Ok((identity, backend))
@@ -1877,7 +1919,7 @@ fn run_concurrent_sweep_spike(
                             .get()
                             .expect("coordinator sets execution start before release");
                         let mut completed = Vec::new();
-                        if cuda_lockstep {
+                        if mode == SweepConcurrencyMode::CudaLockstepNonblocking {
                             for index in (lane..prepared.len()).step_by(workers) {
                                 let draw = &prepared[index];
                                 let start_offset = execution_started.elapsed();
@@ -2358,8 +2400,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     };
     let fused_capacity = sweep_cuda_fused_draw_capacity(options.backend)?;
     let draw_workers = sweep_concurrency_spike_workers(draw_count, options.backend)?;
-    let cuda_lockstep =
-        sweep_concurrency_spike_cuda_lockstep(draw_count, draw_workers, options.backend)?;
+    let concurrency_mode = sweep_concurrency_mode(draw_count, draw_workers, options.backend)?;
     if fused_capacity.is_some() && draw_workers != 1 {
         return Err(format!(
             "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
@@ -2665,15 +2706,23 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             )?);
         }
     } else {
-        if cuda_lockstep {
-            eprintln!(
-                "EXPERIMENTAL CUDA lockstep-stream spike: {draw_workers} draw lanes on non-blocking streams; default sweep behavior remains sequential"
-            );
-        } else {
-            eprintln!(
-                "EXPERIMENTAL sweep concurrency spike: {draw_workers} isolated {:?} backends; default sweep behavior remains sequential",
-                options.backend
-            );
+        match concurrency_mode {
+            SweepConcurrencyMode::CudaLockstepNonblocking => {
+                eprintln!(
+                    "EXPERIMENTAL CUDA lockstep-stream spike: {draw_workers} draw lanes on non-blocking streams; default sweep behavior remains sequential"
+                );
+            }
+            SweepConcurrencyMode::CudaFreeNonblocking => {
+                eprintln!(
+                    "EXPERIMENTAL CUDA free-running non-blocking-stream spike: {draw_workers} draw lanes on non-blocking streams without tick barriers; default sweep behavior remains sequential"
+                );
+            }
+            SweepConcurrencyMode::IndependentDefaultStreams => {
+                eprintln!(
+                    "EXPERIMENTAL sweep concurrency spike: {draw_workers} isolated {:?} backends; default sweep behavior remains sequential",
+                    options.backend
+                );
+            }
         }
         let mut prepared = Vec::with_capacity(draw_count as usize);
         for draw in 0..draw_count {
@@ -2712,7 +2761,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             &options,
             draw_workers,
             &prepared,
-            cuda_lockstep,
+            concurrency_mode,
         )?;
         setup_elapsed = concurrent.setup_elapsed;
         run_manifest.backend_identity = Some(concurrent.identity);
@@ -2817,10 +2866,12 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 ticks_per_draw: options.ticks,
                 requested_draw_workers: draw_workers,
                 effective_draw_workers: draw_workers,
-                execution_mode: if cuda_lockstep {
-                    "cuda-lockstep-nonblocking-streams"
-                } else {
-                    "independent-backends"
+                execution_mode: match concurrency_mode {
+                    SweepConcurrencyMode::CudaLockstepNonblocking => {
+                        "cuda-lockstep-nonblocking-streams"
+                    }
+                    SweepConcurrencyMode::CudaFreeNonblocking => "cuda-free-nonblocking-streams",
+                    SweepConcurrencyMode::IndependentDefaultStreams => "independent-backends",
                 },
                 setup_wall_time_ms: duration_ms(setup_elapsed),
                 execution_window_wall_time_ms: duration_ms(execution_window),
@@ -3282,9 +3333,9 @@ impl SweepBackend {
         initial_params: &ParamEnv,
         seed: u64,
         backend: BackendSelection,
-        cuda_lockstep: bool,
+        mode: SweepConcurrencyMode,
     ) -> Result<Self, String> {
-        if !cuda_lockstep {
+        if mode == SweepConcurrencyMode::IndependentDefaultStreams {
             return Self::new(model, initial, initial_params, seed, backend);
         }
         #[cfg(test)]
@@ -3314,7 +3365,7 @@ impl SweepBackend {
                 }
             }
             BackendSelection::Cpu => {
-                Err("CUDA lockstep-stream spike requires --backend cuda".to_owned())
+                Err("CUDA non-blocking-stream spike requires --backend cuda".to_owned())
             }
         }
     }
