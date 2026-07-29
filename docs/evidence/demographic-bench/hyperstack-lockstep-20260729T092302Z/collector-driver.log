@@ -1,0 +1,1023 @@
+Waiting up to 4 minutes for tailnet node sembla-bench to appear.
+It joins part-way through cloud-init, so it is not there yet on a fresh VM.
+Found tailnet node sembla-bench at 100.98.230.11; using it instead of the public IP.
+Transport: tailnet (100.98.230.11). Survives an egress-IP change.
+Evidence push: enabled; artifacts will also land on an evidence/<UTC> branch.
+started benchmark as PID 22713
+Benchmark running detached on ubuntu@100.98.230.11. Polling until it finishes.
+A dropped connection is harmless: re-run this script to rejoin.
+   Compiling sembla-runtime v0.3.0 (/home/ubuntu/sembla/crates/sembla-runtime)
+PASS: output trees identical; evidence: /home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/summary.json
+PASS: output trees identical; evidence: /home/ubuntu/demographic-bench/sweep-concurrency/1000000/cuda/summary.json
+Evidence was pushed to branch: evidence/hyperstack-20260729T093114Z
+It is retrievable with 'git fetch origin evidence/hyperstack-20260729T093114Z' from anywhere,
+independently of this session surviving.
+Transferred artifact checksums verified.
+Destroying the VM.
+[0m[1mdata.hyperstack_core_environments.available[0]: Reading...[0m[0m
+[0m[1mdata.hyperstack_core_regions.available[0]: Reading...[0m[0m
+[0m[1mdata.hyperstack_core_flavors.available[0]: Reading...[0m[0m
+[0m[1mdata.hyperstack_core_images.available[0]: Reading...[0m[0m
+[0m[1mdata.hyperstack_core_keypairs.available[0]: Reading...[0m[0m
+[0m[1mdata.hyperstack_core_stocks.available[0]: Reading...[0m[0m
+[0m[1mdata.hyperstack_core_environments.available[0]: Read complete after 1s[0m
+[0m[1mdata.hyperstack_core_regions.available[0]: Read complete after 1s[0m
+[0m[1mdata.hyperstack_core_keypairs.available[0]: Read complete after 1s[0m
+[0m[1mdata.hyperstack_core_stocks.available[0]: Read complete after 1s[0m
+[0m[1mdata.hyperstack_core_images.available[0]: Read complete after 1s[0m
+[0m[1mdata.hyperstack_core_flavors.available[0]: Read complete after 2s[0m
+[0m[1mhyperstack_core_virtual_machine.gpu[0]: Refreshing state... [name=sembla-precision-00f0374f368b][0m
+[0m[1mhyperstack_core_virtual_machine_sg_rule.ssh[0]: Refreshing state...[0m
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  [31m-[0m destroy[0m
+
+Terraform will perform the following actions:
+
+[1m  # hyperstack_core_virtual_machine.gpu[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "hyperstack_core_virtual_machine" "gpu" {
+      [31m-[0m[0m assign_floating_ip        = true [90m-> null[0m[0m
+      [31m-[0m[0m create_bootable_volume    = false [90m-> null[0m[0m
+      [31m-[0m[0m created_at                = "2026-07-29 09:19:39 +0000 UTC" [90m-> null[0m[0m
+      [31m-[0m[0m enable_port_randomization = false [90m-> null[0m[0m
+      [31m-[0m[0m environment               = {
+          [31m-[0m[0m features = {
+              [31m-[0m[0m green_status      = "GREEN" [90m-> null[0m[0m
+              [31m-[0m[0m network_optimised = true [90m-> null[0m[0m
+            } [90m-> null[0m[0m
+          [31m-[0m[0m id       = 99172 [90m-> null[0m[0m
+          [31m-[0m[0m name     = "default-CANADA-1" [90m-> null[0m[0m
+          [31m-[0m[0m org_id   = 28979 [90m-> null[0m[0m
+          [31m-[0m[0m region   = "CANADA-1" [90m-> null[0m[0m
+        } [90m-> null[0m[0m
+      [31m-[0m[0m environment_name          = "default-CANADA-1" [90m-> null[0m[0m
+      [31m-[0m[0m fixed_ip                  = "10.0.0.251" [90m-> null[0m[0m
+      [31m-[0m[0m flavor                    = {
+          [31m-[0m[0m cpu       = 28 [90m-> null[0m[0m
+          [31m-[0m[0m disk      = 100 [90m-> null[0m[0m
+          [31m-[0m[0m ephemeral = 750 [90m-> null[0m[0m
+          [31m-[0m[0m gpu       = "H100-80G-PCIe-spot" [90m-> null[0m[0m
+          [31m-[0m[0m gpu_count = 1 [90m-> null[0m[0m
+          [31m-[0m[0m id        = 165 [90m-> null[0m[0m
+          [31m-[0m[0m labels    = [
+              [31m-[0m[0m {
+                  [31m-[0m[0m id    = 19317 [90m-> null[0m[0m
+                  [31m-[0m[0m label = "local-storage-only" [90m-> null[0m[0m
+                },
+              [31m-[0m[0m {
+                  [31m-[0m[0m id    = 19318 [90m-> null[0m[0m
+                  [31m-[0m[0m label = "no-hibernation" [90m-> null[0m[0m
+                },
+              [31m-[0m[0m {
+                  [31m-[0m[0m id    = 19319 [90m-> null[0m[0m
+                  [31m-[0m[0m label = "no-snapshot" [90m-> null[0m[0m
+                },
+            ] [90m-> null[0m[0m
+          [31m-[0m[0m name      = "n3-H100x1-spot" [90m-> null[0m[0m
+          [31m-[0m[0m ram       = 180 [90m-> null[0m[0m
+        } [90m-> null[0m[0m
+      [31m-[0m[0m flavor_name               = "n3-H100x1-spot" [90m-> null[0m[0m
+      [31m-[0m[0m floating_ip               = "185.216.20.101" [90m-> null[0m[0m
+      [31m-[0m[0m floating_ip_status        = "ATTACHED" [90m-> null[0m[0m
+      [31m-[0m[0m id                        = 952659 [90m-> null[0m[0m
+      [31m-[0m[0m image                     = {
+          [31m-[0m[0m name = "Ubuntu Server 22.04 LTS R570 CUDA 12.8" [90m-> null[0m[0m
+        } [90m-> null[0m[0m
+      [31m-[0m[0m image_name                = "Ubuntu Server 22.04 LTS R570 CUDA 12.8" [90m-> null[0m[0m
+      [31m-[0m[0m key_name                  = "sembla-hyperstack" [90m-> null[0m[0m
+      [31m-[0m[0m keypair                   = {
+          [31m-[0m[0m name = "sembla-hyperstack" [90m-> null[0m[0m
+        } [90m-> null[0m[0m
+      [31m-[0m[0m labels                    = [] [90m-> null[0m[0m
+      [31m-[0m[0m locked                    = false [90m-> null[0m[0m
+      [31m-[0m[0m name                      = "sembla-precision-00f0374f368b" [90m-> null[0m[0m
+      [31m-[0m[0m os                        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8" [90m-> null[0m[0m
+      [31m-[0m[0m power_state               = "RUNNING" [90m-> null[0m[0m
+      [31m-[0m[0m security_rules            = [
+          [31m-[0m[0m {
+              [31m-[0m[0m created_at         = "2026-07-29 09:22:34 +0000 UTC" [90m-> null[0m[0m
+              [31m-[0m[0m direction          = "ingress" [90m-> null[0m[0m
+              [31m-[0m[0m ethertype          = "IPv4" [90m-> null[0m[0m
+              [31m-[0m[0m id                 = 3084265 [90m-> null[0m[0m
+              [31m-[0m[0m port_range_max     = 22 [90m-> null[0m[0m
+              [31m-[0m[0m port_range_min     = 22 [90m-> null[0m[0m
+              [31m-[0m[0m protocol           = "tcp" [90m-> null[0m[0m
+              [31m-[0m[0m remote_ip_prefix   = "220.244.0.146/32" [90m-> null[0m[0m
+              [31m-[0m[0m status             = "SUCCESS" [90m-> null[0m[0m
+              [31m-[0m[0m virtual_machine_id = 952659 [90m-> null[0m[0m
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m created_at         = "2026-07-29 09:22:40 +0000 UTC" [90m-> null[0m[0m
+              [31m-[0m[0m direction          = "egress" [90m-> null[0m[0m
+              [31m-[0m[0m ethertype          = "IPv4" [90m-> null[0m[0m
+              [31m-[0m[0m id                 = 3084266 [90m-> null[0m[0m
+              [31m-[0m[0m port_range_max     = 65535 [90m-> null[0m[0m
+              [31m-[0m[0m port_range_min     = 1 [90m-> null[0m[0m
+              [31m-[0m[0m protocol           = "any" [90m-> null[0m[0m
+              [31m-[0m[0m remote_ip_prefix   = "0.0.0.0/0" [90m-> null[0m[0m
+              [31m-[0m[0m status             = "SUCCESS" [90m-> null[0m[0m
+              [31m-[0m[0m virtual_machine_id = 952659 [90m-> null[0m[0m
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m created_at         = "2026-07-29 09:22:40 +0000 UTC" [90m-> null[0m[0m
+              [31m-[0m[0m direction          = "egress" [90m-> null[0m[0m
+              [31m-[0m[0m ethertype          = "IPv6" [90m-> null[0m[0m
+              [31m-[0m[0m id                 = 3084267 [90m-> null[0m[0m
+              [31m-[0m[0m port_range_max     = 65535 [90m-> null[0m[0m
+              [31m-[0m[0m port_range_min     = 1 [90m-> null[0m[0m
+              [31m-[0m[0m protocol           = "any" [90m-> null[0m[0m
+              [31m-[0m[0m remote_ip_prefix   = "0.0.0.0/0" [90m-> null[0m[0m
+              [31m-[0m[0m status             = "SUCCESS" [90m-> null[0m[0m
+              [31m-[0m[0m virtual_machine_id = 952659 [90m-> null[0m[0m
+            },
+        ] [90m-> null[0m[0m
+      [31m-[0m[0m status                    = "ACTIVE" [90m-> null[0m[0m
+      [31m-[0m[0m user_data                 = (sensitive value) [90m-> null[0m[0m
+      [31m-[0m[0m vm_state                  = "active" [90m-> null[0m[0m
+      [31m-[0m[0m volume_attachments        = [] [90m-> null[0m[0m
+    }
+
+[1m  # hyperstack_core_virtual_machine_sg_rule.ssh[0][0m will be [1m[31mdestroyed[0m
+[0m  [31m-[0m[0m resource "hyperstack_core_virtual_machine_sg_rule" "ssh" {
+      [31m-[0m[0m created_at         = "2026-07-29 09:22:34 +0000 UTC" [90m-> null[0m[0m
+      [31m-[0m[0m direction          = "ingress" [90m-> null[0m[0m
+      [31m-[0m[0m ethertype          = "IPv4" [90m-> null[0m[0m
+      [31m-[0m[0m id                 = 3084265 [90m-> null[0m[0m
+      [31m-[0m[0m port_range_max     = 22 [90m-> null[0m[0m
+      [31m-[0m[0m port_range_min     = 22 [90m-> null[0m[0m
+      [31m-[0m[0m protocol           = "tcp" [90m-> null[0m[0m
+      [31m-[0m[0m remote_ip_prefix   = "220.244.0.146/32" [90m-> null[0m[0m
+      [31m-[0m[0m status             = "SUCCESS" [90m-> null[0m[0m
+      [31m-[0m[0m virtual_machine_id = 952659 [90m-> null[0m[0m
+    }
+
+[1mPlan:[0m 0 to add, 0 to change, 2 to destroy.
+[0m
+Changes to Outputs:
+  [31m-[0m[0m billing_warning  = "Hyperstack ACTIVE and SHUTOFF VMs continue billing. Retrieve all artifacts, then terraform destroy immediately. Guest poweroff is not a billing control." [90m-> null[0m[0m
+  [31m-[0m[0m discovery        = {
+      [31m-[0m[0m environments       = [
+          [31m-[0m[0m {
+              [31m-[0m[0m id     = 99171
+              [31m-[0m[0m name   = "default-NORWAY-1"
+              [31m-[0m[0m region = "NORWAY-1"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m id     = 99172
+              [31m-[0m[0m name   = "default-CANADA-1"
+              [31m-[0m[0m region = "CANADA-1"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m id     = 99174
+              [31m-[0m[0m name   = "default-CANADA-2"
+              [31m-[0m[0m region = "CANADA-2"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m id     = 99173
+              [31m-[0m[0m name   = "default-US-1"
+              [31m-[0m[0m region = "US-1"
+            },
+        ]
+      [31m-[0m[0m full_rate_flavors  = [
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 112
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-SXM5"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 235
+              [31m-[0m[0m name            = "n3-H100-SXM5x8"
+              [31m-[0m[0m ram             = 1880
+              [31m-[0m[0m region_name     = "CANADA-2"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 176
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H200-141G-SXM5"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 146
+              [31m-[0m[0m name            = "n3-H200-SXM5x8"
+              [31m-[0m[0m ram             = 1800
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 192
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-SXM5"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 118
+              [31m-[0m[0m name            = "n3-H100-SXM5x8"
+              [31m-[0m[0m ram             = 1800
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 192
+              [31m-[0m[0m disk            = 32100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-SXM5"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 228
+              [31m-[0m[0m name            = "n3-H100-SXM5x8-bigroot"
+              [31m-[0m[0m ram             = 1800
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 192
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-SXM5"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 144
+              [31m-[0m[0m name            = "n3-H100-SXM5x8"
+              [31m-[0m[0m ram             = 960
+              [31m-[0m[0m region_name     = "US-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 192
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-SXM4"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 163
+              [31m-[0m[0m name            = "n3-A100-SXM4x8"
+              [31m-[0m[0m ram             = 960
+              [31m-[0m[0m region_name     = "US-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-NVLink"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 115
+              [31m-[0m[0m name            = "n3-H100x8-NVLink"
+              [31m-[0m[0m ram             = 1440
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 6600
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-NVLink"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 227
+              [31m-[0m[0m name            = "n3-H100x8-NVLink-bigroot"
+              [31m-[0m[0m ram             = 1440
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe-NVLink"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 121
+              [31m-[0m[0m name            = "n3-A100x8-NVLink"
+              [31m-[0m[0m ram             = 1920
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-NVLink-spot"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 239
+              [31m-[0m[0m name            = "n3-H100x8-NVLink-spot"
+              [31m-[0m[0m ram             = 1440
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 28
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 1
+              [31m-[0m[0m id              = 95
+              [31m-[0m[0m name            = "n3-H100x1"
+              [31m-[0m[0m ram             = 180
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 28
+              [31m-[0m[0m disk            = 850
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 1
+              [31m-[0m[0m id              = 219
+              [31m-[0m[0m name            = "n3-H100x1-bigroot"
+              [31m-[0m[0m ram             = 180
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 60
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 2
+              [31m-[0m[0m id              = 96
+              [31m-[0m[0m name            = "n3-H100x2"
+              [31m-[0m[0m ram             = 360
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 60
+              [31m-[0m[0m disk            = 1600
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 2
+              [31m-[0m[0m id              = 221
+              [31m-[0m[0m name            = "n3-H100x2-bigroot"
+              [31m-[0m[0m ram             = 360
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 124
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 4
+              [31m-[0m[0m id              = 97
+              [31m-[0m[0m name            = "n3-H100x4"
+              [31m-[0m[0m ram             = 720
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 124
+              [31m-[0m[0m disk            = 3300
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 4
+              [31m-[0m[0m id              = 223
+              [31m-[0m[0m name            = "n3-H100x4-bigroot"
+              [31m-[0m[0m ram             = 720
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 98
+              [31m-[0m[0m name            = "n3-H100x8"
+              [31m-[0m[0m ram             = 1440
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 6600
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 225
+              [31m-[0m[0m name            = "n3-H100x8-bigroot"
+              [31m-[0m[0m ram             = 1440
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 28
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 1
+              [31m-[0m[0m id              = 100
+              [31m-[0m[0m name            = "n3-A100x1"
+              [31m-[0m[0m ram             = 120
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 60
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 2
+              [31m-[0m[0m id              = 101
+              [31m-[0m[0m name            = "n3-A100x2"
+              [31m-[0m[0m ram             = 240
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 124
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 4
+              [31m-[0m[0m id              = 102
+              [31m-[0m[0m name            = "n3-A100x4"
+              [31m-[0m[0m ram             = 480
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 103
+              [31m-[0m[0m name            = "n3-A100x8"
+              [31m-[0m[0m ram             = 960
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 28
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 1
+              [31m-[0m[0m id              = 147
+              [31m-[0m[0m name            = "n3-A100x1-spot"
+              [31m-[0m[0m ram             = 120
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 60
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 2
+              [31m-[0m[0m id              = 148
+              [31m-[0m[0m name            = "n3-A100x2-spot"
+              [31m-[0m[0m ram             = 240
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 124
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 4
+              [31m-[0m[0m id              = 149
+              [31m-[0m[0m name            = "n3-A100x4-spot"
+              [31m-[0m[0m ram             = 480
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "A100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 150
+              [31m-[0m[0m name            = "n3-A100x8-spot"
+              [31m-[0m[0m ram             = 960
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = false
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 28
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 1
+              [31m-[0m[0m id              = 165
+              [31m-[0m[0m name            = "n3-H100x1-spot"
+              [31m-[0m[0m ram             = 180
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 60
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 2
+              [31m-[0m[0m id              = 166
+              [31m-[0m[0m name            = "n3-H100x2-spot"
+              [31m-[0m[0m ram             = 360
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 124
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 4
+              [31m-[0m[0m id              = 167
+              [31m-[0m[0m name            = "n3-H100x4-spot"
+              [31m-[0m[0m ram             = 720
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m cpu             = 252
+              [31m-[0m[0m disk            = 100
+              [31m-[0m[0m display_name    = ""
+              [31m-[0m[0m gpu             = "H100-80G-PCIe-spot"
+              [31m-[0m[0m gpu_count       = 8
+              [31m-[0m[0m id              = 168
+              [31m-[0m[0m name            = "n3-H100x8-spot"
+              [31m-[0m[0m ram             = 1440
+              [31m-[0m[0m region_name     = "CANADA-1"
+              [31m-[0m[0m stock_available = true
+            },
+        ]
+      [31m-[0m[0m keypairs           = [
+          [31m-[0m[0m {
+              [31m-[0m[0m environment = "default-NORWAY-1"
+              [31m-[0m[0m fingerprint = "27:e5:03:5d:94:90:aa:fc:db:19:95:d2:28:c6:44:b6"
+              [31m-[0m[0m id          = 62839
+              [31m-[0m[0m name        = "sembla-hyperstack"
+              [31m-[0m[0m region      = [90mnull[0m[0m
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m environment = "default-CANADA-1"
+              [31m-[0m[0m fingerprint = "27:e5:03:5d:94:90:aa:fc:db:19:95:d2:28:c6:44:b6"
+              [31m-[0m[0m id          = 62849
+              [31m-[0m[0m name        = "sembla-hyperstack"
+              [31m-[0m[0m region      = [90mnull[0m[0m
+            },
+        ]
+      [31m-[0m[0m regions            = [
+          [31m-[0m[0m {
+              [31m-[0m[0m description = "CANADA-2 region"
+              [31m-[0m[0m id          = 5
+              [31m-[0m[0m name        = "CANADA-2"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = [90mnull[0m[0m
+              [31m-[0m[0m id          = 2
+              [31m-[0m[0m name        = "CANADA-1"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = [90mnull[0m[0m
+              [31m-[0m[0m id          = 1
+              [31m-[0m[0m name        = "NORWAY-1"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = [90mnull[0m[0m
+              [31m-[0m[0m id          = 3
+              [31m-[0m[0m name        = "US-1"
+            },
+        ]
+      [31m-[0m[0m stock              = [
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "0"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 0
+                }
+              [31m-[0m[0m model          = "A100-80G-PCIe"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "8"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 2
+                }
+              [31m-[0m[0m model          = "H100-80G-PCIe-NVLink"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "50+"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 57
+                  [31m-[0m[0m n2x  = 26
+                  [31m-[0m[0m n4x  = 9
+                  [31m-[0m[0m n8x  = 3
+                }
+              [31m-[0m[0m model          = "H100-80G-PCIe-spot"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "50+"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 7
+                }
+              [31m-[0m[0m model          = "H100-80G-PCIe-NVLink-spot"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "0"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 0
+                }
+              [31m-[0m[0m model          = "A100-80G-PCIe-NVLink"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "0"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 0
+                }
+              [31m-[0m[0m model          = "H200-141G-SXM5"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "10+"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 4
+                }
+              [31m-[0m[0m model          = "H100-80G-SXM5"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "0"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 0
+                }
+              [31m-[0m[0m model          = "H100-80G-PCIe"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "0"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 0
+                }
+              [31m-[0m[0m model          = "A100-80G-PCIe-spot"
+              [31m-[0m[0m region         = "CANADA-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "0"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 0
+                }
+              [31m-[0m[0m model          = "A100-80G-SXM4"
+              [31m-[0m[0m region         = "US-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m available      = "8"
+              [31m-[0m[0m configurations = {
+                  [31m-[0m[0m n10x = 0
+                  [31m-[0m[0m n1x  = 0
+                  [31m-[0m[0m n2x  = 0
+                  [31m-[0m[0m n4x  = 0
+                  [31m-[0m[0m n8x  = 1
+                }
+              [31m-[0m[0m model          = "H100-80G-SXM5"
+              [31m-[0m[0m region         = "US-1"
+              [31m-[0m[0m stocktype      = "GPU"
+            },
+        ]
+      [31m-[0m[0m ubuntu_cuda_images = [
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 1243
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "CANADA-2"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 1242
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "CANADA-2"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 1241
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "CANADA-2"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 1240
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "CANADA-2"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 175
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R535 CUDA 12.2 with Docker"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R535 CUDA 12.2 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 517
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 516
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 515
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 514
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 299
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R550 CUDA 12.4 with Docker"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R550 CUDA 12.4 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 298
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R550 CUDA 12.4"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R550 CUDA 12.4"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 29
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R535 CUDA 12.2"
+              [31m-[0m[0m region_name = "CANADA-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R535 CUDA 12.2"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 225
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R535 CUDA 12.2 with Docker"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R535 CUDA 12.2 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 522
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 521
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 519
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 518
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 297
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R550 CUDA 12.4 with Docker"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R550 CUDA 12.4 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 296
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R550 CUDA 12.4"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R550 CUDA 12.4"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 226
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R535 CUDA 12.2"
+              [31m-[0m[0m region_name = "NORWAY-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R535 CUDA 12.2"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 300
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R535 CUDA 12.2 with Docker"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R535 CUDA 12.2 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 526
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 525
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 24.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 24.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 524
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8 with Docker"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 523
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R570 CUDA 12.8"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R570 CUDA 12.8"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 289
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R550 CUDA 12.4 with Docker"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R550 CUDA 12.4 with Docker"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 288
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R550 CUDA 12.4"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R550 CUDA 12.4"
+            },
+          [31m-[0m[0m {
+              [31m-[0m[0m description = ""
+              [31m-[0m[0m id          = 287
+              [31m-[0m[0m is_public   = true
+              [31m-[0m[0m name        = "Ubuntu Server 22.04 LTS R535 CUDA 12.2"
+              [31m-[0m[0m region_name = "US-1"
+              [31m-[0m[0m type        = "Ubuntu"
+              [31m-[0m[0m version     = "Server 22.04 LTS R535 CUDA 12.2"
+            },
+        ]
+    } [90m-> null[0m[0m
+  [31m-[0m[0m instance_id      = 952659 [90m-> null[0m[0m
+  [31m-[0m[0m public_ip        = "185.216.20.101" [90m-> null[0m[0m
+  [31m-[0m[0m selected_profile = {
+      [31m-[0m[0m environment               = "default-CANADA-1"
+      [31m-[0m[0m expected_gpu              = "H100"
+      [31m-[0m[0m expected_gpu_count        = 1
+      [31m-[0m[0m expected_hourly_price_usd = 2.00672043
+      [31m-[0m[0m flavor                    = "n3-H100x1-spot"
+      [31m-[0m[0m image                     = "Ubuntu Server 22.04 LTS R570 CUDA 12.8"
+      [31m-[0m[0m max_hourly_price_usd      = 5
+      [31m-[0m[0m provider                  = "hyperstack"
+      [31m-[0m[0m region                    = "CANADA-1"
+      [31m-[0m[0m repository_ref            = "645bb7c2b8da9be063ee48470a440dee29964408"
+      [31m-[0m[0m requested_fp64_class      = "full-rate"
+      [31m-[0m[0m ssh_cidr                  = "220.244.0.146/32"
+    } [90m-> null[0m[0m
+  [31m-[0m[0m ssh_command      = "ssh ubuntu@185.216.20.101" [90m-> null[0m[0m
+  [31m-[0m[0m ssh_user         = "ubuntu" [90m-> null[0m[0m
+[0m[1mhyperstack_core_virtual_machine_sg_rule.ssh[0]: Destroying...[0m[0m
+[0m[1mhyperstack_core_virtual_machine_sg_rule.ssh[0]: Destruction complete after 0s[0m
+[0m[1mhyperstack_core_virtual_machine.gpu[0]: Destroying... [name=sembla-precision-00f0374f368b][0m[0m
+[0m[1mhyperstack_core_virtual_machine.gpu[0]: Still destroying... [name=sembla-precision-00f0374f368b, 10s elapsed][0m[0m
+[0m[1mhyperstack_core_virtual_machine.gpu[0]: Destruction complete after 19s[0m
+[0m[1m[32m
+Destroy complete! Resources: 2 destroyed.
+[0mTerraform destroy completed and state is clean. Confirm in the Hyperstack console that no VM remains.
+Final evidence checksums verified.
+
+Evidence written to: /Users/ian/projects/sembla/docs/evidence/demographic-bench/hyperstack-lockstep-20260729T092302Z
+
+--- /Users/ian/projects/sembla/docs/evidence/demographic-bench/hyperstack-lockstep-20260729T092302Z/README.md ---
+# Concurrent CUDA sweep-draw spike evidence
+
+This targeted paid session ran only the direct concurrency spike at repository
+commit `645bb7c2b8da9be063ee48470a440dee29964408`. It did not rerun the unrelated frozen §L4 gate.
+
+Execution mode: synchronized tick boundaries on explicitly non-blocking CUDA streams.
+
+The `sweep-concurrency/` tree contains workers 1/2/4, three repetitions at 1M
+and 10M, complete output-tree hashes and comparisons, resource samples, a
+negative comparator control, a schedule control, and a 1M Nsight Systems CUDA
+trace exported as CSV.

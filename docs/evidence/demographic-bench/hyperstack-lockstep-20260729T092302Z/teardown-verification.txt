@@ -1,0 +1,20 @@
+verified_utc=2026-07-29T09:49:27Z
+$ terraform state list
+(empty)
+$ bash reconcile-orphans.sh
+name_prefix: sembla-precision
+
+tracked in Terraform state: 0
+other VMs in the account (never touched): 0
+
+No orphans. Every sembla-precision* VM in the account is tracked in state.
+$ gh api repos/ianmoran11/sembla/keys --jq length
+0
+$ test ! -e hyperstack-paid.tfplan
+PASS: consumed paid plan absent
+$ test ! -e "$SEMBLA_HOST_KEY_DIR"
+PASS: injected host-key material absent
+$ test ! -e .hyperstack_known_hosts
+PASS: session known-host entry absent
+$ process check
+PASS: no collector or watchdog process remains

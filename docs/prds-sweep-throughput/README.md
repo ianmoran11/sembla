@@ -240,29 +240,37 @@ serialize. This closes the complete-default-stream design and triggers the
 scoped shared-context/non-blocking-stream prototype; CUDA Gate 1 is not complete
 until that direct arm is measured.
 
-The next runnable arm is the synchronized lockstep-stream spike selected after
-that trace. `--cuda-lockstep-streams` makes every active lane own an explicitly
-non-blocking CUDA stream and advances equal-sized lane groups through tick
-boundaries together. It is still hidden, default-off evidence code: production
-sweeps remain sequential, and this arm intentionally retains complete backends
-so it can answer the stream-overlap question before introducing shared-program
-lifetime abstractions.
+The synchronized lockstep-stream arm is recorded in
+[`hyperstack-lockstep-20260729T092302Z`](../evidence/demographic-bench/hyperstack-lockstep-20260729T092302Z/).
+`--cuda-lockstep-streams` gives each active lane an explicitly non-blocking CUDA
+stream and advances equal-sized lane groups through tick boundaries together.
+It remains hidden and default-off; production sweeps remain sequential.
 
-```sh
-python3 scripts/run-sweep-concurrency-spike.py \
-  --binary target/release/sembla \
-  --model <model.json> --population <state> \
-  --backend cuda --cuda-lockstep-streams \
-  --output-root <new-evidence-dir> \
-  --workers 1 2 4 --draws 20 --ticks 24 --noise independent
-```
+All 18 complete output-tree comparisons pass across workers 1/2/4, three
+repetitions, and the 1M/10M shapes. Ratio-of-median whole-sweep speedups for
+two/four workers are 1.197×/1.252× at 1M and 1.296×/1.405× at 10M. Using the
+same aggregation, these are weaker than the isolated scheduler's 1.322×/1.267×
+and 1.487×/1.654× results. At 10M/four workers, lockstep execution is 18.5%
+slower than isolated execution and still uses 22,701 MiB VRAM and 9,369,148 KiB
+RSS. The hardware matrix used independent noise only; this is sufficient to
+reject a slower arm but would not satisfy the CRN requirement for a positive
+Gate-1 result.
 
-Nsight must show whether synchronized non-blocking streams produce overlapping
-kernel intervals and whether that overlap improves whole-sweep wall. If streams
-still serialize or contend, the remaining experiment is a fused grid-y batch:
-one kernel launch with draw as an explicit dimension. That is a broader codegen
-and draw-major-buffer spike, so it is justified only by the smaller direct arm;
-it is not silently folded into a numbered PRD.
+Nsight directly proves simultaneous execution rather than serialization:
+39,552 kernels run on context 1, split evenly between streams 13 and 14, with
+35.939 ms at concurrency two and maximum concurrency two. However, only 11.25%
+of the kernel interval union overlaps. Summed kernel time rises from 307.323 ms
+to 355.407 ms relative to the prior trace, while total positive inter-kernel
+gaps rise from 168.988 ms to 418.451 ms. Real overlap therefore does not make
+this synchronized complete-backend design competitive. The arm is negative and
+closed as a production candidate.
+
+The remaining possible CUDA experiment is a fused grid-y batch: one kernel
+launch with draw as an explicit dimension and draw-major mutable state. That is
+a broader codegen/state-layout spike, not an extension of the measured stream
+arm and not permission for a numbered PRD. If pursued, it must be runnable,
+default-off, exact against both sequential output and the isolated-backend
+result, and judged by whole-sweep wall and capacity rather than overlap alone.
 
 **CPU arm**
 
@@ -308,6 +316,9 @@ The outcome is recorded independently for CPU and CUDA as one of:
 3. blocked — compilation/module/state separation must be measured first.
 
 Do not choose a universal worker count or an `auto` policy from one scale.
+The complete-backend/default-stream and complete-backend/lockstep-stream CUDA
+mechanisms are both negative and closed. CUDA remains blocked unless a distinct
+fused draw-dimension spike produces positive direct evidence.
 
 ### Binding contract for future PRDs
 
@@ -315,7 +326,9 @@ Any numbered PRD drafted after Gate 1 inherits these constraints:
 
 - Default concurrency remains 1 unless a later measured decision changes it.
 - Every active draw owns isolated mutable state, parameters, seed/tick,
-  diagnostics, observations, scratch, and — on CUDA — a non-blocking stream.
+  diagnostics, observations, and scratch. A stream-slot design also requires a
+  non-blocking stream per draw; a fused design may use one stream only if every
+  mutable region and kernel coordinate remains explicitly draw-indexed.
 - A lane is retained and reset between assigned draws; concurrency must not
   reintroduce per-draw construction, state cloning, or NVRTC compilation.
 - Theta and execution seed are derived from `k`, never from admission,
@@ -356,19 +369,21 @@ The expected order is:
    arm wins: thread an explicit inner-worker budget through runtime execution,
    retain one resettable `StateStore` per lane, prevent nested oversubscription,
    and prove bit identity across outer/inner partitions.
-3. **CUDA compiled program and draw slots — conditional.** Only if the CUDA arm
-   wins: compile/load once, share only lifetime-safe immutable program material,
-   create one retained mutable allocation set and non-blocking stream per slot,
-   and preflight checked VRAM requirements. If `cudarc` cannot support safe
-   sharing without broad `unsafe` code or a dependency change, stop and report
+3. **CUDA fused draw slots — conditional.** Only if a future fused arm wins:
+   compile/load once, keep every mutable allocation and reduction draw-indexed,
+   launch the draw dimension explicitly, and preflight checked VRAM
+   requirements. The measured complete-backend stream-slot design must not be
+   repackaged as this PRD. If `cudarc` cannot express the required lifetimes and
+   launches without broad `unsafe` code or a dependency change, stop and report
    the boundary rather than hiding recompilation or serialization.
 4. **Measured defaults and publication — conditional.** Decide whether the
    option remains explicit or gains an `auto` policy only after repeated
    multi-shape evidence. Dynamic throttling is not part of the first delivery.
 
 Do not manufacture a mechanism PRD when its prerequisite measurement is
-negative, or split out immutable CUDA program state when independent backends
-are already measured to be cheap and capacity-safe.
+negative. In particular, do not draft a CUDA concurrency PRD from either
+complete-backend arm; only a positive fused draw-dimension spike can reopen that
+conditional track.
 
 ### Required acceptance evidence shape
 
