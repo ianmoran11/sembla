@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-27T23:00:05.942Z",
+  "runId": "2026-07-27T22-42-02-169Z",
+  "prdPath": "docs/prds-run-queue/0002-device-observation-grouped.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-run-queue/0002-device-observation-grouped.md",
+  "attempt": 4,
+  "text": "## Review result\n\n**Assessment: REVISE**\n\nCriterion 4 remains violated:\n\n```text\naeb3c28: crates/sembla-cli/src/main.rs\n696f439: DECISIONS.md\n```\n\nThe required rejection removals and §K6/§K9 amendments remain in separate commits. No history correction has occurred.\n\nAll other local criteria remain satisfied: focused tests pass, both demographic corpus configurations are listed, 136 Markdown links pass, forbidden files and goldens are unchanged, and hardware criteria remain documented as pending under §J14.2. The non-managed workspace is clean.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Acceptance criterion 4 remains violated: commit 696f439 contains the DECISIONS.md §K6/§K9 amendments, while commit aeb3c28 contains the CUDA rejection removals in crates/sembla-cli/src/main.rs; the required same-commit history correction has not occurred.\"],\"summary\":\"All functional local criteria, focused gates, scope constraints, and golden-preservation requirements pass; hardware criteria are properly pending. Approval is blocked solely by the unchanged split commit history.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "Acceptance criterion 4 remains violated: commit 696f439 contains the DECISIONS.md §K6/§K9 amendments, while commit aeb3c28 contains the CUDA rejection removals in crates/sembla-cli/src/main.rs; the required same-commit history correction has not occurred."
+    ],
+    "summary": "All functional local criteria, focused gates, scope constraints, and golden-preservation requirements pass; hardware criteria are properly pending. Approval is blocked solely by the unchanged split commit history.",
+    "raw": "## Review result\n\n**Assessment: REVISE**\n\nCriterion 4 remains violated:\n\n```text\naeb3c28: crates/sembla-cli/src/main.rs\n696f439: DECISIONS.md\n```\n\nThe required rejection removals and §K6/§K9 amendments remain in separate commits. No history correction has occurred.\n\nAll other local criteria remain satisfied: focused tests pass, both demographic corpus configurations are listed, 136 Markdown links pass, forbidden files and goldens are unchanged, and hardware criteria remain documented as pending under §J14.2. The non-managed workspace is clean.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Acceptance criterion 4 remains violated: commit 696f439 contains the DECISIONS.md §K6/§K9 amendments, while commit aeb3c28 contains the CUDA rejection removals in crates/sembla-cli/src/main.rs; the required same-commit history correction has not occurred.\"],\"summary\":\"All functional local criteria, focused gates, scope constraints, and golden-preservation requirements pass; hardware criteria are properly pending. Approval is blocked solely by the unchanged split commit history.\"}\n```",
+    "source": "json"
+  }
+}

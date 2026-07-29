@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T08:03:45.103Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0003-philox.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0003-philox.md",
+  "attempt": 1,
+  "text": "## Assessment: REVISE\n\nCriteria 1–4 and 6 pass. Philox vectors, coordinate packing, purity/collision checks, million-sample statistics, endpoint handling, exponential semantics, rustdoc, and all workspace checks succeed.\n\n### Blocking issue\n\n`scripts/check.sh:11-13` does not fully enforce criterion 5. Its regex misses valid Cargo forms including:\n\n- `[dependencies.rand]`\n- `package = 'rand'`\n- Workspace-inherited aliases such as `my_rng.workspace = true`\n\nThis contradicts the comment that aliases cannot bypass the guard. Use manifest-aware dependency inspection or cover all valid Cargo declaration forms.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"scripts/check.sh:11-13 uses a text regex that misses valid Cargo RNG dependency declarations such as [dependencies.rand], single-quoted package aliases, and workspace-inherited aliases, so acceptance criterion 5 is not fully enforced despite the script claiming aliases cannot bypass it.\"],\"summary\":\"Philox correctness, Random123 vectors, coordinate packing, purity/collision coverage, million-sample uniform and exponential tests, endpoint handling, and rustdoc all pass. Revision is required only to make external-RNG dependency enforcement complete.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "scripts/check.sh:11-13 uses a text regex that misses valid Cargo RNG dependency declarations such as [dependencies.rand], single-quoted package aliases, and workspace-inherited aliases, so acceptance criterion 5 is not fully enforced despite the script claiming aliases cannot bypass it."
+    ],
+    "summary": "Philox correctness, Random123 vectors, coordinate packing, purity/collision coverage, million-sample uniform and exponential tests, endpoint handling, and rustdoc all pass. Revision is required only to make external-RNG dependency enforcement complete.",
+    "raw": "## Assessment: REVISE\n\nCriteria 1–4 and 6 pass. Philox vectors, coordinate packing, purity/collision checks, million-sample statistics, endpoint handling, exponential semantics, rustdoc, and all workspace checks succeed.\n\n### Blocking issue\n\n`scripts/check.sh:11-13` does not fully enforce criterion 5. Its regex misses valid Cargo forms including:\n\n- `[dependencies.rand]`\n- `package = 'rand'`\n- Workspace-inherited aliases such as `my_rng.workspace = true`\n\nThis contradicts the comment that aliases cannot bypass the guard. Use manifest-aware dependency inspection or cover all valid Cargo declaration forms.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"scripts/check.sh:11-13 uses a text regex that misses valid Cargo RNG dependency declarations such as [dependencies.rand], single-quoted package aliases, and workspace-inherited aliases, so acceptance criterion 5 is not fully enforced despite the script claiming aliases cannot bypass it.\"],\"summary\":\"Philox correctness, Random123 vectors, coordinate packing, purity/collision coverage, million-sample uniform and exponential tests, endpoint handling, and rustdoc all pass. Revision is required only to make external-RNG dependency enforcement complete.\"}\n```",
+    "source": "json"
+  }
+}

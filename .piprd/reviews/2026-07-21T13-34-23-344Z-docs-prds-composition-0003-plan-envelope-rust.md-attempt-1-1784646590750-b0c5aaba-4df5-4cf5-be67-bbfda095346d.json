@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-21T15:09:50.750Z",
+  "runId": "2026-07-21T13-34-23-344Z",
+  "prdPath": "docs/prds-composition/0003-plan-envelope-rust.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-composition/0003-plan-envelope-rust.md",
+  "attempt": 1,
+  "text": "## Review\n\nNo blocking issues found.\n\n- Envelope types, identity helpers, canonical hashing, deterministic validation, dispatch, and CLI behavior match the PRD.\n- `ValidatedPlan` aligns stable words with existing dense rule IDs without changing `ValidatedModel` or runtime behavior.\n- All 12 negative fixtures produce their asserted errors.\n- Golden hashes match independently recomputed values:\n  - Semantic: `0524e9403ce2e945a6a98bd5cc7db646779d565c963e83e9a881e86b3459cc9c`\n  - Envelope: `135c303af99e524e9260751891e38f8724e65cf9e6906ff0d441d77fe63a0028`\n- All five cross-language rule-word vectors match.\n- Legacy validation succeeds; every runtime entry point rejects plans with the PRD 0004 message.\n- `cargo test --workspace`, `./scripts/check.sh`, and `git diff --check` pass.\n- Existing IR tests, `examples/`, frontend, runtime, and CUDA are unchanged. `Cargo.lock` only adds the allowed `sembla-ir → sha2` edge.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"PRD 0003 is fully satisfied: plan types, stable identities, canonical hashes, validation, dispatch, CLI behavior, fixtures, negative coverage, legacy compatibility, scope, and all required checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "PRD 0003 is fully satisfied: plan types, stable identities, canonical hashes, validation, dispatch, CLI behavior, fixtures, negative coverage, legacy compatibility, scope, and all required checks pass.",
+    "raw": "## Review\n\nNo blocking issues found.\n\n- Envelope types, identity helpers, canonical hashing, deterministic validation, dispatch, and CLI behavior match the PRD.\n- `ValidatedPlan` aligns stable words with existing dense rule IDs without changing `ValidatedModel` or runtime behavior.\n- All 12 negative fixtures produce their asserted errors.\n- Golden hashes match independently recomputed values:\n  - Semantic: `0524e9403ce2e945a6a98bd5cc7db646779d565c963e83e9a881e86b3459cc9c`\n  - Envelope: `135c303af99e524e9260751891e38f8724e65cf9e6906ff0d441d77fe63a0028`\n- All five cross-language rule-word vectors match.\n- Legacy validation succeeds; every runtime entry point rejects plans with the PRD 0004 message.\n- `cargo test --workspace`, `./scripts/check.sh`, and `git diff --check` pass.\n- Existing IR tests, `examples/`, frontend, runtime, and CUDA are unchanged. `Cargo.lock` only adds the allowed `sembla-ir → sha2` edge.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"PRD 0003 is fully satisfied: plan types, stable identities, canonical hashes, validation, dispatch, CLI behavior, fixtures, negative coverage, legacy compatibility, scope, and all required checks pass.\"}\n```",
+    "source": "json"
+  }
+}

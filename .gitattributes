@@ -1,0 +1,41 @@
+# Normalize text conservatively while leaving content-based binary detection enabled.
+* text=auto eol=lf
+
+# Scientific data and model artifacts.
+*.bin -text
+*.pt -text
+*.pth -text
+*.npy -text
+*.npz -text
+*.onnx -text
+*.parquet -text
+
+# Images and document binaries.
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.webp -text
+*.bmp -text
+*.ico -text
+*.pdf -text
+
+# Archives and compressed files.
+*.zip -text
+*.tar -text
+*.gz -text
+*.bz2 -text
+*.xz -text
+*.7z -text
+
+# Compiled binaries that may be checked in as fixtures.
+*.pyc -text
+*.wasm -text
+*.so -text
+*.dylib -text
+*.dll -text
+*.a -text
+
+# This captured machine log contains mixed control/newline bytes and Git treats
+# it as binary evidence. Never apply text normalization to it.
+/spikes/precision/evidence/hyperstack-h100-20260718/bootstrap.log -text

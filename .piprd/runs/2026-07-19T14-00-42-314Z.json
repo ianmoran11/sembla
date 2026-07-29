@@ -1,0 +1,29 @@
+{
+  "runId": "2026-07-19T14-00-42-314Z",
+  "startedAt": "2026-07-19T14:00:42.314Z",
+  "updatedAt": "2026-07-19T14:59:02.514Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-proof-track",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-proof-track/0001-lumping-spec-model.md",
+    "/Users/ian/projects/sembla/docs/prds-proof-track/0002-lumping-theorem.md",
+    "/Users/ian/projects/sembla/docs/prds-proof-track/0003-congruence-guard-docs.md"
+  ],
+  "currentIndex": 3,
+  "approved": [
+    "docs/prds-proof-track/0001-lumping-spec-model.md",
+    "docs/prds-proof-track/0002-lumping-theorem.md",
+    "docs/prds-proof-track/0003-congruence-guard-docs.md"
+  ],
+  "commits": [
+    "4ac9895",
+    "bcd2393",
+    "fd2f7ce"
+  ],
+  "total": 3,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

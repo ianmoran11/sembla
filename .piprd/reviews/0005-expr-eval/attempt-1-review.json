@@ -1,0 +1,9 @@
+{
+  "assessment": "REVISE",
+  "blockingIssues": [
+    "eval_column cannot reliably evaluate a valid root Expr::Enum because it guesses enum context from table attributes and rejects variants shared by multiple enum types as ambiguous; preserve or pass the validated expected type.",
+    "ValueColumn publicly adds Ref(Vec<u32>) although PRD 0005 specifies only Real, Int, Bool, and Enum result columns; follow or explicitly revise the API contract.",
+    "AggCache scope uses reusable state/model memory addresses plus a per-store generation, so a cache surviving dropped/reallocated stores or models can reuse stale entries; enforce cache lifetime per tick or use stable non-reusable identities."
+  ],
+  "summary": "Workspace checks and all explicit acceptance tests pass, including exhaustive variants, 1,003-row O(n²) lumping equivalence, one-build caching, canonical f64 Sum order, and Snapshot-only access. The enum typing/API and cache identity issues still require implementation changes."
+}

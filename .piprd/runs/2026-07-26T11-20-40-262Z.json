@@ -1,0 +1,23 @@
+{
+  "runId": "2026-07-26T11-20-40-262Z",
+  "startedAt": "2026-07-26T11:20:40.262Z",
+  "updatedAt": "2026-07-26T12:04:49.285Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-execution-timing",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-execution-timing/0001-per-phase-timing-instrumentation.md"
+  ],
+  "currentIndex": 1,
+  "approved": [
+    "docs/prds-execution-timing/0001-per-phase-timing-instrumentation.md"
+  ],
+  "commits": [
+    "5fb74f0"
+  ],
+  "total": 1,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

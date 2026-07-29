@@ -1,0 +1,24 @@
+{
+  "runId": "2026-07-26T07-58-36-064Z",
+  "startedAt": "2026-07-26T07:58:36.064Z",
+  "updatedAt": "2026-07-26T08:21:15.329Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance/0001-resolve-column-references-once.md",
+    "/Users/ian/projects/sembla/docs/prds-host-evaluator-performance/0002-resolve-reference-columns-once.md"
+  ],
+  "currentIndex": 2,
+  "approved": [
+    "docs/prds-host-evaluator-performance/0002-resolve-reference-columns-once.md"
+  ],
+  "commits": [
+    "db2648a"
+  ],
+  "total": 2,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

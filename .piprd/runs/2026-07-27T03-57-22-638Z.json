@@ -1,0 +1,28 @@
+{
+  "runId": "2026-07-27T03-57-22-638Z",
+  "startedAt": "2026-07-27T03:57:22.638Z",
+  "updatedAt": "2026-07-27T04:45:12.657Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-evaluator-throughput",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0001-tile-the-tick.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0002-guarded-racing-clock.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0003-tile-the-remainder.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0004-degenerate-hazard-fast-path.md"
+  ],
+  "currentIndex": 4,
+  "approved": [
+    "docs/prds-evaluator-throughput/0003-tile-the-remainder.md",
+    "docs/prds-evaluator-throughput/0004-degenerate-hazard-fast-path.md"
+  ],
+  "commits": [
+    "74cdb63",
+    "5b8c96c"
+  ],
+  "total": 4,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T16:36:05.156Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0012-gpu-spike.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0012-gpu-spike.md",
+  "attempt": 1,
+  "text": "## Assessment: REVISE\n\n### Blocking issue\n\nThe spike uses `f32` hazard and exponential-race arithmetic in:\n\n- `spikes/gpu-throughput/src/lib.rs:13-14,31-32`\n- `spikes/gpu-throughput/src/kernels.wgsl:120-125`\n\nThis conflicts with the binding all-PRD `f64` hazard-arithmetic convention in `docs/prds/README.md:31-38`. The documentation discloses the limitation, but the reported throughput does not measure the required numeric workload.\n\nAll explicit workspace, GPU workload, Philox, smoke-test, timing, scaling, and results-document requirements otherwise pass.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"The spike measures hazard and exponential-race arithmetic with f32 in src/lib.rs and src/kernels.wgsl, violating the binding all-PRD f64 hazard-arithmetic convention in docs/prds/README.md. A compliant f64 measurement or explicit authority-approved exception is required.\"],\"summary\":\"Standalone workspace isolation, GPU Philox KATs, 10k CPU/GPU correctness, full 26M workload, timing, scaling, and RESULTS fields pass, but the measured f32 workload does not satisfy the binding f64 numeric convention.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "The spike measures hazard and exponential-race arithmetic with f32 in src/lib.rs and src/kernels.wgsl, violating the binding all-PRD f64 hazard-arithmetic convention in docs/prds/README.md. A compliant f64 measurement or explicit authority-approved exception is required."
+    ],
+    "summary": "Standalone workspace isolation, GPU Philox KATs, 10k CPU/GPU correctness, full 26M workload, timing, scaling, and RESULTS fields pass, but the measured f32 workload does not satisfy the binding f64 numeric convention.",
+    "raw": "## Assessment: REVISE\n\n### Blocking issue\n\nThe spike uses `f32` hazard and exponential-race arithmetic in:\n\n- `spikes/gpu-throughput/src/lib.rs:13-14,31-32`\n- `spikes/gpu-throughput/src/kernels.wgsl:120-125`\n\nThis conflicts with the binding all-PRD `f64` hazard-arithmetic convention in `docs/prds/README.md:31-38`. The documentation discloses the limitation, but the reported throughput does not measure the required numeric workload.\n\nAll explicit workspace, GPU workload, Philox, smoke-test, timing, scaling, and results-document requirements otherwise pass.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"The spike measures hazard and exponential-race arithmetic with f32 in src/lib.rs and src/kernels.wgsl, violating the binding all-PRD f64 hazard-arithmetic convention in docs/prds/README.md. A compliant f64 measurement or explicit authority-approved exception is required.\"],\"summary\":\"Standalone workspace isolation, GPU Philox KATs, 10k CPU/GPU correctness, full 26M workload, timing, scaling, and RESULTS fields pass, but the measured f32 workload does not satisfy the binding f64 numeric convention.\"}\n```",
+    "source": "json"
+  }
+}

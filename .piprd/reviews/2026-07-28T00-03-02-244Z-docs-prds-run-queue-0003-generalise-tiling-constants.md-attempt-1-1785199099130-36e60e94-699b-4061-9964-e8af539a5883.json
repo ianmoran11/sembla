@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-28T00:38:19.130Z",
+  "runId": "2026-07-28T00-03-02-244Z",
+  "prdPath": "docs/prds-run-queue/0003-generalise-tiling-constants.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-run-queue/0003-generalise-tiling-constants.md",
+  "attempt": 1,
+  "text": "## Review result\n\n**Assessment: APPROVED**\n\nAll acceptance criteria are satisfied:\n\n1. Typed IR liveness derivation is tested across three hand-checked model shapes.\n2. Demographic transitions derive 960 rows, near 1,024; measurements are effectively flat or improved.\n3. The threshold uses node-row work and cites `threading_spike`.\n4. The 262,144-row, 40-view canary exists and improves materially.\n5. Existing worker/tile determinism matrices remain unchanged and pass.\n6. No existing goldens changed; manifest and `final_state_sha256` checks pass.\n7. `cargo test --locked` and `scripts/check-rust.sh` pass.\n8. The two-shape protocol and §M1 amendments are present.\n9. Markdown-link checking passes.\n\nAll implementation paths are authorized. There are no dependency, IR, Lean, CUDA, CLI, or pre-existing fixture/golden changes. Only `.piprd/**` managed state is otherwise dirty.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"The implementation derives cache-fitting tiles and work thresholds from typed model IR, preserves deterministic execution and overrides, adds and measures the required many-view canary, keeps demographic performance effectively unchanged, preserves all goldens, respects scope, and passes every required local gate.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "The implementation derives cache-fitting tiles and work thresholds from typed model IR, preserves deterministic execution and overrides, adds and measures the required many-view canary, keeps demographic performance effectively unchanged, preserves all goldens, respects scope, and passes every required local gate.",
+    "raw": "## Review result\n\n**Assessment: APPROVED**\n\nAll acceptance criteria are satisfied:\n\n1. Typed IR liveness derivation is tested across three hand-checked model shapes.\n2. Demographic transitions derive 960 rows, near 1,024; measurements are effectively flat or improved.\n3. The threshold uses node-row work and cites `threading_spike`.\n4. The 262,144-row, 40-view canary exists and improves materially.\n5. Existing worker/tile determinism matrices remain unchanged and pass.\n6. No existing goldens changed; manifest and `final_state_sha256` checks pass.\n7. `cargo test --locked` and `scripts/check-rust.sh` pass.\n8. The two-shape protocol and §M1 amendments are present.\n9. Markdown-link checking passes.\n\nAll implementation paths are authorized. There are no dependency, IR, Lean, CUDA, CLI, or pre-existing fixture/golden changes. Only `.piprd/**` managed state is otherwise dirty.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"The implementation derives cache-fitting tiles and work thresholds from typed model IR, preserves deterministic execution and overrides, adds and measures the required many-view canary, keeps demographic performance effectively unchanged, preserves all goldens, respects scope, and passes every required local gate.\"}\n```",
+    "source": "json"
+  }
+}

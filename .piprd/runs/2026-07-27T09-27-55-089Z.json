@@ -1,0 +1,20 @@
+{
+  "runId": "2026-07-27T09-27-55-089Z",
+  "startedAt": "2026-07-27T09:27:55.089Z",
+  "updatedAt": "2026-07-27T09:42:20.350Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-cuda-host-path",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-cuda-host-path/0001-reuse-the-host-state-buffer.md"
+  ],
+  "currentIndex": 0,
+  "approved": [],
+  "commits": [],
+  "total": 1,
+  "status": "stopped",
+  "stage": "review",
+  "attempt": 5,
+  "adviseEnabled": true,
+  "stoppedReason": "still needs revision after 5 attempt(s)"
+}

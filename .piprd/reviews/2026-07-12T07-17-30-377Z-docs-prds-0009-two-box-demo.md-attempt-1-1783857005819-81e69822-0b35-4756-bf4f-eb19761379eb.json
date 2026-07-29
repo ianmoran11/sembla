@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T11:50:05.819Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0009-two-box-demo.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0009-two-box-demo.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n1. Workspace tests and model validation succeed.\n2. The fixed-seed 100k-person test restricts during ticks 10–20 and lowers peak infections versus baseline.\n3. The 200-tick test bounds policy mode changes to two.\n4. Repeated model comparisons are byte-identical; baseline comparison rows exactly match standalone SIR output.\n5. Effective restriction begins exactly one tick after the policy transition fires.\n6. Lower-beta parameter contrast produces a strictly lower final attack rate and deterministic output.\n7. `docs/examples/sir_policy.md` contains runnable model and parameter comparison commands.\n\nThe models preserve infection/recovery rule IDs 0 and 1, so paired runs share identical Philox coordinates. No blocking issues were found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0009 criteria pass: the validated two-box SIR/policy model, deterministic hysteresis, tick-zero neutral modifier, exact one-tick feedback, CRN-aligned comparisons, 100k paired peak test, deterministic parameter contrast, and runnable documentation are implemented and verified.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0009 criteria pass: the validated two-box SIR/policy model, deterministic hysteresis, tick-zero neutral modifier, exact one-tick feedback, CRN-aligned comparisons, 100k paired peak test, deterministic parameter contrast, and runnable documentation are implemented and verified.",
+    "raw": "## Assessment: APPROVED\n\nAll acceptance criteria pass:\n\n1. Workspace tests and model validation succeed.\n2. The fixed-seed 100k-person test restricts during ticks 10–20 and lowers peak infections versus baseline.\n3. The 200-tick test bounds policy mode changes to two.\n4. Repeated model comparisons are byte-identical; baseline comparison rows exactly match standalone SIR output.\n5. Effective restriction begins exactly one tick after the policy transition fires.\n6. Lower-beta parameter contrast produces a strictly lower final attack rate and deterministic output.\n7. `docs/examples/sir_policy.md` contains runnable model and parameter comparison commands.\n\nThe models preserve infection/recovery rule IDs 0 and 1, so paired runs share identical Philox coordinates. No blocking issues were found.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0009 criteria pass: the validated two-box SIR/policy model, deterministic hysteresis, tick-zero neutral modifier, exact one-tick feedback, CRN-aligned comparisons, 100k paired peak test, deterministic parameter contrast, and runnable documentation are implemented and verified.\"}\n```",
+    "source": "json"
+  }
+}

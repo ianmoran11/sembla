@@ -1,0 +1,38 @@
+{
+  "runId": "2026-07-20T15-11-23-077Z",
+  "startedAt": "2026-07-20T15:11:23.077Z",
+  "updatedAt": "2026-07-20T22:30:24.637Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-surface-syntax",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-surface-syntax/0001-kernel-and-contract.md",
+    "/Users/ian/projects/sembla/docs/prds-surface-syntax/0002-binders-names-notation.md",
+    "/Users/ian/projects/sembla/docs/prds-surface-syntax/0003-reaction-arrows.md",
+    "/Users/ian/projects/sembla/docs/prds-surface-syntax/0004-keyed-frequency.md",
+    "/Users/ian/projects/sembla/docs/prds-surface-syntax/0005-command-frontend.md",
+    "/Users/ian/projects/sembla/docs/prds-surface-syntax/0006-migrate-models-and-docs.md"
+  ],
+  "currentIndex": 6,
+  "approved": [
+    "docs/prds-surface-syntax/0001-kernel-and-contract.md",
+    "docs/prds-surface-syntax/0002-binders-names-notation.md",
+    "docs/prds-surface-syntax/0003-reaction-arrows.md",
+    "docs/prds-surface-syntax/0004-keyed-frequency.md",
+    "docs/prds-surface-syntax/0005-command-frontend.md",
+    "docs/prds-surface-syntax/0006-migrate-models-and-docs.md"
+  ],
+  "commits": [
+    "4f9d667",
+    "3af40fc",
+    "692b7ff",
+    "f03feed",
+    "1aaa84b",
+    "cb7e164"
+  ],
+  "total": 6,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

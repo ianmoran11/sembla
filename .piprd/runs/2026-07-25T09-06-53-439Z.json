@@ -1,0 +1,32 @@
+{
+  "runId": "2026-07-25T09-06-53-439Z",
+  "startedAt": "2026-07-25T09:06:53.439Z",
+  "updatedAt": "2026-07-25T22:06:21.820Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0001-decision-record-and-baseline.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0002-parallel-validation-kernels.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0003-diagnostic-equality-tests.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0004-differential-corpus-membership.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0005-measure-and-publish.md"
+  ],
+  "currentIndex": 4,
+  "approved": [
+    "docs/prds-cuda-validation-parallelism/0002-parallel-validation-kernels.md",
+    "docs/prds-cuda-validation-parallelism/0003-diagnostic-equality-tests.md",
+    "docs/prds-cuda-validation-parallelism/0004-differential-corpus-membership.md"
+  ],
+  "commits": [
+    "8feb168",
+    "de7bce7",
+    "dbc665f"
+  ],
+  "total": 5,
+  "status": "stopped",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true,
+  "stoppedReason": "review did not produce a usable assessment (```)"
+}

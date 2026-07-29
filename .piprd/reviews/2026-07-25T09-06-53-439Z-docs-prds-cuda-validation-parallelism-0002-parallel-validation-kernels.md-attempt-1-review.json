@@ -1,0 +1,63 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-25T10:00:07Z",
+  "runId": "2026-07-25T09-06-53-439Z",
+  "prdPath": "docs/prds-cuda-validation-parallelism/0002-parallel-validation-kernels.md",
+  "attempt": 1,
+  "assessment": "REVISE",
+  "blockingIssues": [
+    {
+      "severity": "critical",
+      "paths": [
+        "crates/sembla-cuda/src/codegen.rs:1156",
+        "crates/sembla-cuda/src/codegen.rs:1962-1970",
+        "crates/sembla-cuda/src/backend.rs:931-936",
+        "crates/sembla-cuda/src/backend.rs:1121-1139"
+      ],
+      "summary": "The reduction starts status[1] at zero, never writes status[0], and stores an unconsumed key in status[2], so it cannot surface the required code/candidate pair."
+    },
+    {
+      "severity": "critical",
+      "paths": [
+        "crates/sembla-cuda/src/codegen.rs:1251",
+        "crates/sembla-cuda/src/codegen.rs:1351",
+        "crates/sembla-cuda/src/codegen.rs:1558",
+        "crates/sembla-cuda/src/codegen.rs:1662",
+        "crates/sembla-cuda/src/backend.rs:615",
+        "crates/sembla-cuda/src/backend.rs:685",
+        "crates/sembla-cuda/src/backend.rs:778",
+        "crates/sembla-cuda/src/backend.rs:882"
+      ],
+      "summary": "All four target validation kernels retain the single-thread guard and are still launched with the one-thread launch configuration."
+    },
+    {
+      "severity": "high",
+      "paths": [
+        "crates/sembla-cuda/src/codegen.rs:2282-2283",
+        "crates/sembla-cuda/src/codegen.rs:2366-2367",
+        "crates/sembla-cuda/src/codegen.rs:2420-2425"
+      ],
+      "summary": "No required source assertions were added, and scripts/check-rust.sh plus cargo test --locked fail three existing sembla-cuda tests."
+    }
+  ],
+  "criteria": {
+    "local-1": "failed: CUDA-feature and workspace builds pass, but scripts/check-rust.sh fails",
+    "local-2": "failed: four guards remain and no required source assertion exists",
+    "local-3": "failed: bare status candidate assignments remain and no required source assertion exists",
+    "local-4": "failed: guards remain on status kernels, but no confinement assertion exists",
+    "local-5": "passed: protected paths are byte-unchanged",
+    "local-6": "failed: cargo test --locked exits 101 with three failures",
+    "hardware-7": "pending: no NVIDIA hardware available",
+    "hardware-8": "pending: no GPU run or host reduction test"
+  },
+  "commands": [
+    {"command": "cargo build --locked -p sembla-cuda --features cuda", "result": "passed"},
+    {"command": "cargo build --locked --workspace", "result": "passed"},
+    {"command": "scripts/check-rust.sh", "result": "failed (exit 101)"},
+    {"command": "cargo test --locked", "result": "failed (exit 101)"},
+    {"command": "git diff --quiet HEAD -- examples fixtures calibration crates/sembla-cli/tests/fixtures crates/sembla-cuda/tests docs/evidence", "result": "passed"},
+    {"command": "git diff --cached --quiet", "result": "passed"},
+    {"command": "nvidia-smi availability check", "result": "unavailable; hardware pending"}
+  ],
+  "summary": "REVISE: the core kernels and launches remain serial, the reduction cannot report a valid status/candidate, required source tests are absent, and mandatory test/check commands fail."
+}

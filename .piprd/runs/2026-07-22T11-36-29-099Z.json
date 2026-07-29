@@ -1,0 +1,35 @@
+{
+  "runId": "2026-07-22T11-36-29-099Z",
+  "startedAt": "2026-07-22T11:36:29.099Z",
+  "updatedAt": "2026-07-23T00:37:41.747Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-composition-integration",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-composition-integration/0001-roadmap-and-decisions.md",
+    "/Users/ian/projects/sembla/docs/prds-composition-integration/0002-cuda-plans-and-diff-backends.md",
+    "/Users/ian/projects/sembla/docs/prds-composition-integration/0003-sweep-plans.md",
+    "/Users/ian/projects/sembla/docs/prds-composition-integration/0004-compare-crn-plans.md",
+    "/Users/ian/projects/sembla/docs/prds-composition-integration/0005-composition-widget.md"
+  ],
+  "currentIndex": 5,
+  "approved": [
+    "docs/prds-composition-integration/0001-roadmap-and-decisions.md",
+    "docs/prds-composition-integration/0002-cuda-plans-and-diff-backends.md",
+    "docs/prds-composition-integration/0003-sweep-plans.md",
+    "docs/prds-composition-integration/0004-compare-crn-plans.md",
+    "docs/prds-composition-integration/0005-composition-widget.md"
+  ],
+  "commits": [
+    "d38eb78",
+    "7ccfc1b",
+    "b7f133f",
+    "387c949",
+    "d52c892"
+  ],
+  "total": 5,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

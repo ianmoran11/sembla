@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-12T11:15:14.482Z",
+  "runId": "2026-07-12T07-17-30-377Z",
+  "prdPath": "docs/prds/0008-sir-model.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds/0008-sir-model.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n1. **Workspace tests:** All tests pass, including prior PRD coverage.\n2. **Determinism:** The compiled-CLI test generates 100k-person populations and runs 100 ticks from scratch twice. CSV bytes and both hashes match; different seed and θ change both hashes.\n3. **Epidemiology:** Tests verify documented \\(R_0=8\\), monotonic S/R, rising then falling I, attack rate above 50%, and zero growth with β=0.\n4. **Lumping:** The active 1M-person test confirms two employer aggregates are built once per tick, not per row.\n5. **Performance:** The release harness measured 1M agents × 10 ticks at **0.106 seconds/tick**, below the 2-second limit.\n6. **Documentation:** `docs/examples/sir.md` covers the model, formula, generation, execution, format, and determinism commands.\n\nNo PRD blockers were found. The unrelated `.DS_Store` change should remain excluded from the managed commit.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0008 criteria pass: the symbolic SIR model, deterministic Philox population generator, typed dt/parameter CLI pipeline, exact 100k-by-100 end-to-end determinism contract, epidemiology checks, active 1M lumping, 0.106s/tick release performance, and documentation are implemented and verified.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0008 criteria pass: the symbolic SIR model, deterministic Philox population generator, typed dt/parameter CLI pipeline, exact 100k-by-100 end-to-end determinism contract, epidemiology checks, active 1M lumping, 0.106s/tick release performance, and documentation are implemented and verified.",
+    "raw": "## Assessment: APPROVED\n\n1. **Workspace tests:** All tests pass, including prior PRD coverage.\n2. **Determinism:** The compiled-CLI test generates 100k-person populations and runs 100 ticks from scratch twice. CSV bytes and both hashes match; different seed and θ change both hashes.\n3. **Epidemiology:** Tests verify documented \\(R_0=8\\), monotonic S/R, rising then falling I, attack rate above 50%, and zero growth with β=0.\n4. **Lumping:** The active 1M-person test confirms two employer aggregates are built once per tick, not per row.\n5. **Performance:** The release harness measured 1M agents × 10 ticks at **0.106 seconds/tick**, below the 2-second limit.\n6. **Documentation:** `docs/examples/sir.md` covers the model, formula, generation, execution, format, and determinism commands.\n\nNo PRD blockers were found. The unrelated `.DS_Store` change should remain excluded from the managed commit.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0008 criteria pass: the symbolic SIR model, deterministic Philox population generator, typed dt/parameter CLI pipeline, exact 100k-by-100 end-to-end determinism contract, epidemiology checks, active 1M lumping, 0.106s/tick release performance, and documentation are implemented and verified.\"}\n```",
+    "source": "json"
+  }
+}

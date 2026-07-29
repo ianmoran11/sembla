@@ -1,0 +1,26 @@
+{
+  "runId": "2026-07-27T01-22-33-347Z",
+  "startedAt": "2026-07-27T01:22:33.347Z",
+  "updatedAt": "2026-07-27T03:47:13.076Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-evaluator-throughput",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0001-tile-the-tick.md",
+    "/Users/ian/projects/sembla/docs/prds-evaluator-throughput/0002-guarded-racing-clock.md"
+  ],
+  "currentIndex": 2,
+  "approved": [
+    "docs/prds-evaluator-throughput/0001-tile-the-tick.md",
+    "docs/prds-evaluator-throughput/0002-guarded-racing-clock.md"
+  ],
+  "commits": [
+    "c77a1c0",
+    "4ed4fe8"
+  ],
+  "total": 2,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

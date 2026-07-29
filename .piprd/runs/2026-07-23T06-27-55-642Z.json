@@ -1,0 +1,44 @@
+{
+  "runId": "2026-07-23T06-27-55-642Z",
+  "startedAt": "2026-07-23T06:27:55.642Z",
+  "updatedAt": "2026-07-23T13:53:56.079Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-project-hygiene",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0001-generated-artifacts-and-portability.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0002-reproducible-check-contract.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0003-ci-supply-chain-and-filters.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0004-python-ci-lock.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0005-current-docs-and-project-policies.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0006-text-policy-and-doc-link-check.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0007-cargo-package-policy.md",
+    "/Users/ian/projects/sembla/docs/prds-project-hygiene/0008-safe-local-cleanup.md"
+  ],
+  "currentIndex": 8,
+  "approved": [
+    "docs/prds-project-hygiene/0001-generated-artifacts-and-portability.md",
+    "docs/prds-project-hygiene/0002-reproducible-check-contract.md",
+    "docs/prds-project-hygiene/0003-ci-supply-chain-and-filters.md",
+    "docs/prds-project-hygiene/0004-python-ci-lock.md",
+    "docs/prds-project-hygiene/0005-current-docs-and-project-policies.md",
+    "docs/prds-project-hygiene/0006-text-policy-and-doc-link-check.md",
+    "docs/prds-project-hygiene/0007-cargo-package-policy.md",
+    "docs/prds-project-hygiene/0008-safe-local-cleanup.md"
+  ],
+  "commits": [
+    "f9fadd0",
+    "32aad5c",
+    "570a2f0",
+    "4673ea5",
+    "dc1cb4e",
+    "5f6cb5f",
+    "857ffa6",
+    "5c08c93"
+  ],
+  "total": 8,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

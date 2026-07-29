@@ -1,0 +1,44 @@
+{
+  "runId": "2026-07-18T08-35-19-296Z",
+  "startedAt": "2026-07-18T08:35:19.296Z",
+  "updatedAt": "2026-07-18T13:22:51.300Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-npe-path",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0001-run-manifest.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0002-observation-ir.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0003-observation-runtime-cli.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0004-lean-observation-parity.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0005-sweep-replica-theta-file.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0006-theta-x-export.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0007-npe-reference-pipeline.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0008-cuda-backend.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0009-differential-harness-selection.md",
+    "/Users/ian/projects/sembla/docs/prds-npe-path/0010-ci.md"
+  ],
+  "currentIndex": 7,
+  "approved": [
+    "docs/prds-npe-path/0001-run-manifest.md",
+    "docs/prds-npe-path/0002-observation-ir.md",
+    "docs/prds-npe-path/0003-observation-runtime-cli.md",
+    "docs/prds-npe-path/0004-lean-observation-parity.md",
+    "docs/prds-npe-path/0005-sweep-replica-theta-file.md",
+    "docs/prds-npe-path/0006-theta-x-export.md",
+    "docs/prds-npe-path/0007-npe-reference-pipeline.md"
+  ],
+  "commits": [
+    "ca35b4c",
+    "021e7a1",
+    "60a897b",
+    "716603e",
+    "a64711b",
+    "4a0d158",
+    "582e443"
+  ],
+  "total": 10,
+  "status": "running",
+  "stage": "implement",
+  "attempt": 1,
+  "adviseEnabled": true
+}

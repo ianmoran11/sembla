@@ -1,0 +1,18 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-15T14:41:50.798Z",
+  "runId": "2026-07-15T13-41-37-334Z",
+  "prdPath": "docs/prds-precision-spike/0002-portable-precision-kernels.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-precision-spike/0002-portable-precision-kernels.md",
+  "attempt": 1,
+  "text": "## Review\n\n### Blocking issue\n\n- `docs/prds-precision-spike/0002-portable-precision-kernels.md:33-35` requires compilation without fast-math/FMA contraction. Instead, `spikes/precision/src/gpu.rs:1015-1018` uses default compilation options with no disable control. The live probe reports `FMA-contraction-observed=true`; `src/wgsl/df64.wgsl:11-21` substitutes atomic rounding fences. This validates the workaround’s measured accuracy but does not satisfy the required compile-mode assertion.\n\n### Acceptance criteria\n\n1. **PASS** — 9 tests, formatting, and Clippy pass; root workspace metadata excludes the spike.\n2. **PASS** — Four GPU WGSL Philox vectors pass.\n3. **PASS** — Both strategies execute and print reduction and winner metrics.\n4. **PASS** — f32: `1.394316e-7`, `1/50,000`; df64: `9.292057e-15`, `0/50,000`.\n5. **PASS** — FMA/fast-math status is recorded, but it exposes the blocking specification deviation above.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0002 requires compilation without fast-math/FMA contraction, but the implementation uses default wgpu compilation, observes FMA contraction, and substitutes atomic rounding fences rather than enforcing the required compile mode.\"],\"summary\":\"GPU execution, Philox validation, accuracy thresholds, dispatch hooks, and workspace isolation pass; the normative strict-compilation requirement remains unmet.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "PRD 0002 requires compilation without fast-math/FMA contraction, but the implementation uses default wgpu compilation, observes FMA contraction, and substitutes atomic rounding fences rather than enforcing the required compile mode."
+    ],
+    "summary": "GPU execution, Philox validation, accuracy thresholds, dispatch hooks, and workspace isolation pass; the normative strict-compilation requirement remains unmet.",
+    "raw": "## Review\n\n### Blocking issue\n\n- `docs/prds-precision-spike/0002-portable-precision-kernels.md:33-35` requires compilation without fast-math/FMA contraction. Instead, `spikes/precision/src/gpu.rs:1015-1018` uses default compilation options with no disable control. The live probe reports `FMA-contraction-observed=true`; `src/wgsl/df64.wgsl:11-21` substitutes atomic rounding fences. This validates the workaround’s measured accuracy but does not satisfy the required compile-mode assertion.\n\n### Acceptance criteria\n\n1. **PASS** — 9 tests, formatting, and Clippy pass; root workspace metadata excludes the spike.\n2. **PASS** — Four GPU WGSL Philox vectors pass.\n3. **PASS** — Both strategies execute and print reduction and winner metrics.\n4. **PASS** — f32: `1.394316e-7`, `1/50,000`; df64: `9.292057e-15`, `0/50,000`.\n5. **PASS** — FMA/fast-math status is recorded, but it exposes the blocking specification deviation above.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"PRD 0002 requires compilation without fast-math/FMA contraction, but the implementation uses default wgpu compilation, observes FMA contraction, and substitutes atomic rounding fences rather than enforcing the required compile mode.\"],\"summary\":\"GPU execution, Philox validation, accuracy thresholds, dispatch hooks, and workspace isolation pass; the normative strict-compilation requirement remains unmet.\"}\n```",
+    "source": "json"
+  }
+}

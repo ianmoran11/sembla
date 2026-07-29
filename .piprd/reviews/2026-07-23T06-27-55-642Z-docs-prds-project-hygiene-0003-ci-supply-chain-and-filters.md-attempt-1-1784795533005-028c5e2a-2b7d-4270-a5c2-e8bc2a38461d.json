@@ -1,0 +1,16 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-23T08:32:13.005Z",
+  "runId": "2026-07-23T06-27-55-642Z",
+  "prdPath": "docs/prds-project-hygiene/0003-ci-supply-chain-and-filters.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-project-hygiene/0003-ci-supply-chain-and-filters.md",
+  "attempt": 1,
+  "text": "## Assessment: APPROVED\n\n- **AC1:** All 12 workflow action references use verified 40-character upstream SHAs with release comments; checker mutation tests confirm enforcement.\n- **AC2:** Dependabot contains one grouped weekly `github-actions` entry and no other ecosystems.\n- **AC3:** NPE filtering covers the harness, workflow, requirements input, future CI lock, calibration files, and historical PRDs while unrelated paths remain skipped.\n- **AC4:** Permissions remain minimal/read-only; helper jobs have five-minute timeouts; GPU workflow remains dispatch-only and disclaims GPU execution.\n- **AC5:** Workflow parsing, complete repository checks, direct parity, lock, scope, and whitespace checks passed.\n- `actionlint` is correctly reported **UNANSWERED** because it is unavailable locally.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0003 acceptance criteria are satisfied: action SHAs are upstream-verified and enforced, Dependabot is GitHub-Actions-only, NPE filtering is self-testing, permissions and GPU semantics are preserved, and all available checks pass.\"}\n```",
+  "parsed": {
+    "assessment": "APPROVED",
+    "blockingIssues": [],
+    "summary": "All PRD 0003 acceptance criteria are satisfied: action SHAs are upstream-verified and enforced, Dependabot is GitHub-Actions-only, NPE filtering is self-testing, permissions and GPU semantics are preserved, and all available checks pass.",
+    "raw": "## Assessment: APPROVED\n\n- **AC1:** All 12 workflow action references use verified 40-character upstream SHAs with release comments; checker mutation tests confirm enforcement.\n- **AC2:** Dependabot contains one grouped weekly `github-actions` entry and no other ecosystems.\n- **AC3:** NPE filtering covers the harness, workflow, requirements input, future CI lock, calibration files, and historical PRDs while unrelated paths remain skipped.\n- **AC4:** Permissions remain minimal/read-only; helper jobs have five-minute timeouts; GPU workflow remains dispatch-only and disclaims GPU execution.\n- **AC5:** Workflow parsing, complete repository checks, direct parity, lock, scope, and whitespace checks passed.\n- `actionlint` is correctly reported **UNANSWERED** because it is unavailable locally.\n\n```json\n{\"assessment\":\"APPROVED\",\"blockingIssues\":[],\"summary\":\"All PRD 0003 acceptance criteria are satisfied: action SHAs are upstream-verified and enforced, Dependabot is GitHub-Actions-only, NPE filtering is self-testing, permissions and GPU semantics are preserved, and all available checks pass.\"}\n```",
+    "source": "json"
+  }
+}
