@@ -60,6 +60,12 @@ winner only after the hardware gate below passes.
   admission/reuse accounting and attributable timing. Local, CUDA-feature
   compile, allowlist, link, and complete repository checks pass; H100/Nsight
   evidence remains deferred to PRD 0003.
+- PRD 0003 is locally implemented: the opt-in H100 collector freezes the exact
+  27-command A/B/C protocol behind a mandatory preflight, the analyzer enforces
+  the frozen host/Nsight gates, and bounded idempotent teardown preserves
+  separate benchmark and cleanup status. Local synthetic, allowlist, link, and
+  complete repository checks pass. No paid VM was provisioned and no hardware
+  verdict or treatment promotion is claimed.
 
 ## Binding contracts
 

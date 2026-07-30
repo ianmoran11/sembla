@@ -21,6 +21,20 @@ INCOMPATIBLE = (
     "BENCH_CONCURRENCY_FUSED",
     "BENCH_CONCURRENCY_CRN",
 )
+FOCUSED_INCOMPATIBLE = (
+    "BENCH_CUDA_READBACK_DIAGNOSTIC",
+    "BENCH_PROFILE",
+    "BENCH_CORPUS",
+    "BENCH_SWEEP",
+    "BENCH_SWEEP_NUMA",
+    "BENCH_CONCURRENCY_SPIKE",
+    "BENCH_CONCURRENCY_SPIKE_ONLY",
+    "BENCH_CONCURRENCY_SUPPORTED",
+    "BENCH_CONCURRENCY_LOCKSTEP",
+    "BENCH_CONCURRENCY_FREE_STREAMS",
+    "BENCH_CONCURRENCY_FUSED",
+    "BENCH_CONCURRENCY_CRN",
+)
 
 
 class CollectorFlagValidationTest(unittest.TestCase):
@@ -38,8 +52,14 @@ class CollectorFlagValidationTest(unittest.TestCase):
         environment = os.environ.copy()
         for name in (
             "BENCH_CUDA_READBACK_DIAGNOSTIC",
+            "BENCH_CUDA_FINAL_STATE_DECISION",
             "BENCH_SWEEP_BASELINE_COMMIT",
+            "KEEP_VM",
+            "SEMBLA_FOCUSED_TEARDOWN_TEST_MODE",
+            "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256",
+            "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY",
             *INCOMPATIBLE,
+            *FOCUSED_INCOMPATIBLE,
         ):
             environment.pop(name, None)
         environment.update(
@@ -59,6 +79,12 @@ class CollectorFlagValidationTest(unittest.TestCase):
             timeout=30,
         )
 
+    def test_rejects_malformed_focused_value(self):
+        result = self.run_script(BENCH_CUDA_FINAL_STATE_DECISION="yes")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("must be 0 or 1", result.stderr)
+        self.assertFalse(self.artifact.exists())
+
     def test_rejects_malformed_diagnostic_value(self):
         result = self.run_script(BENCH_CUDA_READBACK_DIAGNOSTIC="yes")
         self.assertEqual(result.returncode, 2)
@@ -74,6 +100,49 @@ class CollectorFlagValidationTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertIn(f"mutually exclusive with {incompatible}", result.stderr)
                 self.assertFalse(self.artifact.exists())
+
+    def test_focused_stage_rejects_every_conflict_keep_vm_and_retired_selectors_before_artifacts(self):
+        for incompatible in FOCUSED_INCOMPATIBLE:
+            with self.subTest(incompatible=incompatible):
+                result = self.run_script(
+                    BENCH_CUDA_FINAL_STATE_DECISION="1", **{incompatible: "1"}
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("mutually exclusive", result.stderr)
+                self.assertIn(incompatible, result.stderr)
+                self.assertIn("BENCH_CUDA_FINAL_STATE_DECISION", result.stderr)
+                self.assertFalse(self.artifact.exists())
+        for environment, expected in [
+            ({"KEEP_VM": "1"}, "rejects KEEP_VM=1"),
+            ({"BENCH_SWEEP_BASELINE_COMMIT": "deadbeef"}, "BENCH_SWEEP_BASELINE_COMMIT"),
+            ({"SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256": "1"}, "retired selector"),
+            ({"SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY": "1"}, "retired selector"),
+        ]:
+            result = self.run_script(BENCH_CUDA_FINAL_STATE_DECISION="1", **environment)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(expected, result.stderr)
+            self.assertFalse(self.artifact.exists())
+
+    def test_focused_preflight_failures_and_outer_timeout_have_cleanup_paths(self):
+        source = SCRIPT.read_text()
+        self.assertIn("focused_paid_resources_in_state", source)
+        self.assertIn('if ! state="$(cd "$MODULE_DIR"', source)
+        self.assertIn('[[ -n "${HYPERSTACK_API_KEY:-}" ]]', source)
+        self.assertIn("sembla-final-state-preflight-cleanup", source)
+        self.assertIn("cuda_final_state_teardown", source)
+        self.assertIn("kill -TERM -- \"-$pid\"", source)
+        self.assertIn("demographic-bench-partial.tar.gz", source)
+        runbook = (SCRIPT.parent / "RUNBOOK.md").read_text()
+        self.assertIn("set -o pipefail", runbook)
+
+    def test_focused_stage_is_baked_into_payload_and_cannot_reach_broad_suites(self):
+        source = SCRIPT.read_text()
+        self.assertIn("export BENCH_CUDA_FINAL_STATE_DECISION=%q", source)
+        self.assertIn('BENCH_CUDA_FINAL_STATE_DECISION:-0}\" == \"1\"', source)
+        self.assertIn("scripts/run-cuda-final-state-decision.py", source)
+        self.assertIn("exactly 27 benchmark", source)
+        self.assertIn('&& "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "1"', source)
+        self.assertNotIn("SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256=1", source)
 
     def test_rejects_sweep_baseline_commit(self):
         result = self.run_script(
@@ -134,7 +203,8 @@ class CollectorFlagValidationTest(unittest.TestCase):
         source = SCRIPT.read_text()
         start = source.index("reload_nvidia_counter_mode() {")
         end = source.index(
-            '\nif [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]', start
+            '\nif [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ' + "\\" + "\n",
+            start,
         )
         functions = source[start:end]
         home = Path(self.temp.name) / "home"
