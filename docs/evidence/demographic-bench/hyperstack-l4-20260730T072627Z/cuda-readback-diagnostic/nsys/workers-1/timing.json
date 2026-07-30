@@ -1,0 +1,29 @@
+{
+  "schema": "sembla-sweep-timing-v1",
+  "backend": "cuda",
+  "draws": 4,
+  "ticks_per_draw": 24,
+  "setup_wall_time_ms": 2631.293613,
+  "draw_zero_including_setup_wall_time_ms": 4370.723772,
+  "draw_timings": [
+    {
+      "k": 0,
+      "wall_time_ms": 1739.4301589999998
+    },
+    {
+      "k": 1,
+      "wall_time_ms": 1593.206123
+    },
+    {
+      "k": 2,
+      "wall_time_ms": 1620.441747
+    },
+    {
+      "k": 3,
+      "wall_time_ms": 1643.6996139999999
+    }
+  ],
+  "whole_sweep_wall_time_ms": 11704.844034,
+  "repository_commit": "e9600f31251c495268337ed6c0eb16d7fb2b838c",
+  "binary_sha256": "f7a0aeb6e953b75c2d41b92ac16d2c3c17fe5a401b343fcf153b8def996af3d3"
+}

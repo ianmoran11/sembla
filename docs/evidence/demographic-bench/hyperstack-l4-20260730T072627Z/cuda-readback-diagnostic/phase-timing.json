@@ -1,0 +1,422 @@
+{
+  "schema": "sembla-execution-timing-v1",
+  "session": {
+    "backend": "cuda",
+    "scale": 10000000,
+    "ticks": 24,
+    "seed": 9009,
+    "repository_commit": "e9600f31251c495268337ed6c0eb16d7fb2b838c",
+    "binary_sha256": "f7a0aeb6e953b75c2d41b92ac16d2c3c17fe5a401b343fcf153b8def996af3d3"
+  },
+  "kernel_sync_inserted": false,
+  "timer": {
+    "clock": "std::time::Instant",
+    "resolution": "nanoseconds",
+    "reported_unit": "milliseconds"
+  },
+  "ticks": [
+    {
+      "tick": 0,
+      "wall_time_ms": 19.291217,
+      "phases_ms": {
+        "kernels": 19.267091,
+        "readback_control": 0.018208,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.004928,
+        "other": 0.0009599999999999999
+      },
+      "phase_sum_ms": 19.291217,
+      "within_tolerance": true
+    },
+    {
+      "tick": 1,
+      "wall_time_ms": 19.569342,
+      "phases_ms": {
+        "kernels": 19.549391999999997,
+        "readback_control": 0.015854,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.003065,
+        "other": 0.001001
+      },
+      "phase_sum_ms": 19.569342,
+      "within_tolerance": true
+    },
+    {
+      "tick": 2,
+      "wall_time_ms": 19.799486,
+      "phases_ms": {
+        "kernels": 19.780367000000002,
+        "readback_control": 0.015743,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.002804,
+        "other": 0.000542
+      },
+      "phase_sum_ms": 19.799486,
+      "within_tolerance": true
+    },
+    {
+      "tick": 3,
+      "wall_time_ms": 19.706557999999998,
+      "phases_ms": {
+        "kernels": 19.686607,
+        "readback_control": 0.016263999999999997,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.0031750000000000003,
+        "other": 0.000482
+      },
+      "phase_sum_ms": 19.706557999999998,
+      "within_tolerance": true
+    },
+    {
+      "tick": 4,
+      "wall_time_ms": 19.844794,
+      "phases_ms": {
+        "kernels": 19.824794,
+        "readback_control": 0.016595,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029,
+        "report": 0.002984,
+        "other": 0.00039200000000000004
+      },
+      "phase_sum_ms": 19.844794,
+      "within_tolerance": true
+    },
+    {
+      "tick": 5,
+      "wall_time_ms": 20.071482000000003,
+      "phases_ms": {
+        "kernels": 20.051652,
+        "readback_control": 0.015824,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.00008,
+        "report": 0.003174,
+        "other": 0.000752
+      },
+      "phase_sum_ms": 20.071482000000003,
+      "within_tolerance": true
+    },
+    {
+      "tick": 6,
+      "wall_time_ms": 19.913086,
+      "phases_ms": {
+        "kernels": 19.893966,
+        "readback_control": 0.016154,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.002474,
+        "other": 0.00046199999999999995
+      },
+      "phase_sum_ms": 19.913086,
+      "within_tolerance": true
+    },
+    {
+      "tick": 7,
+      "wall_time_ms": 20.057891,
+      "phases_ms": {
+        "kernels": 20.038032,
+        "readback_control": 0.015704,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029,
+        "report": 0.003576,
+        "other": 0.00055
+      },
+      "phase_sum_ms": 20.057891,
+      "within_tolerance": true
+    },
+    {
+      "tick": 8,
+      "wall_time_ms": 19.929969,
+      "phases_ms": {
+        "kernels": 19.910372,
+        "readback_control": 0.016344,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000031,
+        "report": 0.002904,
+        "other": 0.00031800000000000003
+      },
+      "phase_sum_ms": 19.929969,
+      "within_tolerance": true
+    },
+    {
+      "tick": 9,
+      "wall_time_ms": 20.198069999999998,
+      "phases_ms": {
+        "kernels": 20.177011,
+        "readback_control": 0.017114,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000111,
+        "report": 0.003116,
+        "other": 0.000718
+      },
+      "phase_sum_ms": 20.198069999999998,
+      "within_tolerance": true
+    },
+    {
+      "tick": 10,
+      "wall_time_ms": 20.000677000000003,
+      "phases_ms": {
+        "kernels": 19.980797000000003,
+        "readback_control": 0.016665,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.0027140000000000003,
+        "other": 0.000471
+      },
+      "phase_sum_ms": 20.000677000000003,
+      "within_tolerance": true
+    },
+    {
+      "tick": 11,
+      "wall_time_ms": 20.088005,
+      "phases_ms": {
+        "kernels": 20.068869,
+        "readback_control": 0.015302,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029,
+        "report": 0.0032440000000000004,
+        "other": 0.000561
+      },
+      "phase_sum_ms": 20.088005,
+      "within_tolerance": true
+    },
+    {
+      "tick": 12,
+      "wall_time_ms": 20.147855999999997,
+      "phases_ms": {
+        "kernels": 20.127857,
+        "readback_control": 0.016465,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.003185,
+        "other": 0.000319
+      },
+      "phase_sum_ms": 20.147855999999997,
+      "within_tolerance": true
+    },
+    {
+      "tick": 13,
+      "wall_time_ms": 20.217589,
+      "phases_ms": {
+        "kernels": 20.198342,
+        "readback_control": 0.016024,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.00007000000000000001,
+        "report": 0.002593,
+        "other": 0.0005600000000000001
+      },
+      "phase_sum_ms": 20.217589,
+      "within_tolerance": true
+    },
+    {
+      "tick": 14,
+      "wall_time_ms": 20.113575,
+      "phases_ms": {
+        "kernels": 20.093345,
+        "readback_control": 0.015964000000000002,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.00011999999999999999,
+        "report": 0.003406,
+        "other": 0.00074
+      },
+      "phase_sum_ms": 20.113575,
+      "within_tolerance": true
+    },
+    {
+      "tick": 15,
+      "wall_time_ms": 20.128316,
+      "phases_ms": {
+        "kernels": 20.108467,
+        "readback_control": 0.016153,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000031,
+        "report": 0.003005,
+        "other": 0.00066
+      },
+      "phase_sum_ms": 20.128316,
+      "within_tolerance": true
+    },
+    {
+      "tick": 16,
+      "wall_time_ms": 20.261325,
+      "phases_ms": {
+        "kernels": 20.239673,
+        "readback_control": 0.017446,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.003665,
+        "other": 0.000511
+      },
+      "phase_sum_ms": 20.261325,
+      "within_tolerance": true
+    },
+    {
+      "tick": 17,
+      "wall_time_ms": 20.240093,
+      "phases_ms": {
+        "kernels": 20.219583999999998,
+        "readback_control": 0.017245,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.002804,
+        "other": 0.00043
+      },
+      "phase_sum_ms": 20.240093,
+      "within_tolerance": true
+    },
+    {
+      "tick": 18,
+      "wall_time_ms": 20.186553999999997,
+      "phases_ms": {
+        "kernels": 20.166184,
+        "readback_control": 0.016794,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029,
+        "report": 0.002764,
+        "other": 0.000783
+      },
+      "phase_sum_ms": 20.186553999999997,
+      "within_tolerance": true
+    },
+    {
+      "tick": 19,
+      "wall_time_ms": 20.349196,
+      "phases_ms": {
+        "kernels": 20.329507,
+        "readback_control": 0.016144,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000031,
+        "report": 0.002884,
+        "other": 0.00063
+      },
+      "phase_sum_ms": 20.349196,
+      "within_tolerance": true
+    },
+    {
+      "tick": 20,
+      "wall_time_ms": 20.226142,
+      "phases_ms": {
+        "kernels": 20.205402,
+        "readback_control": 0.016966,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.0032660000000000002,
+        "other": 0.000478
+      },
+      "phase_sum_ms": 20.226142,
+      "within_tolerance": true
+    },
+    {
+      "tick": 21,
+      "wall_time_ms": 20.395104,
+      "phases_ms": {
+        "kernels": 20.374583,
+        "readback_control": 0.016616000000000002,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.000029999999999999997,
+        "report": 0.003506,
+        "other": 0.00036899999999999997
+      },
+      "phase_sum_ms": 20.395104,
+      "within_tolerance": true
+    },
+    {
+      "tick": 22,
+      "wall_time_ms": 20.337691000000003,
+      "phases_ms": {
+        "kernels": 20.31732,
+        "readback_control": 0.016404000000000002,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.00011999999999999999,
+        "report": 0.003145,
+        "other": 0.000702
+      },
+      "phase_sum_ms": 20.337691000000003,
+      "within_tolerance": true
+    },
+    {
+      "tick": 23,
+      "wall_time_ms": 20.456669,
+      "phases_ms": {
+        "kernels": 20.429159,
+        "readback_control": 0.015824,
+        "state_transfer": 0.0,
+        "state_reconstruct": 0.0,
+        "state_hash": 0.0,
+        "observe_views": 0.00002,
+        "report": 0.011156,
+        "other": 0.00051
+      },
+      "phase_sum_ms": 20.456669,
+      "within_tolerance": true
+    }
+  ],
+  "totals": {
+    "wall_time_ms": 481.530687,
+    "phases_ms": {
+      "kernels": 481.03837300000004,
+      "readback_control": 0.393816,
+      "state_transfer": 0.0,
+      "state_reconstruct": 0.0,
+      "state_hash": 0.0,
+      "observe_views": 0.00106,
+      "report": 0.083537,
+      "other": 0.013901
+    },
+    "phase_sum_ms": 481.530687
+  },
+  "self_check": {
+    "tolerance_ms": 0.001,
+    "all_ticks_reconciled": true,
+    "other_non_negative": true
+  }
+}
