@@ -48,9 +48,9 @@ impl PhiloxCoordinate {
 
 #[cfg(feature = "cuda")]
 pub use backend::{
-    CudaBackend, CudaDeviceIdentity, CudaFinalStateDownloadedBytes, CudaFinalStateReadback,
-    CudaFinalStateReadbackMode, CudaFusedBatchMetadata, CudaRunResult, CudaTickObservation,
-    FusedReusedCudaTickObservations, HashMode,
+    CudaBackend, CudaDeviceIdentity, CudaFinalStateBufferAccounting, CudaFinalStateDownloadedBytes,
+    CudaFinalStateReadback, CudaFinalStateReadbackMode, CudaFusedBatchMetadata, CudaRunResult,
+    CudaSweepCapacityEstimate, CudaTickObservation, FusedReusedCudaTickObservations, HashMode,
 };
 #[cfg(not(feature = "cuda"))]
 pub use backend_stub::{

@@ -55,7 +55,7 @@ fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
     let cli = include_str!("../../sembla-cli/src/main.rs");
     assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"));
     assert!(cli.contains("CudaBackend::new_nonblocking_stream("));
-    assert!(cli.contains("backend.run_draw_lockstep("));
+    assert!(cli.contains(".run_draw_lockstep("));
     assert!(cli.contains("let lockstep_tick = std::sync::Barrier::new(workers);"));
 }
 
@@ -124,7 +124,7 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
     );
     assert!(scheduler.contains("} else {"));
     assert!(scheduler.contains("next_draw.fetch_add("));
-    assert!(scheduler.contains("backend.run_draw("));
+    assert!(scheduler.contains(".run_draw("));
 
     // Both CUDA stream modes share the non-blocking constructor; independent
     // mode keeps the default stream.
@@ -137,7 +137,7 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
 }
 
 #[test]
-fn final_state_diagnostic_reuses_one_packed_hash_and_forces_pageable_download() {
+fn final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffers() {
     let backend = include_str!("../src/backend.rs");
     let method = section(
         backend,
@@ -146,8 +146,14 @@ fn final_state_diagnostic_reuses_one_packed_hash_and_forces_pageable_download() 
     );
     assert!(method.contains("CudaFinalStateReadbackMode::Materialized"));
     assert!(method.contains("CudaFinalStateReadbackMode::PackedPageable"));
+    assert!(method.contains("CudaFinalStateReadbackMode::PackedPinned"));
     assert!(method.contains("self.download_state_parts()?"));
-    assert!(method.contains("hash_state("));
+    assert!(method.matches("hash_state(").count() >= 2);
+    assert!(method.contains(".memcpy_dtoh("));
+    assert!(method.contains("wait_until_readable()?"));
+    assert!(method.contains(".stage()?"));
+    assert!(!method.contains("new_stream("));
+    assert!(!method.contains("fork("));
     assert!(!method.contains("final_state_hash_device"));
     assert!(!backend.contains("struct DeviceHashPlan"));
     assert!(!backend.contains("hash_digest: CudaSlice"));
@@ -155,7 +161,36 @@ fn final_state_diagnostic_reuses_one_packed_hash_and_forces_pageable_download() 
     let cli = include_str!("../../sembla-cli/src/main.rs");
     assert!(cli.contains("SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE"));
     assert_eq!(cli.matches(".final_state_readback(").count(), 2);
-    assert!(cli.contains("sembla-cuda-final-state-readback-v1"));
+    assert!(cli.contains("sembla-cuda-final-state-readback-v2"));
+
+    let fields = section(
+        backend,
+        "pub struct CudaBackend {",
+        "\n}\n\nimpl CudaBackend",
+    );
+    assert!(fields.contains("pinned_final_state: Option<PinnedFinalStateBuffers>"));
+    let owner = section(
+        backend,
+        "struct PinnedFinalStateBuffers {",
+        "\nfn checked_final_state_component_bytes(",
+    );
+    assert!(owner.contains("stream: std::sync::Arc<CudaStream>"));
+    assert!(owner.contains("self.stream.synchronize()"));
+    assert!(owner.contains("impl Drop for PinnedFinalStateBuffers"));
+    let constructor = section(
+        backend,
+        "impl<T> PinnedFinalStateComponent<T>",
+        "\n#[derive(Debug)]\nstruct PinnedFinalStateBuffers",
+    );
+    assert_eq!(constructor.matches("alloc_pinned::<T>").count(), 1);
+    assert!(constructor.contains("if len == 0"));
+    assert!(constructor.contains("return Ok(None)"));
+    assert!(constructor.contains("SAFETY: cudarc returns uninitialized page-locked memory"));
+    assert!(constructor.contains("never exposes or reads it until"));
+    assert_eq!(method.matches("if let Some(destination)").count(), 3);
+    assert!(owner.contains("map_or(&[], |component| component.cacheable.as_slice())"));
+    assert!(!backend.contains("cuMemHostAlloc"));
+    assert!(!backend.contains("device snapshot"));
 }
 
 #[test]

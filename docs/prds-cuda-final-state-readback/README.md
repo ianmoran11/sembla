@@ -55,6 +55,11 @@ winner only after the hardware gate below passes.
   the hidden materialized/pageable packed-host seams have versioned per-draw
   diagnostics. Local, CUDA-feature compile, allowlist, link, and repository
   checks pass; paid-hardware evidence remains deferred to PRD 0003.
+- PRD 0002 is locally implemented: hidden `packed-pinned` retains one bounded,
+  synchronized pinned-plus-cacheable buffer set per used CUDA lane with exact
+  admission/reuse accounting and attributable timing. Local, CUDA-feature
+  compile, allowlist, link, and complete repository checks pass; H100/Nsight
+  evidence remains deferred to PRD 0003.
 
 ## Binding contracts
 

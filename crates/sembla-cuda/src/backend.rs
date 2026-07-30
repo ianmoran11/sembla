@@ -2,8 +2,8 @@ use std::mem;
 use std::time::{Duration, Instant};
 
 use cudarc::driver::{
-    CudaContext, CudaEvent, CudaFunction, CudaSlice, DriverError, LaunchArgs, LaunchConfig,
-    PushKernelArg,
+    CudaContext, CudaEvent, CudaFunction, CudaSlice, CudaStream, DeviceRepr, DriverError,
+    LaunchArgs, LaunchConfig, PinnedHostSlice, PushKernelArg, ValidAsZeroBits,
 };
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
@@ -41,6 +41,7 @@ pub enum CudaFinalStateReadbackMode {
     #[default]
     Materialized,
     PackedPageable,
+    PackedPinned,
 }
 
 impl CudaFinalStateReadbackMode {
@@ -48,11 +49,13 @@ impl CudaFinalStateReadbackMode {
         match self {
             Self::Materialized => "materialized",
             Self::PackedPageable => "packed-pageable",
+            Self::PackedPinned => "packed-pinned",
         }
     }
 }
 
-/// Actual pageable bytes downloaded while producing one final-state digest.
+/// Exact logical component bytes participating in the canonical final-state
+/// digest. Device-side padding is deliberately excluded.
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CudaFinalStateDownloadedBytes {
@@ -62,21 +65,60 @@ pub struct CudaFinalStateDownloadedBytes {
     pub total: usize,
 }
 
+/// Retained pinned and cacheable-buffer accounting for one CUDA lane.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CudaFinalStateBufferAccounting {
+    pub buffer_set_count: usize,
+    pub underlying_pinned_allocation_count: usize,
+    pub pinned_bytes: usize,
+    pub cacheable_staging_bytes: usize,
+}
+
+/// Conservative sweep admission including final-state treatment memory.
+#[doc(hidden)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CudaSweepCapacityEstimate {
+    pub workers: usize,
+    pub device_bytes: usize,
+    pub device_bytes_per_lane_before_margin: usize,
+    pub fixed_device_bytes_before_margin: usize,
+    pub host_bytes: usize,
+    pub safety_margin_percent: usize,
+    pub final_state_bytes_per_lane: CudaFinalStateDownloadedBytes,
+    pub requested_pinned_bytes_per_lane: usize,
+    pub requested_cacheable_staging_bytes_per_lane: usize,
+    pub requested_pinned_bytes: usize,
+    pub requested_cacheable_staging_bytes: usize,
+    pub requested_buffer_set_count: usize,
+    pub requested_underlying_pinned_allocation_count: usize,
+}
+
 /// Digest plus diagnostic-only attribution for one CUDA final-state seam.
 #[doc(hidden)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CudaFinalStateReadback {
     pub digest: [u8; 32],
     pub mode: CudaFinalStateReadbackMode,
+    /// One-time lazy allocation. It is excluded from `total` and is zero after
+    /// the lane's retained set has been created.
+    pub allocation: Duration,
     /// The blocking pageable `memcpy_dtov` host-call interval. Cudarc 0.17.6
     /// exposes no separate completion-wait boundary for this API.
-    pub pageable_dtoh_host_api: Duration,
-    pub completion_wait: Option<Duration>,
-    /// `None` means not applicable for packed-pageable mode.
+    pub pageable_dtoh_host_api: Option<Duration>,
+    /// Pinned D2H enqueue/API calls on the backend's existing lane stream.
+    pub pinned_dtoh_enqueue_api: Option<Duration>,
+    /// Same-stream completion plus the pinned destinations' recorded events.
+    pub wait_to_pinned_host_readable: Option<Duration>,
+    /// Copy from write-combined pinned memory to retained cacheable buffers.
+    pub pinned_to_cacheable_staging_copy: Option<Duration>,
+    /// `None` means reconstruction is not applicable to this mode.
     pub host_state_reconstruction: Option<Duration>,
     pub cpu_sha256: Duration,
+    /// Complete final-state seam excluding one-time allocation.
     pub total: Duration,
     pub downloaded_bytes: CudaFinalStateDownloadedBytes,
+    pub buffer_accounting: CudaFinalStateBufferAccounting,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,16 +136,6 @@ pub struct CudaDeviceIdentity {
 /// least this much available host memory. It covers the coordinator state,
 /// four state-sized retained/readback copies per lane, per-lane working
 /// reserve, a process reserve, and the same safety margin.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct CudaSweepCapacityEstimate {
-    pub workers: usize,
-    pub device_bytes: usize,
-    pub device_bytes_per_lane_before_margin: usize,
-    pub fixed_device_bytes_before_margin: usize,
-    pub host_bytes: usize,
-    pub safety_margin_percent: usize,
-}
-
 #[derive(Clone, Debug)]
 pub struct CudaTickObservation {
     pub tick: u32,
@@ -255,9 +287,11 @@ struct Layout {
     resource_count: usize,
     column_offsets: Vec<u64>,
     state_len: usize,
+    state_logical_len: usize,
     ports: Vec<(usize, usize)>,
     input_offsets: Vec<u64>,
     input_len: usize,
+    input_logical_len: usize,
     candidate_offsets: Vec<u64>,
     candidate_count: usize,
     claim_instance_offsets: Vec<u64>,
@@ -290,6 +324,331 @@ pub struct CudaFusedBatchMetadata {
     pub streams: usize,
     pub nvrtc_compiles: usize,
     pub generated_source_sha256: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum FinalStateAllocationInjection {
+    #[default]
+    None,
+    #[cfg(test)]
+    Pinned(&'static str),
+    #[cfg(test)]
+    Staging(&'static str),
+}
+
+impl FinalStateAllocationInjection {
+    fn rejects_pinned(self, _label: &str) -> bool {
+        match self {
+            Self::None => false,
+            #[cfg(test)]
+            Self::Pinned(injected) => injected == _label,
+            #[cfg(test)]
+            Self::Staging(_) => false,
+        }
+    }
+
+    fn rejects_staging(self, _label: &str) -> bool {
+        match self {
+            Self::None => false,
+            #[cfg(test)]
+            Self::Pinned(_) => false,
+            #[cfg(test)]
+            Self::Staging(injected) => injected == _label,
+        }
+    }
+}
+
+fn allocate_cacheable_staging<T>(
+    len: usize,
+    label: &'static str,
+    injection: FinalStateAllocationInjection,
+) -> Result<Vec<T>, CudaError>
+where
+    T: Copy + Default,
+{
+    let bytes = len.checked_mul(mem::size_of::<T>()).ok_or_else(|| {
+        CudaError::InvalidInput(format!("packed-pinned {label} staging byte size overflow"))
+    })?;
+    if injection.rejects_staging(label) {
+        return Err(CudaError::DeviceExecution(format!(
+            "injected packed-pinned cacheable staging allocation failure for {label}: requested {bytes} bytes for one lane"
+        )));
+    }
+    let mut cacheable = Vec::new();
+    cacheable.try_reserve_exact(len).map_err(|error| {
+        CudaError::DeviceExecution(format!(
+            "packed-pinned cacheable staging allocation failed for {label}: requested {bytes} bytes for one lane: {error}"
+        ))
+    })?;
+    cacheable.resize(len, T::default());
+    if cacheable.capacity() != len {
+        let effective_bytes = cacheable
+            .capacity()
+            .checked_mul(mem::size_of::<T>())
+            .ok_or_else(|| {
+                CudaError::InvalidInput(format!(
+                    "packed-pinned {label} effective staging capacity overflow"
+                ))
+            })?;
+        return Err(CudaError::DeviceExecution(format!(
+            "packed-pinned cacheable staging allocation for {label} retained {effective_bytes} bytes, but admission reserved exactly {bytes} bytes for one lane"
+        )));
+    }
+    Ok(cacheable)
+}
+
+#[derive(Debug)]
+struct PinnedFinalStateComponent<T> {
+    label: &'static str,
+    pinned: PinnedHostSlice<T>,
+    cacheable: Vec<T>,
+}
+
+impl<T> PinnedFinalStateComponent<T>
+where
+    T: Copy + Default + DeviceRepr + ValidAsZeroBits,
+{
+    fn allocate(
+        stream: &std::sync::Arc<CudaStream>,
+        len: usize,
+        label: &'static str,
+        injection: FinalStateAllocationInjection,
+    ) -> Result<Option<Self>, CudaError> {
+        if len == 0 {
+            return Ok(None);
+        }
+        let bytes = len.checked_mul(mem::size_of::<T>()).ok_or_else(|| {
+            CudaError::InvalidInput(format!(
+                "packed-pinned {label} destination byte size overflow"
+            ))
+        })?;
+        if bytes >= isize::MAX as usize {
+            return Err(CudaError::InvalidInput(format!(
+                "packed-pinned {label} destination requests {bytes} bytes, which exceeds cudarc's pinned-slice bound"
+            )));
+        }
+
+        let cacheable = allocate_cacheable_staging(len, label, injection)?;
+
+        if injection.rejects_pinned(label) {
+            return Err(CudaError::DeviceExecution(format!(
+                "injected packed-pinned page-locked allocation failure for {label}: requested {bytes} bytes for one lane"
+            )));
+        }
+        // SAFETY: cudarc returns uninitialized page-locked memory. This owner
+        // never exposes or reads it until a full-slice `memcpy_dtoh` has been
+        // enqueued on `stream`, that stream has synchronized successfully, and
+        // the destination's recorded event has also synchronized via
+        // `PinnedHostSlice::as_slice`. Zero-length components never enter this
+        // constructor. The checked byte bound above prevents cudarc's internal
+        // multiplication/assertions from overflowing or panicking.
+        let pinned = unsafe { stream.context().alloc_pinned::<T>(len) }.map_err(|error| {
+            CudaError::Driver(format!(
+                "packed-pinned page-locked allocation failed for {label}: requested {bytes} bytes for one lane: {error}"
+            ))
+        })?;
+        Ok(Some(Self {
+            label,
+            pinned,
+            cacheable,
+        }))
+    }
+
+    fn wait_until_readable(&self) -> Result<(), CudaError> {
+        self.pinned.as_slice().map(|_| ()).map_err(|error| {
+            CudaError::Driver(format!(
+                "packed-pinned {} destination did not become host-readable: {error}",
+                self.label
+            ))
+        })
+    }
+
+    fn stage(&mut self) -> Result<(), CudaError> {
+        let pinned = self.pinned.as_slice().map_err(|error| {
+            CudaError::Driver(format!(
+                "packed-pinned {} destination was not readable for cacheable staging: {error}",
+                self.label
+            ))
+        })?;
+        self.cacheable.copy_from_slice(pinned);
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct PinnedFinalStateBuffers {
+    // This is an Arc clone of the backend's existing default/non-blocking lane
+    // stream. No treatment-specific stream is created.
+    stream: std::sync::Arc<CudaStream>,
+    state: Option<PinnedFinalStateComponent<u8>>,
+    inputs: Option<PinnedFinalStateComponent<u8>>,
+    input_counts: Option<PinnedFinalStateComponent<u64>>,
+    accounting: CudaFinalStateBufferAccounting,
+}
+
+impl PinnedFinalStateBuffers {
+    fn allocate(
+        stream: &std::sync::Arc<CudaStream>,
+        bytes: CudaFinalStateDownloadedBytes,
+        injection: FinalStateAllocationInjection,
+    ) -> Result<Self, CudaError> {
+        let state = PinnedFinalStateComponent::allocate(stream, bytes.state, "state", injection)?;
+        let inputs =
+            PinnedFinalStateComponent::allocate(stream, bytes.inputs, "inputs", injection)?;
+        let input_count_len = bytes
+            .input_counts
+            .checked_div(mem::size_of::<u64>())
+            .ok_or_else(|| {
+                CudaError::InvalidInput("input-count size divisor is zero".to_owned())
+            })?;
+        let input_counts = PinnedFinalStateComponent::allocate(
+            stream,
+            input_count_len,
+            "input counts",
+            injection,
+        )?;
+
+        let underlying_pinned_allocation_count = usize::from(state.is_some())
+            + usize::from(inputs.is_some())
+            + usize::from(input_counts.is_some());
+        let cacheable_staging_bytes = state
+            .as_ref()
+            .and_then(|component| {
+                component
+                    .cacheable
+                    .capacity()
+                    .checked_mul(mem::size_of::<u8>())
+            })
+            .unwrap_or(0)
+            .checked_add(
+                inputs
+                    .as_ref()
+                    .and_then(|component| {
+                        component
+                            .cacheable
+                            .capacity()
+                            .checked_mul(mem::size_of::<u8>())
+                    })
+                    .unwrap_or(0),
+            )
+            .and_then(|value| {
+                value.checked_add(
+                    input_counts
+                        .as_ref()
+                        .and_then(|component| {
+                            component
+                                .cacheable
+                                .capacity()
+                                .checked_mul(mem::size_of::<u64>())
+                        })
+                        .unwrap_or(0),
+                )
+            })
+            .ok_or_else(|| {
+                CudaError::InvalidInput(
+                    "packed-pinned cacheable staging capacity overflow".to_owned(),
+                )
+            })?;
+        Ok(Self {
+            stream: std::sync::Arc::clone(stream),
+            state,
+            inputs,
+            input_counts,
+            accounting: CudaFinalStateBufferAccounting {
+                buffer_set_count: 1,
+                underlying_pinned_allocation_count,
+                pinned_bytes: bytes.total,
+                cacheable_staging_bytes,
+            },
+        })
+    }
+
+    fn wait_until_readable(&self) -> Result<(), CudaError> {
+        self.stream.synchronize().map_err(|error| {
+            CudaError::Driver(format!(
+                "packed-pinned existing lane stream did not complete final-state D2H work: {error}"
+            ))
+        })?;
+        if let Some(component) = &self.state {
+            component.wait_until_readable()?;
+        }
+        if let Some(component) = &self.inputs {
+            component.wait_until_readable()?;
+        }
+        if let Some(component) = &self.input_counts {
+            component.wait_until_readable()?;
+        }
+        Ok(())
+    }
+
+    fn stage(&mut self) -> Result<(), CudaError> {
+        if let Some(component) = &mut self.state {
+            component.stage()?;
+        }
+        if let Some(component) = &mut self.inputs {
+            component.stage()?;
+        }
+        if let Some(component) = &mut self.input_counts {
+            component.stage()?;
+        }
+        Ok(())
+    }
+
+    fn state(&self) -> &[u8] {
+        self.state
+            .as_ref()
+            .map_or(&[], |component| component.cacheable.as_slice())
+    }
+
+    fn inputs(&self) -> &[u8] {
+        self.inputs
+            .as_ref()
+            .map_or(&[], |component| component.cacheable.as_slice())
+    }
+
+    fn input_counts(&self) -> &[u64] {
+        self.input_counts
+            .as_ref()
+            .map_or(&[], |component| component.cacheable.as_slice())
+    }
+}
+
+impl Drop for PinnedFinalStateBuffers {
+    fn drop(&mut self) {
+        // A failed enqueue/wait may unwind with work still pending. Synchronize
+        // the retained lane stream before the pinned destinations are freed.
+        self.stream.context().record_err(self.stream.synchronize());
+    }
+}
+
+fn checked_final_state_component_bytes(
+    state: usize,
+    inputs: usize,
+    input_count_len: usize,
+) -> Result<CudaFinalStateDownloadedBytes, CudaError> {
+    let input_counts = input_count_len
+        .checked_mul(mem::size_of::<u64>())
+        .ok_or_else(|| CudaError::InvalidInput("input-count byte total overflow".to_owned()))?;
+    let total = state
+        .checked_add(inputs)
+        .and_then(|bytes| bytes.checked_add(input_counts))
+        .ok_or_else(|| CudaError::InvalidInput("final-state byte total overflow".to_owned()))?;
+    Ok(CudaFinalStateDownloadedBytes {
+        state,
+        inputs,
+        input_counts,
+        total,
+    })
+}
+
+fn final_state_component_bytes(
+    layout: &Layout,
+) -> Result<CudaFinalStateDownloadedBytes, CudaError> {
+    checked_final_state_component_bytes(
+        layout.state_logical_len,
+        layout.input_logical_len,
+        layout.ports.len(),
+    )
 }
 
 fn checked_arena_len(per_slot: usize, slots: usize, label: &str) -> Result<usize, CudaError> {
@@ -513,6 +872,7 @@ fn estimate_isolated_sweep_capacity(
     generated: &GeneratedCuda,
     parameter_bytes: usize,
     workers: usize,
+    final_state_mode: CudaFinalStateReadbackMode,
 ) -> Result<CudaSweepCapacityEstimate, CudaError> {
     if workers == 0 {
         return Err(CudaError::InvalidInput(
@@ -560,10 +920,48 @@ fn estimate_isolated_sweep_capacity(
         .checked_mul(workers)
         .and_then(|bytes| bytes.checked_add(SWEEP_CAPACITY_FIXED_DEVICE_RESERVE))
         .ok_or_else(|| CudaError::InvalidInput("CUDA sweep device estimate overflow".to_owned()))?;
+    let final_state_bytes_per_lane = final_state_component_bytes(layout)?;
+    let (requested_pinned_bytes_per_lane, requested_cacheable_staging_bytes_per_lane) =
+        if final_state_mode == CudaFinalStateReadbackMode::PackedPinned {
+            (
+                final_state_bytes_per_lane.total,
+                final_state_bytes_per_lane.total,
+            )
+        } else {
+            (0, 0)
+        };
+    let requested_pinned_bytes = requested_pinned_bytes_per_lane
+        .checked_mul(workers)
+        .ok_or_else(|| {
+            CudaError::InvalidInput("CUDA sweep pinned-byte estimate overflow".to_owned())
+        })?;
+    let requested_cacheable_staging_bytes = requested_cacheable_staging_bytes_per_lane
+        .checked_mul(workers)
+        .ok_or_else(|| {
+            CudaError::InvalidInput("CUDA sweep staging-byte estimate overflow".to_owned())
+        })?;
+    let allocations_per_lane = usize::from(final_state_bytes_per_lane.state != 0)
+        + usize::from(final_state_bytes_per_lane.inputs != 0)
+        + usize::from(final_state_bytes_per_lane.input_counts != 0);
+    let requested_buffer_set_count =
+        usize::from(final_state_mode == CudaFinalStateReadbackMode::PackedPinned)
+            .checked_mul(workers)
+            .ok_or_else(|| {
+                CudaError::InvalidInput("CUDA sweep pinned buffer-set count overflow".to_owned())
+            })?;
+    let requested_underlying_pinned_allocation_count = if requested_buffer_set_count == 0 {
+        0
+    } else {
+        allocations_per_lane.checked_mul(workers).ok_or_else(|| {
+            CudaError::InvalidInput("CUDA sweep pinned allocation-count overflow".to_owned())
+        })?
+    };
     let retained_host_state = layout
         .state_len
         .checked_mul(4)
         .and_then(|bytes| bytes.checked_add(SWEEP_CAPACITY_PER_LANE_HOST_RESERVE))
+        .and_then(|bytes| bytes.checked_add(requested_pinned_bytes_per_lane))
+        .and_then(|bytes| bytes.checked_add(requested_cacheable_staging_bytes_per_lane))
         .ok_or_else(|| {
             CudaError::InvalidInput("CUDA sweep host lane estimate overflow".to_owned())
         })?;
@@ -579,6 +977,13 @@ fn estimate_isolated_sweep_capacity(
         fixed_device_bytes_before_margin: SWEEP_CAPACITY_FIXED_DEVICE_RESERVE,
         host_bytes: with_capacity_safety_margin(host_before_margin, "host")?,
         safety_margin_percent: 25,
+        final_state_bytes_per_lane,
+        requested_pinned_bytes_per_lane,
+        requested_cacheable_staging_bytes_per_lane,
+        requested_pinned_bytes,
+        requested_cacheable_staging_bytes,
+        requested_buffer_set_count,
+        requested_underlying_pinned_allocation_count,
     })
 }
 
@@ -667,6 +1072,9 @@ pub struct CudaBackend {
     host_tables: Vec<TableInit>,
     generated: GeneratedCuda,
     layout: Layout,
+    // Declared before the stream and device sources so its Drop synchronization
+    // runs before either can be released.
+    pinned_final_state: Option<PinnedFinalStateBuffers>,
     stream: std::sync::Arc<cudarc::driver::CudaStream>,
     transition_functions: Vec<CudaFunction>,
     reset_status: CudaFunction,
@@ -787,7 +1195,8 @@ impl CudaBackend {
         model: &ValidatedModel,
         initial_tables: &[TableInit],
         workers: usize,
-    ) -> Result<(usize, usize, usize, usize, usize), CudaError> {
+        final_state_mode: CudaFinalStateReadbackMode,
+    ) -> Result<CudaSweepCapacityEstimate, CudaError> {
         let generated = generate(model)?;
         let layout = build_layout(model, initial_tables, &generated)?;
         let parameter_bytes = model
@@ -799,15 +1208,13 @@ impl CudaBackend {
             .ok_or_else(|| {
                 CudaError::InvalidInput("CUDA sweep parameter size overflow".to_owned())
             })?;
-        let estimate =
-            estimate_isolated_sweep_capacity(&layout, &generated, parameter_bytes, workers)?;
-        Ok((
-            estimate.device_bytes,
-            estimate.host_bytes,
-            estimate.device_bytes_per_lane_before_margin,
-            estimate.fixed_device_bytes_before_margin,
-            estimate.safety_margin_percent,
-        ))
+        estimate_isolated_sweep_capacity(
+            &layout,
+            &generated,
+            parameter_bytes,
+            workers,
+            final_state_mode,
+        )
     }
 
     /// Returns `(free, total)` bytes for device zero. The short-lived context
@@ -1301,6 +1708,7 @@ impl CudaBackend {
             host_tables: initial_tables,
             generated,
             layout,
+            pinned_final_state: None,
             stream,
             transition_functions,
             reset_status,
@@ -1630,9 +2038,24 @@ impl CudaBackend {
         Ok(&self.host_state)
     }
 
+    fn ensure_pinned_final_state_buffers(
+        &mut self,
+        injection: FinalStateAllocationInjection,
+    ) -> Result<Duration, CudaError> {
+        if self.pinned_final_state.is_some() {
+            return Ok(Duration::ZERO);
+        }
+        let bytes = final_state_component_bytes(&self.layout)?;
+        let allocation_started = Instant::now();
+        let buffers = PinnedFinalStateBuffers::allocate(&self.stream, bytes, injection)?;
+        let allocation = allocation_started.elapsed();
+        self.pinned_final_state = Some(buffers);
+        Ok(allocation)
+    }
+
     /// Produces the canonical final-state digest through the selected hidden
-    /// diagnostic seam. `PackedPageable` always downloads all packed
-    /// components, even if the retained host snapshot is already current.
+    /// diagnostic seam. Packed modes always download every logical component,
+    /// even if the retained materialized host snapshot is already current.
     #[doc(hidden)]
     pub fn final_state_readback(
         &mut self,
@@ -1643,9 +2066,9 @@ impl CudaBackend {
                 "final-state readback diagnostics do not support fused CUDA batches".to_owned(),
             ));
         }
-        let total_started = Instant::now();
         match mode {
             CudaFinalStateReadbackMode::Materialized => {
+                let total_started = Instant::now();
                 let mut pageable_dtoh_host_api = Duration::ZERO;
                 let mut host_state_reconstruction = Duration::ZERO;
                 let mut downloaded_bytes = CudaFinalStateDownloadedBytes::default();
@@ -1665,17 +2088,20 @@ impl CudaBackend {
                 Ok(CudaFinalStateReadback {
                     digest,
                     mode,
-                    pageable_dtoh_host_api,
-                    // cudarc 0.17.6's pageable memcpy_dtov call does not expose
-                    // a separately attributable completion-wait boundary.
-                    completion_wait: None,
+                    allocation: Duration::ZERO,
+                    pageable_dtoh_host_api: Some(pageable_dtoh_host_api),
+                    pinned_dtoh_enqueue_api: None,
+                    wait_to_pinned_host_readable: None,
+                    pinned_to_cacheable_staging_copy: None,
                     host_state_reconstruction: Some(host_state_reconstruction),
                     cpu_sha256,
                     total: total_started.elapsed(),
                     downloaded_bytes,
+                    buffer_accounting: CudaFinalStateBufferAccounting::default(),
                 })
             }
             CudaFinalStateReadbackMode::PackedPageable => {
+                let total_started = Instant::now();
                 let transfer_started = Instant::now();
                 let (state, inputs, input_counts) = self.download_state_parts()?;
                 let pageable_dtoh_host_api = transfer_started.elapsed();
@@ -1686,12 +2112,130 @@ impl CudaBackend {
                 Ok(CudaFinalStateReadback {
                     digest,
                     mode,
-                    pageable_dtoh_host_api,
-                    completion_wait: None,
+                    allocation: Duration::ZERO,
+                    pageable_dtoh_host_api: Some(pageable_dtoh_host_api),
+                    pinned_dtoh_enqueue_api: None,
+                    wait_to_pinned_host_readable: None,
+                    pinned_to_cacheable_staging_copy: None,
                     host_state_reconstruction: None,
                     cpu_sha256,
                     total: total_started.elapsed(),
                     downloaded_bytes,
+                    buffer_accounting: CudaFinalStateBufferAccounting::default(),
+                })
+            }
+            CudaFinalStateReadbackMode::PackedPinned => {
+                let downloaded_bytes = final_state_component_bytes(&self.layout)?;
+                let allocation =
+                    self.ensure_pinned_final_state_buffers(FinalStateAllocationInjection::None)?;
+                let total_started = Instant::now();
+                let stream = std::sync::Arc::clone(&self.stream);
+                let enqueue_started = Instant::now();
+                {
+                    let buffers = self
+                        .pinned_final_state
+                        .as_mut()
+                        .expect("packed-pinned allocation installed its owner");
+                    if let Some(destination) = &mut buffers.state {
+                        let source =
+                            self.state
+                                .try_slice(0..downloaded_bytes.state)
+                                .ok_or_else(|| {
+                                    CudaError::DeviceExecution(
+                                        "packed-pinned logical state view exceeds device slice"
+                                            .to_owned(),
+                                    )
+                                })?;
+                        stream
+                            .memcpy_dtoh(&source, &mut destination.pinned)
+                            .map_err(|error| {
+                                CudaError::Driver(format!(
+                                    "packed-pinned state D2H enqueue failed for {} bytes: {error}",
+                                    downloaded_bytes.state
+                                ))
+                            })?;
+                    }
+                    if let Some(destination) = &mut buffers.inputs {
+                        let source = self
+                            .inputs
+                            .try_slice(0..downloaded_bytes.inputs)
+                            .ok_or_else(|| {
+                                CudaError::DeviceExecution(
+                                    "packed-pinned logical input view exceeds device slice"
+                                        .to_owned(),
+                                )
+                            })?;
+                        stream
+                            .memcpy_dtoh(&source, &mut destination.pinned)
+                            .map_err(|error| {
+                                CudaError::Driver(format!(
+                                    "packed-pinned input D2H enqueue failed for {} bytes: {error}",
+                                    downloaded_bytes.inputs
+                                ))
+                            })?;
+                    }
+                    if let Some(destination) = &mut buffers.input_counts {
+                        let count_len = downloaded_bytes.input_counts / mem::size_of::<u64>();
+                        let source =
+                            self.input_counts.try_slice(0..count_len).ok_or_else(|| {
+                                CudaError::DeviceExecution(
+                                    "packed-pinned logical input-count view exceeds device slice"
+                                        .to_owned(),
+                                )
+                            })?;
+                        stream
+                            .memcpy_dtoh(&source, &mut destination.pinned)
+                            .map_err(|error| {
+                                CudaError::Driver(format!(
+                                    "packed-pinned input-count D2H enqueue failed for {} bytes: {error}",
+                                    downloaded_bytes.input_counts
+                                ))
+                            })?;
+                    }
+                }
+                let pinned_dtoh_enqueue_api = enqueue_started.elapsed();
+
+                let wait_started = Instant::now();
+                self.pinned_final_state
+                    .as_ref()
+                    .expect("packed-pinned owner remains installed")
+                    .wait_until_readable()?;
+                let wait_to_pinned_host_readable = wait_started.elapsed();
+
+                let staging_started = Instant::now();
+                self.pinned_final_state
+                    .as_mut()
+                    .expect("packed-pinned owner remains installed")
+                    .stage()?;
+                let pinned_to_cacheable_staging_copy = staging_started.elapsed();
+
+                let hash_started = Instant::now();
+                let buffers = self
+                    .pinned_final_state
+                    .as_ref()
+                    .expect("packed-pinned owner remains installed");
+                let digest = hash_state(
+                    &self.model,
+                    &self.layout,
+                    buffers.state(),
+                    buffers.inputs(),
+                    buffers.input_counts(),
+                );
+                let cpu_sha256 = hash_started.elapsed();
+                let buffer_accounting = buffers.accounting;
+                Ok(CudaFinalStateReadback {
+                    digest,
+                    mode,
+                    allocation,
+                    pageable_dtoh_host_api: None,
+                    pinned_dtoh_enqueue_api: Some(pinned_dtoh_enqueue_api),
+                    wait_to_pinned_host_readable: Some(wait_to_pinned_host_readable),
+                    pinned_to_cacheable_staging_copy: Some(pinned_to_cacheable_staging_copy),
+                    host_state_reconstruction: None,
+                    cpu_sha256,
+                    total: total_started.elapsed(),
+                    downloaded_bytes,
+                    buffer_accounting,
                 })
             }
         }
@@ -3718,15 +4262,57 @@ impl CudaBackend {
     }
 
     fn download_state_parts(&self) -> Result<DownloadedStateParts, CudaError> {
-        let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
-        let inputs = self
-            .stream
-            .memcpy_dtov(&self.inputs)
-            .map_err(driver_error)?;
-        let input_counts = self
-            .stream
-            .memcpy_dtov(&self.input_counts)
-            .map_err(driver_error)?;
+        if self.fused_batch.is_some() {
+            let state = self.stream.memcpy_dtov(&self.state).map_err(driver_error)?;
+            let inputs = self
+                .stream
+                .memcpy_dtov(&self.inputs)
+                .map_err(driver_error)?;
+            let input_counts = self
+                .stream
+                .memcpy_dtov(&self.input_counts)
+                .map_err(driver_error)?;
+            return Ok((state, inputs, input_counts));
+        }
+        let state = if self.layout.state_logical_len == 0 {
+            Vec::new()
+        } else {
+            let source = self
+                .state
+                .try_slice(0..self.layout.state_logical_len)
+                .ok_or_else(|| {
+                    CudaError::DeviceExecution(
+                        "logical state view exceeds CUDA device slice".to_owned(),
+                    )
+                })?;
+            self.stream.memcpy_dtov(&source).map_err(driver_error)?
+        };
+        let inputs = if self.layout.input_logical_len == 0 {
+            Vec::new()
+        } else {
+            let source = self
+                .inputs
+                .try_slice(0..self.layout.input_logical_len)
+                .ok_or_else(|| {
+                    CudaError::DeviceExecution(
+                        "logical input view exceeds CUDA device slice".to_owned(),
+                    )
+                })?;
+            self.stream.memcpy_dtov(&source).map_err(driver_error)?
+        };
+        let input_counts = if self.layout.ports.is_empty() {
+            Vec::new()
+        } else {
+            let source = self
+                .input_counts
+                .try_slice(0..self.layout.ports.len())
+                .ok_or_else(|| {
+                    CudaError::DeviceExecution(
+                        "logical input-count view exceeds CUDA device slice".to_owned(),
+                    )
+                })?;
+            self.stream.memcpy_dtov(&source).map_err(driver_error)?
+        };
         Ok((state, inputs, input_counts))
     }
 
@@ -4075,6 +4661,8 @@ fn build_layout(
             }
         }
     }
+    let state_logical_len = state_len;
+    let input_logical_len = input_len;
     state_len = state_len.max(1);
     input_len = input_len.max(1);
 
@@ -4144,9 +4732,11 @@ fn build_layout(
         resource_count,
         column_offsets,
         state_len,
+        state_logical_len,
         ports,
         input_offsets,
         input_len,
+        input_logical_len,
         candidate_offsets,
         candidate_count,
         claim_instance_offsets,
@@ -4549,8 +5139,10 @@ mod diagnostic_equality_hardware {
 #[cfg(test)]
 mod sweep_capacity_tests {
     use super::{
-        build_layout, estimate_isolated_sweep_capacity, generate, hash_state, pack_initial_state,
-        write_column, SWEEP_CAPACITY_MIB,
+        allocate_cacheable_staging, build_layout, checked_final_state_component_bytes,
+        estimate_isolated_sweep_capacity, final_state_component_bytes, generate, hash_state,
+        pack_initial_state, write_column, CudaFinalStateReadbackMode,
+        FinalStateAllocationInjection, SWEEP_CAPACITY_MIB,
     };
     use sembla_runtime::state::{ColumnData, ColumnInit, InputTable, StateStore, TableInit};
 
@@ -4596,9 +5188,14 @@ mod sweep_capacity_tests {
             let layout = build_layout(&model, &tables, &generated).unwrap();
             let parameter_bytes = model.model().params.len().max(1) * 8;
             for (workers, observed) in [1_usize, 2, 4].into_iter().zip(observed_mib) {
-                let estimate =
-                    estimate_isolated_sweep_capacity(&layout, &generated, parameter_bytes, workers)
-                        .unwrap();
+                let estimate = estimate_isolated_sweep_capacity(
+                    &layout,
+                    &generated,
+                    parameter_bytes,
+                    workers,
+                    CudaFinalStateReadbackMode::Materialized,
+                )
+                .unwrap();
                 assert!(
                     estimate.device_bytes >= observed * SWEEP_CAPACITY_MIB,
                     "{scale} rows/{workers} lanes: estimate {} MiB under measured {observed} MiB",
@@ -4613,10 +5210,146 @@ mod sweep_capacity_tests {
         let (model, tables) = demographic_shape(1);
         let generated = generate(&model).unwrap();
         let layout = build_layout(&model, &tables, &generated).unwrap();
-        assert!(estimate_isolated_sweep_capacity(&layout, &generated, 8, 0)
+        assert!(estimate_isolated_sweep_capacity(
+            &layout,
+            &generated,
+            8,
+            0,
+            CudaFinalStateReadbackMode::PackedPinned,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("greater than zero"));
+    }
+
+    #[test]
+    fn packed_pinned_accounting_is_exact_per_lane_and_zero_aware() {
+        let empty_source = r#"{"name":"empty","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[],"transitions":[],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+        let empty = sembla_ir::validate(sembla_ir::parse_json(empty_source).unwrap()).unwrap();
+        let generated = generate(&empty).unwrap();
+        let layout = build_layout(&empty, &[], &generated).unwrap();
+        let zero = checked_final_state_component_bytes(0, 0, 0).unwrap();
+        assert_eq!(zero.total, 0);
+        assert_eq!(zero.state, 0);
+        assert_eq!(zero.inputs, 0);
+        assert_eq!(zero.input_counts, 0);
+        assert!(checked_final_state_component_bytes(usize::MAX, 1, 0)
             .unwrap_err()
             .to_string()
-            .contains("greater than zero"));
+            .contains("final-state byte total overflow"));
+        assert!(checked_final_state_component_bytes(0, 0, usize::MAX)
+            .unwrap_err()
+            .to_string()
+            .contains("input-count byte total overflow"));
+        let empty_bytes = final_state_component_bytes(&layout).unwrap();
+        assert_eq!(empty_bytes, zero);
+        let empty_materialized = StateStore::new(&empty, Vec::new()).unwrap();
+        assert_eq!(
+            hash_state(&empty, &layout, &[], &[], &[]),
+            empty_materialized.state_hash()
+        );
+        let estimate = estimate_isolated_sweep_capacity(
+            &layout,
+            &generated,
+            8,
+            4,
+            CudaFinalStateReadbackMode::PackedPinned,
+        )
+        .unwrap();
+        assert_eq!(estimate.requested_buffer_set_count, 4);
+        let empty_allocations_per_lane = usize::from(empty_bytes.state != 0);
+        assert_eq!(
+            estimate.requested_underlying_pinned_allocation_count,
+            empty_allocations_per_lane * 4
+        );
+        assert_eq!(estimate.requested_pinned_bytes, empty_bytes.total * 4);
+        assert_eq!(
+            estimate.requested_cacheable_staging_bytes,
+            empty_bytes.total * 4
+        );
+
+        let (model, tables) = demographic_shape(3);
+        let generated = generate(&model).unwrap();
+        let layout = build_layout(&model, &tables, &generated).unwrap();
+        let bytes = final_state_component_bytes(&layout).unwrap();
+        let workers = 2;
+        let pinned = estimate_isolated_sweep_capacity(
+            &layout,
+            &generated,
+            8,
+            workers,
+            CudaFinalStateReadbackMode::PackedPinned,
+        )
+        .unwrap();
+        assert_eq!(pinned.final_state_bytes_per_lane, bytes);
+        assert_eq!(pinned.requested_pinned_bytes_per_lane, bytes.total);
+        assert_eq!(
+            pinned.requested_cacheable_staging_bytes_per_lane,
+            bytes.total
+        );
+        assert_eq!(pinned.requested_pinned_bytes, bytes.total * workers);
+        assert_eq!(
+            pinned.requested_cacheable_staging_bytes,
+            bytes.total * workers
+        );
+        assert_eq!(pinned.requested_buffer_set_count, workers);
+        let allocations_per_lane = usize::from(bytes.state != 0)
+            + usize::from(bytes.inputs != 0)
+            + usize::from(bytes.input_counts != 0);
+        assert_eq!(
+            pinned.requested_underlying_pinned_allocation_count,
+            allocations_per_lane * workers
+        );
+        assert!(pinned.requested_underlying_pinned_allocation_count <= 3 * workers);
+
+        assert!(estimate_isolated_sweep_capacity(
+            &layout,
+            &generated,
+            8,
+            usize::MAX,
+            CudaFinalStateReadbackMode::PackedPinned,
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("overflow"));
+
+        for mode in [
+            CudaFinalStateReadbackMode::Materialized,
+            CudaFinalStateReadbackMode::PackedPageable,
+        ] {
+            let control =
+                estimate_isolated_sweep_capacity(&layout, &generated, 8, workers, mode).unwrap();
+            assert_eq!(control.requested_pinned_bytes, 0);
+            assert_eq!(control.requested_cacheable_staging_bytes, 0);
+            assert_eq!(control.requested_buffer_set_count, 0);
+            assert_eq!(control.requested_underlying_pinned_allocation_count, 0);
+        }
+    }
+
+    #[test]
+    fn cacheable_staging_allocation_is_fallible_and_zero_safe() {
+        let empty = allocate_cacheable_staging::<u64>(
+            0,
+            "input counts",
+            FinalStateAllocationInjection::None,
+        )
+        .unwrap();
+        assert!(empty.is_empty());
+        assert_eq!(empty.capacity(), 0);
+
+        let error = allocate_cacheable_staging::<u8>(
+            17,
+            "state",
+            FinalStateAllocationInjection::Staging("state"),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("injected packed-pinned cacheable staging allocation failure"));
+        assert!(error.contains("requested 17 bytes"));
+        assert!(error.contains("one lane"));
+        assert!(!error.contains("fallback"));
+        assert!(FinalStateAllocationInjection::Pinned("state").rejects_pinned("state"));
+        assert!(!FinalStateAllocationInjection::Pinned("inputs").rejects_pinned("state"));
     }
 
     #[test]

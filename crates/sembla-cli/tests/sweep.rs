@@ -476,7 +476,7 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&std::fs::read(timing).unwrap()).unwrap();
-    assert_eq!(document["schema"], "sembla-sweep-timing-v2");
+    assert_eq!(document["schema"], "sembla-sweep-timing-v3");
     assert_eq!(document["draws"], 3);
     assert_eq!(document["draw_timings"].as_array().unwrap().len(), 3);
     assert!(document["draw_timings"]
@@ -528,7 +528,7 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
         serde_json::from_slice(&std::fs::read(concurrent_timing).unwrap()).unwrap();
     assert_eq!(
         concurrent_document["schema"],
-        "sembla-sweep-concurrency-spike-timing-v2"
+        "sembla-sweep-concurrency-spike-timing-v3"
     );
     assert_eq!(concurrent_document["requested_draw_workers"], 2);
     assert_eq!(concurrent_document["effective_draw_workers"], 2);
@@ -740,16 +740,31 @@ fn final_state_selector_scope_and_retired_variables_fail_before_output() {
             "accepted only for CUDA sweep execution",
         ),
         (
+            "cpu-sweep-pinned",
+            "cpu",
+            vec![(FINAL_STATE_MODE_ENV, "packed-pinned")],
+            "accepted only for CUDA sweep execution",
+        ),
+        (
             "invalid-value",
             "cuda",
             vec![(FINAL_STATE_MODE_ENV, "device")],
-            "expected 'materialized' or 'packed-pageable'",
+            "expected 'materialized', 'packed-pageable', or 'packed-pinned'",
         ),
         (
             "fused-conflict",
             "cuda",
             vec![
                 (FINAL_STATE_MODE_ENV, "packed-pageable"),
+                ("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", "2"),
+            ],
+            "incompatible with experimental SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS",
+        ),
+        (
+            "fused-pinned-conflict",
+            "cuda",
+            vec![
+                (FINAL_STATE_MODE_ENV, "packed-pinned"),
                 ("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", "2"),
             ],
             "incompatible with experimental SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS",
@@ -786,35 +801,40 @@ fn final_state_selector_scope_and_retired_variables_fail_before_output() {
     }
 
     for backend in ["cpu", "cuda"] {
-        let out = temp.join(format!("run-{backend}.csv"));
-        let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
-        clean_final_state_env(&mut process);
-        let output = process
-            .arg("run")
-            .arg(&model)
-            .arg("--population")
-            .arg(&population)
-            .args([
-                "--seed",
-                "19",
-                "--ticks",
-                "1",
-                "--backend",
-                backend,
-                "--out",
-            ])
-            .arg(&out)
-            .env(FINAL_STATE_MODE_ENV, "packed-pageable")
-            .output()
-            .unwrap();
-        assert!(!output.status.success(), "run/{backend}");
-        assert!(
-            String::from_utf8_lossy(&output.stderr)
-                .contains("accepted only for CUDA sweep execution, not 'run'"),
-            "run/{backend}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        assert!(!out.exists(), "run/{backend} created scientific output");
+        for mode in ["packed-pageable", "packed-pinned"] {
+            let out = temp.join(format!("run-{backend}-{mode}.csv"));
+            let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            clean_final_state_env(&mut process);
+            let output = process
+                .arg("run")
+                .arg(&model)
+                .arg("--population")
+                .arg(&population)
+                .args([
+                    "--seed",
+                    "19",
+                    "--ticks",
+                    "1",
+                    "--backend",
+                    backend,
+                    "--out",
+                ])
+                .arg(&out)
+                .env(FINAL_STATE_MODE_ENV, mode)
+                .output()
+                .unwrap();
+            assert!(!output.status.success(), "run/{backend}/{mode}");
+            assert!(
+                String::from_utf8_lossy(&output.stderr)
+                    .contains("accepted only for CUDA sweep execution, not 'run'"),
+                "run/{backend}/{mode}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                !out.exists(),
+                "run/{backend}/{mode} created scientific output"
+            );
+        }
     }
 
     #[cfg(unix)]
