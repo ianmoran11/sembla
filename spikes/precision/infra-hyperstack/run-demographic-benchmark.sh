@@ -527,6 +527,53 @@ RUNS="$OUT_ROOT/runs"
 rm -rf "$OUT_ROOT"
 mkdir -p "$WORK" "$RUNS"
 export LC_ALL=C
+PARTIAL_ARCHIVE="$HOME/demographic-bench-partial.tar.gz"
+rm -f "$PARTIAL_ARCHIVE"
+remove_ncu_capability() {
+  if [[ -n "${NCU_BIN:-}" && -e "${NCU_BIN:-}" ]] \
+      && getcap "$NCU_BIN" 2>/dev/null | grep -q 'cap_sys_admin'; then
+    sudo -n setcap -r "$NCU_BIN"
+  fi
+  if [[ -n "${DIAGNOSTIC_DIR:-}" && -d "${DIAGNOSTIC_DIR:-}" ]]; then
+    getcap "${NCU_BIN:-/nonexistent}" \
+      > "$DIAGNOSTIC_DIR/ncu-capability-after-cleanup.txt" 2>&1 || true
+  fi
+}
+package_partial_on_error() {
+  local trapped_rc=$?
+  local rc="${1:-$trapped_rc}"
+  trap - ERR
+  set +e
+  remove_ncu_capability
+  local partial_root="$HOME/demographic-bench-partial"
+  rm -rf "$partial_root"
+  mkdir -p "$partial_root"
+  printf '%s\n' "$rc" > "$partial_root/remote-exit-code.txt"
+  for name in gpu-provenance.txt cpu-provenance.txt ram-provenance.txt \
+      session-id.txt host-identity.sha256 repository-commit.txt started-utc.txt \
+      binary.sha256; do
+    [[ -f "$OUT_ROOT/$name" ]] && cp -a "$OUT_ROOT/$name" "$partial_root/"
+  done
+  if [[ -d "$OUT_ROOT/cuda-readback-diagnostic" ]]; then
+    cp -a "$OUT_ROOT/cuda-readback-diagnostic" "$partial_root/"
+  fi
+  (
+    cd "$partial_root" || exit
+    find . -type f ! -name SHA256SUMS.partial -print0 \
+      | LC_ALL=C sort -z | xargs -0 -r sha256sum > SHA256SUMS.partial
+  )
+  tar -czf "$PARTIAL_ARCHIVE" -C "$HOME" "$(basename "$partial_root")"
+  rm -rf "$partial_root"
+  exit "$rc"
+}
+diagnostic_fail() {
+  local message="$1"
+  echo "$message" >&2
+  package_partial_on_error 9
+}
+if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
+  trap package_partial_on_error ERR
+fi
 
 command -v nvidia-smi >/dev/null
 command -v sha256sum >/dev/null
@@ -566,10 +613,56 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   echo '=== focused CUDA readback/contended-kernel diagnostic (10M grouped) ==='
   DIAGNOSTIC_DIR="$OUT_ROOT/cuda-readback-diagnostic"
   mkdir -p "$DIAGNOSTIC_DIR/nsys" "$DIAGNOSTIC_DIR/ncu"
-  command -v nsys >/dev/null || { echo 'nsys is required for BENCH_CUDA_READBACK_DIAGNOSTIC' >&2; exit 9; }
-  command -v ncu >/dev/null || { echo 'ncu is required for BENCH_CUDA_READBACK_DIAGNOSTIC' >&2; exit 9; }
+  command -v nsys >/dev/null \
+    || diagnostic_fail 'nsys is required for BENCH_CUDA_READBACK_DIAGNOSTIC'
+  command -v sudo >/dev/null \
+    || diagnostic_fail 'sudo is required to prepare Nsight Compute counter access'
+  command -v setcap >/dev/null \
+    || diagnostic_fail 'setcap is required to prepare Nsight Compute counter access'
+  command -v getcap >/dev/null \
+    || diagnostic_fail 'getcap is required to verify Nsight Compute counter access'
+  sudo -n true \
+    || diagnostic_fail 'passwordless sudo is required to prepare Nsight Compute counter access'
+  # The CUDA 12.8 image's bundled 2025.1.1 injection shim omits
+  # cuTensorMapEncodeIm2colWide, which cudarc 0.17.6 resolves at startup. The
+  # 2025.2.1 shim supplies it. NVIDIA documents cap_sys_admin on ncu as a
+  # narrower ERR_NVGPUCTRPERM remedy than running the target application as
+  # root; the package-owned binary must remain root-owned and non-writable.
+  NCU_PACKAGE='nsight-compute-2025.2.1'
+  NCU_DEBIAN_VERSION='2025.2.1.3-1'
+  NCU_BIN='/opt/nvidia/nsight-compute/2025.2.1/ncu'
+  apt-cache policy "$NCU_PACKAGE" > "$DIAGNOSTIC_DIR/ncu-package-policy.txt"
+  grep -RhsE '^[[:space:]]*deb ' /etc/apt/sources.list /etc/apt/sources.list.d \
+    > "$DIAGNOSTIC_DIR/ncu-package-sources.txt" || true
+  installed_ncu_version="$(dpkg-query -W -f='${Version}' "$NCU_PACKAGE" 2>/dev/null || true)"
+  if [[ "$installed_ncu_version" != "$NCU_DEBIAN_VERSION" ]]; then
+    timeout --signal=TERM --kill-after=60s 600s \
+      sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      "$NCU_PACKAGE=$NCU_DEBIAN_VERSION" \
+      > "$DIAGNOSTIC_DIR/ncu-package-install.log" 2>&1
+  fi
+  [[ -x "$NCU_BIN" ]] \
+    || diagnostic_fail "pinned Nsight Compute binary missing: $NCU_BIN"
+  [[ "$(stat -c '%U' "$NCU_BIN")" == root ]] \
+    || diagnostic_fail 'pinned Nsight Compute binary is not root-owned'
+  ncu_mode="$(stat -c '%a' "$NCU_BIN")"
+  (( (8#$ncu_mode & 8#022) == 0 )) \
+    || diagnostic_fail 'pinned Nsight Compute binary is group/world writable'
+  sudo -n setcap cap_sys_admin+ep "$NCU_BIN"
+  getcap "$NCU_BIN" > "$DIAGNOSTIC_DIR/ncu-capability.txt"
+  grep -Fq 'cap_sys_admin=ep' "$DIAGNOSTIC_DIR/ncu-capability.txt" \
+    || diagnostic_fail 'Nsight Compute capability was not applied'
+  dpkg-query -W -f='${Package} ${Version}\n' "$NCU_PACKAGE" \
+    > "$DIAGNOSTIC_DIR/ncu-package.txt"
+  grep -Fq "$NCU_PACKAGE $NCU_DEBIAN_VERSION" "$DIAGNOSTIC_DIR/ncu-package.txt" \
+    || diagnostic_fail 'unexpected Nsight Compute Debian package version'
+  stat -c 'owner=%U group=%G mode=%a size=%s' "$NCU_BIN" \
+    > "$DIAGNOSTIC_DIR/ncu-binary-stat.txt"
+  sha256sum "$NCU_BIN" > "$DIAGNOSTIC_DIR/ncu-binary.sha256"
   nsys --version > "$DIAGNOSTIC_DIR/nsys-version.txt" 2>&1
-  ncu --version > "$DIAGNOSTIC_DIR/ncu-version.txt" 2>&1
+  "$NCU_BIN" --version > "$DIAGNOSTIC_DIR/ncu-version.txt" 2>&1
+  grep -Fq 'Version 2025.2.1.' "$DIAGNOSTIC_DIR/ncu-version.txt" \
+    || diagnostic_fail 'unexpected pinned Nsight Compute version'
 
   DIAGNOSTIC_SCALE=10000000
   DIAGNOSTIC_TICKS=24
@@ -603,7 +696,8 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   for diagnostic_workers in 1 4; do
     arm="$DIAGNOSTIC_DIR/nsys/workers-$diagnostic_workers"
     mkdir -p "$arm"
-    timeout 180s nsys profile --trace=cuda --sample=none --cpuctxsw=none \
+    timeout --signal=TERM --kill-after=30s 180s \
+      nsys profile --trace=cuda --sample=none --cpuctxsw=none \
       --stats=false --force-overwrite=true -o "$arm/trace" \
       "$BIN" sweep "$DIAGNOSTIC_MODEL" \
         --population "$DIAGNOSTIC_STATE" --backend cuda --seed "$SEED" \
@@ -611,18 +705,26 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
         --ticks "$DIAGNOSTIC_TICKS" --noise independent \
         --enable grouped-observations --timing-json "$arm/timing.json" \
         --out "$arm/output" > "$arm/stdout.txt" 2> "$arm/stderr.txt"
-    nsys stats --force-export=true --report cuda_gpu_trace --format csv \
+    [[ -s "$arm/trace.nsys-rep" ]] \
+      || diagnostic_fail 'Nsight Systems raw report missing'
+    timeout --signal=TERM --kill-after=10s 60s \
+      nsys stats --force-export=true --report cuda_gpu_trace --format csv \
       "$arm/trace.nsys-rep" > "$arm/cuda-gpu-trace.csv"
-    nsys stats --force-export=true --report cuda_gpu_kern_sum --format csv \
+    timeout --signal=TERM --kill-after=10s 60s \
+      nsys stats --force-export=true --report cuda_gpu_kern_sum --format csv \
       "$arm/trace.nsys-rep" > "$arm/cuda-kernel-summary.csv"
-    nsys stats --force-export=true --report cuda_api_sum --format csv \
+    timeout --signal=TERM --kill-after=10s 60s \
+      nsys stats --force-export=true --report cuda_api_sum --format csv \
       "$arm/trace.nsys-rep" > "$arm/cuda-api-summary.csv"
     for optional_report in cuda_gpu_mem_time_sum cuda_gpu_mem_size_sum cuda_kern_exec_sum; do
-      nsys stats --force-export=true --report "$optional_report" --format csv \
+      timeout --signal=TERM --kill-after=10s 60s \
+        nsys stats --force-export=true --report "$optional_report" --format csv \
         "$arm/trace.nsys-rep" > "$arm/$optional_report.csv" 2>&1 \
         || printf 'report unavailable: %s\n' "$optional_report" > "$arm/$optional_report.UNAVAILABLE"
     done
-    rm -f "$arm/trace.nsys-rep" "$arm/trace.sqlite"
+    # Preserve the raw profiler report; only the derived SQLite export cache is
+    # disposable. The CSVs are retained for machine-readable analysis.
+    rm -f "$arm/trace.sqlite"
     rm -rf "$arm/output"
   done
 
@@ -642,11 +744,13 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   )
   "${analyzer[@]}"
   mapfile -t ncu_kernels < "$DIAGNOSTIC_DIR/ncu-kernels.txt"
-  (( ${#ncu_kernels[@]} == 3 )) || { echo 'diagnostic analyzer did not select three NCU kernels' >&2; exit 9; }
+  (( ${#ncu_kernels[@]} == 3 )) \
+    || diagnostic_fail 'diagnostic analyzer did not select three NCU kernels'
 
   # At most three SOL/occupancy launches and two detailed stall launches.
   for kernel in "${ncu_kernels[@]}"; do
-    timeout 240s ncu --devices 0 --target-processes all --replay-mode kernel \
+    timeout --signal=TERM --kill-after=30s 240s "$NCU_BIN" \
+      --devices 0 --target-processes all --replay-mode kernel \
       --kernel-name-base function --kernel-name "regex:^${kernel}$" \
       --launch-count 1 --section LaunchStats --section Occupancy \
       --section SpeedOfLight --force-overwrite \
@@ -656,10 +760,12 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
         --out "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output.csv" \
       > "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.stdout" \
       2> "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.stderr"
-    ncu --import "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.ncu-rep" \
+    [[ -s "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.ncu-rep" ]] \
+      || diagnostic_fail "raw Nsight Compute report missing for $kernel SOL"
+    timeout --signal=TERM --kill-after=10s 60s "$NCU_BIN" \
+      --import "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.ncu-rep" \
       --csv --page details > "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.csv"
-    rm -f "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.ncu-rep" \
-      "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output.csv" \
+    rm -f "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output.csv" \
       "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output."*.csv
   done
 
@@ -667,7 +773,8 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   [[ "${ncu_kernels[0]}" == 'sembla_count_deferred' ]] \
     || detail_kernels+=(sembla_count_deferred)
   for kernel in "${detail_kernels[@]}"; do
-    timeout 240s ncu --devices 0 --target-processes all --replay-mode kernel \
+    timeout --signal=TERM --kill-after=30s 240s "$NCU_BIN" \
+      --devices 0 --target-processes all --replay-mode kernel \
       --kernel-name-base function --kernel-name "regex:^${kernel}$" \
       --launch-count 1 --section MemoryWorkloadAnalysis \
       --section SchedulerStats --section WarpStateStats --force-overwrite \
@@ -677,17 +784,34 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
         --out "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output.csv" \
       > "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.stdout" \
       2> "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.stderr"
-    ncu --import "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.ncu-rep" \
+    [[ -s "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.ncu-rep" ]] \
+      || diagnostic_fail "raw Nsight Compute report missing for $kernel detail"
+    timeout --signal=TERM --kill-after=10s 60s "$NCU_BIN" \
+      --import "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.ncu-rep" \
       --csv --page details > "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.csv"
-    rm -f "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.ncu-rep" \
-      "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output.csv" \
+    rm -f "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output.csv" \
       "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output."*.csv
   done
 
+  remove_ncu_capability
+  if getcap "$NCU_BIN" | grep -q 'cap_sys_admin'; then
+    diagnostic_fail 'Nsight Compute capability remained after profiling'
+  fi
   "${analyzer[@]}" --ncu-dir "$DIAGNOSTIC_DIR/ncu" \
     --assertions "$OUT_ROOT/assertions.txt"
-  [[ "$(sha256sum "$DIAGNOSTIC_STATE" | awk '{print $1}')" == "$DIAGNOSTIC_STATE_SHA" ]]
-  [[ "$(sha256sum "$DIAGNOSTIC_MODEL" | awk '{print $1}')" == "$DIAGNOSTIC_MODEL_SHA" ]]
+  raw_nsys_count="$(find "$DIAGNOSTIC_DIR/nsys" -name '*.nsys-rep' -type f -size +0c | wc -l)"
+  raw_ncu_count="$(find "$DIAGNOSTIC_DIR/ncu" -name '*.ncu-rep' -type f -size +0c | wc -l)"
+  [[ "$raw_nsys_count" == 2 ]] \
+    || diagnostic_fail 'expected two raw Nsight Systems reports'
+  expected_raw_ncu_count=$(( ${#ncu_kernels[@]} + ${#detail_kernels[@]} ))
+  [[ "$raw_ncu_count" == "$expected_raw_ncu_count" ]] \
+    || diagnostic_fail 'unexpected raw Nsight Compute report count'
+  printf 'PASS raw profiler reports retained: nsys=%s ncu=%s\n' \
+    "$raw_nsys_count" "$raw_ncu_count" >> "$OUT_ROOT/assertions.txt"
+  [[ "$(sha256sum "$DIAGNOSTIC_STATE" | awk '{print $1}')" == "$DIAGNOSTIC_STATE_SHA" ]] \
+    || diagnostic_fail 'diagnostic state changed during profiling'
+  [[ "$(sha256sum "$DIAGNOSTIC_MODEL" | awk '{print $1}')" == "$DIAGNOSTIC_MODEL_SHA" ]] \
+    || diagnostic_fail 'diagnostic model changed during profiling'
   rm -f "$DIAGNOSTIC_STATE" "$DIAGNOSTIC_MODEL"
   echo '=== focused CUDA readback/contended-kernel diagnostic complete ==='
 fi
@@ -2053,6 +2177,26 @@ fi
 if [[ "$bench_status" != "SEMBLA_BENCH_COMPLETE" ]]; then
   echo "Remote benchmark did not complete: ${bench_status:-still running at timeout}" >&2
   echo "Log: $ARTIFACT_DIR/remote-run.log" >&2
+  if ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'test -s ~/demographic-bench-partial.tar.gz'; then
+    partial_dir="$ARTIFACT_DIR/partial"
+    mkdir -p "$partial_dir"
+    scp "${SSH_OPTIONS[@]}" "$REMOTE:demographic-bench-partial.tar.gz" \
+      "$partial_dir/" >/dev/null
+    tar -xzf "$partial_dir/demographic-bench-partial.tar.gz" \
+      -C "$partial_dir" --strip-components=1
+    rm -f "$partial_dir/demographic-bench-partial.tar.gz"
+    if command -v sha256sum >/dev/null; then
+      (cd "$partial_dir" && sha256sum -c SHA256SUMS.partial >/dev/null)
+    elif command -v shasum >/dev/null; then
+      (cd "$partial_dir" && shasum -a 256 -c SHA256SUMS.partial >/dev/null)
+    else
+      echo 'no SHA-256 utility available to verify partial diagnostic evidence' >&2
+      exit 1
+    fi
+    echo "Checksummed partial diagnostic evidence: $partial_dir" >&2
+  else
+    echo 'No remote partial diagnostic archive was available.' >&2
+  fi
   echo "The VM is still up. Re-run this script to rejoin, or destroy it now." >&2
   if [[ -n "$EVIDENCE_BRANCH" ]]; then
     echo "Note: evidence for a completed earlier phase is already on $EVIDENCE_BRANCH." >&2
