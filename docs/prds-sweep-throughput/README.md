@@ -142,15 +142,16 @@ against the PRD where it currently lives.
   the negative comparator control, and final checksums are recorded in
   [`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/).
 
-- [`0004-run-cuda-draws-concurrently`](../prds-run-queue/0001-run-cuda-draws-concurrently.md) —
-  drafted 2026-07-29 after CUDA Gate 1 passed for the free-running
-  non-blocking-stream design; currently queued as run item `0001`.
+- [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
+  implemented and locally approved 2026-07-30 in commit `71c76fd` after CUDA
+  Gate 1 passed for the free-running non-blocking-stream design. Hardware
+  criteria 10–13 remain pending for a later paid GPU session.
 
 The concurrent-draw candidate was scoped below so the measurement could answer
 the architectural questions before an implementation specification froze them;
 that measurement is now complete and `0004` is the result.
 
-## Concurrent-draw track — scoped, not yet drafted
+## Concurrent-draw track — CUDA implemented locally; hardware verification pending
 
 This work stays in `docs/prds-sweep-throughput/`; do not create a second folder.
 It directly extends 0001's retained-backend lifecycle and inherits this folder's
@@ -482,8 +483,8 @@ operator decision (CUDA-capable production):
   timing) is subsumed into `0004` for the CUDA track; a standalone scheduler
   PRD returns only if the CPU track reopens.
 - `0003-control-cpu-draw-resources` — **deferred** pending CPU Gate 1.
-- [`0004-run-cuda-draws-concurrently`](../prds-run-queue/0001-run-cuda-draws-concurrently.md) —
-  **implemented locally 2026-07-30; hardware criteria pending**. Self-contained
+- [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
+  **implemented and locally approved in `71c76fd`; hardware criteria pending**. Self-contained
   for the CUDA track: supported `--draw-workers` interface, bounded capacity
   preflight, per-lane non-blocking streams, and the scheduler contract, on the
   measured free-streams mechanism. The paid GPU rerun uses
