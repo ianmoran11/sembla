@@ -26,8 +26,10 @@ isolated retained backends running simultaneously — depends.
 ## Measured current state
 
 The corrected H100 session at commit
-`5616dbe56cddb26e6a6541bead3572639827a8c2` is recorded in
-[`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/).
+`5616dbe56cddb26e6a6541bead3572639827a8c2` is recorded in the retained local
+evidence directory
+`docs/evidence/demographic-bench/hyperstack-l4-20260729T022057Z/` (not
+published in this history).
 For 20 CUDA draws over 24 ticks:
 
 | scale | whole sweep | draw 0 | median later draw |
@@ -139,18 +141,20 @@ against the PRD where it currently lives.
   identity once. Local correctness and initial CPU evidence are recorded in
   [`../evidence/sweep-backend-reuse-20260728.md`](../evidence/sweep-backend-reuse-20260728.md).
   Corrected-current 1M/10M GPU evidence, complete CPU/CUDA output-tree parity,
-  the negative comparator control, and final checksums are recorded in
-  [`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/).
+  the negative comparator control, and final checksums are retained locally at
+  `docs/evidence/demographic-bench/hyperstack-l4-20260729T022057Z/` (not
+  published in this history).
 
-- [`0004-run-cuda-draws-concurrently`](../prds-run-queue/0001-run-cuda-draws-concurrently.md) —
-  drafted 2026-07-29 after CUDA Gate 1 passed for the free-running
-  non-blocking-stream design; currently queued as run item `0001`.
+- [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
+  implemented and locally approved 2026-07-30 in commit `d862a91` after CUDA
+  Gate 1 passed for the free-running non-blocking-stream design. Hardware
+  criteria 10–13 remain pending for a later paid GPU session.
 
 The concurrent-draw candidate was scoped below so the measurement could answer
 the architectural questions before an implementation specification froze them;
 that measurement is now complete and `0004` is the result.
 
-## Concurrent-draw track — scoped, not yet drafted
+## Concurrent-draw track — CUDA implemented locally; hardware verification pending
 
 This work stays in `docs/prds-sweep-throughput/`; do not create a second folder.
 It directly extends 0001's retained-backend lifecycle and inherits this folder's
@@ -177,9 +181,9 @@ mutable object.
 
 ### Gate 0 — corrected sequential evidence complete
 
-The checksummed
-[`hyperstack-l4-20260729T022057Z`](../evidence/demographic-bench/hyperstack-l4-20260729T022057Z/)
-session satisfies this gate:
+The checksummed session retained locally at
+`docs/evidence/demographic-bench/hyperstack-l4-20260729T022057Z/` (not
+published in this history) satisfies this gate:
 
 - all arms identify current commit
   `5616dbe56cddb26e6a6541bead3572639827a8c2`;
@@ -482,8 +486,8 @@ operator decision (CUDA-capable production):
   timing) is subsumed into `0004` for the CUDA track; a standalone scheduler
   PRD returns only if the CPU track reopens.
 - `0003-control-cpu-draw-resources` — **deferred** pending CPU Gate 1.
-- [`0004-run-cuda-draws-concurrently`](../prds-run-queue/0001-run-cuda-draws-concurrently.md) —
-  **implemented locally 2026-07-30; hardware criteria pending**. Self-contained
+- [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
+  **implemented and locally approved in `d862a91`; hardware criteria pending**. Self-contained
   for the CUDA track: supported `--draw-workers` interface, bounded capacity
   preflight, per-lane non-blocking streams, and the scheduler contract, on the
   measured free-streams mechanism. The paid GPU rerun uses

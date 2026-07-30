@@ -212,8 +212,8 @@ so run them from here rather than folder by folder.
 | 9 | `prds-cuda-validation-parallelism/0008` remove the spin lock | yes | **landed and hardware-verified**: four ordered lock-free passes; differential corpus restored |
 | 10 | `prds-sweep-throughput/0001` reuse the backend across draws | no | **landed and hardware-verified**: one retained resettable backend across sequential draws |
 | 11 | `prds-cuda-host-path/0002` reduce device-side `wins`/`deferred` | yes | **landed and hardware-verified**: compact resident count buffers replace full-state control readback |
-| 12 | [`prds-run-queue/0001`](prds-run-queue/0001-run-cuda-draws-concurrently.md) run CUDA draws concurrently | local only | **next**: promote the Gate-1-positive free-running non-blocking-stream mechanism to an explicit bounded interface; GPU criteria remain pending per §M3 |
-| 13 | **one GPU session** | yes | verify item 12's supported flag, capacity failure, output parity, and non-default-stream execution after its local implementation is approved |
+| 12 | [`prds-sweep-throughput/0004`](prds-sweep-throughput/0004-run-cuda-draws-concurrently.md) run CUDA draws concurrently | local only | **landed and locally approved** in `d862a91`: explicit bounded `--draw-workers` interface; GPU criteria remain pending per §M3 |
+| 13 | **one GPU session** | yes | **next**: verify item 12's supported flag, capacity failure, output parity, and non-default-stream execution |
 
 **Why 9 first.** Item 11 is a device-side change to a reduction, which is exactly
 the shape the differential corpus exists to check. Landing it while the corpus
