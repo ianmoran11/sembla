@@ -1,0 +1,7 @@
+PASS exact 10M grouped CUDA phase timing reconciled for 24 ticks
+PASS equal four-draw Systems arms contain identical kernel instances
+PASS four-worker Systems arm used at least four CUDA streams
+PASS D2H calls, bytes, union, overlap, destinations, and size classes recorded
+PASS evidence-selected kernel duration penalties recorded
+PASS bounded Nsight Compute SOL/occupancy and detailed stall CSVs recorded
+PASS raw profiler reports retained: nsys=2 ncu=5
