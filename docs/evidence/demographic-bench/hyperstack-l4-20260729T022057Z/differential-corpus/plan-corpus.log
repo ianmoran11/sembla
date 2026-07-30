@@ -1,0 +1,89 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends --all-plan-fixtures --population 1000 --seed 7 --ticks 20 --enable grouped-observations`
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="world" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="world" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_grouped_observation tick=0 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=1 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=2 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=3 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=4 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=5 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=6 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=7 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=8 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=9 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=10 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=11 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=12 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=13 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=14 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=15 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=16 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=17 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=18 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+cuda_device_grouped_observation tick=19 box="world" view="population_cells" key_space_size=2000 occupied_groups=1 emitted_groups=1
+model=fixtures/plans/grouped_observation.plan.json verdict=equal cpu_ticks_per_sec=18078.295 cuda_ticks_per_sec=243.631
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/epidemic_policy.plan.json verdict=equal cpu_ticks_per_sec=35041.244 cuda_ticks_per_sec=212.985
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/independent_epidemic_policy.plan.json verdict=equal cpu_ticks_per_sec=37051.583 cuda_ticks_per_sec=231.118
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="pong" view="seen_yes" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/ping_pong.plan.json verdict=equal cpu_ticks_per_sec=156014.759 cuda_ticks_per_sec=246.883
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="epidemic/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="epidemic/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="epidemic/population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/regional_response.plan.json verdict=equal cpu_ticks_per_sec=35395.975 cuda_ticks_per_sec=208.774
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/solo_population.plan.json verdict=equal cpu_ticks_per_sec=40450.538 cuda_ticks_per_sec=236.712
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="north/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/two_independent_regions.plan.json verdict=equal cpu_ticks_per_sec=19133.867 cuda_ticks_per_sec=198.328
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="north/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="north/population" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="south/population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/two_regions.plan.json verdict=equal cpu_ticks_per_sec=18145.823 cuda_ticks_per_sec=173.151
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="wpong/pong" view="seen_yes" eligible=true reason=count with a row-local filter
+model=fixtures/plans/linked/wrapped_ping_pong.plan.json verdict=equal cpu_ticks_per_sec=152663.598 cuda_ticks_per_sec=249.485
+cuda_device_observation eligible=false reason=at least one view requires host observation
+cuda_device_observation_view box="population" view="active_count" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="maximum_value" eligible=false reason=value is not a row-local infallible Int expression; Real extrema retain host NaN ordering
+cuda_device_observation_view box="population" view="minimum_visits" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="population" view="total_value" eligible=false reason=Sum preserves host order for Real and host overflow association for Int
+model=fixtures/plans/observations.plan.json verdict=equal cpu_ticks_per_sec=40240.315 cuda_ticks_per_sec=267.863
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="sir" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/sir.plan.json verdict=equal cpu_ticks_per_sec=47153.574 cuda_ticks_per_sec=236.364
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+model=fixtures/plans/sir_policy.plan.json verdict=equal cpu_ticks_per_sec=30.678 cuda_ticks_per_sec=1.740
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=fixtures/plans/two_box.plan.json verdict=equal cpu_ticks_per_sec=137914.865 cuda_ticks_per_sec=257.034
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=fixtures/plans/two_box_plus_sibling.plan.json verdict=equal cpu_ticks_per_sec=118501.665 cuda_ticks_per_sec=249.399
+corpus_verdict=equal models=14

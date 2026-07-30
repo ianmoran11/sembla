@@ -1,0 +1,74 @@
+Module                  Size  Used by
+nvidia_modeset       1724416  0
+video                  77824  1 nvidia_modeset
+wmi                    28672  1 video
+nvidia_uvm           2121728  0
+nvidia              11653120  7 nvidia_uvm,nvidia_modeset
+ecc                    45056  1 nvidia
+xt_connmark            12288  4
+xt_MASQUERADE          16384  2
+xt_mark                12288  8
+nft_chain_nat          12288  2
+nf_nat                 61440  2 nft_chain_nat,xt_MASQUERADE
+tls                   155648  0
+tcp_diag               12288  0
+inet_diag              28672  1 tcp_diag
+xt_tcpudp              16384  5
+xt_conntrack           12288  5
+nf_conntrack          196608  4 xt_conntrack,nf_nat,xt_connmark,xt_MASQUERADE
+nf_defrag_ipv6         24576  1 nf_conntrack
+nf_defrag_ipv4         12288  1 nf_conntrack
+nft_compat             20480  24
+nf_tables             376832  109 nft_compat,nft_chain_nat
+nfnetlink              20480  2 nft_compat,nf_tables
+binfmt_misc            24576  1
+nls_iso8859_1          12288  1
+intel_rapl_msr         20480  0
+intel_rapl_common      40960  1 intel_rapl_msr
+joydev                 32768  0
+input_leds             12288  0
+serio_raw              20480  0
+qemu_fw_cfg            24576  0
+mac_hid                12288  0
+sch_fq_codel           24576  3
+dm_multipath           45056  0
+scsi_dh_rdac           16384  0
+scsi_dh_emc            12288  0
+scsi_dh_alua           24576  0
+efi_pstore             12288  0
+ip_tables              32768  0
+x_tables               65536  7 xt_conntrack,nft_compat,xt_tcpudp,xt_connmark,ip_tables,xt_MASQUERADE,xt_mark
+autofs4                57344  2
+btrfs                2043904  0
+blake2b_generic        24576  0
+raid10                 73728  0
+raid456               192512  0
+async_raid6_recov      20480  1 raid456
+async_memcpy           16384  2 raid456,async_raid6_recov
+async_pq               20480  2 raid456,async_raid6_recov
+async_xor              16384  3 async_pq,raid456,async_raid6_recov
+async_tx               16384  5 async_pq,async_memcpy,async_xor,raid456,async_raid6_recov
+xor                    20480  2 async_xor,btrfs
+raid6_pq              126976  4 async_pq,btrfs,raid456,async_raid6_recov
+libcrc32c              12288  5 nf_conntrack,nf_nat,btrfs,nf_tables,raid456
+raid1                  57344  0
+raid0                  24576  0
+crct10dif_pclmul       12288  1
+crc32_pclmul           12288  0
+polyval_clmulni        12288  0
+polyval_generic        12288  1 polyval_clmulni
+ghash_clmulni_intel    16384  0
+sha256_ssse3           32768  0
+sha1_ssse3             32768  0
+psmouse               217088  0
+virtio_rng             12288  0
+cirrus                 20480  0
+i2c_piix4              32768  0
+pata_acpi              12288  0
+floppy                131072  0
+hid_generic            12288  0
+usbhid                 77824  0
+hid                   180224  2 usbhid,hid_generic
+aesni_intel           356352  0
+crypto_simd            16384  1 aesni_intel
+cryptd                 24576  2 crypto_simd,ghash_clmulni_intel

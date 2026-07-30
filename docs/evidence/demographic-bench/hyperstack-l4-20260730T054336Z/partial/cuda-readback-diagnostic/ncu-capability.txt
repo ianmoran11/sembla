@@ -1,0 +1,1 @@
+/opt/nvidia/nsight-compute/2025.2.1/ncu cap_sys_admin=ep

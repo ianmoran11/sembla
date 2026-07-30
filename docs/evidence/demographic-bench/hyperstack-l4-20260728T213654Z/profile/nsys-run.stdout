@@ -1,0 +1,6 @@
+results_sha256=cae711f39d5e771a78f22094563d4291fd5af8d3cfa9cda018b258a1da6dac43 final_state_sha256=a58736b10b0168c271785f44a9f2e05614189eb0887e6c09d294aeeb746288e5 observation_sha256=55b554a444d3d852e81e89eebf20bbb366b9fdbe6804881af86db5712b6ff1c0
+Collecting data...
+Generating '/tmp/nsys-report-0b88.qdstrm'
+[1/1] [0%                          ] profile-cuda.nsys-rep[1/1] [0%                          ] profile-cuda.nsys-rep[1/1] [============56%             ] profile-cuda.nsys-rep[1/1] [============57%             ] profile-cuda.nsys-rep[1/1] [=============59%            ] profile-cuda.nsys-rep[1/1] [================70%         ] profile-cuda.nsys-rep[1/1] [===================82%      ] profile-cuda.nsys-rep[1/1] [====================83%     ] profile-cuda.nsys-rep[1/1] [========================100%] profile-cuda.nsys-rep[1/1] [========================100%] profile-cuda.nsys-rep
+Generated:
+    /home/ubuntu/demographic-bench/profile/profile-cuda.nsys-rep

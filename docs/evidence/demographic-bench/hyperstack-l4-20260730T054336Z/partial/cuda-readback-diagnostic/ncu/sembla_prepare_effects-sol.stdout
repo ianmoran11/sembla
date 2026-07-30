@@ -1,0 +1,4 @@
+==PROF== Connected to process 24022 (/home/ubuntu/sembla/target/release/sembla)
+==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU Performance Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM
+results_sha256=ace84c518ace1254b9d2cf70e9bc106b32af9740efb8e3729e3225a000796431 final_state_sha256=7ff27aa9f1fd44c22aea342f3b42a5c986c50ed438c9e466857acfaa4e02d84c observation_sha256=a9cce99ff9693553a6d541b2ae1f47afcd85c3cf573d049faa28b336591d3160
+==PROF== Disconnected from process 24022

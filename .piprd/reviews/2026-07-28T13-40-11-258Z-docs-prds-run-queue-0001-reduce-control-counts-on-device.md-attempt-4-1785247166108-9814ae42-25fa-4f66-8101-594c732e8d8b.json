@@ -1,0 +1,19 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-28T13:59:26.108Z",
+  "runId": "2026-07-28T13-40-11-258Z",
+  "prdPath": "docs/prds-run-queue/0001-reduce-control-counts-on-device.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-run-queue/0001-reduce-control-counts-on-device.md",
+  "attempt": 4,
+  "text": "## Blocking issues\n\n1. **The PRD implementation is still absent.**\n   - `backend.rs:1129-1135` downloads raw `wins` and `deferred`.\n   - `backend.rs:1138-1188` scans both buffers on the host.\n   - No compact device counts, generated reductions, structural transfer test, or synthetic report test exists.\n   - HEAD `c473fd0` and the non-runner worktree contain no implementation.\n\n2. **The required allowlist gate still fails.**\n   - The exact host-path command exits 2 because `docs/prds-cuda-host-path/0002-*.md` does not exist.\n   - The queued-path command passes but is not the stated acceptance command.\n\n## Acceptance criteria\n\n- **1–2:** Fail.\n- **3:** Existing no-lock test passes; no new kernel exists.\n- **4:** Pass; frozen and excluded files are unchanged.\n- **5:** Pass; tests, Rust checks, CUDA check, and CUDA clippy pass.\n- **6:** Pass; Markdown links pass.\n- **7:** Fail.\n- **8–11:** Correctly hardware-pending.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Implement device-side fired/deferred reductions, compact count readback and host report construction, with the required GPU-less structural and synthetic-count tests.\",\"Correct criterion 7 or relocate the PRD so the exact docs/prds-cuda-host-path/0002-*.md allowlist command succeeds.\"],\"summary\":\"The repository still contains the original raw control-buffer D2H transfers and host scans with no implementation diff, while criterion 7 continues to reference a nonexistent PRD path.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "Implement device-side fired/deferred reductions, compact count readback and host report construction, with the required GPU-less structural and synthetic-count tests.",
+      "Correct criterion 7 or relocate the PRD so the exact docs/prds-cuda-host-path/0002-*.md allowlist command succeeds."
+    ],
+    "summary": "The repository still contains the original raw control-buffer D2H transfers and host scans with no implementation diff, while criterion 7 continues to reference a nonexistent PRD path.",
+    "raw": "## Blocking issues\n\n1. **The PRD implementation is still absent.**\n   - `backend.rs:1129-1135` downloads raw `wins` and `deferred`.\n   - `backend.rs:1138-1188` scans both buffers on the host.\n   - No compact device counts, generated reductions, structural transfer test, or synthetic report test exists.\n   - HEAD `c473fd0` and the non-runner worktree contain no implementation.\n\n2. **The required allowlist gate still fails.**\n   - The exact host-path command exits 2 because `docs/prds-cuda-host-path/0002-*.md` does not exist.\n   - The queued-path command passes but is not the stated acceptance command.\n\n## Acceptance criteria\n\n- **1–2:** Fail.\n- **3:** Existing no-lock test passes; no new kernel exists.\n- **4:** Pass; frozen and excluded files are unchanged.\n- **5:** Pass; tests, Rust checks, CUDA check, and CUDA clippy pass.\n- **6:** Pass; Markdown links pass.\n- **7:** Fail.\n- **8–11:** Correctly hardware-pending.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Implement device-side fired/deferred reductions, compact count readback and host report construction, with the required GPU-less structural and synthetic-count tests.\",\"Correct criterion 7 or relocate the PRD so the exact docs/prds-cuda-host-path/0002-*.md allowlist command succeeds.\"],\"summary\":\"The repository still contains the original raw control-buffer D2H transfers and host scans with no implementation diff, while criterion 7 continues to reference a nonexistent PRD path.\"}\n```",
+    "source": "json"
+  }
+}

@@ -1,0 +1,20 @@
+Generating SQLite file /home/ubuntu/demographic-bench/cuda-readback-diagnostic/nsys/workers-1/trace.sqlite from /home/ubuntu/demographic-bench/cuda-readback-diagnostic/nsys/workers-1/trace.nsys-rep
+Processing [/home/ubuntu/demographic-bench/cuda-readback-diagnostic/nsys/workers-1/trace.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+Time (%),Total Time (ns),Num Calls,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+94.1,2830500221,780,3628846.4,483364.5,8622,250595082,17979891.7,cuMemcpyDtoHAsync_v2
+3.7,111360378,39552,2815.5,2425.0,2244,293344,2054.6,cuLaunchKernel
+0.7,20641695,214,96456.5,2814.5,1643,19969899,1364899.7,cuMemcpyHtoDAsync_v2
+0.5,13845550,51,271481.4,911.0,481,4755474,765590.5,cuMemAllocAsync
+0.4,11611716,4,2902929.0,3028454.0,2445883,3108925,307589.2,cuStreamSynchronize
+0.3,8958995,1,8958995.0,8958995.0,8958995,8958995,0.0,cuModuleLoadData
+0.1,3837454,1381,2778.8,2103.0,1191,79744,3337.3,cuEventRecord
+0.1,3425746,1,3425746.0,3425746.0,3425746,3425746,0.0,cuModuleUnload
+0.1,1535327,106,14484.2,9174.5,7622,216436,24437.5,cuMemcpyDtoDAsync_v2
+0.0,1039043,175,5937.4,3416.0,1272,53123,7500.4,cuMemsetD8Async
+0.0,104936,51,2057.6,761.0,391,11838,2541.6,cuMemFreeAsync
+0.0,83828,102,821.8,401.0,149,14923,1788.8,cuStreamWaitEvent
+0.0,41226,102,404.2,190.0,80,10576,1221.8,cuEventDestroy_v2
+0.0,28305,102,277.5,210.0,100,2114,253.1,cuEventCreate
+0.0,5578,1,5578.0,5578.0,5578,5578,0.0,cuInit
+0.0,1153,1,1153.0,1153.0,1153,1153,0.0,cuCtxSetCurrent
+

@@ -1,0 +1,19 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-28T14:00:50.557Z",
+  "runId": "2026-07-28T13-40-11-258Z",
+  "prdPath": "docs/prds-run-queue/0001-reduce-control-counts-on-device.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-run-queue/0001-reduce-control-counts-on-device.md",
+  "attempt": 5,
+  "text": "## Blocking issues\n\n1. **No implementation was produced across the managed attempts.**\n   - `backend.rs:1129-1135` still downloads raw `wins` and `deferred`.\n   - `backend.rs:1138-1188` still scans them on the host.\n   - Compact counts, generated reductions, and required GPU-less tests are absent.\n   - HEAD and the non-runner worktree contain no implementation changes.\n\n2. **Criterion 7 remains impossible.**\n   - The required host-path command exits 2 because no `0002-*.md` file exists there.\n   - The queued-path command passes but is not the specified gate.\n\n## Acceptance criteria\n\n- **1–2:** Fail.\n- **3:** Existing no-lock test passes; no new reduction exists.\n- **4:** Pass; frozen and excluded files are unchanged.\n- **5:** Pass; all required Rust and CUDA-feature gates pass.\n- **6:** Pass; Markdown links pass.\n- **7:** Fail.\n- **8–11:** Properly hardware-pending.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Implement the device-side control-count reduction, compact count transfer/report path, and required GPU-less regression coverage.\",\"Correct the PRD path policy so the exact required allowlist command can succeed.\"],\"summary\":\"All five attempts ended without implementation because criterion 7 continued to reference a nonexistent future PRD location. Raw control-buffer downloads and host scans remain unchanged at HEAD c473fd0.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "Implement the device-side control-count reduction, compact count transfer/report path, and required GPU-less regression coverage.",
+      "Correct the PRD path policy so the exact required allowlist command can succeed."
+    ],
+    "summary": "All five attempts ended without implementation because criterion 7 continued to reference a nonexistent future PRD location. Raw control-buffer downloads and host scans remain unchanged at HEAD c473fd0.",
+    "raw": "## Blocking issues\n\n1. **No implementation was produced across the managed attempts.**\n   - `backend.rs:1129-1135` still downloads raw `wins` and `deferred`.\n   - `backend.rs:1138-1188` still scans them on the host.\n   - Compact counts, generated reductions, and required GPU-less tests are absent.\n   - HEAD and the non-runner worktree contain no implementation changes.\n\n2. **Criterion 7 remains impossible.**\n   - The required host-path command exits 2 because no `0002-*.md` file exists there.\n   - The queued-path command passes but is not the specified gate.\n\n## Acceptance criteria\n\n- **1–2:** Fail.\n- **3:** Existing no-lock test passes; no new reduction exists.\n- **4:** Pass; frozen and excluded files are unchanged.\n- **5:** Pass; all required Rust and CUDA-feature gates pass.\n- **6:** Pass; Markdown links pass.\n- **7:** Fail.\n- **8–11:** Properly hardware-pending.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Implement the device-side control-count reduction, compact count transfer/report path, and required GPU-less regression coverage.\",\"Correct the PRD path policy so the exact required allowlist command can succeed.\"],\"summary\":\"All five attempts ended without implementation because criterion 7 continued to reference a nonexistent future PRD location. Raw control-buffer downloads and host scans remain unchanged at HEAD c473fd0.\"}\n```",
+    "source": "json"
+  }
+}

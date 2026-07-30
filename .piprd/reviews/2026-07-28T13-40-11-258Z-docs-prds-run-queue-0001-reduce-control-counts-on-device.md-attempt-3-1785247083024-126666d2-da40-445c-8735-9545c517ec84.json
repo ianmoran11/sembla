@@ -1,0 +1,19 @@
+{
+  "kind": "review",
+  "createdAt": "2026-07-28T13:58:03.024Z",
+  "runId": "2026-07-28T13-40-11-258Z",
+  "prdPath": "docs/prds-run-queue/0001-reduce-control-counts-on-device.md",
+  "absolutePath": "/Users/ian/projects/sembla/docs/prds-run-queue/0001-reduce-control-counts-on-device.md",
+  "attempt": 3,
+  "text": "## Blocking issues\n\n1. **No control-count implementation exists.**\n   - `backend.rs:1129-1135` still downloads raw `wins` and `deferred`.\n   - `backend.rs:1138-1188` still scans them on the host.\n   - Generated reduction kernels, compact count buffers, and required GPU-less tests remain absent.\n   - No non-runner implementation diff or later implementation commit exists.\n\n2. **Criterion 7 remains unsatisfied.**\n   - The required `docs/prds-cuda-host-path/0002-*.md` file does not exist.\n   - The exact allowlist command exits 2 rather than printing `OK`.\n\n## Acceptance criteria\n\n- **1–2:** Fail.\n- **3:** Existing no-lock coverage passes; no new kernel exists.\n- **4:** Pass; frozen and excluded files remain unchanged.\n- **5:** Pass; all required Rust and CUDA-feature compilation/lint gates pass.\n- **6:** Pass; Markdown links pass.\n- **7:** Fail.\n- **8–11:** Correctly hardware-pending.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Implement device-side fired/deferred reductions, replace raw control-buffer downloads and host scans with compact count transfer/report construction, and add the required GPU-less tests.\",\"Correct criterion 7 or relocate the PRD so the exact docs/prds-cuda-host-path/0002-*.md allowlist command succeeds.\"],\"summary\":\"HEAD remains c473fd0 with no implementation diff. The original raw control-buffer transfer and scan remain, and the authoritative allowlist gate still references a nonexistent PRD path.\"}\n```",
+  "parsed": {
+    "assessment": "REVISE",
+    "blockingIssues": [
+      "Implement device-side fired/deferred reductions, replace raw control-buffer downloads and host scans with compact count transfer/report construction, and add the required GPU-less tests.",
+      "Correct criterion 7 or relocate the PRD so the exact docs/prds-cuda-host-path/0002-*.md allowlist command succeeds."
+    ],
+    "summary": "HEAD remains c473fd0 with no implementation diff. The original raw control-buffer transfer and scan remain, and the authoritative allowlist gate still references a nonexistent PRD path.",
+    "raw": "## Blocking issues\n\n1. **No control-count implementation exists.**\n   - `backend.rs:1129-1135` still downloads raw `wins` and `deferred`.\n   - `backend.rs:1138-1188` still scans them on the host.\n   - Generated reduction kernels, compact count buffers, and required GPU-less tests remain absent.\n   - No non-runner implementation diff or later implementation commit exists.\n\n2. **Criterion 7 remains unsatisfied.**\n   - The required `docs/prds-cuda-host-path/0002-*.md` file does not exist.\n   - The exact allowlist command exits 2 rather than printing `OK`.\n\n## Acceptance criteria\n\n- **1–2:** Fail.\n- **3:** Existing no-lock coverage passes; no new kernel exists.\n- **4:** Pass; frozen and excluded files remain unchanged.\n- **5:** Pass; all required Rust and CUDA-feature compilation/lint gates pass.\n- **6:** Pass; Markdown links pass.\n- **7:** Fail.\n- **8–11:** Correctly hardware-pending.\n\n```json\n{\"assessment\":\"REVISE\",\"blockingIssues\":[\"Implement device-side fired/deferred reductions, replace raw control-buffer downloads and host scans with compact count transfer/report construction, and add the required GPU-less tests.\",\"Correct criterion 7 or relocate the PRD so the exact docs/prds-cuda-host-path/0002-*.md allowlist command succeeds.\"],\"summary\":\"HEAD remains c473fd0 with no implementation diff. The original raw control-buffer transfer and scan remain, and the authoritative allowlist gate still references a nonexistent PRD path.\"}\n```",
+    "source": "json"
+  }
+}

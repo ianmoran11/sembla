@@ -1,0 +1,730 @@
+{
+  "decision_inputs": {
+    "all_d2h_destinations_pageable": true,
+    "projected_20_draw_small_copy_unoverlapped_ms": 0.56482,
+    "projected_20_draw_unoverlapped_d2h_ms": 4742.462635,
+    "workers_4_small_copy_unoverlapped_ms": 0.112964,
+    "workers_4_unoverlapped_d2h_fraction_of_execution_window": 0.2472411480143454,
+    "workers_4_unoverlapped_d2h_ms": 948.492527
+  },
+  "draws_per_systems_arm": 4,
+  "expected_scale": 10000000,
+  "expected_ticks": 24,
+  "kernel_penalties": [
+    {
+      "added_per_draw_ms": 14.979871750000001,
+      "concurrent_per_draw_ms": 92.03424275,
+      "concurrent_total_ms": 368.136971,
+      "name": "sembla_prepare_effects",
+      "ratio": 1.194406515238441,
+      "sequential_per_draw_ms": 77.054371,
+      "sequential_total_ms": 308.217484
+    },
+    {
+      "added_per_draw_ms": 7.718125000000001,
+      "concurrent_per_draw_ms": 51.4028755,
+      "concurrent_total_ms": 205.611502,
+      "name": "sembla_check_candidate_errors",
+      "ratio": 1.176677785993078,
+      "sequential_per_draw_ms": 43.6847505,
+      "sequential_total_ms": 174.739002
+    },
+    {
+      "added_per_draw_ms": 5.85208625,
+      "concurrent_per_draw_ms": 10.6434075,
+      "concurrent_total_ms": 42.57363,
+      "name": "sembla_advance_validation_phase",
+      "ratio": 2.2213930030260443,
+      "sequential_per_draw_ms": 4.79132125,
+      "sequential_total_ms": 19.165285
+    },
+    {
+      "added_per_draw_ms": 4.190486499999999,
+      "concurrent_per_draw_ms": 24.15847525,
+      "concurrent_total_ms": 96.633901,
+      "name": "sembla_observe_view",
+      "ratio": 1.2098602193974093,
+      "sequential_per_draw_ms": 19.96798875,
+      "sequential_total_ms": 79.871955
+    },
+    {
+      "added_per_draw_ms": 2.543780999999999,
+      "concurrent_per_draw_ms": 31.03546575,
+      "concurrent_total_ms": 124.141863,
+      "name": "sembla_validate_claims",
+      "ratio": 1.0892815227432278,
+      "sequential_per_draw_ms": 28.49168475,
+      "sequential_total_ms": 113.966739
+    },
+    {
+      "added_per_draw_ms": 2.42748525,
+      "concurrent_per_draw_ms": 4.1880965,
+      "concurrent_total_ms": 16.752386,
+      "name": "sembla_commit_validation_status",
+      "ratio": 2.3787741331313206,
+      "sequential_per_draw_ms": 1.76061125,
+      "sequential_total_ms": 7.042445
+    },
+    {
+      "added_per_draw_ms": 2.067761000000001,
+      "concurrent_per_draw_ms": 18.29055525,
+      "concurrent_total_ms": 73.162221,
+      "name": "sembla_validate_transition",
+      "ratio": 1.1274602246773857,
+      "sequential_per_draw_ms": 16.22279425,
+      "sequential_total_ms": 64.891177
+    },
+    {
+      "added_per_draw_ms": 0.6580112499999977,
+      "concurrent_per_draw_ms": 16.668362,
+      "concurrent_total_ms": 66.673448,
+      "name": "sembla_mark_effect_active",
+      "ratio": 1.0410991152083284,
+      "sequential_per_draw_ms": 16.01035075,
+      "sequential_total_ms": 64.041403
+    },
+    {
+      "added_per_draw_ms": 0.6071114999999985,
+      "concurrent_per_draw_ms": 20.179788,
+      "concurrent_total_ms": 80.719152,
+      "name": "sembla_count_fired",
+      "ratio": 1.0310183178064583,
+      "sequential_per_draw_ms": 19.5726765,
+      "sequential_total_ms": 78.290706
+    },
+    {
+      "added_per_draw_ms": 0.5472342500000007,
+      "concurrent_per_draw_ms": 12.33041425,
+      "concurrent_total_ms": 49.321657,
+      "name": "sembla_validate_effects",
+      "ratio": 1.0464419834034615,
+      "sequential_per_draw_ms": 11.78318,
+      "sequential_total_ms": 47.13272
+    },
+    {
+      "added_per_draw_ms": 0.39363400000000226,
+      "concurrent_per_draw_ms": 21.06361125,
+      "concurrent_total_ms": 84.254445,
+      "name": "sembla_count_deferred",
+      "ratio": 1.0190437558415795,
+      "sequential_per_draw_ms": 20.66997725,
+      "sequential_total_ms": 82.679909
+    },
+    {
+      "added_per_draw_ms": 0.3745415000000003,
+      "concurrent_per_draw_ms": 5.926832,
+      "concurrent_total_ms": 23.707328,
+      "name": "sembla_init_conflict_winners",
+      "ratio": 1.0674571152211867,
+      "sequential_per_draw_ms": 5.5522905,
+      "sequential_total_ms": 22.209162
+    },
+    {
+      "added_per_draw_ms": 0.17321250000000002,
+      "concurrent_per_draw_ms": 0.295808,
+      "concurrent_total_ms": 1.183232,
+      "name": "sembla_init_grouped_histogram",
+      "ratio": 2.412878123585287,
+      "sequential_per_draw_ms": 0.1225955,
+      "sequential_total_ms": 0.490382
+    },
+    {
+      "added_per_draw_ms": 0.1630407500000004,
+      "concurrent_per_draw_ms": 22.36010125,
+      "concurrent_total_ms": 89.440405,
+      "name": "sembla_resolve_conflicts",
+      "ratio": 1.0073451504986437,
+      "sequential_per_draw_ms": 22.1970605,
+      "sequential_total_ms": 88.788242
+    },
+    {
+      "added_per_draw_ms": 0.1438902500000001,
+      "concurrent_per_draw_ms": 10.07085575,
+      "concurrent_total_ms": 40.283423,
+      "name": "sembla_reduce_claim_instances",
+      "ratio": 1.014494887687481,
+      "sequential_per_draw_ms": 9.9269655,
+      "sequential_total_ms": 39.707862
+    },
+    {
+      "added_per_draw_ms": 0.13161275,
+      "concurrent_per_draw_ms": 0.2628395,
+      "concurrent_total_ms": 1.051358,
+      "name": "sembla_validate_outputs",
+      "ratio": 2.002941473441962,
+      "sequential_per_draw_ms": 0.13122675,
+      "sequential_total_ms": 0.524907
+    },
+    {
+      "added_per_draw_ms": 0.12038549999999981,
+      "concurrent_per_draw_ms": 3.4458305,
+      "concurrent_total_ms": 13.783322,
+      "name": "sembla_transition_00000000",
+      "ratio": 1.0362013204247853,
+      "sequential_per_draw_ms": 3.325445,
+      "sequential_total_ms": 13.30178
+    },
+    {
+      "added_per_draw_ms": 0.08791499999999974,
+      "concurrent_per_draw_ms": 5.112024,
+      "concurrent_total_ms": 20.448096,
+      "name": "sembla_init_effect_owners",
+      "ratio": 1.0174986251293512,
+      "sequential_per_draw_ms": 5.024109,
+      "sequential_total_ms": 20.096436
+    },
+    {
+      "added_per_draw_ms": 0.0665779999999998,
+      "concurrent_per_draw_ms": 8.60259175,
+      "concurrent_total_ms": 34.410367,
+      "name": "sembla_reduce_claim_rules",
+      "ratio": 1.0077996594136227,
+      "sequential_per_draw_ms": 8.53601375,
+      "sequential_total_ms": 34.144055
+    },
+    {
+      "added_per_draw_ms": 0.06543525000000017,
+      "concurrent_per_draw_ms": 9.75658625,
+      "concurrent_total_ms": 39.026345,
+      "name": "sembla_reduce_claim_entities",
+      "ratio": 1.0067520617520045,
+      "sequential_per_draw_ms": 9.691151,
+      "sequential_total_ms": 38.764604
+    },
+    {
+      "added_per_draw_ms": 0.06144975,
+      "concurrent_per_draw_ms": 0.101419,
+      "concurrent_total_ms": 0.405676,
+      "name": "sembla_init_validation_scratch",
+      "ratio": 2.5374256459653357,
+      "sequential_per_draw_ms": 0.03996925,
+      "sequential_total_ms": 0.159877
+    },
+    {
+      "added_per_draw_ms": 0.05990924999999958,
+      "concurrent_per_draw_ms": 4.228337,
+      "concurrent_total_ms": 16.913348,
+      "name": "sembla_transition_00000003",
+      "ratio": 1.014372145468996,
+      "sequential_per_draw_ms": 4.16842775,
+      "sequential_total_ms": 16.673711
+    },
+    {
+      "added_per_draw_ms": 0.057369250000000004,
+      "concurrent_per_draw_ms": 0.095779,
+      "concurrent_total_ms": 0.383116,
+      "name": "sembla_reset_status",
+      "ratio": 2.4936116480841455,
+      "sequential_per_draw_ms": 0.03840975,
+      "sequential_total_ms": 0.153639
+    },
+    {
+      "added_per_draw_ms": 0.0510534999999992,
+      "concurrent_per_draw_ms": 4.11112775,
+      "concurrent_total_ms": 16.444511,
+      "name": "sembla_transition_00000009",
+      "ratio": 1.0125745237294612,
+      "sequential_per_draw_ms": 4.06007425,
+      "sequential_total_ms": 16.240297
+    },
+    {
+      "added_per_draw_ms": 0.049209,
+      "concurrent_per_draw_ms": 0.093034,
+      "concurrent_total_ms": 0.372136,
+      "name": "sembla_init_observations",
+      "ratio": 2.122852253280091,
+      "sequential_per_draw_ms": 0.043825,
+      "sequential_total_ms": 0.1753
+    },
+    {
+      "added_per_draw_ms": 0.04872225,
+      "concurrent_per_draw_ms": 0.090115,
+      "concurrent_total_ms": 0.36046,
+      "name": "sembla_init_grouped_extrema",
+      "ratio": 2.1770720718000134,
+      "sequential_per_draw_ms": 0.04139275,
+      "sequential_total_ms": 0.165571
+    },
+    {
+      "added_per_draw_ms": 0.042835,
+      "concurrent_per_draw_ms": 0.083052,
+      "concurrent_total_ms": 0.332208,
+      "name": "sembla_prepare_outputs",
+      "ratio": 2.0650968495909687,
+      "sequential_per_draw_ms": 0.040217,
+      "sequential_total_ms": 0.160868
+    },
+    {
+      "added_per_draw_ms": 0.03826550000000001,
+      "concurrent_per_draw_ms": 0.0722745,
+      "concurrent_total_ms": 0.289098,
+      "name": "sembla_init_control_counts",
+      "ratio": 2.125158046399483,
+      "sequential_per_draw_ms": 0.034009,
+      "sequential_total_ms": 0.136036
+    },
+    {
+      "added_per_draw_ms": 0.03507325,
+      "concurrent_per_draw_ms": 0.066147,
+      "concurrent_total_ms": 0.264588,
+      "name": "sembla_validate_claim_compatibility",
+      "ratio": 2.1287099239711975,
+      "sequential_per_draw_ms": 0.03107375,
+      "sequential_total_ms": 0.124295
+    },
+    {
+      "added_per_draw_ms": 0.02049650000000014,
+      "concurrent_per_draw_ms": 17.1247345,
+      "concurrent_total_ms": 68.498938,
+      "name": "sembla_build_claim_instances",
+      "ratio": 1.0011983287416837,
+      "sequential_per_draw_ms": 17.104238,
+      "sequential_total_ms": 68.416952
+    },
+    {
+      "added_per_draw_ms": 0.017389750000000426,
+      "concurrent_per_draw_ms": 4.0726395,
+      "concurrent_total_ms": 16.290558,
+      "name": "sembla_transition_00000008",
+      "ratio": 1.0042882069100678,
+      "sequential_per_draw_ms": 4.05524975,
+      "sequential_total_ms": 16.220999
+    },
+    {
+      "added_per_draw_ms": -0.0026754999999996087,
+      "concurrent_per_draw_ms": 4.25277125,
+      "concurrent_total_ms": 17.011085,
+      "name": "sembla_transition_00000006",
+      "ratio": 0.9993712763530646,
+      "sequential_per_draw_ms": 4.25544675,
+      "sequential_total_ms": 17.021787
+    },
+    {
+      "added_per_draw_ms": -0.011683250000000811,
+      "concurrent_per_draw_ms": 4.23449125,
+      "concurrent_total_ms": 16.937965,
+      "name": "sembla_transition_00000007",
+      "ratio": 0.9972485233473093,
+      "sequential_per_draw_ms": 4.2461745,
+      "sequential_total_ms": 16.984698
+    },
+    {
+      "added_per_draw_ms": -0.011770750000000163,
+      "concurrent_per_draw_ms": 3.3218185,
+      "concurrent_total_ms": 13.287274,
+      "name": "sembla_transition_00000001",
+      "ratio": 0.9964690460889865,
+      "sequential_per_draw_ms": 3.33358925,
+      "sequential_total_ms": 13.334357
+    },
+    {
+      "added_per_draw_ms": -0.012038499999999175,
+      "concurrent_per_draw_ms": 4.106182,
+      "concurrent_total_ms": 16.424728,
+      "name": "sembla_transition_00000002",
+      "ratio": 0.9970767713870593,
+      "sequential_per_draw_ms": 4.1182205,
+      "sequential_total_ms": 16.472882
+    },
+    {
+      "added_per_draw_ms": -0.01267700000000005,
+      "concurrent_per_draw_ms": 4.157184,
+      "concurrent_total_ms": 16.628736,
+      "name": "sembla_transition_00000004",
+      "ratio": 0.9969598507000593,
+      "sequential_per_draw_ms": 4.169861,
+      "sequential_total_ms": 16.679444
+    },
+    {
+      "added_per_draw_ms": -0.03236400000000028,
+      "concurrent_per_draw_ms": 4.2121865,
+      "concurrent_total_ms": 16.848746,
+      "name": "sembla_transition_00000005",
+      "ratio": 0.9923751643430794,
+      "sequential_per_draw_ms": 4.2445505,
+      "sequential_total_ms": 16.978202
+    },
+    {
+      "added_per_draw_ms": -0.09925974999999809,
+      "concurrent_per_draw_ms": 16.67093775,
+      "concurrent_total_ms": 66.683751,
+      "name": "sembla_apply_effects",
+      "ratio": 0.9940811818107689,
+      "sequential_per_draw_ms": 16.7701975,
+      "sequential_total_ms": 67.08079
+    },
+    {
+      "added_per_draw_ms": -0.1609904999999996,
+      "concurrent_per_draw_ms": 7.431262,
+      "concurrent_total_ms": 29.725048,
+      "name": "sembla_reduce_claim_keys",
+      "ratio": 0.9787954233608538,
+      "sequential_per_draw_ms": 7.5922525,
+      "sequential_total_ms": 30.36901
+    },
+    {
+      "added_per_draw_ms": -1.5252780000000001,
+      "concurrent_per_draw_ms": 12.30334925,
+      "concurrent_total_ms": 49.213397,
+      "name": "sembla_bound_grouped_view",
+      "ratio": 0.889701416313756,
+      "sequential_per_draw_ms": 13.82862725,
+      "sequential_total_ms": 55.314509
+    },
+    {
+      "added_per_draw_ms": -5.374582250000003,
+      "concurrent_per_draw_ms": 64.90835,
+      "concurrent_total_ms": 259.6334,
+      "name": "sembla_observe_grouped_view",
+      "ratio": 0.9235293395147155,
+      "sequential_per_draw_ms": 70.28293225,
+      "sequential_total_ms": 281.131729
+    }
+  ],
+  "ncu": {
+    "collected": false,
+    "files": []
+  },
+  "phase_timing": {
+    "binary_sha256": "f7a0aeb6e953b75c2d41b92ac16d2c3c17fe5a401b343fcf153b8def996af3d3",
+    "phases_ms": {
+      "kernels": 485.052597,
+      "observe_views": 0.001081,
+      "other": 0.021035,
+      "readback_control": 0.407798,
+      "report": 0.08995600000000001,
+      "state_hash": 0.0,
+      "state_reconstruct": 0.0,
+      "state_transfer": 0.0
+    },
+    "repository_commit": "27f8a930d47ec39edfea3713ccd1589166636970",
+    "wall_time_ms": 485.572467
+  },
+  "schema": "sembla-cuda-readback-diagnostic-v1",
+  "selected_ncu_kernels": [
+    "sembla_prepare_effects",
+    "sembla_check_candidate_errors",
+    "sembla_advance_validation_phase"
+  ],
+  "systems": {
+    "sequential": {
+      "d2h": {
+        "bytes_mb": 1920.0959999999982,
+        "calls": 780,
+        "destinations": {
+          "Pageable": 780
+        },
+        "kernel_overlap_ms": 0.0,
+        "overlap_fraction": 0.0,
+        "size_groups": {
+          "large_ge_1mb": {
+            "bytes_mb": 1920.0,
+            "calls": 4,
+            "kernel_overlap_ms": 0.0,
+            "summed_duration_ms": 975.398264,
+            "union_duration_ms": 975.398264,
+            "unoverlapped_ms": 975.398264
+          },
+          "small_lt_1mb": {
+            "bytes_mb": 0.09600000000000007,
+            "calls": 776,
+            "kernel_overlap_ms": 0.0,
+            "summed_duration_ms": 1.263326,
+            "union_duration_ms": 1.263326,
+            "unoverlapped_ms": 1.263326
+          }
+        },
+        "streams": {
+          "7": 780
+        },
+        "summed_duration_ms": 976.66159,
+        "union_duration_ms": 976.66159,
+        "unoverlapped_ms": 976.66159
+      },
+      "kernel_contexts": {
+        "1": 39552
+      },
+      "kernel_count": 39552,
+      "kernel_instances": {
+        "sembla_advance_validation_phase": 12096,
+        "sembla_apply_effects": 96,
+        "sembla_bound_grouped_view": 192,
+        "sembla_build_claim_instances": 96,
+        "sembla_check_candidate_errors": 3840,
+        "sembla_commit_validation_status": 4032,
+        "sembla_count_deferred": 288,
+        "sembla_count_fired": 960,
+        "sembla_init_conflict_winners": 96,
+        "sembla_init_control_counts": 96,
+        "sembla_init_effect_owners": 96,
+        "sembla_init_grouped_extrema": 96,
+        "sembla_init_grouped_histogram": 288,
+        "sembla_init_observations": 96,
+        "sembla_init_validation_scratch": 96,
+        "sembla_mark_effect_active": 960,
+        "sembla_observe_grouped_view": 288,
+        "sembla_observe_view": 1824,
+        "sembla_prepare_effects": 3840,
+        "sembla_prepare_outputs": 96,
+        "sembla_reduce_claim_entities": 96,
+        "sembla_reduce_claim_instances": 96,
+        "sembla_reduce_claim_keys": 96,
+        "sembla_reduce_claim_rules": 96,
+        "sembla_reset_status": 96,
+        "sembla_resolve_conflicts": 96,
+        "sembla_transition_00000000": 96,
+        "sembla_transition_00000001": 96,
+        "sembla_transition_00000002": 96,
+        "sembla_transition_00000003": 96,
+        "sembla_transition_00000004": 96,
+        "sembla_transition_00000005": 96,
+        "sembla_transition_00000006": 96,
+        "sembla_transition_00000007": 96,
+        "sembla_transition_00000008": 96,
+        "sembla_transition_00000009": 96,
+        "sembla_validate_claim_compatibility": 96,
+        "sembla_validate_claims": 3840,
+        "sembla_validate_effects": 384,
+        "sembla_validate_outputs": 384,
+        "sembla_validate_transition": 3840
+      },
+      "kernel_maximum_concurrency": 1,
+      "kernel_streams": {
+        "7": 39552
+      },
+      "kernel_summed_duration_ms": 1948.061208,
+      "kernel_totals_ms": {
+        "sembla_advance_validation_phase": 19.165285,
+        "sembla_apply_effects": 67.08079,
+        "sembla_bound_grouped_view": 55.314509,
+        "sembla_build_claim_instances": 68.416952,
+        "sembla_check_candidate_errors": 174.739002,
+        "sembla_commit_validation_status": 7.042445,
+        "sembla_count_deferred": 82.679909,
+        "sembla_count_fired": 78.290706,
+        "sembla_init_conflict_winners": 22.209162,
+        "sembla_init_control_counts": 0.136036,
+        "sembla_init_effect_owners": 20.096436,
+        "sembla_init_grouped_extrema": 0.165571,
+        "sembla_init_grouped_histogram": 0.490382,
+        "sembla_init_observations": 0.1753,
+        "sembla_init_validation_scratch": 0.159877,
+        "sembla_mark_effect_active": 64.041403,
+        "sembla_observe_grouped_view": 281.131729,
+        "sembla_observe_view": 79.871955,
+        "sembla_prepare_effects": 308.217484,
+        "sembla_prepare_outputs": 0.160868,
+        "sembla_reduce_claim_entities": 38.764604,
+        "sembla_reduce_claim_instances": 39.707862,
+        "sembla_reduce_claim_keys": 30.36901,
+        "sembla_reduce_claim_rules": 34.144055,
+        "sembla_reset_status": 0.153639,
+        "sembla_resolve_conflicts": 88.788242,
+        "sembla_transition_00000000": 13.30178,
+        "sembla_transition_00000001": 13.334357,
+        "sembla_transition_00000002": 16.472882,
+        "sembla_transition_00000003": 16.673711,
+        "sembla_transition_00000004": 16.679444,
+        "sembla_transition_00000005": 16.978202,
+        "sembla_transition_00000006": 17.021787,
+        "sembla_transition_00000007": 16.984698,
+        "sembla_transition_00000008": 16.220999,
+        "sembla_transition_00000009": 16.240297,
+        "sembla_validate_claim_compatibility": 0.124295,
+        "sembla_validate_claims": 113.966739,
+        "sembla_validate_effects": 47.13272,
+        "sembla_validate_outputs": 0.524907,
+        "sembla_validate_transition": 64.891177
+      },
+      "kernel_union_duration_ms": 1948.061208
+    },
+    "sequential_api": {
+      "cuEventRecord": {
+        "calls": 1378,
+        "summed_thread_time_ms": 2.898149
+      },
+      "cuLaunchKernel": {
+        "calls": 39552,
+        "summed_thread_time_ms": 88.491316
+      },
+      "cuMemcpyDtoHAsync_v2": {
+        "calls": 780,
+        "summed_thread_time_ms": 2944.194583
+      },
+      "cuStreamSynchronize": {
+        "calls": 4,
+        "summed_thread_time_ms": 12.412089
+      },
+      "cuStreamWaitEvent": {
+        "calls": 96,
+        "summed_thread_time_ms": 0.043922
+      }
+    },
+    "sequential_whole_sweep_ms": 12007.57114,
+    "workers_4": {
+      "d2h": {
+        "bytes_mb": 1920.096,
+        "calls": 780,
+        "destinations": {
+          "Pageable": 780
+        },
+        "kernel_overlap_ms": 37.786067,
+        "overlap_fraction": 0.03831175818868071,
+        "size_groups": {
+          "large_ge_1mb": {
+            "bytes_mb": 1920.0,
+            "calls": 4,
+            "kernel_overlap_ms": 35.96667,
+            "summed_duration_ms": 984.356697,
+            "union_duration_ms": 984.356697,
+            "unoverlapped_ms": 948.390027
+          },
+          "small_lt_1mb": {
+            "bytes_mb": 0.09600000000000007,
+            "calls": 776,
+            "kernel_overlap_ms": 1.833797,
+            "summed_duration_ms": 1.946761,
+            "union_duration_ms": 1.946761,
+            "unoverlapped_ms": 0.112964
+          }
+        },
+        "streams": {
+          "20": 195,
+          "21": 195,
+          "22": 195,
+          "23": 195
+        },
+        "summed_duration_ms": 986.303458,
+        "union_duration_ms": 986.278594,
+        "unoverlapped_ms": 948.492527
+      },
+      "kernel_contexts": {
+        "2": 39552
+      },
+      "kernel_count": 39552,
+      "kernel_instances": {
+        "sembla_advance_validation_phase": 12096,
+        "sembla_apply_effects": 96,
+        "sembla_bound_grouped_view": 192,
+        "sembla_build_claim_instances": 96,
+        "sembla_check_candidate_errors": 3840,
+        "sembla_commit_validation_status": 4032,
+        "sembla_count_deferred": 288,
+        "sembla_count_fired": 960,
+        "sembla_init_conflict_winners": 96,
+        "sembla_init_control_counts": 96,
+        "sembla_init_effect_owners": 96,
+        "sembla_init_grouped_extrema": 96,
+        "sembla_init_grouped_histogram": 288,
+        "sembla_init_observations": 96,
+        "sembla_init_validation_scratch": 96,
+        "sembla_mark_effect_active": 960,
+        "sembla_observe_grouped_view": 288,
+        "sembla_observe_view": 1824,
+        "sembla_prepare_effects": 3840,
+        "sembla_prepare_outputs": 96,
+        "sembla_reduce_claim_entities": 96,
+        "sembla_reduce_claim_instances": 96,
+        "sembla_reduce_claim_keys": 96,
+        "sembla_reduce_claim_rules": 96,
+        "sembla_reset_status": 96,
+        "sembla_resolve_conflicts": 96,
+        "sembla_transition_00000000": 96,
+        "sembla_transition_00000001": 96,
+        "sembla_transition_00000002": 96,
+        "sembla_transition_00000003": 96,
+        "sembla_transition_00000004": 96,
+        "sembla_transition_00000005": 96,
+        "sembla_transition_00000006": 96,
+        "sembla_transition_00000007": 96,
+        "sembla_transition_00000008": 96,
+        "sembla_transition_00000009": 96,
+        "sembla_validate_claim_compatibility": 96,
+        "sembla_validate_claims": 3840,
+        "sembla_validate_effects": 384,
+        "sembla_validate_outputs": 384,
+        "sembla_validate_transition": 3840
+      },
+      "kernel_maximum_concurrency": 4,
+      "kernel_streams": {
+        "20": 9888,
+        "21": 9888,
+        "22": 9888,
+        "23": 9888
+      },
+      "kernel_summed_duration_ms": 2094.263819,
+      "kernel_totals_ms": {
+        "sembla_advance_validation_phase": 42.57363,
+        "sembla_apply_effects": 66.683751,
+        "sembla_bound_grouped_view": 49.213397,
+        "sembla_build_claim_instances": 68.498938,
+        "sembla_check_candidate_errors": 205.611502,
+        "sembla_commit_validation_status": 16.752386,
+        "sembla_count_deferred": 84.254445,
+        "sembla_count_fired": 80.719152,
+        "sembla_init_conflict_winners": 23.707328,
+        "sembla_init_control_counts": 0.289098,
+        "sembla_init_effect_owners": 20.448096,
+        "sembla_init_grouped_extrema": 0.36046,
+        "sembla_init_grouped_histogram": 1.183232,
+        "sembla_init_observations": 0.372136,
+        "sembla_init_validation_scratch": 0.405676,
+        "sembla_mark_effect_active": 66.673448,
+        "sembla_observe_grouped_view": 259.6334,
+        "sembla_observe_view": 96.633901,
+        "sembla_prepare_effects": 368.136971,
+        "sembla_prepare_outputs": 0.332208,
+        "sembla_reduce_claim_entities": 39.026345,
+        "sembla_reduce_claim_instances": 40.283423,
+        "sembla_reduce_claim_keys": 29.725048,
+        "sembla_reduce_claim_rules": 34.410367,
+        "sembla_reset_status": 0.383116,
+        "sembla_resolve_conflicts": 89.440405,
+        "sembla_transition_00000000": 13.783322,
+        "sembla_transition_00000001": 13.287274,
+        "sembla_transition_00000002": 16.424728,
+        "sembla_transition_00000003": 16.913348,
+        "sembla_transition_00000004": 16.628736,
+        "sembla_transition_00000005": 16.848746,
+        "sembla_transition_00000006": 17.011085,
+        "sembla_transition_00000007": 16.937965,
+        "sembla_transition_00000008": 16.290558,
+        "sembla_transition_00000009": 16.444511,
+        "sembla_validate_claim_compatibility": 0.264588,
+        "sembla_validate_claims": 124.141863,
+        "sembla_validate_effects": 49.321657,
+        "sembla_validate_outputs": 1.051358,
+        "sembla_validate_transition": 73.162221
+      },
+      "kernel_union_duration_ms": 1948.265375
+    },
+    "workers_4_api": {
+      "cuCtxSynchronize": {
+        "calls": 4,
+        "summed_thread_time_ms": 0.019279
+      },
+      "cuEventRecord": {
+        "calls": 223960,
+        "summed_thread_time_ms": 2928.336687
+      },
+      "cuLaunchKernel": {
+        "calls": 39552,
+        "summed_thread_time_ms": 555.233145
+      },
+      "cuMemcpyDtoHAsync_v2": {
+        "calls": 780,
+        "summed_thread_time_ms": 6532.067354
+      },
+      "cuStreamSynchronize": {
+        "calls": 4,
+        "summed_thread_time_ms": 47.931272
+      },
+      "cuStreamWaitEvent": {
+        "calls": 275188,
+        "summed_thread_time_ms": 211.164734
+      }
+    },
+    "workers_4_execution_window_ms": 3836.3053019999998,
+    "workers_4_whole_sweep_ms": 9791.643688
+  }
+}

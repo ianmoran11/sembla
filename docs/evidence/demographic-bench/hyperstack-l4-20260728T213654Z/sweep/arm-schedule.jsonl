@@ -1,0 +1,8 @@
+{"label":"baseline-cpu-1000000","started_utc":"2026-07-28T21:40:14Z","monotonic_s":126}
+{"label":"current-cpu-1000000","started_utc":"2026-07-28T21:42:48Z","monotonic_s":280}
+{"label":"baseline-cuda-1000000","started_utc":"2026-07-28T21:45:20Z","monotonic_s":432}
+{"label":"current-cuda-1000000","started_utc":"2026-07-28T21:45:32Z","monotonic_s":444}
+{"label":"baseline-cpu-10000000","started_utc":"2026-07-28T21:45:46Z","monotonic_s":458}
+{"label":"current-cpu-10000000","started_utc":"2026-07-28T22:14:45Z","monotonic_s":2197}
+{"label":"baseline-cuda-10000000","started_utc":"2026-07-28T22:44:12Z","monotonic_s":3964}
+{"label":"current-cuda-10000000","started_utc":"2026-07-28T22:47:41Z","monotonic_s":4173}

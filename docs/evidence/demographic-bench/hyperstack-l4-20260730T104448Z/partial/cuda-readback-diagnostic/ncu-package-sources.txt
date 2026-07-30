@@ -1,0 +1,12 @@
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy main restricted
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy-updates main restricted
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy universe
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy-updates universe
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy multiverse
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy-updates multiverse
+deb http://nova.clouds.archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu jammy-security main restricted
+deb http://security.ubuntu.com/ubuntu jammy-security universe
+deb http://security.ubuntu.com/ubuntu jammy-security multiverse
+deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu jammy main
+deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /

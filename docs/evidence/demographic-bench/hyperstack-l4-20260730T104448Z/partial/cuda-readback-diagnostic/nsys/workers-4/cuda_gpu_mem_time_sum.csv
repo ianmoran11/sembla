@@ -1,0 +1,8 @@
+Generating SQLite file /home/ubuntu/demographic-bench/cuda-readback-diagnostic/nsys/workers-4/trace.sqlite from /home/ubuntu/demographic-bench/cuda-readback-diagnostic/nsys/workers-4/trace.nsys-rep
+Processing [/home/ubuntu/demographic-bench/cuda-readback-diagnostic/nsys/workers-4/trace.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_gpu_mem_time_sum.py]... 
+Time (%),Total Time (ns),Count,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Operation
+84.7,954837026,780,1224150.0,2336.0,1472,246587520,17032058.7,[CUDA memcpy Device-to-Host]
+7.0,79099559,268,295147.6,1344.0,768,20300051,2391773.8,[CUDA memcpy Host-to-Device]
+6.7,75247349,112,671851.3,630120.5,509601,1311700,154634.5,[CUDA memcpy Device-to-Device]
+1.6,18547168,268,69205.9,4704.5,768,458781,107708.6,[CUDA memset]
+
