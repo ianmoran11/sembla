@@ -16,6 +16,7 @@
 !destroy-deadline.sh
 !prepare-deploy-key.sh
 !prepare-host-key.sh
+!prepare-paid-session.sh
 !remote-run-spike.sh
 !run-demographic-benchmark.sh
 !review-paid-plan.py
