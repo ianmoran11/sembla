@@ -1507,6 +1507,7 @@ impl<'a> Generator<'a> {
         self.emit_apply_kernel(&mut out)?;
         self.emit_output_kernel(&mut out)?;
         self.emit_observation_kernel(&mut out)?;
+        out.push_str(STATE_HASH_KERNEL);
         out.push_str(PHILOX_TEST_KERNEL);
         let source_sha256 = hex(Sha256::digest(out.as_bytes()).as_slice());
         let aggregate_group_tables = self
@@ -3073,6 +3074,126 @@ __device__ __forceinline__ double sembla_exp(unsigned long long seed, unsigned i
 }
 "#;
 
+const STATE_HASH_KERNEL: &str = r#"
+struct sembla_sha256_context {
+  unsigned int state[8];
+  unsigned char block[64];
+  unsigned int block_len;
+  unsigned long long total_len;
+};
+
+__device__ __forceinline__ unsigned int sembla_sha_rotr(unsigned int value, unsigned int bits) {
+  return (value >> bits) | (value << (32U - bits));
+}
+
+__device__ void sembla_sha256_compress(sembla_sha256_context* context) {
+  const unsigned int constants[64] = {
+    0x428a2f98U,0x71374491U,0xb5c0fbcfU,0xe9b5dba5U,0x3956c25bU,0x59f111f1U,0x923f82a4U,0xab1c5ed5U,
+    0xd807aa98U,0x12835b01U,0x243185beU,0x550c7dc3U,0x72be5d74U,0x80deb1feU,0x9bdc06a7U,0xc19bf174U,
+    0xe49b69c1U,0xefbe4786U,0x0fc19dc6U,0x240ca1ccU,0x2de92c6fU,0x4a7484aaU,0x5cb0a9dcU,0x76f988daU,
+    0x983e5152U,0xa831c66dU,0xb00327c8U,0xbf597fc7U,0xc6e00bf3U,0xd5a79147U,0x06ca6351U,0x14292967U,
+    0x27b70a85U,0x2e1b2138U,0x4d2c6dfcU,0x53380d13U,0x650a7354U,0x766a0abbU,0x81c2c92eU,0x92722c85U,
+    0xa2bfe8a1U,0xa81a664bU,0xc24b8b70U,0xc76c51a3U,0xd192e819U,0xd6990624U,0xf40e3585U,0x106aa070U,
+    0x19a4c116U,0x1e376c08U,0x2748774cU,0x34b0bcb5U,0x391c0cb3U,0x4ed8aa4aU,0x5b9cca4fU,0x682e6ff3U,
+    0x748f82eeU,0x78a5636fU,0x84c87814U,0x8cc70208U,0x90befffaU,0xa4506cebU,0xbef9a3f7U,0xc67178f2U
+  };
+  unsigned int words[64];
+  #pragma unroll
+  for (unsigned int i = 0; i < 16U; ++i) {
+    unsigned int offset = i * 4U;
+    words[i] = ((unsigned int)context->block[offset] << 24) |
+               ((unsigned int)context->block[offset + 1U] << 16) |
+               ((unsigned int)context->block[offset + 2U] << 8) |
+               (unsigned int)context->block[offset + 3U];
+  }
+  #pragma unroll
+  for (unsigned int i = 16U; i < 64U; ++i) {
+    unsigned int x = words[i - 15U];
+    unsigned int y = words[i - 2U];
+    unsigned int s0 = sembla_sha_rotr(x, 7U) ^ sembla_sha_rotr(x, 18U) ^ (x >> 3U);
+    unsigned int s1 = sembla_sha_rotr(y, 17U) ^ sembla_sha_rotr(y, 19U) ^ (y >> 10U);
+    words[i] = words[i - 16U] + s0 + words[i - 7U] + s1;
+  }
+  unsigned int a=context->state[0], b=context->state[1], c=context->state[2], d=context->state[3];
+  unsigned int e=context->state[4], f=context->state[5], g=context->state[6], h=context->state[7];
+  #pragma unroll
+  for (unsigned int i = 0; i < 64U; ++i) {
+    unsigned int s1 = sembla_sha_rotr(e, 6U) ^ sembla_sha_rotr(e, 11U) ^ sembla_sha_rotr(e, 25U);
+    unsigned int choice = (e & f) ^ ((~e) & g);
+    unsigned int temp1 = h + s1 + choice + constants[i] + words[i];
+    unsigned int s0 = sembla_sha_rotr(a, 2U) ^ sembla_sha_rotr(a, 13U) ^ sembla_sha_rotr(a, 22U);
+    unsigned int majority = (a & b) ^ (a & c) ^ (b & c);
+    unsigned int temp2 = s0 + majority;
+    h=g; g=f; f=e; e=d+temp1; d=c; c=b; b=a; a=temp1+temp2;
+  }
+  context->state[0]+=a; context->state[1]+=b; context->state[2]+=c; context->state[3]+=d;
+  context->state[4]+=e; context->state[5]+=f; context->state[6]+=g; context->state[7]+=h;
+  context->block_len = 0U;
+}
+
+__device__ __forceinline__ void sembla_sha256_byte(sembla_sha256_context* context, unsigned char value) {
+  context->block[context->block_len++] = value;
+  context->total_len += 1ULL;
+  if (context->block_len == 64U) sembla_sha256_compress(context);
+}
+
+__device__ void sembla_sha256_bytes(sembla_sha256_context* context,
+                                     const unsigned char* bytes,
+                                     unsigned long long length) {
+  for (unsigned long long i = 0ULL; i < length; ++i) sembla_sha256_byte(context, bytes[i]);
+}
+
+__device__ void sembla_sha256_u64_le(sembla_sha256_context* context, unsigned long long value) {
+  #pragma unroll
+  for (unsigned int i = 0U; i < 8U; ++i) {
+    sembla_sha256_byte(context, (unsigned char)(value >> (i * 8U)));
+  }
+}
+
+extern "C" __global__ void sembla_final_state_sha256(
+    const unsigned char* state, const unsigned char* inputs,
+    const unsigned long long* input_counts, const unsigned char* literals,
+    const unsigned long long* instructions, unsigned long long instruction_count,
+    unsigned char* digest) {
+  if (blockIdx.x != 0U || threadIdx.x != 0U) return;
+  sembla_sha256_context context;
+  const unsigned int initial[8] = {0x6a09e667U,0xbb67ae85U,0x3c6ef372U,0xa54ff53aU,
+                                    0x510e527fU,0x9b05688cU,0x1f83d9abU,0x5be0cd19U};
+  #pragma unroll
+  for (unsigned int i = 0U; i < 8U; ++i) context.state[i] = initial[i];
+  context.block_len = 0U;
+  context.total_len = 0ULL;
+  for (unsigned long long i = 0ULL; i < instruction_count; ++i) {
+    const unsigned long long* instruction = instructions + i * 4ULL;
+    unsigned long long kind = instruction[0];
+    if (kind == 0ULL) {
+      sembla_sha256_bytes(&context, literals + instruction[1], instruction[2]);
+    } else if (kind == 1ULL) {
+      sembla_sha256_bytes(&context, state + instruction[1], instruction[2]);
+    } else if (kind == 2ULL) {
+      sembla_sha256_u64_le(&context, input_counts[instruction[1]]);
+    } else {
+      unsigned long long rows = input_counts[instruction[2]];
+      sembla_sha256_bytes(&context, inputs + instruction[1], rows * instruction[3]);
+    }
+  }
+  unsigned long long message_len = context.total_len;
+  sembla_sha256_byte(&context, 0x80U);
+  while (context.block_len != 56U) sembla_sha256_byte(&context, 0U);
+  unsigned long long bit_len = message_len * 8ULL;
+  for (int shift = 56; shift >= 0; shift -= 8) {
+    sembla_sha256_byte(&context, (unsigned char)(bit_len >> shift));
+  }
+  #pragma unroll
+  for (unsigned int i = 0U; i < 8U; ++i) {
+    digest[i * 4U] = (unsigned char)(context.state[i] >> 24);
+    digest[i * 4U + 1U] = (unsigned char)(context.state[i] >> 16);
+    digest[i * 4U + 2U] = (unsigned char)(context.state[i] >> 8);
+    digest[i * 4U + 3U] = (unsigned char)context.state[i];
+  }
+}
+"#;
+
 const PHILOX_TEST_KERNEL: &str = r#"
 extern "C" __global__ void sembla_philox_vectors(const unsigned long long* seeds,
                                                    const unsigned int* ticks,
@@ -3378,6 +3499,18 @@ mod tests {
         assert!(!resolver.contains("atomicMin"));
         assert!(!resolver.contains("atomicAdd"));
         assert!(!resolver.contains("other_row"));
+    }
+
+    #[test]
+    fn final_state_sha256_kernel_has_exact_streaming_and_dynamic_input_seams() {
+        let generated = generate(&sir_model()).unwrap();
+        let kernel = kernel_body(&generated.source, "sembla_final_state_sha256");
+        assert!(kernel.contains("const unsigned long long* input_counts"));
+        assert!(kernel.contains("input_counts[instruction[1]]"));
+        assert!(kernel.contains("rows * instruction[3]"));
+        assert!(kernel.contains("digest[i * 4U]"));
+        assert!(generated.source.contains("sembla_sha256_compress"));
+        assert!(generated.source.contains("message_len * 8ULL"));
     }
 
     #[test]

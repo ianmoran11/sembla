@@ -94,6 +94,18 @@ pub type TimedReusedCudaTickObservation = (
 );
 type DownloadedStateParts = (Vec<u8>, Vec<u8>, Vec<u64>);
 
+const HASH_INSTRUCTION_LITERAL: u64 = 0;
+const HASH_INSTRUCTION_STATE: u64 = 1;
+const HASH_INSTRUCTION_INPUT_COUNT: u64 = 2;
+const HASH_INSTRUCTION_INPUT_DATA: u64 = 3;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DeviceHashPlan {
+    literals: Vec<u8>,
+    /// Four u64 words per instruction: kind and three kind-specific operands.
+    instructions: Vec<u64>,
+}
+
 /// Scan, order identity, branch, then exact-key payload recovery. Kernel
 /// boundaries between these passes provide device-wide ordering without a
 /// mutex or retry loop in generated validation code.
@@ -307,6 +319,7 @@ fn with_capacity_safety_margin(bytes: usize, label: &str) -> Result<usize, CudaE
 fn isolated_lane_device_buffer_bytes(
     layout: &Layout,
     generated: &GeneratedCuda,
+    hash_plan: &DeviceHashPlan,
     parameter_bytes: usize,
 ) -> Result<usize, CudaError> {
     let mut total = 0_usize;
@@ -459,12 +472,20 @@ fn isolated_lane_device_buffer_bytes(
     )?;
     add(12, 8, "validation status")?;
     add(layout.candidate_offsets.len().max(1), 4, "effect active")?;
+    add(hash_plan.literals.len().max(1), 1, "state hash literals")?;
+    add(
+        hash_plan.instructions.len().max(1),
+        8,
+        "state hash instructions",
+    )?;
+    add(32, 1, "state hash digest")?;
     Ok(total)
 }
 
 fn estimate_isolated_sweep_capacity(
     layout: &Layout,
     generated: &GeneratedCuda,
+    hash_plan: &DeviceHashPlan,
     parameter_bytes: usize,
     workers: usize,
 ) -> Result<CudaSweepCapacityEstimate, CudaError> {
@@ -473,7 +494,7 @@ fn estimate_isolated_sweep_capacity(
             "CUDA sweep worker count must be greater than zero".to_owned(),
         ));
     }
-    let census = isolated_lane_device_buffer_bytes(layout, generated, parameter_bytes)?;
+    let census = isolated_lane_device_buffer_bytes(layout, generated, hash_plan, parameter_bytes)?;
     if generated.source.len() > SWEEP_CAPACITY_MAX_GENERATED_SOURCE_BYTES {
         return Err(CudaError::InvalidInput(format!(
             "generated CUDA source is {} bytes; the conservative sweep capacity bound supports at most {} bytes",
@@ -663,6 +684,7 @@ pub struct CudaBackend {
     advance_validation_phase: CudaFunction,
     commit_validation_status: CudaFunction,
     mark_effect_active: CudaFunction,
+    final_state_sha256: CudaFunction,
     state: CudaSlice<u8>,
     next_state: CudaSlice<u8>,
     pristine_state: CudaSlice<u8>,
@@ -711,6 +733,9 @@ pub struct CudaBackend {
     generic_enum_counts: CudaSlice<u64>,
     effect_active: CudaSlice<u32>,
     status: CudaSlice<u64>,
+    hash_literals: CudaSlice<u8>,
+    hash_instructions: CudaSlice<u64>,
+    hash_digest: CudaSlice<u8>,
     seed: u64,
     next_tick: u32,
     hash_mode: HashMode,
@@ -744,6 +769,7 @@ impl CudaBackend {
     ) -> Result<(usize, usize, usize, usize, usize), CudaError> {
         let generated = generate(model)?;
         let layout = build_layout(model, initial_tables, &generated)?;
+        let hash_plan = build_device_hash_plan(model, &layout)?;
         let parameter_bytes = model
             .model()
             .params
@@ -753,8 +779,13 @@ impl CudaBackend {
             .ok_or_else(|| {
                 CudaError::InvalidInput("CUDA sweep parameter size overflow".to_owned())
             })?;
-        let estimate =
-            estimate_isolated_sweep_capacity(&layout, &generated, parameter_bytes, workers)?;
+        let estimate = estimate_isolated_sweep_capacity(
+            &layout,
+            &generated,
+            &hash_plan,
+            parameter_bytes,
+            workers,
+        )?;
         Ok((
             estimate.device_bytes,
             estimate.host_bytes,
@@ -964,8 +995,10 @@ impl CudaBackend {
         let advance_validation_phase = load("sembla_advance_validation_phase")?;
         let commit_validation_status = load("sembla_commit_validation_status")?;
         let mark_effect_active = load("sembla_mark_effect_active")?;
+        let final_state_sha256 = load("sembla_final_state_sha256")?;
 
         let layout = build_layout(model, &initial_tables, &generated)?;
+        let hash_plan = build_device_hash_plan(model, &layout)?;
         let state_bytes = pack_initial_state(model, &initial_tables, &layout)?;
         let params_bytes = pack_params(model, params)?;
         let slot_count = fused_capacity.unwrap_or(1);
@@ -1172,6 +1205,13 @@ impl CudaBackend {
         let effect_active = stream
             .alloc_zeros::<u32>(arena_len(effect_active_stride, "effect active")?)
             .map_err(driver_error)?;
+        let hash_literals = stream
+            .memcpy_stod(&nonempty_u8(&hash_plan.literals))
+            .map_err(driver_error)?;
+        let hash_instructions = stream
+            .memcpy_stod(&nonempty(&hash_plan.instructions))
+            .map_err(driver_error)?;
+        let hash_digest = stream.alloc_zeros::<u8>(32).map_err(driver_error)?;
 
         let fused_batch = if let Some(capacity) = fused_capacity {
             let mut strides = vec![0_u64; FUSED_BUFFER_COUNT];
@@ -1297,6 +1337,7 @@ impl CudaBackend {
             advance_validation_phase,
             commit_validation_status,
             mark_effect_active,
+            final_state_sha256,
             state,
             next_state,
             pristine_state,
@@ -1345,6 +1386,9 @@ impl CudaBackend {
             generic_enum_counts,
             effect_active,
             status,
+            hash_literals,
+            hash_instructions,
+            hash_digest,
             seed,
             next_tick: 0,
             hash_mode,
@@ -1582,6 +1626,43 @@ impl CudaBackend {
     pub fn ensure_observed_state(&mut self) -> Result<&StateStore, CudaError> {
         self.ensure_host_state()?;
         Ok(&self.host_state)
+    }
+
+    /// Computes the canonical final-state SHA-256 on the device and downloads
+    /// only its 32-byte digest. Fused batches are rejected because this plan is
+    /// deliberately scoped to one retained sweep lane.
+    #[doc(hidden)]
+    pub fn final_state_hash_device(&mut self) -> Result<[u8; 32], CudaError> {
+        if self.fused_batch.is_some() {
+            return Err(CudaError::InvalidInput(
+                "device final-state hashing does not support fused CUDA batches".to_owned(),
+            ));
+        }
+        let instruction_count = u64::try_from(self.hash_instructions.len() / 4)
+            .map_err(|_| CudaError::InvalidInput("device hash plan is too large".to_owned()))?;
+        let mut args = self.stream.launch_builder(&self.final_state_sha256);
+        args.arg(&self.state)
+            .arg(&self.inputs)
+            .arg(&self.input_counts)
+            .arg(&self.hash_literals)
+            .arg(&self.hash_instructions)
+            .arg(&instruction_count)
+            .arg(&mut self.hash_digest);
+        unsafe {
+            args.launch(LaunchConfig {
+                grid_dim: (1, 1, 1),
+                block_dim: (1, 1, 1),
+                shared_mem_bytes: 0,
+            })
+        }
+        .map_err(driver_error)?;
+        let digest = self
+            .stream
+            .memcpy_dtov(&self.hash_digest)
+            .map_err(driver_error)?;
+        digest.try_into().map_err(|_| {
+            CudaError::DeviceExecution("device SHA-256 returned the wrong digest length".to_owned())
+        })
     }
 
     /// Returns the once-per-run IR eligibility decision used by this backend.
@@ -3886,6 +3967,14 @@ fn device_status(status: &[u64]) -> CudaError {
     CudaError::DeviceExecution(message)
 }
 
+fn nonempty_u8(values: &[u8]) -> Vec<u8> {
+    if values.is_empty() {
+        vec![0]
+    } else {
+        values.to_vec()
+    }
+}
+
 fn nonempty(values: &[u64]) -> Vec<u64> {
     if values.is_empty() {
         vec![0]
@@ -4116,6 +4205,195 @@ fn write_column(bytes: &mut [u8], offset: usize, data: &ColumnData) {
             }
         }
     }
+}
+
+struct DeviceHashPlanBuilder {
+    plan: DeviceHashPlan,
+}
+
+impl DeviceHashPlanBuilder {
+    fn new() -> Self {
+        Self {
+            plan: DeviceHashPlan {
+                literals: Vec::new(),
+                instructions: Vec::new(),
+            },
+        }
+    }
+
+    fn instruction(&mut self, kind: u64, first: u64, second: u64, third: u64) {
+        self.plan
+            .instructions
+            .extend_from_slice(&[kind, first, second, third]);
+    }
+
+    fn literal(&mut self, bytes: &[u8]) -> Result<(), CudaError> {
+        let offset = u64::try_from(self.plan.literals.len())
+            .map_err(|_| CudaError::InvalidInput("device hash literals exceed u64".to_owned()))?;
+        let length = u64::try_from(bytes.len())
+            .map_err(|_| CudaError::InvalidInput("device hash literal exceeds u64".to_owned()))?;
+        self.plan.literals.extend_from_slice(bytes);
+        self.instruction(HASH_INSTRUCTION_LITERAL, offset, length, 0);
+        Ok(())
+    }
+
+    fn u64_literal(&mut self, value: usize) -> Result<(), CudaError> {
+        self.literal(&(value as u64).to_le_bytes())
+    }
+
+    fn string(&mut self, value: &str) -> Result<(), CudaError> {
+        self.u64_literal(value.len())?;
+        self.literal(value.as_bytes())
+    }
+
+    fn state(&mut self, offset: usize, length: usize) -> Result<(), CudaError> {
+        self.instruction(
+            HASH_INSTRUCTION_STATE,
+            u64::try_from(offset).map_err(|_| {
+                CudaError::InvalidInput("device hash state offset exceeds u64".to_owned())
+            })?,
+            u64::try_from(length).map_err(|_| {
+                CudaError::InvalidInput("device hash state length exceeds u64".to_owned())
+            })?,
+            0,
+        );
+        Ok(())
+    }
+
+    fn input_count(&mut self, index: usize) -> Result<(), CudaError> {
+        self.instruction(
+            HASH_INSTRUCTION_INPUT_COUNT,
+            u64::try_from(index).map_err(|_| {
+                CudaError::InvalidInput("device hash input index exceeds u64".to_owned())
+            })?,
+            0,
+            0,
+        );
+        Ok(())
+    }
+
+    fn input_data(
+        &mut self,
+        offset: usize,
+        count_index: usize,
+        width: usize,
+    ) -> Result<(), CudaError> {
+        self.instruction(
+            HASH_INSTRUCTION_INPUT_DATA,
+            u64::try_from(offset).map_err(|_| {
+                CudaError::InvalidInput("device hash input offset exceeds u64".to_owned())
+            })?,
+            u64::try_from(count_index).map_err(|_| {
+                CudaError::InvalidInput("device hash input index exceeds u64".to_owned())
+            })?,
+            u64::try_from(width).expect("column width fits u64"),
+        );
+        Ok(())
+    }
+}
+
+fn column_hash_encoding(ty: &AttrType) -> (u8, usize) {
+    match ty {
+        AttrType::Real => (0, 8),
+        AttrType::Int => (1, 8),
+        AttrType::Enum { .. } => (2, 2),
+        AttrType::Ref { .. } => (3, 4),
+    }
+}
+
+fn build_device_hash_plan(
+    model: &ValidatedModel,
+    layout: &Layout,
+) -> Result<DeviceHashPlan, CudaError> {
+    let mut plan = DeviceHashPlanBuilder::new();
+    plan.literal(if layout.ports.is_empty() {
+        b"SEMBLA_STATE_V1\0"
+    } else {
+        b"SEMBLA_STATE_V2\0"
+    })?;
+    plan.u64_literal(layout.row_counts.len())?;
+    let mut table_index = 0;
+    let mut column_index = 0;
+    for model_box in &model.model().boxes {
+        for table in &model_box.tables {
+            plan.string(&model_box.name)?;
+            plan.string(&table.name)?;
+            let rows = usize::try_from(layout.row_counts[table_index]).map_err(|_| {
+                CudaError::InvalidInput("state row count exceeds host usize".to_owned())
+            })?;
+            plan.u64_literal(rows)?;
+            plan.u64_literal(table.attrs.len())?;
+            for attr in &table.attrs {
+                plan.string(&attr.name)?;
+                let (tag, width) = column_hash_encoding(&attr.ty);
+                plan.literal(&[tag])?;
+                plan.u64_literal(rows)?;
+                plan.state(
+                    usize::try_from(layout.column_offsets[column_index]).map_err(|_| {
+                        CudaError::InvalidInput("state column offset exceeds host usize".to_owned())
+                    })?,
+                    rows.checked_mul(width).ok_or_else(|| {
+                        CudaError::InvalidInput("state hash segment length overflow".to_owned())
+                    })?,
+                )?;
+                column_index += 1;
+            }
+            table_index += 1;
+        }
+    }
+    if !layout.ports.is_empty() {
+        plan.u64_literal(layout.ports.len())?;
+        let mut field = 0;
+        for (port_flat, (box_index, port_index)) in layout.ports.iter().copied().enumerate() {
+            let model_box = &model.model().boxes[box_index];
+            let port = &model_box.inputs[port_index];
+            plan.string(&model_box.name)?;
+            plan.string(&port.name)?;
+            plan.input_count(port_flat)?;
+            plan.u64_literal(port.schema.len())?;
+            for attr in &port.schema {
+                plan.string(&attr.name)?;
+                let (tag, width) = column_hash_encoding(&attr.ty);
+                plan.literal(&[tag])?;
+                plan.input_count(port_flat)?;
+                plan.input_data(
+                    usize::try_from(layout.input_offsets[field]).map_err(|_| {
+                        CudaError::InvalidInput("input column offset exceeds host usize".to_owned())
+                    })?,
+                    port_flat,
+                    width,
+                )?;
+                field += 1;
+            }
+        }
+    }
+    debug_assert_eq!(plan.plan.instructions.len() % 4, 0);
+    Ok(plan.plan)
+}
+
+#[cfg(test)]
+fn hash_device_plan_host(
+    plan: &DeviceHashPlan,
+    state: &[u8],
+    inputs: &[u8],
+    input_counts: &[u64],
+) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    for instruction in plan.instructions.chunks_exact(4) {
+        let first = instruction[1] as usize;
+        let second = instruction[2] as usize;
+        match instruction[0] {
+            HASH_INSTRUCTION_LITERAL => hash.update(&plan.literals[first..first + second]),
+            HASH_INSTRUCTION_STATE => hash.update(&state[first..first + second]),
+            HASH_INSTRUCTION_INPUT_COUNT => hash.update(input_counts[first].to_le_bytes()),
+            HASH_INSTRUCTION_INPUT_DATA => {
+                let length = input_counts[second] as usize * instruction[3] as usize;
+                hash.update(&inputs[first..first + length]);
+            }
+            kind => panic!("unknown device hash instruction {kind}"),
+        }
+    }
+    hash.finalize().into()
 }
 
 fn hash_state(
@@ -4421,8 +4699,11 @@ mod diagnostic_equality_hardware {
 
 #[cfg(test)]
 mod sweep_capacity_tests {
-    use super::{build_layout, estimate_isolated_sweep_capacity, generate, SWEEP_CAPACITY_MIB};
-    use sembla_runtime::state::TableInit;
+    use super::{
+        build_device_hash_plan, build_layout, estimate_isolated_sweep_capacity, generate,
+        hash_device_plan_host, hash_state, SWEEP_CAPACITY_MIB,
+    };
+    use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
 
     fn demographic_shape(scale: usize) -> (sembla_ir::ValidatedModel, Vec<TableInit>) {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -4464,11 +4745,17 @@ mod sweep_capacity_tests {
             let (model, tables) = demographic_shape(scale);
             let generated = generate(&model).unwrap();
             let layout = build_layout(&model, &tables, &generated).unwrap();
+            let hash_plan = build_device_hash_plan(&model, &layout).unwrap();
             let parameter_bytes = model.model().params.len().max(1) * 8;
             for (workers, observed) in [1_usize, 2, 4].into_iter().zip(observed_mib) {
-                let estimate =
-                    estimate_isolated_sweep_capacity(&layout, &generated, parameter_bytes, workers)
-                        .unwrap();
+                let estimate = estimate_isolated_sweep_capacity(
+                    &layout,
+                    &generated,
+                    &hash_plan,
+                    parameter_bytes,
+                    workers,
+                )
+                .unwrap();
                 assert!(
                     estimate.device_bytes >= observed * SWEEP_CAPACITY_MIB,
                     "{scale} rows/{workers} lanes: estimate {} MiB under measured {observed} MiB",
@@ -4483,10 +4770,41 @@ mod sweep_capacity_tests {
         let (model, tables) = demographic_shape(1);
         let generated = generate(&model).unwrap();
         let layout = build_layout(&model, &tables, &generated).unwrap();
-        assert!(estimate_isolated_sweep_capacity(&layout, &generated, 8, 0)
-            .unwrap_err()
-            .to_string()
-            .contains("greater than zero"));
+        let hash_plan = build_device_hash_plan(&model, &layout).unwrap();
+        assert!(
+            estimate_isolated_sweep_capacity(&layout, &generated, &hash_plan, 8, 0)
+                .unwrap_err()
+                .to_string()
+                .contains("greater than zero")
+        );
+    }
+
+    #[test]
+    fn device_hash_plan_matches_canonical_packed_hash_with_dynamic_inputs() {
+        let source = r#"{"name":"hash_inputs","dt":1.0,"params":[],"boxes":[{"name":"source","tables":[{"name":"Event","size_hint":2,"attrs":[{"name":"amount","ty":{"kind":"int"}}]}],"transitions":[],"inputs":[],"outputs":[{"name":"events","schema":[{"name":"amount","ty":{"kind":"int"}}],"builder":{"kind":"per_table","table":"Event","fields":[{"name":"amount","op":{"kind":"sum","value":{"kind":"self_attr","name":"amount"}},"filter":null}]}}],"views":[]},{"name":"sink","tables":[],"transitions":[],"inputs":[{"name":"events","schema":[{"name":"amount","ty":{"kind":"int"}}]}],"outputs":[],"views":[]}],"wires":[{"from":{"box":"source","port":"events"},"to":{"box":"sink","port":"events"}}],"summaries":[]}"#;
+        let model = sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap();
+        let tables = vec![TableInit::new(
+            "source",
+            "Event",
+            2,
+            vec![ColumnInit::new("amount", ColumnData::Int(vec![4, 9]))],
+        )];
+        let generated = generate(&model).unwrap();
+        let layout = build_layout(&model, &tables, &generated).unwrap();
+        assert!(!layout.ports.is_empty());
+        let plan = build_device_hash_plan(&model, &layout).unwrap();
+        assert_eq!(plan.instructions.len() % 4, 0);
+        let state = (0..layout.state_len)
+            .map(|index| index.wrapping_mul(37) as u8)
+            .collect::<Vec<_>>();
+        let inputs = (0..layout.input_len.max(1))
+            .map(|index| index.wrapping_mul(19).wrapping_add(7) as u8)
+            .collect::<Vec<_>>();
+        let input_counts = vec![1_u64; layout.ports.len()];
+        assert_eq!(
+            hash_device_plan_host(&plan, &state, &inputs, &input_counts),
+            hash_state(&model, &layout, &state, &inputs, &input_counts)
+        );
     }
 }
 

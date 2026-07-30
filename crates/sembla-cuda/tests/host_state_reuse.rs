@@ -137,6 +137,32 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
 }
 
 #[test]
+fn device_final_hash_experiment_is_opt_in_and_keeps_publication_shape() {
+    let backend = include_str!("../src/backend.rs");
+    let method = section(
+        backend,
+        "    pub fn final_state_hash_device(&mut self)",
+        "\n    /// Returns the once-per-run IR eligibility decision",
+    );
+    assert!(method.contains("self.fused_batch.is_some()"));
+    assert!(method.contains("memcpy_dtov(&self.hash_digest)"));
+    assert!(!method.contains("memcpy_dtov(&self.state)"));
+    assert!(!method.contains("download_state"));
+
+    let cli = include_str!("../../sembla-cli/src/main.rs");
+    assert!(cli.contains("SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256"));
+    assert!(cli.contains("SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY"));
+    assert_eq!(
+        cli.matches("experimental_cuda_final_state_hash(backend)?")
+            .count(),
+        2
+    );
+    assert!(cli.contains(
+        "SweepDrawOutput {\n                    output,\n                    final_state_hash,"
+    ));
+}
+
+#[test]
 fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
     let backend = include_str!("../src/backend.rs");
     let reused = section(

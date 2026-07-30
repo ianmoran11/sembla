@@ -54,6 +54,26 @@ fn reset_and_reseed_matches_a_fresh_backend_after_prior_draws() {
     assert_eq!(retained_hash, fresh_hash);
 }
 
+#[test]
+fn device_final_state_sha256_matches_host_for_state_and_dynamic_inputs() {
+    let model = input_integer_ordering_model();
+    let params = ParamEnv::defaults(&model);
+    let mut backend = CudaBackend::new(
+        &model,
+        input_integer_ordering_state(),
+        &params,
+        29,
+        HashMode::FinalOnly,
+    )
+    .unwrap();
+    for _ in 0..2 {
+        backend.run_tick_observed_reused().unwrap();
+    }
+    let device = backend.final_state_hash_device().unwrap();
+    let host = backend.ensure_observed_state().unwrap().state_hash();
+    assert_eq!(device, host);
+}
+
 fn claim_overflow_state() -> Vec<TableInit> {
     vec![
         TableInit::new("world", "Worker", 1, Vec::new()),

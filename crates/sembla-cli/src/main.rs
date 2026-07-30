@@ -1686,6 +1686,9 @@ const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DE
 const SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS";
 const SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS";
 const SWEEP_CUDA_FUSED_DRAWS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS";
+const SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV: &str = "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256";
+const SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV: &str =
+    "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SweepConcurrencyMode {
@@ -1896,6 +1899,13 @@ fn sweep_cuda_fused_draw_capacity(
     {
         return Err(format!(
             "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with the lockstep-stream, free-stream, and draw-delay spike controls"
+        ));
+    }
+    if std::env::var_os(SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV).is_some()
+        || std::env::var_os(SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV).is_some()
+    {
+        return Err(format!(
+            "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with experimental {SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV}"
         ));
     }
     Ok(Some(capacity))
@@ -3906,6 +3916,55 @@ static SWEEP_BACKEND_CONSTRUCTIONS: std::sync::atomic::AtomicUsize =
 #[cfg(test)]
 static SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+#[cfg(feature = "cuda")]
+fn experimental_cuda_final_state_hash(
+    backend: &mut sembla_cuda::CudaBackend,
+) -> Result<[u8; 32], String> {
+    let enabled = parse_experimental_bool_env(SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV)?;
+    let verify = parse_experimental_bool_env(SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV)?;
+    if verify && !enabled {
+        return Err(format!(
+            "{SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV}=1 requires {SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV}=1"
+        ));
+    }
+    if !enabled {
+        return backend
+            .ensure_observed_state()
+            .map(|state| state.state_hash())
+            .map_err(|error| error.to_string());
+    }
+    let digest = backend
+        .final_state_hash_device()
+        .map_err(|error| error.to_string())?;
+    if verify {
+        let host_digest = backend
+            .ensure_observed_state()
+            .map_err(|error| error.to_string())?
+            .state_hash();
+        if digest != host_digest {
+            return Err(format!(
+                "experimental CUDA final-state SHA-256 mismatch: device={} host={}",
+                hex(&digest),
+                hex(&host_digest)
+            ));
+        }
+    }
+    Ok(digest)
+}
+
+#[cfg(feature = "cuda")]
+fn parse_experimental_bool_env(name: &str) -> Result<bool, String> {
+    let Some(value) = std::env::var_os(name) else {
+        return Ok(false);
+    };
+    let value = value.to_string_lossy();
+    if value == "1" {
+        Ok(true)
+    } else {
+        Err(format!("{name} must be 1 when set, found '{value}'"))
+    }
+}
+
 enum SweepBackend {
     Cpu {
         state: StateStore,
@@ -4088,10 +4147,7 @@ impl SweepBackend {
                     )?;
                 }
                 let output = output.finish(model, None)?;
-                let final_state_hash = backend
-                    .ensure_observed_state()
-                    .map_err(|error| error.to_string())?
-                    .state_hash();
+                let final_state_hash = experimental_cuda_final_state_hash(backend)?;
                 Ok(SweepDrawOutput {
                     output,
                     final_state_hash,
@@ -4224,10 +4280,7 @@ impl SweepBackend {
                 let output = output
                     .expect("healthy lockstep draw has an accumulator")
                     .finish(model, None)?;
-                let final_state_hash = backend
-                    .ensure_observed_state()
-                    .map_err(|error| error.to_string())?
-                    .state_hash();
+                let final_state_hash = experimental_cuda_final_state_hash(backend)?;
                 Ok(SweepDrawOutput {
                     output,
                     final_state_hash,

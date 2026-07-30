@@ -785,6 +785,56 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
     rm -rf "$arm/output"
   done
 
+  # Opt-in final-state hash experiment. Control preserves the full final D2H;
+  # treatment hashes the canonical state stream on-device and reads 32 bytes.
+  # Scientific trees must remain byte-identical at worker counts 1, 2, and 4.
+  HASH_EXPERIMENT_DIR="$DIAGNOSTIC_DIR/device-final-hash"
+  HASH_EXPERIMENT_DRAWS=20
+  mkdir -p "$HASH_EXPERIMENT_DIR"
+  for hash_mode in control device; do
+    for diagnostic_workers in 1 2 4; do
+      arm="$HASH_EXPERIMENT_DIR/$hash_mode-workers-$diagnostic_workers"
+      mkdir -p "$arm"
+      hash_env=()
+      if [[ "$hash_mode" == device ]]; then
+        hash_env+=(SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256=1)
+      fi
+      timeout --signal=TERM --kill-after=30s 900s \
+        env "${hash_env[@]}" "$BIN" sweep "$DIAGNOSTIC_MODEL" \
+        --population "$DIAGNOSTIC_STATE" --backend cuda --seed "$SEED" \
+        --draws "$HASH_EXPERIMENT_DRAWS" --draw-workers "$diagnostic_workers" \
+        --ticks "$DIAGNOSTIC_TICKS" --noise independent \
+        --enable grouped-observations --timing-json "$arm/timing.json" \
+        --out "$arm/output" > "$arm/stdout.txt" 2> "$arm/stderr.txt"
+      (
+        cd "$arm/output"
+        find . -type f -print0 | sort -z | xargs -0 sha256sum
+      ) > "$arm/output.sha256"
+    done
+  done
+  for candidate in \
+    "$HASH_EXPERIMENT_DIR/control-workers-2/output.sha256" \
+    "$HASH_EXPERIMENT_DIR/control-workers-4/output.sha256" \
+    "$HASH_EXPERIMENT_DIR/device-workers-1/output.sha256" \
+    "$HASH_EXPERIMENT_DIR/device-workers-2/output.sha256" \
+    "$HASH_EXPERIMENT_DIR/device-workers-4/output.sha256"; do
+    diff -u "$HASH_EXPERIMENT_DIR/control-workers-1/output.sha256" "$candidate"
+  done
+  timeout --signal=TERM --kill-after=30s 900s \
+    env SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256=1 \
+        SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY=1 \
+    "$BIN" sweep "$DIAGNOSTIC_MODEL" \
+      --population "$DIAGNOSTIC_STATE" --backend cuda --seed "$SEED" \
+      --draws 1 --draw-workers 1 --ticks "$DIAGNOSTIC_TICKS" \
+      --noise independent --enable grouped-observations \
+      --out "$HASH_EXPERIMENT_DIR/verified-output" \
+      > "$HASH_EXPERIMENT_DIR/verify.stdout" \
+      2> "$HASH_EXPERIMENT_DIR/verify.stderr"
+  (
+    cd "$HASH_EXPERIMENT_DIR/verified-output"
+    find . -type f -print0 | sort -z | xargs -0 sha256sum
+  ) > "$HASH_EXPERIMENT_DIR/verified-output.sha256"
+
   analyzer=(
     python3 scripts/analyze-cuda-readback-diagnostic.py
     --phase-timing "$DIAGNOSTIC_DIR/phase-timing.json"
@@ -1959,9 +2009,10 @@ repository commit \`$COMMIT_BEFORE\`. It did not rerun the unrelated frozen or
 concurrency gates.
 
 The \`cuda-readback-diagnostic/\` tree contains native 24-tick phase timing,
-equal four-draw worker-one/worker-four Nsight Systems traces, machine-derived
-D2H and per-kernel duration analysis, and bounded Nsight Compute reports for
-three evidence-selected kernels. Systems timings decide contention; Compute
+equal four-draw worker-one/worker-four Nsight Systems traces, 20-draw control
+versus device-final-hash timings and exact output manifests at workers 1/2/4,
+machine-derived D2H and per-kernel duration analysis, and bounded Nsight Compute
+reports for three evidence-selected kernels. Systems timings decide contention; Compute
 reports occupancy, bandwidth, and stalls only because replay destroys overlap.
 EOF
 else
