@@ -209,9 +209,11 @@ so run them from here rather than folder by folder.
 | 6 | `prds-evaluator-throughput/0005` write identity | no | the serial remainder is the write path; three of its four costs share one cause |
 | 7 | `prds-evaluator-throughput/0006` effect gathering | no | effect values computed for every row, used for the ~2% that fire |
 | 8 | `prds-device-observation/0001` + `0002` | yes | **landed, hardware-verified §L11**: CUDA 26.37 s → 14.10 s (1.87×); `state_transfer`, `state_reconstruct` and `observe_views` all exactly zero |
-| 9 | `prds-cuda-validation-parallelism/0008` remove the spin lock | yes | *do this first.* It blocks the differential corpus, which is the safety net for every further device-side change — including item 10. 23-second reproduction |
-| 10 | `prds-sweep-throughput/0001` reuse the backend across draws | no | largest win for batch work, and needs no GPU session: `sweep` NVRTC-recompiles the model and clones the full initial state **every draw** |
-| 11 | **device-side `wins`/`deferred` reduction** — unwritten | yes | now **91%** of CUDA wall time (`readback_control` 53% + `report` 33%), moving and counting 200 MB/tick at 5M to produce ≤13 diagnostic integers. Written once the corpus is green, so its criteria can *require* corpus equality rather than defer it (§M3) |
+| 9 | `prds-cuda-validation-parallelism/0008` remove the spin lock | yes | **landed and hardware-verified**: four ordered lock-free passes; differential corpus restored |
+| 10 | `prds-sweep-throughput/0001` reuse the backend across draws | no | **landed and hardware-verified**: one retained resettable backend across sequential draws |
+| 11 | `prds-cuda-host-path/0002` reduce device-side `wins`/`deferred` | yes | **landed and hardware-verified**: compact resident count buffers replace full-state control readback |
+| 12 | [`prds-run-queue/0001`](prds-run-queue/0001-run-cuda-draws-concurrently.md) run CUDA draws concurrently | local only | **next**: promote the Gate-1-positive free-running non-blocking-stream mechanism to an explicit bounded interface; GPU criteria remain pending per §M3 |
+| 13 | **one GPU session** | yes | verify item 12's supported flag, capacity failure, output parity, and non-default-stream execution after its local implementation is approved |
 
 **Why 9 first.** Item 11 is a device-side change to a reduction, which is exactly
 the shape the differential corpus exists to check. Landing it while the corpus

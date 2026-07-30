@@ -1,6 +1,12 @@
 # Run queue
 
-**Empty.** Nothing is pending.
+**Pending: one PRD.**
+
+1. [`0001-run-cuda-draws-concurrently`](0001-run-cuda-draws-concurrently.md) —
+   promote the measured free-running non-blocking CUDA-stream spike to a
+   supported, explicit, bounded, default-off `--draw-workers` interface.
+   Local criteria run without a GPU; hardware criteria remain pending for a
+   later paid session.
 
 ## Last cleared 2026-07-29
 
@@ -26,7 +32,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now would do nothing.
+Running it now will run only `0001-run-cuda-draws-concurrently`.
 
 ## How to use it
 
