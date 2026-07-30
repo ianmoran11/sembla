@@ -35,6 +35,10 @@
 #   BENCH_CONCURRENCY_LOCKSTEP=1
 #                               - synchronize lane groups at tick boundaries and
 #                                 use explicitly non-blocking CUDA streams
+#   BENCH_CONCURRENCY_SUPPORTED=1
+#                               - exercise the supported --draw-workers interface
+#                                 at 1/2/4 lanes, including independent and CRN
+#                                 parity, capacity rejection, and Nsight evidence
 #   BENCH_CONCURRENCY_FREE_STREAMS=1
 #                               - schedule lanes dynamically with no tick
 #                                 barriers on explicitly non-blocking CUDA
@@ -127,6 +131,11 @@ if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" \
   echo 'BENCH_CONCURRENCY_FUSED=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
   exit 2
 fi
+if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" \
+      && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
+  echo 'BENCH_CONCURRENCY_SUPPORTED=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
+  exit 2
+fi
 if [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" \
       && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
   echo 'BENCH_CONCURRENCY_FREE_STREAMS=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
@@ -146,6 +155,14 @@ if [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" \
       && ( "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
            || "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ) ]]; then
   echo 'BENCH_CONCURRENCY_FREE_STREAMS is mutually exclusive with LOCKSTEP and FUSED' >&2
+  exit 2
+fi
+if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" \
+      && ( "${BENCH_CONCURRENCY_LOCKSTEP:-0}" == "1" \
+           || "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" \
+           || "${BENCH_CONCURRENCY_FUSED:-0}" == "1" \
+           || "${BENCH_CONCURRENCY_CRN:-0}" == "1" ) ]]; then
+  echo 'BENCH_CONCURRENCY_SUPPORTED is self-contained and mutually exclusive with hidden concurrency mode/CRN selectors' >&2
   exit 2
 fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
@@ -455,6 +472,7 @@ printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:
 printf 'export BENCH_CONCURRENCY_SPIKE=%q\n' "${BENCH_CONCURRENCY_SPIKE:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_LOCKSTEP=%q\n' "${BENCH_CONCURRENCY_LOCKSTEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_FUSED=%q\n' "${BENCH_CONCURRENCY_FUSED:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CONCURRENCY_SUPPORTED=%q\n' "${BENCH_CONCURRENCY_SUPPORTED:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_FREE_STREAMS=%q\n' "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_CRN=%q\n' "${BENCH_CONCURRENCY_CRN:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CONCURRENCY_SPIKE_ONLY=%q\n' "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" >> "$REMOTE_SCRIPT"
@@ -754,7 +772,10 @@ if [[ "${BENCH_CONCURRENCY_SPIKE:-0}" == "1" ]]; then
     --format=csv,noheader > "$CONCURRENCY_DIR/gpu.txt"
   concurrency_driver_args=()
   concurrency_env=()
-  if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
+  if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+    echo 'mode: supported --draw-workers on free-running non-blocking CUDA streams'
+    concurrency_driver_args=(--supported-draw-workers)
+  elif [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
     echo 'mode: fused grid-y draw slots in one CUDA phase launch'
     concurrency_driver_args=(--cuda-fused-grid-y)
     concurrency_env=(SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS=2)
@@ -861,12 +882,52 @@ PY
       "${concurrency_driver_args[@]}" \
       2>&1 | tee "$scale_dir/cuda-driver.log"
 
+    if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+      python3 scripts/run-sweep-concurrency-spike.py \
+        --binary "$BIN" --model "$concurrency_model" \
+        --population "$concurrency_state" --backend cuda \
+        --output-root "$scale_dir/cuda-crn" --workers 1 2 4 \
+        --repetitions 1 --draws 20 --ticks 24 --seed "$SEED" --noise crn \
+        --export-pairs --enable grouped-observations \
+        --supported-draw-workers \
+        2>&1 | tee "$scale_dir/cuda-crn-driver.log"
+    fi
+
+    if [[ "$concurrency_scale" == "10000000" && "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+      capacity_out="$scale_dir/capacity-failure-output"
+      set +e
+      env -u SEMBLA_SWEEP_SPIKE_DRAW_WORKERS \
+        -u SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS \
+        "$BIN" sweep "$concurrency_model" \
+          --population "$concurrency_state" --backend cuda \
+          --draw-workers 20 --seed "$SEED" --draws 20 --ticks 1 \
+          --noise independent --enable grouped-observations \
+          --out "$capacity_out" \
+          > "$scale_dir/capacity-failure.stdout" \
+          2> "$scale_dir/capacity-failure.stderr"
+      capacity_status=$?
+      set -e
+      printf '%s\n' "$capacity_status" > "$scale_dir/capacity-failure.exit-code.txt"
+      if [[ "$capacity_status" == "0" || -e "$capacity_out" ]]; then
+        echo 'supported capacity-failure arm did not reject before scientific output' >&2
+        exit 10
+      fi
+      if ! grep -q 'insufficient CUDA device memory' "$scale_dir/capacity-failure.stderr"; then
+        echo 'supported capacity-failure arm did not report the capacity preflight error' >&2
+        exit 10
+      fi
+      printf '%s\n' \
+        'PASS oversized supported worker request failed capacity preflight before scientific output' \
+        > "$scale_dir/capacity-failure-check.txt"
+    fi
+
     if [[ "$concurrency_scale" == "1000000" && "${BENCH_CONCURRENCY_CRN:-0}" != "1" ]]; then
       # Exercise the selected scheduler directly and require the ordinary
       # sequential scientific output tree. The independent mode also forces a
       # completion inversion; lockstep mode instead verifies its explicit
       # timing identity because tick barriers intentionally prevent that shape.
       schedule_env=("${concurrency_env[@]}")
+      schedule_worker_args=()
       schedule_workers=2
       reference_arm=workers-1
       if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
@@ -875,10 +936,16 @@ PY
       elif [[ "${BENCH_CONCURRENCY_LOCKSTEP:-0}" != "1" ]]; then
         schedule_env+=(SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS=2000)
       fi
-      env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS="$schedule_workers" "${schedule_env[@]}" \
+      if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+        schedule_worker_args=(--draw-workers "$schedule_workers")
+      else
+        schedule_env+=(SEMBLA_SWEEP_SPIKE_DRAW_WORKERS="$schedule_workers")
+      fi
+      env "${schedule_env[@]}" \
         "$BIN" sweep "$concurrency_model" \
           --population "$concurrency_state" --backend cuda \
           --seed "$SEED" --draws 20 --ticks 24 --noise independent \
+          "${schedule_worker_args[@]}" \
           --enable grouped-observations \
           --export-pairs "$scale_dir/schedule-control-pairs.csv" \
           --timing-json "$scale_dir/schedule-control-timing.json" \
@@ -892,12 +959,13 @@ PY
         "$scale_dir/schedule-control-check.txt" \
         "${BENCH_CONCURRENCY_LOCKSTEP:-0}" \
         "${BENCH_CONCURRENCY_FUSED:-0}" \
-        "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" <<'PY'
+        "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" \
+        "${BENCH_CONCURRENCY_SUPPORTED:-0}" <<'PY'
 import json, pathlib, sys
 source, report = map(pathlib.Path, sys.argv[1:3])
 lockstep = sys.argv[3] == "1"
 fused = sys.argv[4] == "1"
-free = sys.argv[5] == "1"
+free = sys.argv[5] == "1" or sys.argv[6] == "1"
 doc = json.loads(source.read_text())
 if fused:
     assert doc["schema"] == "sembla-cuda-fused-draw-spike-timing-v1"
@@ -938,6 +1006,13 @@ elif not fused:
     else:
         message = "PASS: completion inversion and byte-identical publication\n"
     assert draws[1]["finish_offset_ms"] < draws[0]["finish_offset_ms"]
+    if free:
+        assert draws[2]["start_offset_ms"] < draws[0]["finish_offset_ms"]
+        assert doc["maximum_pending_results"] <= 4
+        assert abs(
+            doc["execution_window_wall_time_ms"]
+            - max(draw["finish_offset_ms"] for draw in draws)
+        ) < 0.001
 report.write_text(message)
 PY
 
@@ -950,13 +1025,20 @@ PY
       fi
       (
         cd "$scale_dir"
-        env SEMBLA_SWEEP_SPIKE_DRAW_WORKERS="$schedule_workers" "${concurrency_env[@]}" \
+        nsys_env=("${concurrency_env[@]}")
+        nsys_worker_args=()
+        if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+          nsys_worker_args=(--draw-workers "$schedule_workers")
+        else
+          nsys_env+=(SEMBLA_SWEEP_SPIKE_DRAW_WORKERS="$schedule_workers")
+        fi
+        env "${nsys_env[@]}" \
           nsys profile --trace=cuda --force-overwrite=true \
             -o cuda-workers-2-trace \
             "$BIN" sweep "$concurrency_model" \
               --population "$concurrency_state" --backend cuda \
               --seed "$SEED" --draws 4 --ticks 24 --noise independent \
-              --enable grouped-observations \
+              --enable grouped-observations "${nsys_worker_args[@]}" \
               --timing-json nsys-timing.json --out nsys-output \
               > nsys.stdout 2> nsys.stderr
         nsys stats --force-export=true --report cuda_gpu_trace --format csv \
@@ -1525,7 +1607,13 @@ assert all(doc["assertions"].values())
 )
 PY
 else
-  if [[ "${BENCH_CONCURRENCY_CRN:-0}" == "1" ]]; then
+  if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+    noise_description='independent noise with three repetitions plus CRN noise with one repetition'
+    repetitions_description='three independent-noise repetitions and one CRN repetition'
+    nsys_description=' and a 1M Nsight Systems CUDA trace exported as CSV'
+    nsys_assertion='PASS Nsight Systems CUDA trace exported for overlap analysis'
+    schedule_assertion='PASS supported free-stream completion inversion preserved ordered publication and oversized capacity was rejected before output'
+  elif [[ "${BENCH_CONCURRENCY_CRN:-0}" == "1" ]]; then
     noise_description='CRN noise with one repetition (correctness arm; timing claims remain with the independent-noise arm)'
     repetitions_description='one repetition'
     nsys_description=''
@@ -1538,7 +1626,9 @@ else
     nsys_assertion='PASS Nsight Systems CUDA trace exported for overlap analysis'
     schedule_assertion=''
   fi
-  if [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
+  if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
+    mode_description='supported --draw-workers on free-running non-blocking CUDA streams with bounded capacity preflight'
+  elif [[ "${BENCH_CONCURRENCY_FUSED:-0}" == "1" ]]; then
     mode_description='fused grid-y draw slots in one CUDA phase launch'
     [[ -z "$schedule_assertion" ]] && schedule_assertion='PASS complete fused chunk timing metadata preserved ordered publication'
   elif [[ "${BENCH_CONCURRENCY_FREE_STREAMS:-0}" == "1" ]]; then
@@ -1562,9 +1652,10 @@ Noise/repetition protocol: $noise_description.
 
 The \`sweep-concurrency/\` tree contains workers 1/2/4, $repetitions_description
 at 1M and 10M, complete output-tree hashes and comparisons, resource samples,
-and a negative comparator control$nsys_description. Fused mode additionally
-requires a capacity-four, two-active-slot compute-sanitizer shakedown before
-starting the matrix.
+and a negative comparator control$nsys_description. Supported mode additionally
+runs the CRN matrix and an oversized-request/no-scientific-output capacity
+failure arm. Fused mode additionally requires a capacity-four, two-active-slot
+compute-sanitizer shakedown before starting the matrix.
 EOF
   printf '%s\n' \
     'PASS targeted concurrency-only payload selected' \

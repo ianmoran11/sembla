@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 mod manifest;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--timing-json timing.json] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] [--enable grouped-observations] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
+const USAGE: &str = "usage: sembla --version | sembla validate <model-or-plan.json> | sembla plan-hash <plan-envelope.json> | sembla state-hash <file.state> | sembla bundle-verify <bundle-dir> | sembla diff-ir <a.json> <b.json> | sembla synth-pop --persons N --employers E --initial-infected I --seed S --out pop.bin | sembla synth-state --model model-or-plan.json --slots N --areas K --present-fraction F --streams birth:B,overseas:O,internal:I --seed S --out state.artifact (benchmark/test tooling for the documented demographic column roles; emits state.artifact.model.json) | sembla run <model-or-plan.json> --seed N --ticks K --population N|pop.bin|file.state [--backend cpu|cuda] [--out results.csv] [--export-state final.state] [--dt D] [--params file.json] [--timing-json timing.json] [--enable grouped-observations] | sembla sweep <model-or-plan.json> --population N|pop.bin|file.state --seed S (--draws K | --theta-file file.json) --ticks T --out dir [--backend cpu|cuda] [--draw-workers N] [--noise crn|independent] [--params file.json] [--export-pairs pairs.csv] [--timing-json timing.json] [--enable grouped-observations] | sembla compare <model-or-plan.json> <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --out compare.csv [--backend cpu|cuda] | sembla compare <model-or-plan.json> --population pop.bin|file.state --seed N --ticks K --params-a a.json --params-b b.json --out compare.csv [--backend cpu|cuda] [--enable grouped-observations] | sembla verify-run <manifest.json> <model-or-plan.json> --population N|pop.bin|file.state [--params file.json] [--draw K] | sembla diff-backends <model-or-plan.json> --population N|pop.bin|file.state --seed N --ticks K [--dt D] [--params file.json] [--enable grouped-observations] | sembla diff-backends --all-examples [--population N] [--seed N] [--ticks K] [--dt D] | sembla diff-backends --all-plan-fixtures [--population N] [--seed N] [--ticks K]";
 const PLAN_NOT_RUNNABLE: &str = "plan envelopes are not yet runnable; see PRD 0004";
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -213,6 +213,9 @@ struct SweepOptions {
     export_pairs: Option<String>,
     timing_json: Option<String>,
     backend: BackendSelection,
+    /// `None` preserves whether the supported option was omitted. The
+    /// resolved execution default is still exactly one worker.
+    draw_workers: Option<usize>,
     enabled_features: FeatureSet,
 }
 
@@ -228,6 +231,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
     let mut export_pairs = None;
     let mut timing_json = None;
     let mut backend = None;
+    let mut draw_workers = None;
     let mut enabled_features = FeatureSet::new();
     let mut index = 0;
     while index < flags.len() {
@@ -265,6 +269,13 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
             "--export-pairs" => set_once(&mut export_pairs, value.clone(), flag)?,
             "--timing-json" => set_once(&mut timing_json, value.clone(), flag)?,
             "--backend" => set_once(&mut backend, parse_backend(value)?, flag)?,
+            "--draw-workers" => {
+                let value: usize = parse_number(value, flag)?;
+                if value == 0 {
+                    return Err("'--draw-workers' must be greater than zero".to_owned());
+                }
+                set_once(&mut draw_workers, value, flag)?;
+            }
             "--enable" => {
                 enabled_features.insert(parse_feature(value)?);
             }
@@ -293,6 +304,7 @@ fn parse_sweep_options(flags: &[String]) -> Result<SweepOptions, String> {
         export_pairs,
         timing_json,
         backend: backend.unwrap_or_default(),
+        draw_workers,
         enabled_features,
     })
 }
@@ -1710,29 +1722,51 @@ struct SweepConcurrentExecution {
     draws: Vec<SweepConcurrentCompletedDraw>,
 }
 
-fn sweep_concurrency_spike_workers(
+fn sweep_draw_workers(
     draw_count: u32,
     backend: BackendSelection,
+    supported_workers: Option<usize>,
 ) -> Result<usize, String> {
-    let Some(raw) = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV) else {
-        return Ok(1);
-    };
-    let raw = raw.to_string_lossy();
-    let workers = raw.parse::<usize>().map_err(|_| {
-        format!("{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV} must be a positive integer, found '{raw}'")
-    })?;
-    if workers == 0 {
-        return Err(format!(
-            "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV} must be greater than zero"
-        ));
+    let hidden_workers = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV)
+        .map(|raw| {
+            let raw = raw.to_string_lossy();
+            let workers = raw.parse::<usize>().map_err(|_| {
+                format!(
+                    "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV} must be a positive integer, found '{raw}'"
+                )
+            })?;
+            if workers == 0 {
+                return Err(format!(
+                    "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV} must be greater than zero"
+                ));
+            }
+            Ok(workers)
+        })
+        .transpose()?;
+    if let (Some(supported), Some(hidden)) = (supported_workers, hidden_workers) {
+        if supported != hidden {
+            return Err(format!(
+                "--draw-workers {supported} conflicts with {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}={hidden}"
+            ));
+        }
     }
+    let workers = supported_workers.or(hidden_workers).unwrap_or(1);
     let draw_count = usize::try_from(draw_count).expect("draw count is u32");
     if workers > draw_count {
-        return Err(format!(
-            "{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}={workers} exceeds draw count {draw_count}"
-        ));
+        let source = if supported_workers.is_some() {
+            format!("--draw-workers {workers}")
+        } else {
+            format!("{SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}={workers}")
+        };
+        return Err(format!("{source} exceeds draw count {draw_count}"));
     }
-    if workers > 1
+    if supported_workers.is_some() && workers > 1 && backend != BackendSelection::Cuda {
+        return Err("--draw-workers greater than 1 requires --backend cuda".to_owned());
+    }
+    // Preserve the default-off CPU evidence seam while keeping it unreachable
+    // through the supported CUDA-only option.
+    if supported_workers.is_none()
+        && workers > 1
         && backend == BackendSelection::Cpu
         && std::env::var_os("SEMBLA_EVAL_THREADS").is_none()
     {
@@ -1747,6 +1781,7 @@ fn sweep_concurrency_mode(
     draw_count: u32,
     workers: usize,
     backend: BackendSelection,
+    supported_option_present: bool,
 ) -> Result<SweepConcurrencyMode, String> {
     let lockstep_raw = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV);
     let free_raw = std::env::var_os(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV);
@@ -1754,6 +1789,31 @@ fn sweep_concurrency_mode(
         return Err(format!(
             "{SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV} and {SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV} are mutually exclusive"
         ));
+    }
+    if supported_option_present && lockstep_raw.is_some() {
+        return Err(format!(
+            "--draw-workers is incompatible with experimental {SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV}"
+        ));
+    }
+    if supported_option_present {
+        if let Some(raw) = free_raw.as_ref() {
+            let raw = raw.to_string_lossy();
+            if raw != "1" {
+                return Err(format!(
+                    "{SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV} must be 1 when set, found '{raw}'"
+                ));
+            }
+            if workers <= 1 {
+                return Err(format!(
+                    "{SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV}=1 requires --draw-workers greater than 1"
+                ));
+            }
+        }
+        return Ok(if workers > 1 {
+            SweepConcurrencyMode::CudaFreeNonblocking
+        } else {
+            SweepConcurrencyMode::IndependentDefaultStreams
+        });
     }
     if let Some(raw) = free_raw {
         let raw = raw.to_string_lossy();
@@ -1804,10 +1864,18 @@ fn sweep_concurrency_mode(
     Ok(SweepConcurrencyMode::IndependentDefaultStreams)
 }
 
-fn sweep_cuda_fused_draw_capacity(backend: BackendSelection) -> Result<Option<usize>, String> {
+fn sweep_cuda_fused_draw_capacity(
+    backend: BackendSelection,
+    supported_option_present: bool,
+) -> Result<Option<usize>, String> {
     let Some(raw) = std::env::var_os(SWEEP_CUDA_FUSED_DRAWS_ENV) else {
         return Ok(None);
     };
+    if supported_option_present {
+        return Err(format!(
+            "--draw-workers is incompatible with experimental {SWEEP_CUDA_FUSED_DRAWS_ENV}"
+        ));
+    }
     let raw = raw.to_string_lossy();
     let capacity = raw.parse::<usize>().map_err(|_| {
         format!("{SWEEP_CUDA_FUSED_DRAWS_ENV} must be one of 1, 2, or 4, found '{raw}'")
@@ -1844,6 +1912,109 @@ fn sweep_concurrency_spike_draw_zero_delay() -> Result<Duration, String> {
         )
     })?;
     Ok(Duration::from_millis(milliseconds))
+}
+
+#[cfg(feature = "cuda")]
+const SWEEP_TEST_CUDA_FREE_MEMORY_ENV: &str = "SEMBLA_SWEEP_TEST_CUDA_FREE_MEMORY_BYTES";
+
+#[cfg(feature = "cuda")]
+fn capacity_mib(bytes: usize) -> f64 {
+    bytes as f64 / (1024.0 * 1024.0)
+}
+
+#[cfg(feature = "cuda")]
+struct CudaSweepCapacityDecision {
+    workers: usize,
+    required: usize,
+    free: usize,
+    total: usize,
+    per_lane: usize,
+    fixed: usize,
+    margin_percent: usize,
+    host_assumption: usize,
+}
+
+#[cfg(feature = "cuda")]
+fn ensure_cuda_sweep_capacity(decision: &CudaSweepCapacityDecision) -> Result<(), String> {
+    if decision.required > decision.free {
+        return Err(format!(
+            "insufficient CUDA device memory for --draw-workers {}: conservative bound {:.1} MiB exceeds {:.1} MiB free on device 0 ({:.1} MiB total); no lanes were constructed. The bound includes {:.1} MiB per lane plus {:.1} MiB fixed before a {}% safety margin. Host-memory assumption: at least {:.1} MiB available; host memory is not silently capped or overcommitted by this preflight",
+            decision.workers,
+            capacity_mib(decision.required),
+            capacity_mib(decision.free),
+            capacity_mib(decision.total),
+            capacity_mib(decision.per_lane),
+            capacity_mib(decision.fixed),
+            decision.margin_percent,
+            capacity_mib(decision.host_assumption),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(feature = "cuda")]
+fn preflight_cuda_sweep_capacity_with_memory(
+    model: &sembla_ir::ValidatedModel,
+    initial_tables: &[TableInit],
+    workers: usize,
+    actual_free: usize,
+    total: usize,
+) -> Result<(), String> {
+    let (required, host_assumption, per_lane, fixed, margin_percent) =
+        CudaBackend::estimate_isolated_sweep_capacity(model, initial_tables, workers)
+            .map_err(|error| format!("could not establish conservative CUDA capacity: {error}"))?;
+    // Tests may lower, but never raise, the observed free-memory limit. This
+    // makes rejection deterministic without providing a way to bypass safety.
+    let free = match std::env::var_os(SWEEP_TEST_CUDA_FREE_MEMORY_ENV) {
+        Some(raw) => {
+            let raw = raw.to_string_lossy();
+            let injected = raw.parse::<usize>().map_err(|_| {
+                format!(
+                    "{SWEEP_TEST_CUDA_FREE_MEMORY_ENV} must be an unsigned byte count, found '{raw}'"
+                )
+            })?;
+            actual_free.min(injected)
+        }
+        None => actual_free,
+    };
+    let decision = CudaSweepCapacityDecision {
+        workers,
+        required,
+        free,
+        total,
+        per_lane,
+        fixed,
+        margin_percent,
+        host_assumption,
+    };
+    ensure_cuda_sweep_capacity(&decision)?;
+    eprintln!(
+        "CUDA draw-worker preflight admitted {workers} lanes: conservative device bound {:.1} MiB <= {:.1} MiB free on device 0 ({margin_percent}% safety margin); host-memory assumption: at least {:.1} MiB available",
+        capacity_mib(required),
+        capacity_mib(free),
+        capacity_mib(host_assumption),
+    );
+    Ok(())
+}
+
+#[cfg(feature = "cuda")]
+fn preflight_cuda_sweep_capacity(
+    model: &sembla_ir::ValidatedModel,
+    initial_tables: &[TableInit],
+    workers: usize,
+) -> Result<(), String> {
+    let (actual_free, total) = CudaBackend::device_zero_memory_info()
+        .map_err(|error| format!("could not query free CUDA device memory: {error}"))?;
+    preflight_cuda_sweep_capacity_with_memory(model, initial_tables, workers, actual_free, total)
+}
+
+#[cfg(not(feature = "cuda"))]
+fn preflight_cuda_sweep_capacity(
+    _model: &sembla_ir::ValidatedModel,
+    _initial_tables: &[TableInit],
+    _workers: usize,
+) -> Result<(), String> {
+    Err("cuda backend unavailable: crate built without the 'cuda' feature; CUDA draw-worker capacity cannot be established".to_owned())
 }
 
 fn run_concurrent_sweep_spike(
@@ -2050,6 +2221,378 @@ fn run_concurrent_sweep_spike(
         execution_window_elapsed,
         identity,
         draws,
+    })
+}
+
+struct SweepConcurrentInputs<'a> {
+    model: &'a sembla_ir::ValidatedModel,
+    initial_tables: &'a [TableInit],
+    construction_params: &'a ParamEnv,
+    options: &'a SweepOptions,
+    prepared: &'a [SweepPreparedDraw],
+}
+
+struct SweepBoundedConcurrentExecution {
+    setup_elapsed: Duration,
+    execution_window_elapsed: Duration,
+    publication_elapsed: Duration,
+    identity: manifest::BackendIdentity,
+    timings: Vec<SweepConcurrencySpikeTimingDraw>,
+    maximum_pending_results: usize,
+}
+
+/// Keeps supported sweep policy testable without changing the production
+/// backend selected by that policy. Production delegates every operation to
+/// the existing CUDA/CPU implementations; tests may replace only these
+/// hardware boundaries while exercising the same option resolution,
+/// scheduler, publication, manifest, and timing paths.
+trait SweepRuntime: Sync {
+    fn preflight_cuda_capacity(
+        &self,
+        model: &sembla_ir::ValidatedModel,
+        initial_tables: &[TableInit],
+        workers: usize,
+    ) -> Result<(), String>;
+
+    fn new_backend(
+        &self,
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        initial_params: &ParamEnv,
+        seed: u64,
+        backend: BackendSelection,
+    ) -> Result<SweepBackend, String>;
+
+    fn new_concurrency_lane(
+        &self,
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        initial_params: &ParamEnv,
+        seed: u64,
+        backend: BackendSelection,
+        mode: SweepConcurrencyMode,
+    ) -> Result<SweepBackend, String>;
+}
+
+struct ProductionSweepRuntime;
+
+impl SweepRuntime for ProductionSweepRuntime {
+    fn preflight_cuda_capacity(
+        &self,
+        model: &sembla_ir::ValidatedModel,
+        initial_tables: &[TableInit],
+        workers: usize,
+    ) -> Result<(), String> {
+        preflight_cuda_sweep_capacity(model, initial_tables, workers)
+    }
+
+    fn new_backend(
+        &self,
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        initial_params: &ParamEnv,
+        seed: u64,
+        backend: BackendSelection,
+    ) -> Result<SweepBackend, String> {
+        SweepBackend::new(model, initial, initial_params, seed, backend)
+    }
+
+    fn new_concurrency_lane(
+        &self,
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        initial_params: &ParamEnv,
+        seed: u64,
+        backend: BackendSelection,
+        mode: SweepConcurrencyMode,
+    ) -> Result<SweepBackend, String> {
+        SweepBackend::new_concurrency_lane(model, initial, initial_params, seed, backend, mode)
+    }
+}
+
+fn run_bounded_concurrent_sweep<R, F>(
+    inputs: SweepConcurrentInputs<'_>,
+    workers: usize,
+    mode: SweepConcurrencyMode,
+    runtime: &R,
+    mut publish: F,
+) -> Result<SweepBoundedConcurrentExecution, String>
+where
+    R: SweepRuntime,
+    F: FnMut(&manifest::BackendIdentity, SweepConcurrentCompletedDraw) -> Result<(), String>,
+{
+    let SweepConcurrentInputs {
+        model,
+        initial_tables,
+        construction_params,
+        options,
+        prepared,
+    } = inputs;
+    let setup_started = Instant::now();
+    let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
+    let next_draw = std::sync::atomic::AtomicUsize::new(0);
+    // Two lane-widths preserve genuine free-running scheduling beyond the
+    // initially active draws while bounding speculative completed results.
+    // A delayed low-k draw therefore cannot create storage proportional to the
+    // total draw count, but another lane can still claim and run later work.
+    let admission_window = workers
+        .checked_mul(2)
+        .ok_or_else(|| "concurrent sweep admission window overflow".to_owned())?;
+    let published_prefix = std::sync::atomic::AtomicUsize::new(0);
+    let admission_mutex = std::sync::Mutex::new(());
+    let admission_changed = std::sync::Condvar::new();
+    let construction_failed = std::sync::atomic::AtomicBool::new(false);
+    let identities = std::sync::Mutex::new(
+        std::iter::repeat_with(|| None)
+            .take(workers)
+            .collect::<Vec<Option<Result<manifest::BackendIdentity, String>>>>(),
+    );
+    let ready = std::sync::Barrier::new(workers + 1);
+    let start = std::sync::Barrier::new(workers + 1);
+    let execution_started = std::sync::OnceLock::<Instant>::new();
+    let (sender, receiver) = std::sync::mpsc::sync_channel(workers);
+
+    let (
+        identity,
+        setup_elapsed,
+        execution_window_elapsed,
+        publication_elapsed,
+        timings,
+        maximum_pending_results,
+    ) = std::thread::scope(|scope| -> Result<_, String> {
+        let handles = (0..workers)
+            .map(|lane| {
+                let sender = sender.clone();
+                let next_draw = &next_draw;
+                let published_prefix = &published_prefix;
+                let admission_mutex = &admission_mutex;
+                let admission_changed = &admission_changed;
+                let construction_failed = &construction_failed;
+                let identities = &identities;
+                let ready = &ready;
+                let start = &start;
+                let execution_started = &execution_started;
+                scope.spawn(move || -> Result<(), String> {
+                    let backend = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                        || -> Result<_, String> {
+                            // The constructor runs here, on the worker thread:
+                            // CUDA contexts must never be constructed on the
+                            // coordinator and moved across this boundary.
+                            let backend = runtime.new_concurrency_lane(
+                                model,
+                                initial_tables.to_vec(),
+                                construction_params,
+                                options.seed,
+                                options.backend,
+                                mode,
+                            )?;
+                            Ok((backend.identity(), backend))
+                        },
+                    ))
+                    .unwrap_or_else(|_| {
+                        Err(
+                            "concurrent sweep worker panicked during backend construction"
+                                .to_owned(),
+                        )
+                    });
+                    identities.lock().expect("identity mutex poisoned")[lane] = Some(
+                        backend
+                            .as_ref()
+                            .map(|(identity, _)| identity.clone())
+                            .map_err(Clone::clone),
+                    );
+                    ready.wait();
+                    start.wait();
+                    if construction_failed.load(std::sync::atomic::Ordering::Acquire) {
+                        return backend.map(|_| ());
+                    }
+                    let (_, mut backend) = backend?;
+                    let execution_started = *execution_started
+                        .get()
+                        .expect("coordinator sets execution start before release");
+                    loop {
+                        let index = next_draw.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(draw) = prepared.get(index) else {
+                            break;
+                        };
+                        let mut admission = admission_mutex.lock().map_err(|_| {
+                            "concurrent sweep admission mutex was poisoned".to_owned()
+                        })?;
+                        while index
+                            >= published_prefix
+                                .load(std::sync::atomic::Ordering::Acquire)
+                                .saturating_add(admission_window)
+                        {
+                            admission = admission_changed.wait(admission).map_err(|_| {
+                                "concurrent sweep admission mutex was poisoned".to_owned()
+                            })?;
+                        }
+                        drop(admission);
+
+                        let start_offset = execution_started.elapsed();
+                        let started = Instant::now();
+                        if draw.k == 0 && !draw_zero_delay.is_zero() {
+                            std::thread::sleep(draw_zero_delay);
+                        }
+                        let execution =
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                backend.run_draw(
+                                    model,
+                                    &draw.params,
+                                    draw.execution_seed,
+                                    options.ticks,
+                                    &options.enabled_features,
+                                )
+                            }))
+                            .unwrap_or_else(|_| {
+                                Err(format!("draw {}: concurrent worker panicked", draw.k))
+                            });
+                        let completed = SweepConcurrentCompletedDraw {
+                            index,
+                            lane,
+                            start_offset,
+                            finish_offset: execution_started.elapsed(),
+                            elapsed: started.elapsed(),
+                            execution,
+                        };
+                        sender.send(completed).map_err(|_| {
+                            "concurrent sweep coordinator stopped receiving results".to_owned()
+                        })?;
+                    }
+                    Ok(())
+                })
+            })
+            .collect::<Vec<_>>();
+        drop(sender);
+        ready.wait();
+        let setup_elapsed = setup_started.elapsed();
+
+        let identity_result = {
+            let identities = identities.lock().expect("identity mutex poisoned");
+            let mut errors = identities
+                .iter()
+                .enumerate()
+                .filter_map(|(lane, identity)| {
+                    match identity
+                        .as_ref()
+                        .expect("every ready lane recorded identity")
+                    {
+                        Ok(_) => None,
+                        Err(error) => Some((lane, error.clone())),
+                    }
+                });
+            if let Some((lane, error)) = errors.next() {
+                Err(format!("concurrency lane {lane}: {error}"))
+            } else {
+                let first = identities[0]
+                    .as_ref()
+                    .expect("lane zero identity exists")
+                    .as_ref()
+                    .expect("construction errors handled")
+                    .clone();
+                if identities.iter().skip(1).any(|identity| {
+                    identity
+                        .as_ref()
+                        .expect("ready lane identity exists")
+                        .as_ref()
+                        .is_ok_and(|identity| identity != &first)
+                }) {
+                    Err("concurrent sweep backend identity changed across lanes".to_owned())
+                } else {
+                    Ok(first)
+                }
+            }
+        };
+        if identity_result.is_err() {
+            construction_failed.store(true, std::sync::atomic::Ordering::Release);
+        }
+        let execution_start = Instant::now();
+        execution_started
+            .set(execution_start)
+            .expect("execution start is set exactly once");
+        start.wait();
+
+        if let Err(error) = identity_result {
+            for handle in handles {
+                let _ = handle.join();
+            }
+            return Err(error);
+        }
+        let identity = identity_result.expect("identity error returned above");
+        let mut pending = std::collections::BTreeMap::new();
+        let mut next_publish = 0_usize;
+        let mut received = 0_usize;
+        let mut maximum_pending_results = 0_usize;
+        let mut execution_window_elapsed = Duration::ZERO;
+        let mut publication_elapsed = Duration::ZERO;
+        let mut publication_error = None;
+        let mut timings = Vec::with_capacity(prepared.len());
+
+        while received < prepared.len() {
+            let completed = receiver.recv().map_err(|_| {
+                "concurrent sweep workers stopped before returning every draw".to_owned()
+            })?;
+            received += 1;
+            execution_window_elapsed = execution_window_elapsed.max(completed.finish_offset);
+            if pending.insert(completed.index, completed).is_some() {
+                return Err("concurrent sweep returned a draw more than once".to_owned());
+            }
+            maximum_pending_results = maximum_pending_results.max(pending.len());
+            while let Some(completed) = pending.remove(&next_publish) {
+                timings.push(SweepConcurrencySpikeTimingDraw {
+                    k: prepared[completed.index].k,
+                    lane: completed.lane,
+                    start_offset_ms: duration_ms(completed.start_offset),
+                    finish_offset_ms: duration_ms(completed.finish_offset),
+                    wall_time_ms: duration_ms(completed.elapsed),
+                });
+                if publication_error.is_none() {
+                    let publication_started = Instant::now();
+                    if let Err(error) = publish(&identity, completed) {
+                        publication_error = Some(error);
+                    }
+                    publication_elapsed += publication_started.elapsed();
+                }
+                next_publish += 1;
+                published_prefix.store(next_publish, std::sync::atomic::Ordering::Release);
+                admission_changed.notify_all();
+            }
+        }
+
+        let mut lane_errors = Vec::new();
+        for (lane, handle) in handles.into_iter().enumerate() {
+            match handle.join() {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => lane_errors.push(format!("concurrency lane {lane}: {error}")),
+                Err(_) => lane_errors.push(format!("concurrency lane {lane}: worker panicked")),
+            }
+        }
+        if let Some(error) = publication_error {
+            return Err(error);
+        }
+        if let Some(error) = lane_errors.into_iter().next() {
+            return Err(error);
+        }
+        if next_publish != prepared.len() || !pending.is_empty() {
+            return Err("concurrent sweep did not return every draw exactly once".to_owned());
+        }
+        Ok((
+            identity,
+            setup_elapsed,
+            execution_window_elapsed,
+            publication_elapsed,
+            timings,
+            maximum_pending_results,
+        ))
+    })?;
+
+    Ok(SweepBoundedConcurrentExecution {
+        setup_elapsed,
+        execution_window_elapsed,
+        publication_elapsed,
+        identity,
+        timings,
+        maximum_pending_results,
     })
 }
 
@@ -2373,6 +2916,14 @@ fn publish_sweep_draw(
 }
 
 fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
+    sweep_file_result_with_runtime(path, options, &ProductionSweepRuntime)
+}
+
+fn sweep_file_result_with_runtime<R: SweepRuntime>(
+    path: &str,
+    options: SweepOptions,
+    runtime: &R,
+) -> Result<(), String> {
     let sweep_started = Instant::now();
     let RunInput { model, plan } = read_executable_input(path, None, &options.enabled_features)?;
     if options.export_pairs.is_some() && model.model().summaries.is_empty() {
@@ -2398,9 +2949,16 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         (None, Some(draws)) => draws,
         _ => unreachable!("sweep option exclusivity was checked while parsing"),
     };
-    let fused_capacity = sweep_cuda_fused_draw_capacity(options.backend)?;
-    let draw_workers = sweep_concurrency_spike_workers(draw_count, options.backend)?;
-    let concurrency_mode = sweep_concurrency_mode(draw_count, draw_workers, options.backend)?;
+    let supported_workers_present = options.draw_workers.is_some();
+    let fused_capacity =
+        sweep_cuda_fused_draw_capacity(options.backend, supported_workers_present)?;
+    let draw_workers = sweep_draw_workers(draw_count, options.backend, options.draw_workers)?;
+    let concurrency_mode = sweep_concurrency_mode(
+        draw_count,
+        draw_workers,
+        options.backend,
+        supported_workers_present,
+    )?;
     if fused_capacity.is_some() && draw_workers != 1 {
         return Err(format!(
             "{SWEEP_CUDA_FUSED_DRAWS_ENV} is incompatible with {SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV}>1"
@@ -2449,6 +3007,14 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
     let initialized = initialized_tables(&model, &options.population)?;
     run_manifest.initial_state = initialized.state_hash.map(state_artifact_tuple);
     let initial_tables = initialized.tables;
+    // Construction values are placeholders only: draw zero also follows the
+    // same explicit reset and reseed path as every later draw.
+    let construction_params = ParamEnv::defaults(&model);
+    if draw_workers > 1 && concurrency_mode == SweepConcurrencyMode::CudaFreeNonblocking {
+        // This is deliberately before output-directory creation and before any
+        // worker thread can construct a retained backend.
+        runtime.preflight_cuda_capacity(&model, &initial_tables, draw_workers)?;
+    }
     let out = Path::new(&options.out);
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
     if let Some(timing_path) = options.timing_json.as_deref().map(Path::new) {
@@ -2542,9 +3108,6 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
 
     let mut all_series = Vec::with_capacity(draw_count as usize);
     let mut reported_columns: Option<Vec<String>> = None;
-    // Construction values are placeholders only: draw zero also follows the
-    // same explicit reset and reseed path as every later draw.
-    let construction_params = ParamEnv::defaults(&model);
     let mut draw_durations = Vec::with_capacity(draw_count as usize);
     let mut concurrency_spike_timing = None;
     let mut fused_spike_timing = None;
@@ -2647,7 +3210,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
         ));
     } else if draw_workers == 1 {
         let setup_started = Instant::now();
-        let mut backend = SweepBackend::new(
+        let mut backend = runtime.new_backend(
             &model,
             initial_tables,
             &construction_params,
@@ -2713,9 +3276,15 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 );
             }
             SweepConcurrencyMode::CudaFreeNonblocking => {
-                eprintln!(
-                    "EXPERIMENTAL CUDA free-running non-blocking-stream spike: {draw_workers} draw lanes on non-blocking streams without tick barriers; default sweep behavior remains sequential"
-                );
+                if supported_workers_present {
+                    eprintln!(
+                        "CUDA sweep: {draw_workers} retained draw lanes on free-running non-blocking streams"
+                    );
+                } else {
+                    eprintln!(
+                        "EXPERIMENTAL CUDA free-running non-blocking-stream spike: {draw_workers} draw lanes on non-blocking streams without tick barriers; default sweep behavior remains sequential"
+                    );
+                }
             }
             SweepConcurrencyMode::IndependentDefaultStreams => {
                 eprintln!(
@@ -2754,53 +3323,103 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             });
         }
 
-        let concurrent = run_concurrent_sweep_spike(
-            &model,
-            &initial_tables,
-            &construction_params,
-            &options,
-            draw_workers,
-            &prepared,
-            concurrency_mode,
-        )?;
-        setup_elapsed = concurrent.setup_elapsed;
-        run_manifest.backend_identity = Some(concurrent.identity);
-        let publication_started = Instant::now();
-        let mut timing_draws = Vec::with_capacity(concurrent.draws.len());
-        for completed in concurrent.draws {
-            let prepared_draw = &prepared[completed.index];
-            timing_draws.push(SweepConcurrencySpikeTimingDraw {
-                k: prepared_draw.k,
-                lane: completed.lane,
-                start_offset_ms: duration_ms(completed.start_offset),
-                finish_offset_ms: duration_ms(completed.finish_offset),
-                wall_time_ms: duration_ms(completed.elapsed),
-            });
-            draw_durations.push(completed.elapsed);
-            let execution = completed
-                .execution
-                .map_err(|error| format!("draw {}: {error}", prepared_draw.k))?;
-            all_series.push(publish_sweep_draw(
-                prepared_draw.k,
-                &prepared_draw.params,
-                prepared_draw.execution_seed,
-                execution,
-                &mut reported_columns,
-                &mut pairs_csv,
-                &parameter_columns,
-                &summary_columns,
-                &mut run_manifest,
-                out,
-                options.export_pairs.is_some(),
-            )?);
+        if concurrency_mode == SweepConcurrencyMode::CudaFreeNonblocking {
+            let concurrent = run_bounded_concurrent_sweep(
+                SweepConcurrentInputs {
+                    model: &model,
+                    initial_tables: &initial_tables,
+                    construction_params: &construction_params,
+                    options: &options,
+                    prepared: &prepared,
+                },
+                draw_workers,
+                concurrency_mode,
+                runtime,
+                |identity, completed| {
+                    let prepared_draw = &prepared[completed.index];
+                    draw_durations.push(completed.elapsed);
+                    let execution = completed
+                        .execution
+                        .map_err(|error| format!("draw {}: {error}", prepared_draw.k))?;
+                    if run_manifest.backend_identity.is_none() {
+                        run_manifest.backend_identity = Some(identity.clone());
+                    }
+                    all_series.push(publish_sweep_draw(
+                        prepared_draw.k,
+                        &prepared_draw.params,
+                        prepared_draw.execution_seed,
+                        execution,
+                        &mut reported_columns,
+                        &mut pairs_csv,
+                        &parameter_columns,
+                        &summary_columns,
+                        &mut run_manifest,
+                        out,
+                        options.export_pairs.is_some(),
+                    )?);
+                    Ok(())
+                },
+            )?;
+            setup_elapsed = concurrent.setup_elapsed;
+            run_manifest.backend_identity = Some(concurrent.identity);
+            debug_assert!(concurrent.maximum_pending_results <= draw_workers.saturating_mul(2));
+            concurrency_spike_timing = Some((
+                concurrent.execution_window_elapsed,
+                concurrent.publication_elapsed,
+                concurrent.timings,
+                concurrent.maximum_pending_results,
+            ));
+        } else {
+            let concurrent = run_concurrent_sweep_spike(
+                &model,
+                &initial_tables,
+                &construction_params,
+                &options,
+                draw_workers,
+                &prepared,
+                concurrency_mode,
+            )?;
+            setup_elapsed = concurrent.setup_elapsed;
+            run_manifest.backend_identity = Some(concurrent.identity);
+            let publication_started = Instant::now();
+            let mut timing_draws = Vec::with_capacity(concurrent.draws.len());
+            for completed in concurrent.draws {
+                let prepared_draw = &prepared[completed.index];
+                timing_draws.push(SweepConcurrencySpikeTimingDraw {
+                    k: prepared_draw.k,
+                    lane: completed.lane,
+                    start_offset_ms: duration_ms(completed.start_offset),
+                    finish_offset_ms: duration_ms(completed.finish_offset),
+                    wall_time_ms: duration_ms(completed.elapsed),
+                });
+                draw_durations.push(completed.elapsed);
+                let execution = completed
+                    .execution
+                    .map_err(|error| format!("draw {}: {error}", prepared_draw.k))?;
+                all_series.push(publish_sweep_draw(
+                    prepared_draw.k,
+                    &prepared_draw.params,
+                    prepared_draw.execution_seed,
+                    execution,
+                    &mut reported_columns,
+                    &mut pairs_csv,
+                    &parameter_columns,
+                    &summary_columns,
+                    &mut run_manifest,
+                    out,
+                    options.export_pairs.is_some(),
+                )?);
+            }
+            concurrency_spike_timing = Some((
+                concurrent.execution_window_elapsed,
+                publication_started.elapsed(),
+                timing_draws,
+                draw_count as usize,
+            ));
         }
-        concurrency_spike_timing = Some((
-            concurrent.execution_window_elapsed,
-            publication_started.elapsed(),
-            timing_draws,
-        ));
     }
 
+    let final_publication_started = Instant::now();
     let summary = summary_csv(
         reported_columns.as_deref().unwrap_or_default(),
         &all_series,
@@ -2828,6 +3447,9 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
             pairs_sha256,
         )?;
         manifest::write_pairs_metadata(&manifest::pairs_sidecar_path(export_path), &metadata)?;
+    }
+    if let Some((_, publication_elapsed, _, _)) = &mut concurrency_spike_timing {
+        *publication_elapsed += final_publication_started.elapsed();
     }
     if let Some(path) = &options.timing_json {
         let backend = match options.backend {
@@ -2857,7 +3479,12 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 repository_commit,
                 binary_sha256,
             })
-        } else if let Some((execution_window, publication, timing_draws)) = concurrency_spike_timing
+        } else if let Some((
+            execution_window,
+            publication_elapsed,
+            timing_draws,
+            maximum_pending_results,
+        )) = concurrency_spike_timing
         {
             serde_json::to_string_pretty(&SweepConcurrencySpikeTimingDocument {
                 schema: "sembla-sweep-concurrency-spike-timing-v1",
@@ -2866,6 +3493,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 ticks_per_draw: options.ticks,
                 requested_draw_workers: draw_workers,
                 effective_draw_workers: draw_workers,
+                maximum_pending_results,
                 execution_mode: match concurrency_mode {
                     SweepConcurrencyMode::CudaLockstepNonblocking => {
                         "cuda-lockstep-nonblocking-streams"
@@ -2875,7 +3503,7 @@ fn sweep_file_result(path: &str, options: SweepOptions) -> Result<(), String> {
                 },
                 setup_wall_time_ms: duration_ms(setup_elapsed),
                 execution_window_wall_time_ms: duration_ms(execution_window),
-                publication_wall_time_ms: duration_ms(publication),
+                publication_wall_time_ms: duration_ms(publication_elapsed),
                 draw_timings: timing_draws,
                 whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
                 repository_commit,
@@ -3275,6 +3903,8 @@ fn same_file_identity(_left: &Path, _right: &Path) -> bool {
 #[cfg(test)]
 static SWEEP_BACKEND_CONSTRUCTIONS: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
+#[cfg(test)]
+static SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 enum SweepBackend {
     Cpu {
@@ -3792,6 +4422,7 @@ struct SweepConcurrencySpikeTimingDocument {
     ticks_per_draw: u32,
     requested_draw_workers: usize,
     effective_draw_workers: usize,
+    maximum_pending_results: usize,
     execution_mode: &'static str,
     setup_wall_time_ms: f64,
     execution_window_wall_time_ms: f64,
@@ -6056,12 +6687,24 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, fused_publishable_prefix,
-        initialize_population, parse_backend, parse_diff_options, run, run_file_result,
-        run_results_output, run_results_output_with_features, sweep_file_result, BackendSelection,
-        HashMode, RunOptions, SweepOptions, SWEEP_BACKEND_CONSTRUCTIONS, VERSION,
+        collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, duration_ms,
+        fused_publishable_prefix, initialize_population, parse_backend, parse_diff_options,
+        parse_sweep_options, run, run_bounded_concurrent_sweep, run_file_result,
+        run_results_output, run_results_output_with_features, sweep_file_result,
+        sweep_file_result_with_runtime, BackendSelection, HashMode, ProductionSweepRuntime,
+        RunOptions, SweepBackend, SweepConcurrencyMode, SweepConcurrentInputs, SweepOptions,
+        SweepPreparedDraw, SweepRuntime, SWEEP_BACKEND_CONSTRUCTIONS,
+        SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK, SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV,
+        SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV, SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV,
+        SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV, SWEEP_CUDA_FUSED_DRAWS_ENV, VERSION,
     };
-    use sembla_runtime::{eval::ParamEnv, state::StateStore};
+    use sembla_runtime::{
+        eval::ParamEnv,
+        state::{ColumnData, ColumnInit, StateStore, TableInit},
+    };
+
+    #[cfg(feature = "cuda")]
+    use super::{preflight_cuda_sweep_capacity_with_memory, SWEEP_TEST_CUDA_FREE_MEMORY_ENV};
 
     fn load(source: &str) -> sembla_ir::ValidatedModel {
         sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
@@ -6071,10 +6714,79 @@ mod tests {
         StateStore::new(model, initialize_population(model, rows)).unwrap()
     }
 
+    /// A local policy-conformance runtime, never available to production.
+    /// It replaces only device-dependent construction and admission while the
+    /// supported CUDA option, free-stream mode, bounded scheduler, ordered
+    /// publication, manifest, and timing paths remain unchanged.
+    struct LocalConformanceSweepRuntime;
+
+    impl SweepRuntime for LocalConformanceSweepRuntime {
+        fn preflight_cuda_capacity(
+            &self,
+            _model: &sembla_ir::ValidatedModel,
+            _initial_tables: &[TableInit],
+            _workers: usize,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn new_backend(
+            &self,
+            model: &sembla_ir::ValidatedModel,
+            initial: Vec<TableInit>,
+            initial_params: &ParamEnv,
+            seed: u64,
+            _backend: BackendSelection,
+        ) -> Result<SweepBackend, String> {
+            SweepBackend::new(model, initial, initial_params, seed, BackendSelection::Cpu)
+        }
+
+        fn new_concurrency_lane(
+            &self,
+            model: &sembla_ir::ValidatedModel,
+            initial: Vec<TableInit>,
+            initial_params: &ParamEnv,
+            seed: u64,
+            _backend: BackendSelection,
+            _mode: SweepConcurrencyMode,
+        ) -> Result<SweepBackend, String> {
+            SweepBackend::new(model, initial, initial_params, seed, BackendSelection::Cpu)
+        }
+    }
+
+    struct ScopedEnv {
+        key: &'static str,
+        previous: Option<std::ffi::OsString>,
+    }
+
+    impl ScopedEnv {
+        fn remove(key: &'static str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::remove_var(key);
+            Self { key, previous }
+        }
+
+        fn set(key: &'static str, value: &str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for ScopedEnv {
+        fn drop(&mut self) {
+            match &self.previous {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
     #[test]
     fn sweep_constructs_one_backend_for_multiple_draws() {
         use std::sync::atomic::Ordering;
 
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
         let out = std::env::temp_dir().join(format!(
             "sembla-sweep-construction-count-{}-{}",
             std::process::id(),
@@ -6095,6 +6807,7 @@ mod tests {
             export_pairs: None,
             timing_json: None,
             backend: BackendSelection::Cpu,
+            draw_workers: None,
             enabled_features: sembla_ir::FeatureSet::new(),
         };
 
@@ -6110,6 +6823,446 @@ mod tests {
             4
         );
         std::fs::remove_dir_all(out).unwrap();
+    }
+
+    #[test]
+    fn supported_draw_workers_local_conformance_is_byte_stable_and_ordered() {
+        use std::collections::BTreeMap;
+        use std::path::{Path, PathBuf};
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        fn output_tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+            fn visit(root: &Path, directory: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
+                for entry in std::fs::read_dir(directory).unwrap() {
+                    let path = entry.unwrap().path();
+                    if path.is_dir() {
+                        visit(root, &path, files);
+                    } else {
+                        files.insert(
+                            path.strip_prefix(root).unwrap().to_owned(),
+                            std::fs::read(path).unwrap(),
+                        );
+                    }
+                }
+            }
+
+            let mut files = BTreeMap::new();
+            visit(root, root, &mut files);
+            files
+        }
+
+        fn parsed_options(
+            state: &Path,
+            out: &Path,
+            timing: Option<&Path>,
+            noise: &str,
+            workers: usize,
+            grouped: bool,
+        ) -> SweepOptions {
+            let mut flags = vec![
+                "--seed".to_owned(),
+                "9182".to_owned(),
+                "--draws".to_owned(),
+                "4".to_owned(),
+                "--ticks".to_owned(),
+                "5".to_owned(),
+                "--noise".to_owned(),
+                noise.to_owned(),
+                "--population".to_owned(),
+                state.display().to_string(),
+                "--out".to_owned(),
+                out.display().to_string(),
+                "--backend".to_owned(),
+                "cuda".to_owned(),
+                "--draw-workers".to_owned(),
+                workers.to_string(),
+            ];
+            if let Some(timing) = timing {
+                flags.extend(["--timing-json".to_owned(), timing.display().to_string()]);
+            }
+            if grouped {
+                flags.extend([
+                    "--enable".to_owned(),
+                    sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned(),
+                ]);
+            }
+            parse_sweep_options(&flags).unwrap()
+        }
+
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        // The supported option must be the only concurrency selector in this
+        // local conformance corpus. Scoped restoration keeps parallel tests and
+        // caller environments intact even if an assertion panics.
+        let _hidden_workers = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV);
+        let _hidden_lockstep = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV);
+        let _hidden_free = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV);
+        let _hidden_fused = ScopedEnv::remove(SWEEP_CUDA_FUSED_DRAWS_ENV);
+        let _delay = ScopedEnv::set(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV, "100");
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp = std::env::temp_dir().join(format!(
+            "sembla-supported-draw-workers-local-conformance-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&temp).unwrap();
+        let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let runtime = LocalConformanceSweepRuntime;
+
+        for model_name in ["contest_competing_exits", "grouped_observation"] {
+            let grouped = model_name == "grouped_observation";
+            let model_path = repository.join(format!(
+                "crates/sembla-cli/tests/fixtures/{model_name}.json"
+            ));
+            let source = std::fs::read_to_string(&model_path).unwrap();
+            let features = if grouped {
+                sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()])
+            } else {
+                sembla_ir::FeatureSet::new()
+            };
+            let model = sembla_ir::validate_with_features(
+                sembla_ir::parse_json(&source).unwrap(),
+                &features,
+            )
+            .unwrap();
+            let tables = if model_name == "contest_competing_exits" {
+                vec![
+                    TableInit::new("World", "slot_resource", 100, Vec::new()),
+                    TableInit::new(
+                        "World",
+                        "slot",
+                        100,
+                        vec![
+                            ColumnInit::new("occupancy", ColumnData::Enum(vec![0; 100])),
+                            ColumnInit::new("cause", ColumnData::Enum(vec![0; 100])),
+                            ColumnInit::new(
+                                "slot_resource",
+                                ColumnData::Ref((0_u32..100).collect()),
+                            ),
+                        ],
+                    ),
+                ]
+            } else {
+                vec![
+                    TableInit::new("world", "area", 12, Vec::new()),
+                    TableInit::new(
+                        "world",
+                        "person_slot",
+                        5,
+                        vec![
+                            ColumnInit::new("sex", ColumnData::Enum(vec![0, 0, 1, 1, 0])),
+                            ColumnInit::new("area", ColumnData::Ref(vec![10, 2, 10, 2, 2])),
+                            ColumnInit::new(
+                                "age_months",
+                                ColumnData::Int(vec![-1, 0, 59, 60, 120]),
+                            ),
+                            ColumnInit::new("occupancy", ColumnData::Enum(vec![0; 5])),
+                        ],
+                    ),
+                ]
+            };
+            let state = temp.join(format!("{model_name}.state"));
+            sembla_runtime::state_artifact::write(&state, &model, &tables).unwrap();
+
+            for noise in ["crn", "independent"] {
+                let sequential = temp.join(format!("{model_name}-{noise}-sequential"));
+                let concurrent = temp.join(format!("{model_name}-{noise}-concurrent"));
+                let timing = temp.join(format!("{model_name}-{noise}-timing.json"));
+
+                let sequential_options =
+                    parsed_options(&state, &sequential, None, noise, 1, grouped);
+                assert_eq!(sequential_options.backend, BackendSelection::Cuda);
+                assert_eq!(sequential_options.draw_workers, Some(1));
+                sweep_file_result_with_runtime(
+                    model_path.to_str().unwrap(),
+                    sequential_options,
+                    &runtime,
+                )
+                .unwrap();
+
+                let concurrent_options =
+                    parsed_options(&state, &concurrent, Some(&timing), noise, 2, grouped);
+                assert_eq!(concurrent_options.backend, BackendSelection::Cuda);
+                assert_eq!(concurrent_options.draw_workers, Some(2));
+                sweep_file_result_with_runtime(
+                    model_path.to_str().unwrap(),
+                    concurrent_options,
+                    &runtime,
+                )
+                .unwrap();
+
+                let sequential_files = output_tree(&sequential);
+                let concurrent_files = output_tree(&concurrent);
+                assert_eq!(
+                    sequential_files.keys().collect::<Vec<_>>(),
+                    concurrent_files.keys().collect::<Vec<_>>(),
+                    "supported file set changed for {model_name}/{noise}"
+                );
+                for (path, sequential_bytes) in &sequential_files {
+                    assert_eq!(
+                        concurrent_files.get(path),
+                        Some(sequential_bytes),
+                        "supported output '{}' changed for {model_name}/{noise}",
+                        path.display()
+                    );
+                }
+
+                let timing_document: serde_json::Value =
+                    serde_json::from_slice(&std::fs::read(&timing).unwrap()).unwrap();
+                assert_eq!(
+                    timing_document["schema"],
+                    "sembla-sweep-concurrency-spike-timing-v1"
+                );
+                assert_eq!(
+                    timing_document["execution_mode"],
+                    "cuda-free-nonblocking-streams"
+                );
+                assert_eq!(timing_document["requested_draw_workers"], 2);
+                assert_eq!(timing_document["effective_draw_workers"], 2);
+                assert!(timing_document["setup_wall_time_ms"].as_f64().unwrap() >= 0.0);
+                assert!(
+                    timing_document["execution_window_wall_time_ms"]
+                        .as_f64()
+                        .unwrap()
+                        >= 0.0
+                );
+                assert!(
+                    timing_document["publication_wall_time_ms"]
+                        .as_f64()
+                        .unwrap()
+                        >= 0.0
+                );
+                let draw_timings = timing_document["draw_timings"].as_array().unwrap();
+                assert_eq!(
+                    draw_timings
+                        .iter()
+                        .map(|draw| draw["k"].as_u64().unwrap())
+                        .collect::<Vec<_>>(),
+                    vec![0, 1, 2, 3]
+                );
+                assert!(
+                    draw_timings[1]["finish_offset_ms"].as_f64().unwrap()
+                        < draw_timings[0]["finish_offset_ms"].as_f64().unwrap(),
+                    "forced completion inversion did not occur for {model_name}/{noise}"
+                );
+                assert!(
+                    draw_timings[2]["start_offset_ms"].as_f64().unwrap()
+                        < draw_timings[0]["finish_offset_ms"].as_f64().unwrap(),
+                    "delayed low-k draw held up later work for {model_name}/{noise}"
+                );
+
+                let concurrent_manifest: serde_json::Value = serde_json::from_slice(
+                    &std::fs::read(concurrent.join("run-manifest.json")).unwrap(),
+                )
+                .unwrap();
+                let execution = &concurrent_manifest["executions"][3];
+                let fresh = temp.join(format!("{model_name}-{noise}-fresh.csv"));
+                run_file_result(
+                    model_path.to_str().unwrap(),
+                    RunOptions {
+                        seed: execution["seed"].as_u64().unwrap(),
+                        ticks: 5,
+                        population: state.display().to_string(),
+                        out: Some(fresh.display().to_string()),
+                        export_state: None,
+                        dt: None,
+                        params: None,
+                        timing_json: None,
+                        backend: BackendSelection::Cpu,
+                        enabled_features: features.clone(),
+                    },
+                )
+                .unwrap();
+                assert_eq!(
+                    std::fs::read(concurrent.join("draw_3.csv")).unwrap(),
+                    std::fs::read(&fresh).unwrap(),
+                    "draw 3 changed when run alongside peers for {model_name}/{noise}"
+                );
+                if grouped {
+                    assert_eq!(
+                        std::fs::read(concurrent.join("draw_3.grouped.population_cells.csv"))
+                            .unwrap(),
+                        std::fs::read(temp.join(format!(
+                            "{model_name}-{noise}-fresh.grouped.population_cells.csv"
+                        )))
+                        .unwrap(),
+                        "grouped draw 3 changed when run alongside peers for {noise}"
+                    );
+                }
+                let fresh_manifest: serde_json::Value = serde_json::from_slice(
+                    &std::fs::read(format!("{}.manifest.json", fresh.display())).unwrap(),
+                )
+                .unwrap();
+                assert_eq!(execution["resolved_theta"], serde_json::json!({}));
+                for field in [
+                    "results_sha256",
+                    "final_state_sha256",
+                    "observation_sha256",
+                    "grouped_outputs",
+                ] {
+                    assert_eq!(
+                        execution[field], fresh_manifest[field],
+                        "draw-alone manifest field {field} changed for {model_name}/{noise}"
+                    );
+                }
+            }
+        }
+
+        std::fs::remove_dir_all(temp).unwrap();
+    }
+
+    #[test]
+    fn concurrent_scheduler_constructs_exactly_one_retained_backend_per_lane() {
+        use std::sync::atomic::Ordering;
+
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let model = load(include_str!("../../../examples/reversible_ctmc.json"));
+        let initial = initialize_population(&model, 32);
+        let construction_params = ParamEnv::defaults(&model);
+        let options = SweepOptions {
+            seed: 71,
+            draws: Some(5),
+            theta_file: None,
+            noise_mode: super::manifest::NoiseMode::Independent,
+            ticks: 2,
+            population: "32".to_owned(),
+            out: "unused".to_owned(),
+            params: None,
+            export_pairs: None,
+            timing_json: None,
+            backend: BackendSelection::Cpu,
+            draw_workers: None,
+            enabled_features: sembla_ir::FeatureSet::new(),
+        };
+        let prepared = (0_u32..5)
+            .map(|k| SweepPreparedDraw {
+                k,
+                params: ParamEnv::defaults(&model),
+                execution_seed: sembla_runtime::rng::derive_sweep_replica_seed(71, k),
+            })
+            .collect::<Vec<_>>();
+
+        SWEEP_BACKEND_CONSTRUCTIONS.store(0, Ordering::SeqCst);
+        std::env::set_var(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV, "100");
+        let mut published = Vec::new();
+        let result = run_bounded_concurrent_sweep(
+            SweepConcurrentInputs {
+                model: &model,
+                initial_tables: &initial,
+                construction_params: &construction_params,
+                options: &options,
+                prepared: &prepared,
+            },
+            2,
+            SweepConcurrencyMode::IndependentDefaultStreams,
+            &ProductionSweepRuntime,
+            |_, completed| {
+                published.push(completed.index);
+                Ok(())
+            },
+        );
+        std::env::remove_var(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV);
+        let completed = result.unwrap();
+        assert_eq!(published, [0, 1, 2, 3, 4]);
+        assert!(completed.maximum_pending_results <= 4);
+        assert!(
+            completed.timings[2].start_offset_ms < completed.timings[0].finish_offset_ms,
+            "delayed draw zero held up later dynamically claimed work"
+        );
+        assert!(
+            (duration_ms(completed.execution_window_elapsed)
+                - completed
+                    .timings
+                    .iter()
+                    .map(|draw| draw.finish_offset_ms)
+                    .fold(0.0_f64, f64::max))
+            .abs()
+                < 0.001
+        );
+        assert_eq!(SWEEP_BACKEND_CONSTRUCTIONS.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn bounded_scheduler_reports_lowest_k_and_stops_higher_publication() {
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let model = load(include_str!("../../../examples/reversible_ctmc.json"));
+        let initial = initialize_population(&model, 32);
+        let construction_params = ParamEnv::defaults(&model);
+        let options = SweepOptions {
+            seed: 71,
+            draws: Some(5),
+            theta_file: None,
+            noise_mode: super::manifest::NoiseMode::Independent,
+            ticks: 2,
+            population: "32".to_owned(),
+            out: "unused".to_owned(),
+            params: None,
+            export_pairs: None,
+            timing_json: None,
+            backend: BackendSelection::Cpu,
+            draw_workers: None,
+            enabled_features: sembla_ir::FeatureSet::new(),
+        };
+        let prepared = (0_u32..5)
+            .map(|k| SweepPreparedDraw {
+                k,
+                params: ParamEnv::defaults(&model),
+                execution_seed: sembla_runtime::rng::derive_sweep_replica_seed(71, k),
+            })
+            .collect::<Vec<_>>();
+        let mut publication_attempts = Vec::new();
+        let result = run_bounded_concurrent_sweep(
+            SweepConcurrentInputs {
+                model: &model,
+                initial_tables: &initial,
+                construction_params: &construction_params,
+                options: &options,
+                prepared: &prepared,
+            },
+            2,
+            SweepConcurrencyMode::IndependentDefaultStreams,
+            &ProductionSweepRuntime,
+            |_, completed| {
+                publication_attempts.push(completed.index);
+                if completed.index == 2 {
+                    Err("draw 2: injected failure".to_owned())
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        let error = match result {
+            Err(error) => error,
+            Ok(_) => panic!("injected publication failure unexpectedly succeeded"),
+        };
+        assert_eq!(publication_attempts, [0, 1, 2]);
+        assert!(error.contains("draw 2: injected failure"));
+    }
+
+    #[cfg(feature = "cuda")]
+    #[test]
+    fn fake_memory_limit_rejects_before_any_lane_construction() {
+        use std::sync::atomic::Ordering;
+
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let model = load(include_str!("../../../examples/reversible_ctmc.json"));
+        let initial = initialize_population(&model, 32);
+        SWEEP_BACKEND_CONSTRUCTIONS.store(0, Ordering::SeqCst);
+        std::env::set_var(SWEEP_TEST_CUDA_FREE_MEMORY_ENV, "1");
+        let result = preflight_cuda_sweep_capacity_with_memory(
+            &model,
+            &initial,
+            4,
+            80 * 1024 * 1024 * 1024,
+            80 * 1024 * 1024 * 1024,
+        );
+        std::env::remove_var(SWEEP_TEST_CUDA_FREE_MEMORY_ENV);
+        let error = result.unwrap_err();
+        assert!(error.contains("insufficient CUDA device memory"));
+        assert!(error.contains("no lanes were constructed"));
+        assert_eq!(SWEEP_BACKEND_CONSTRUCTIONS.load(Ordering::SeqCst), 0);
     }
 
     #[test]
