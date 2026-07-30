@@ -25,6 +25,12 @@
 #                                 the no-grouped and grouped configurations,
 #                                 --timing-json plus nsys). Additive: the frozen
 #                                 §L4 protocol is unchanged either way.
+#   BENCH_CUDA_READBACK_DIAGNOSTIC=1
+#                               - self-contained 10M grouped CUDA diagnostic:
+#                                 phase timing, equal four-draw sequential/four-
+#                                 worker Nsight Systems traces, and bounded
+#                                 evidence-selected Nsight Compute reports. Skips
+#                                 the unrelated frozen and concurrency gates.
 #   BENCH_SWEEP=1               - additionally collect retained-backend sweep
 #                                 evidence at 1M and 10M rows, 24 ticks, 20
 #                                 draws; requires BENCH_SWEEP_BASELINE_COMMIT
@@ -65,8 +71,8 @@
 #   SSH_FAILURE_LIMIT           - default 5 consecutive poll failures before the
 #                                 collector gives up and says why
 #
-# BENCH_PROFILE, BENCH_CORPUS, BENCH_SWEEP, its baseline commit, and the
-# concurrency-spike flags are baked into the content-addressed
+# BENCH_PROFILE, BENCH_CUDA_READBACK_DIAGNOSTIC, BENCH_CORPUS, BENCH_SWEEP,
+# its baseline commit, and the concurrency-spike flags are baked into the content-addressed
 # payload hash, so a run with them set will not silently rejoin a plain gate run
 # already in progress -- it is correctly treated as a different payload.
 #
@@ -116,6 +122,26 @@ for legacy_override in BENCH_SCALES_CUDA BENCH_SCALES_CPU BENCH_TICKS BENCH_SEED
     exit 2
   fi
 done
+case "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" in
+  0|1) ;;
+  *) echo 'BENCH_CUDA_READBACK_DIAGNOSTIC must be 0 or 1' >&2; exit 2 ;;
+esac
+if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
+  for incompatible in \
+    BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP BENCH_CONCURRENCY_SPIKE \
+    BENCH_CONCURRENCY_SPIKE_ONLY BENCH_CONCURRENCY_SUPPORTED \
+    BENCH_CONCURRENCY_LOCKSTEP BENCH_CONCURRENCY_FREE_STREAMS \
+    BENCH_CONCURRENCY_FUSED BENCH_CONCURRENCY_CRN; do
+    if [[ "${!incompatible:-0}" == "1" ]]; then
+      echo "BENCH_CUDA_READBACK_DIAGNOSTIC is mutually exclusive with $incompatible" >&2
+      exit 2
+    fi
+  done
+  if [[ -n "${BENCH_SWEEP_BASELINE_COMMIT:-}" ]]; then
+    echo 'BENCH_CUDA_READBACK_DIAGNOSTIC is mutually exclusive with BENCH_SWEEP_BASELINE_COMMIT' >&2
+    exit 2
+  fi
+fi
 if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" == "1" \
       && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
   echo 'BENCH_CONCURRENCY_SPIKE_ONLY=1 requires BENCH_CONCURRENCY_SPIKE=1' >&2
@@ -466,6 +492,7 @@ REMOTE_SCRIPT="$(mktemp)"
 # payload hash reflects it: a profile run and a plain gate run are then correctly
 # treated as different payloads instead of one rejoining the other.
 printf 'export BENCH_PROFILE=%q\n' "${BENCH_PROFILE:-0}" > "$REMOTE_SCRIPT"
+printf 'export BENCH_CUDA_READBACK_DIAGNOSTIC=%q\n' "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
@@ -530,6 +557,140 @@ cargo build --locked --release -p sembla-cli --features cuda
 BIN="$SPIKE_DIR/target/release/sembla"
 BIN_SHA="$(sha256sum "$BIN" | awk '{print $1}')"
 printf '%s  target/release/sembla\n' "$BIN_SHA" > "$OUT_ROOT/binary.sha256"
+
+# --- focused CUDA readback/contended-kernel diagnostic ------------------------
+# This is a measurement-only stage. Nsight Systems compares real equal-work
+# timelines; Nsight Compute runs serially and is used only for occupancy,
+# bandwidth, and stall diagnosis because kernel replay destroys concurrency.
+if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
+  echo '=== focused CUDA readback/contended-kernel diagnostic (10M grouped) ==='
+  DIAGNOSTIC_DIR="$OUT_ROOT/cuda-readback-diagnostic"
+  mkdir -p "$DIAGNOSTIC_DIR/nsys" "$DIAGNOSTIC_DIR/ncu"
+  command -v nsys >/dev/null || { echo 'nsys is required for BENCH_CUDA_READBACK_DIAGNOSTIC' >&2; exit 9; }
+  command -v ncu >/dev/null || { echo 'ncu is required for BENCH_CUDA_READBACK_DIAGNOSTIC' >&2; exit 9; }
+  nsys --version > "$DIAGNOSTIC_DIR/nsys-version.txt" 2>&1
+  ncu --version > "$DIAGNOSTIC_DIR/ncu-version.txt" 2>&1
+
+  DIAGNOSTIC_SCALE=10000000
+  DIAGNOSTIC_TICKS=24
+  DIAGNOSTIC_DRAWS=4
+  DIAGNOSTIC_STATE="$WORK/cuda-readback-10m.state"
+  "$BIN" synth-state \
+    --model fixtures/demographic/benchmark/demographic_slots.full.json \
+    --slots "$DIAGNOSTIC_SCALE" --areas "$AREAS" \
+    --present-fraction "$PRESENT_FRACTION" --streams "$STREAMS" \
+    --seed "$SEED" --out "$DIAGNOSTIC_STATE" \
+    > "$DIAGNOSTIC_DIR/synth-state.stdout" \
+    2> "$DIAGNOSTIC_DIR/synth-state.stderr"
+  DIAGNOSTIC_MODEL="$DIAGNOSTIC_STATE.model.json"
+  DIAGNOSTIC_STATE_SHA="$(sha256sum "$DIAGNOSTIC_STATE" | awk '{print $1}')"
+  DIAGNOSTIC_MODEL_SHA="$(sha256sum "$DIAGNOSTIC_MODEL" | awk '{print $1}')"
+  printf '%s\n' "$DIAGNOSTIC_STATE_SHA" > "$DIAGNOSTIC_DIR/state.sha256"
+  printf '%s\n' "$DIAGNOSTIC_MODEL_SHA" > "$DIAGNOSTIC_DIR/model.sha256"
+
+  # Native per-tick phase attribution. This is the only profiler-independent
+  # timing arm and the only source for readback_control/report phase totals.
+  "$BIN" run "$DIAGNOSTIC_MODEL" \
+    --population "$DIAGNOSTIC_STATE" --backend cuda --seed "$SEED" \
+    --ticks "$DIAGNOSTIC_TICKS" --enable grouped-observations \
+    --timing-json "$DIAGNOSTIC_DIR/phase-timing.json" \
+    --out "$DIAGNOSTIC_DIR/phase-output.csv" \
+    > "$DIAGNOSTIC_DIR/phase.stdout" 2> "$DIAGNOSTIC_DIR/phase.stderr"
+  rm -f "$DIAGNOSTIC_DIR"/phase-output.csv "$DIAGNOSTIC_DIR"/phase-output.*.csv
+
+  # Equal four-draw arms: worker one is the production default; worker four
+  # fills every requested lane. Systems, not Compute, decides duration penalty.
+  for diagnostic_workers in 1 4; do
+    arm="$DIAGNOSTIC_DIR/nsys/workers-$diagnostic_workers"
+    mkdir -p "$arm"
+    timeout 180s nsys profile --trace=cuda --sample=none --cpuctxsw=none \
+      --stats=false --force-overwrite=true -o "$arm/trace" \
+      "$BIN" sweep "$DIAGNOSTIC_MODEL" \
+        --population "$DIAGNOSTIC_STATE" --backend cuda --seed "$SEED" \
+        --draws "$DIAGNOSTIC_DRAWS" --draw-workers "$diagnostic_workers" \
+        --ticks "$DIAGNOSTIC_TICKS" --noise independent \
+        --enable grouped-observations --timing-json "$arm/timing.json" \
+        --out "$arm/output" > "$arm/stdout.txt" 2> "$arm/stderr.txt"
+    nsys stats --force-export=true --report cuda_gpu_trace --format csv \
+      "$arm/trace.nsys-rep" > "$arm/cuda-gpu-trace.csv"
+    nsys stats --force-export=true --report cuda_gpu_kern_sum --format csv \
+      "$arm/trace.nsys-rep" > "$arm/cuda-kernel-summary.csv"
+    nsys stats --force-export=true --report cuda_api_sum --format csv \
+      "$arm/trace.nsys-rep" > "$arm/cuda-api-summary.csv"
+    for optional_report in cuda_gpu_mem_time_sum cuda_gpu_mem_size_sum cuda_kern_exec_sum; do
+      nsys stats --force-export=true --report "$optional_report" --format csv \
+        "$arm/trace.nsys-rep" > "$arm/$optional_report.csv" 2>&1 \
+        || printf 'report unavailable: %s\n' "$optional_report" > "$arm/$optional_report.UNAVAILABLE"
+    done
+    rm -f "$arm/trace.nsys-rep" "$arm/trace.sqlite"
+    rm -rf "$arm/output"
+  done
+
+  analyzer=(
+    python3 scripts/analyze-cuda-readback-diagnostic.py
+    --phase-timing "$DIAGNOSTIC_DIR/phase-timing.json"
+    --sequential-trace "$DIAGNOSTIC_DIR/nsys/workers-1/cuda-gpu-trace.csv"
+    --concurrent-trace "$DIAGNOSTIC_DIR/nsys/workers-4/cuda-gpu-trace.csv"
+    --sequential-api "$DIAGNOSTIC_DIR/nsys/workers-1/cuda-api-summary.csv"
+    --concurrent-api "$DIAGNOSTIC_DIR/nsys/workers-4/cuda-api-summary.csv"
+    --sequential-timing "$DIAGNOSTIC_DIR/nsys/workers-1/timing.json"
+    --concurrent-timing "$DIAGNOSTIC_DIR/nsys/workers-4/timing.json"
+    --expected-scale "$DIAGNOSTIC_SCALE" --expected-ticks "$DIAGNOSTIC_TICKS"
+    --draws-per-arm "$DIAGNOSTIC_DRAWS"
+    --selected-kernels-out "$DIAGNOSTIC_DIR/ncu-kernels.txt"
+    --output "$DIAGNOSTIC_DIR/analysis.json"
+  )
+  "${analyzer[@]}"
+  mapfile -t ncu_kernels < "$DIAGNOSTIC_DIR/ncu-kernels.txt"
+  (( ${#ncu_kernels[@]} == 3 )) || { echo 'diagnostic analyzer did not select three NCU kernels' >&2; exit 9; }
+
+  # At most three SOL/occupancy launches and two detailed stall launches.
+  for kernel in "${ncu_kernels[@]}"; do
+    timeout 240s ncu --devices 0 --target-processes all --replay-mode kernel \
+      --kernel-name-base function --kernel-name "regex:^${kernel}$" \
+      --launch-count 1 --section LaunchStats --section Occupancy \
+      --section SpeedOfLight --force-overwrite \
+      --export "$DIAGNOSTIC_DIR/ncu/${kernel}-sol" \
+      "$BIN" run "$DIAGNOSTIC_MODEL" --population "$DIAGNOSTIC_STATE" \
+        --backend cuda --seed "$SEED" --ticks 2 --enable grouped-observations \
+        --out "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output.csv" \
+      > "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.stdout" \
+      2> "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.stderr"
+    ncu --import "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.ncu-rep" \
+      --csv --page details > "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.csv"
+    rm -f "$DIAGNOSTIC_DIR/ncu/${kernel}-sol.ncu-rep" \
+      "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output.csv" \
+      "$DIAGNOSTIC_DIR/ncu/${kernel}-sol-output."*.csv
+  done
+
+  detail_kernels=("${ncu_kernels[0]}")
+  [[ "${ncu_kernels[0]}" == 'sembla_count_deferred' ]] \
+    || detail_kernels+=(sembla_count_deferred)
+  for kernel in "${detail_kernels[@]}"; do
+    timeout 240s ncu --devices 0 --target-processes all --replay-mode kernel \
+      --kernel-name-base function --kernel-name "regex:^${kernel}$" \
+      --launch-count 1 --section MemoryWorkloadAnalysis \
+      --section SchedulerStats --section WarpStateStats --force-overwrite \
+      --export "$DIAGNOSTIC_DIR/ncu/${kernel}-detail" \
+      "$BIN" run "$DIAGNOSTIC_MODEL" --population "$DIAGNOSTIC_STATE" \
+        --backend cuda --seed "$SEED" --ticks 2 --enable grouped-observations \
+        --out "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output.csv" \
+      > "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.stdout" \
+      2> "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.stderr"
+    ncu --import "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.ncu-rep" \
+      --csv --page details > "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.csv"
+    rm -f "$DIAGNOSTIC_DIR/ncu/${kernel}-detail.ncu-rep" \
+      "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output.csv" \
+      "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output."*.csv
+  done
+
+  "${analyzer[@]}" --ncu-dir "$DIAGNOSTIC_DIR/ncu" \
+    --assertions "$OUT_ROOT/assertions.txt"
+  [[ "$(sha256sum "$DIAGNOSTIC_STATE" | awk '{print $1}')" == "$DIAGNOSTIC_STATE_SHA" ]]
+  [[ "$(sha256sum "$DIAGNOSTIC_MODEL" | awk '{print $1}')" == "$DIAGNOSTIC_MODEL_SHA" ]]
+  rm -f "$DIAGNOSTIC_STATE" "$DIAGNOSTIC_MODEL"
+  echo '=== focused CUDA readback/contended-kernel diagnostic complete ==='
+fi
 
 # --- optional phase-attribution profile ---------------------------------------
 # Runs BEFORE the frozen gate, deliberately: it finishes in minutes where the
@@ -1327,7 +1488,8 @@ PY
   echo '=== retained-backend sweep evidence complete ==='
 fi
 
-if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" != "1" ]]; then
+if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" != "1" \
+      && "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" != "1" ]]; then
 STATE="$WORK/initial.state"
 echo '=== synthesizing one shared 10M state artifact ==='
 "$BIN" synth-state \
@@ -1606,6 +1768,20 @@ assert all(doc["assertions"].values())
     "PASS exactly three no-grouped replicates per backend\n"
 )
 PY
+elif [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
+  cat > "$OUT_ROOT/README.md" <<EOF
+# Focused CUDA readback/contended-kernel diagnostic evidence
+
+This targeted paid session ran only the fixed 10M grouped CUDA diagnostic at
+repository commit \`$COMMIT_BEFORE\`. It did not rerun the unrelated frozen or
+concurrency gates.
+
+The \`cuda-readback-diagnostic/\` tree contains native 24-tick phase timing,
+equal four-draw worker-one/worker-four Nsight Systems traces, machine-derived
+D2H and per-kernel duration analysis, and bounded Nsight Compute reports for
+three evidence-selected kernels. Systems timings decide contention; Compute
+reports occupancy, bandwidth, and stalls only because replay destroys overlap.
+EOF
 else
   if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" ]]; then
     noise_description='independent noise with three repetitions plus CRN noise with one repetition'

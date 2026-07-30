@@ -214,7 +214,7 @@ so run them from here rather than folder by folder.
 | 11 | `prds-cuda-host-path/0002` reduce device-side `wins`/`deferred` | yes | **landed and hardware-verified**: compact resident count buffers replace full-state control readback |
 | 12 | [`prds-sweep-throughput/0004`](prds-sweep-throughput/0004-run-cuda-draws-concurrently.md) run CUDA draws concurrently | yes | **landed and hardware-verified**: explicit bounded `--draw-workers`; 10M speedups 1.584×/1.756× at workers 2/4, 24 complete-tree comparisons byte-equal |
 | 13 | **one GPU session** | yes | **done 2026-07-30**: supported flag, capacity failure, output parity, non-default streams, checksums, and teardown all verified in `hyperstack-supported-concurrency-20260730T022957Z` |
-| 14 | **profile the remaining CUDA readback/contended-kernel cost** | yes | **next**: focused Nsight Compute plus phase attribution before changing packed/pinned asynchronous D2H readback; measurement first per §M1 |
+| 14 | **profile the remaining CUDA readback/contended-kernel cost** | yes | **next; collector prepared** as `BENCH_CUDA_READBACK_DIAGNOSTIC=1`: equal 10M worker-1/4 Systems traces plus bounded Compute reports decide between final-state buffering, tiny-copy synchronization, and kernel contention before any prototype (§M1) |
 
 **Why 9 first.** Item 11 is a device-side change to a reduction, which is exactly
 the shape the differential corpus exists to check. Landing it while the corpus

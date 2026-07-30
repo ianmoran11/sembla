@@ -424,6 +424,42 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
+## Focused CUDA readback/contended-kernel diagnostic
+
+Use this self-contained measurement stage before changing CUDA readback or
+kernel scheduling:
+
+```bash
+BENCH_CUDA_READBACK_DIAGNOSTIC=1 \
+  bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
+```
+
+The stage fixes the binding case at 10M slots, 24 ticks, seed 9009, independent
+noise, and grouped observations. It records:
+
+- one profiler-independent CUDA `run` with per-tick phase timing, including
+  `readback_control`;
+- equal four-draw Nsight Systems arms at `--draw-workers 1` and `4`, exporting
+  CUDA GPU trace, kernel summary, and API summary CSVs;
+- D2H call/byte/union/overlap statistics and per-kernel concurrent duration
+  penalties in `cuda-readback-diagnostic/analysis.json`; and
+- bounded Nsight Compute reports: SOL/launch/occupancy for the three kernels
+  with the largest Systems penalty, plus memory/scheduler/warp detail for at
+  most two kernels.
+
+Nsight Systems decides real duration and concurrency. Nsight Compute runs only
+serial one-worker diagnostic launches because replay serializes kernels and
+changes cache/scheduling; its durations must not be used as end-to-end timing.
+The stage fails if `nsys` or `ncu` is absent, if equal-work kernel counts differ,
+if four streams are not observed, or if any selected Compute report is missing.
+It writes machine assertions and skips both the frozen §L4 gate and the full
+concurrency matrix.
+
+`BENCH_CUDA_READBACK_DIAGNOSTIC=1` is mutually exclusive with every other
+`BENCH_*` stage selector and is baked into the detached payload hash. It needs a
+paid GPU host. The normal checksum transfer, evidence push, mandatory Terraform
+destroy, watchdog, and provider reconciliation rules remain unchanged.
+
 ## Supported concurrent CUDA sweep stage
 
 Use the production-interface stage for this PRD's deferred GPU criteria:
