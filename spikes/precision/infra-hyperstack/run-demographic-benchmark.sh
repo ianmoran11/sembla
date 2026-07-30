@@ -529,26 +529,62 @@ mkdir -p "$WORK" "$RUNS"
 export LC_ALL=C
 PARTIAL_ARCHIVE="$HOME/demographic-bench-partial.tar.gz"
 rm -f "$PARTIAL_ARCHIVE"
-remove_ncu_capability() {
-  if [[ -n "${NCU_BIN:-}" && -e "${NCU_BIN:-}" ]] \
-      && getcap "$NCU_BIN" 2>/dev/null | grep -q 'cap_sys_admin'; then
-    sudo -n setcap -r "$NCU_BIN"
-  fi
+reload_nvidia_counter_mode() {
+  local admin_only="$1"
+  timeout --signal=TERM --kill-after=5s 30s \
+    sudo -n systemctl stop nvidia-persistenced.service \
+    || return $?
+  for module in nvidia_uvm nvidia_drm nvidia_modeset nvidia_peermem nvidia; do
+    if grep -q "^${module} " /proc/modules; then
+      timeout --signal=TERM --kill-after=5s 30s sudo -n modprobe -r "$module" \
+        || return $?
+    fi
+  done
+  timeout --signal=TERM --kill-after=5s 30s \
+    sudo -n modprobe nvidia "NVreg_RestrictProfilingToAdminUsers=$admin_only" \
+    || return $?
+  timeout --signal=TERM --kill-after=5s 30s sudo -n modprobe nvidia_uvm \
+    || return $?
+  timeout --signal=TERM --kill-after=5s 30s \
+    sudo -n systemctl start nvidia-persistenced.service \
+    || return $?
+  timeout --signal=TERM --kill-after=5s 15s \
+    systemctl is-active --quiet nvidia-persistenced.service \
+    || return $?
+}
+restore_nvidia_counter_restriction() {
+  [[ "${NCU_COUNTER_MODE_ACTIVE:-0}" == "1" ]] || return 0
+  reload_nvidia_counter_mode 1 || return $?
   if [[ -n "${DIAGNOSTIC_DIR:-}" && -d "${DIAGNOSTIC_DIR:-}" ]]; then
-    getcap "${NCU_BIN:-/nonexistent}" \
-      > "$DIAGNOSTIC_DIR/ncu-capability-after-cleanup.txt" 2>&1 || true
+    cat /proc/driver/nvidia/params \
+      > "$DIAGNOSTIC_DIR/nvidia-driver-params-after-cleanup.txt" 2>&1 || return $?
+    lsmod > "$DIAGNOSTIC_DIR/nvidia-modules-after-cleanup.txt" 2>&1 || return $?
   fi
+  grep -Fq 'RmProfilingAdminOnly: 1' /proc/driver/nvidia/params || return 1
+  NCU_COUNTER_MODE_ACTIVE=0
 }
 package_partial_on_error() {
   local trapped_rc=$?
   local rc="${1:-$trapped_rc}"
-  trap - ERR
+  if [[ "${DIAGNOSTIC_FAILURE_HANDLED:-0}" == "1" ]]; then
+    exit "$rc"
+  fi
+  DIAGNOSTIC_FAILURE_HANDLED=1
+  trap - ERR TERM INT EXIT
   set +e
-  remove_ncu_capability
+  local restoration_status='not-required'
+  if [[ "${NCU_COUNTER_MODE_ACTIVE:-0}" == "1" ]]; then
+    if restore_nvidia_counter_restriction; then
+      restoration_status='restored-admin-only'
+    else
+      restoration_status='RESTORATION-FAILED'
+    fi
+  fi
   local partial_root="$HOME/demographic-bench-partial"
   rm -rf "$partial_root"
   mkdir -p "$partial_root"
   printf '%s\n' "$rc" > "$partial_root/remote-exit-code.txt"
+  printf '%s\n' "$restoration_status" > "$partial_root/counter-restoration-status.txt"
   for name in gpu-provenance.txt cpu-provenance.txt ram-provenance.txt \
       session-id.txt host-identity.sha256 repository-commit.txt started-utc.txt \
       binary.sha256; do
@@ -571,8 +607,19 @@ diagnostic_fail() {
   echo "$message" >&2
   package_partial_on_error 9
 }
+diagnostic_exit_handler() {
+  local rc="$1"
+  if [[ "$rc" != 0 || "${NCU_COUNTER_MODE_ACTIVE:-0}" == "1" ]]; then
+    (( rc == 0 )) && rc=1
+    package_partial_on_error "$rc"
+  fi
+}
 if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
-  trap package_partial_on_error ERR
+  DIAGNOSTIC_FAILURE_HANDLED=0
+  trap 'package_partial_on_error $?' ERR
+  trap 'package_partial_on_error 143' TERM
+  trap 'package_partial_on_error 130' INT
+  trap 'diagnostic_exit_handler $?' EXIT
 fi
 
 command -v nvidia-smi >/dev/null
@@ -617,17 +664,18 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
     || diagnostic_fail 'nsys is required for BENCH_CUDA_READBACK_DIAGNOSTIC'
   command -v sudo >/dev/null \
     || diagnostic_fail 'sudo is required to prepare Nsight Compute counter access'
-  command -v setcap >/dev/null \
-    || diagnostic_fail 'setcap is required to prepare Nsight Compute counter access'
+  command -v modprobe >/dev/null \
+    || diagnostic_fail 'modprobe is required to prepare Nsight Compute counter access'
   command -v getcap >/dev/null \
-    || diagnostic_fail 'getcap is required to verify Nsight Compute counter access'
+    || diagnostic_fail 'getcap is required to reject residual profiler capabilities'
   sudo -n true \
     || diagnostic_fail 'passwordless sudo is required to prepare Nsight Compute counter access'
   # The CUDA 12.8 image's bundled 2025.1.1 injection shim omits
   # cuTensorMapEncodeIm2colWide, which cudarc 0.17.6 resolves at startup. The
-  # 2025.2.1 shim supplies it. NVIDIA documents cap_sys_admin on ncu as a
-  # narrower ERR_NVGPUCTRPERM remedy than running the target application as
-  # root; the package-owned binary must remain root-owned and non-writable.
+  # 2025.2.1 shim supplies it. On the R570 image, file capabilities do not
+  # propagate to ncu's injected target. NVIDIA's documented temporary regkey
+  # method does: reload the idle driver with non-admin counter access, run ncu
+  # and Sembla unprivileged, then restore admin-only access before packaging.
   NCU_PACKAGE='nsight-compute-2025.2.1'
   NCU_DEBIAN_VERSION='2025.2.1.3-1'
   NCU_BIN='/opt/nvidia/nsight-compute/2025.2.1/ncu'
@@ -648,10 +696,9 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   ncu_mode="$(stat -c '%a' "$NCU_BIN")"
   (( (8#$ncu_mode & 8#022) == 0 )) \
     || diagnostic_fail 'pinned Nsight Compute binary is group/world writable'
-  sudo -n setcap cap_sys_admin+ep "$NCU_BIN"
-  getcap "$NCU_BIN" > "$DIAGNOSTIC_DIR/ncu-capability.txt"
-  grep -Fq 'cap_sys_admin=ep' "$DIAGNOSTIC_DIR/ncu-capability.txt" \
-    || diagnostic_fail 'Nsight Compute capability was not applied'
+  getcap "$NCU_BIN" > "$DIAGNOSTIC_DIR/ncu-file-capabilities.txt"
+  [[ ! -s "$DIAGNOSTIC_DIR/ncu-file-capabilities.txt" ]] \
+    || diagnostic_fail 'pinned Nsight Compute binary has a residual file capability'
   dpkg-query -W -f='${Package} ${Version}\n' "$NCU_PACKAGE" \
     > "$DIAGNOSTIC_DIR/ncu-package.txt"
   grep -Fq "$NCU_PACKAGE $NCU_DEBIAN_VERSION" "$DIAGNOSTIC_DIR/ncu-package.txt" \
@@ -663,6 +710,16 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   "$NCU_BIN" --version > "$DIAGNOSTIC_DIR/ncu-version.txt" 2>&1
   grep -Fq 'Version 2025.2.1.' "$DIAGNOSTIC_DIR/ncu-version.txt" \
     || diagnostic_fail 'unexpected pinned Nsight Compute version'
+  cat /proc/driver/nvidia/params > "$DIAGNOSTIC_DIR/nvidia-driver-params-before.txt"
+  lsmod > "$DIAGNOSTIC_DIR/nvidia-modules-before.txt"
+  NCU_COUNTER_MODE_ACTIVE=1
+  reload_nvidia_counter_mode 0
+  cat /proc/driver/nvidia/params > "$DIAGNOSTIC_DIR/nvidia-driver-params-active.txt"
+  lsmod > "$DIAGNOSTIC_DIR/nvidia-modules-active.txt"
+  grep -Fq 'RmProfilingAdminOnly: 0' "$DIAGNOSTIC_DIR/nvidia-driver-params-active.txt" \
+    || diagnostic_fail 'NVIDIA driver did not enable unprivileged counter access'
+  nvidia-smi --query-gpu=name,driver_version --format=csv,noheader \
+    > "$DIAGNOSTIC_DIR/nvidia-counter-access-gpu-check.txt"
 
   DIAGNOSTIC_SCALE=10000000
   DIAGNOSTIC_TICKS=24
@@ -793,10 +850,11 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
       "$DIAGNOSTIC_DIR/ncu/${kernel}-detail-output."*.csv
   done
 
-  remove_ncu_capability
-  if getcap "$NCU_BIN" | grep -q 'cap_sys_admin'; then
-    diagnostic_fail 'Nsight Compute capability remained after profiling'
-  fi
+  restore_nvidia_counter_restriction \
+    || diagnostic_fail 'unable to restore admin-only NVIDIA counter access'
+  grep -Fq 'RmProfilingAdminOnly: 1' \
+    "$DIAGNOSTIC_DIR/nvidia-driver-params-after-cleanup.txt" \
+    || diagnostic_fail 'NVIDIA driver did not restore admin-only counter access'
   "${analyzer[@]}" --ncu-dir "$DIAGNOSTIC_DIR/ncu" \
     --assertions "$OUT_ROOT/assertions.txt"
   raw_nsys_count="$(find "$DIAGNOSTIC_DIR/nsys" -name '*.nsys-rep' -type f -size +0c | wc -l)"

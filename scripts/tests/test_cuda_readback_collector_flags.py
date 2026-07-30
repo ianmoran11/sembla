@@ -84,16 +84,25 @@ class CollectorFlagValidationTest(unittest.TestCase):
         self.assertIn("mutually exclusive with BENCH_SWEEP_BASELINE_COMMIT", result.stderr)
         self.assertFalse(self.artifact.exists())
 
-    def test_pins_compatible_ncu_and_limits_counter_privilege(self):
+    def test_pins_compatible_ncu_and_temporarily_opens_driver_counters(self):
         source = SCRIPT.read_text()
         self.assertIn("NCU_PACKAGE='nsight-compute-2025.2.1'", source)
         self.assertIn("NCU_DEBIAN_VERSION='2025.2.1.3-1'", source)
         self.assertIn("NCU_BIN='/opt/nvidia/nsight-compute/2025.2.1/ncu'", source)
         self.assertIn("dpkg-query -W -f='${Package} ${Version}\\n'", source)
-        self.assertIn("sudo -n setcap cap_sys_admin+ep \"$NCU_BIN\"", source)
-        self.assertIn("getcap \"$NCU_BIN\"", source)
-        self.assertIn("remove_ncu_capability", source)
-        self.assertIn("sudo -n setcap -r \"$NCU_BIN\"", source)
+        self.assertIn("reload_nvidia_counter_mode 0", source)
+        self.assertIn("restore_nvidia_counter_restriction", source)
+        self.assertIn(
+            'sudo -n modprobe nvidia "NVreg_RestrictProfilingToAdminUsers=$admin_only"',
+            source,
+        )
+        self.assertIn("RmProfilingAdminOnly: 0", source)
+        self.assertIn("RmProfilingAdminOnly: 1", source)
+        self.assertIn("--kill-after=5s 30s", source)
+        self.assertIn("trap 'package_partial_on_error 143' TERM", source)
+        self.assertIn("trap 'package_partial_on_error 130' INT", source)
+        self.assertIn("trap 'diagnostic_exit_handler $?' EXIT", source)
+        self.assertNotIn("setcap cap_sys_admin", source)
         self.assertEqual(
             source.count(
                 'timeout --signal=TERM --kill-after=30s 240s "$NCU_BIN"'
@@ -115,17 +124,15 @@ class CollectorFlagValidationTest(unittest.TestCase):
         self.assertNotIn('-sol.ncu-rep" \\\n      "$DIAGNOSTIC_DIR', source)
         self.assertNotIn('-detail.ncu-rep" \\\n      "$DIAGNOSTIC_DIR', source)
         self.assertIn("package_partial_on_error", source)
-        self.assertIn(
-            'if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then\n  trap package_partial_on_error ERR',
-            source,
-        )
+        self.assertIn("DIAGNOSTIC_FAILURE_HANDLED=0", source)
+        self.assertIn("trap 'package_partial_on_error $?' ERR", source)
         self.assertIn("diagnostic_fail", source)
         self.assertIn("SHA256SUMS.partial", source)
         self.assertIn("Checksummed partial diagnostic evidence", source)
 
     def test_explicit_failure_packages_checksummed_partial_without_work_state(self):
         source = SCRIPT.read_text()
-        start = source.index("remove_ncu_capability() {")
+        start = source.index("reload_nvidia_counter_mode() {")
         end = source.index(
             '\nif [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]', start
         )
@@ -163,10 +170,31 @@ diagnostic_fail "forced explicit validation failure"
             path = root / relative.removeprefix("./")
             self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), expected)
 
+    def test_internal_reload_failure_propagates_and_keeps_active_flag_for_retry(self):
+        source = SCRIPT.read_text()
+        start = source.index("reload_nvidia_counter_mode() {")
+        end = source.index("\npackage_partial_on_error() {", start)
+        functions = source[start:end]
+        script = f"""set -Eeuo pipefail
+{functions}
+timeout() {{ return 77; }}
+NCU_COUNTER_MODE_ACTIVE=1
+set +e
+restore_nvidia_counter_restriction
+rc=$?
+set -e
+printf 'rc=%s active=%s\\n' "$rc" "$NCU_COUNTER_MODE_ACTIVE"
+[[ "$rc" == 77 && "$NCU_COUNTER_MODE_ACTIVE" == 1 ]]
+"""
+        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("rc=77 active=1", result.stdout)
+
     def test_documents_both_profiler_compatibility_preflights(self):
         source = SCRIPT.read_text()
         self.assertIn("cuTensorMapEncodeIm2colWide", source)
         self.assertIn("passwordless sudo is required", source)
+        self.assertIn("file capabilities do not", source)
         self.assertIn("Version 2025.2.1.", source)
 
 

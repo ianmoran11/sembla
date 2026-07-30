@@ -454,13 +454,22 @@ The CUDA 12.8 image's bundled Nsight Compute 2025.1.1 injection shim lacks a
 driver symbol that `cudarc` 0.17.6 resolves at startup. The stage therefore
 pins Debian package `nsight-compute-2025.2.1=2025.2.1.3-1`, installs it
 from the configured NVIDIA package repository when absent, and records the
-exact package, repository policy/source, binary metadata, capability, and tool
-version. The stock image restricts GPU counters to administrators, so the stage
-uses passwordless `sudo` only to install the root-owned package and apply
-NVIDIA's documented `cap_sys_admin+ep` capability to its non-writable `ncu`
-binary. `ncu` and the Sembla target then run as the unprivileged benchmark user.
-An H100 compatibility probe verified that 2025.2.1 resolves the missing symbol
-and can collect metrics when counter access is enabled.
+exact package, repository policy/source, binary metadata/hash, and tool
+version. The stock R570 image restricts GPU counters to administrators, and a
+file capability on `ncu` does not propagate to its injected target. Before any
+diagnostic CUDA workload, the stage therefore stops persistence, unloads only
+loaded NVIDIA modules, and uses NVIDIA's documented temporary regkey method to
+reload the driver with `NVreg_RestrictProfilingToAdminUsers=0`. Both `ncu` and
+Sembla then run unprivileged, and the collector rejects any residual file
+capability on the profiler. After the last profiler launch—or from scoped
+`ERR`, `TERM`, `INT`, and `EXIT` failure handlers—the stage reloads the idle
+driver with admin-only access. Every privileged service/module operation has a
+TERM/KILL bound; the active-mode flag is cleared only after the loaded parameter
+is verified as admin-only. Module/driver parameters are recorded before,
+during, and after the window, and partial evidence records restoration success
+or failure. A transient operator probe motivated this method but is not accepted
+evidence; the next retained run must itself prove the active parameter, the
+unprivileged metric collection, and admin-only restoration.
 
 Every profiler launch has a TERM deadline and a subsequent KILL deadline;
 report imports are bounded separately. Raw `.nsys-rep` and `.ncu-rep` files are
@@ -468,9 +477,10 @@ retained alongside their CSV exports. If the stage fails, the payload packages
 a checksummed partial diagnostic tree—excluding the large generated state—and
 the local driver retrieves and verifies it before returning failure.
 
-The stage fails if `nsys`, passwordless `sudo`, capability tooling, the exact
-profiler package, or counter access is unavailable, if equal-work kernel counts
-differ, if four streams are not observed, or if any selected Compute report is
+The stage fails if `nsys`, passwordless `sudo`, module reload tooling, the exact
+profiler package, or temporary counter access is unavailable, if equal-work
+kernel counts differ, if four streams are not observed, or if any selected
+Compute report is
 missing. It writes machine assertions and skips both the frozen §L4 gate and
 the full concurrency matrix.
 
