@@ -146,15 +146,17 @@ against the PRD where it currently lives.
   published in this history).
 
 - [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
-  implemented and locally approved 2026-07-30 in commit `d862a91` after CUDA
-  Gate 1 passed for the free-running non-blocking-stream design. Hardware
-  criteria 10–13 remain pending for a later paid GPU session.
+  implemented and locally approved 2026-07-30 in commit `d862a91`, then
+  hardware-verified on H100 at commit `d72057f`. All criteria pass: 24 complete
+  output-tree comparisons are byte-equal, capacity failure precedes lane/output
+  creation, and Nsight proves two non-default streams. Evidence:
+  [`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
 
 The concurrent-draw candidate was scoped below so the measurement could answer
 the architectural questions before an implementation specification froze them;
 that measurement is now complete and `0004` is the result.
 
-## Concurrent-draw track — CUDA implemented locally; hardware verification pending
+## Concurrent-draw track — CUDA implemented and hardware-verified
 
 This work stays in `docs/prds-sweep-throughput/`; do not create a second folder.
 It directly extends 0001's retained-backend lifecycle and inherits this folder's
@@ -487,12 +489,12 @@ operator decision (CUDA-capable production):
   PRD returns only if the CPU track reopens.
 - `0003-control-cpu-draw-resources` — **deferred** pending CPU Gate 1.
 - [`0004-run-cuda-draws-concurrently`](0004-run-cuda-draws-concurrently.md) —
-  **implemented and locally approved in `d862a91`; hardware criteria pending**. Self-contained
-  for the CUDA track: supported `--draw-workers` interface, bounded capacity
-  preflight, per-lane non-blocking streams, and the scheduler contract, on the
-  measured free-streams mechanism. The paid GPU rerun uses
-  `BENCH_CONCURRENCY_SPIKE=1`, `BENCH_CONCURRENCY_SUPPORTED=1`, and
-  `BENCH_CONCURRENCY_SPIKE_ONLY=1` as documented in the Hyperstack runbook.
+  **implemented in `d862a91` and hardware-verified at `d72057f`**. The H100
+  stage reproduced the supported free-stream mechanism at 1.275×/1.278× (1M)
+  and 1.584×/1.756× (10M), with all 24 complete-tree comparisons byte-equal,
+  four negative controls rejected, bounded capacity failure before lane/output
+  creation, and two non-default streams in Nsight. Evidence:
+  [`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
   Capacity-order tests inject `SEMBLA_SWEEP_TEST_CUDA_FREE_MEMORY_BYTES`; the
   seam can only lower (never raise) the queried device-zero free-memory limit.
 - `0005-publish-concurrency-defaults` — **conditional** as written: any

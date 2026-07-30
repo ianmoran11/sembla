@@ -1,5 +1,11 @@
 # PRD 0004: Run CUDA sweep draws concurrently on free-running non-blocking streams
 
+## Status
+
+Implemented and locally approved in `d862a91`; hardware-verified on H100 at
+`d72057f`. All acceptance criteria pass. Evidence and calculations:
+[`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
+
 ## Context
 
 Read `docs/prds-sweep-throughput/README.md` first; its constraints bind,
@@ -220,20 +226,20 @@ failing on a deliberate perturbation (§M4) — both already exist in
     non-default streams; reported as evidence, not as a success criterion —
     whole-sweep wall and byte-parity decide.
 
-**Local criteria 1–9 are sufficient for approval.** Criteria 10–13 are
-§J14.2 hardware criteria and are listed as pending, executed in a later GPU
-session. Do not present a local result as GPU evidence, and do not block
-approval on lacking a GPU. The collector stage that will run criteria 11–13
-must be built and committed by this PRD; running it needs a paid GPU host and
-is not part of this PRD.
+**Local criteria 1–9 were sufficient for implementation approval.** Hardware
+criteria 10–13 were subsequently executed on H100 at `d72057f`; all pass.
+The supported collector completed the independent/CRN matrix, capacity-failure
+arm, and Nsight trace, with evidence at
+[`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
+The earlier local approval was not presented as GPU evidence.
 
 ## Note on expectations
 
-The 1.598×/1.745× (10M) and 1.266×/1.270× (1M) figures are **measured** for
-this exact mechanism on H100, not projections. The production form must
-nevertheless re-measure through the supported flag in the hardware session:
-the flag adds preflight and interface work the spike did not pay, and §M1
-forbids inheriting a number from an interface that no longer exists.
+The Gate 1 spike measured 1.598×/1.745× (10M) and 1.266×/1.270× (1M) for
+this mechanism on H100. The completed supported-interface session independently
+measured 1.584×/1.756× (10M) and 1.275×/1.278× (1M). The agreement confirms
+that the production flag and capacity preflight preserve the spike result
+rather than inheriting it by assumption (§M1).
 
 Memory is the binding constraint, not compute: 22,701 MiB VRAM at 10M/four
 lanes. The value of this PRD at 10M is real but bounded (≤ ~1.75× at four

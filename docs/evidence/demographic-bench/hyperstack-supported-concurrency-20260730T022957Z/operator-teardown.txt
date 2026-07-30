@@ -1,0 +1,29 @@
+checked_utc=2026-07-30T02:54:14Z
+command=terraform state list
+terraform_state_resource_count=0
+command=bash reconcile-orphans.sh
+name_prefix: sembla-precision
+
+tracked in Terraform state: 0
+other VMs in the account (never touched): 0
+
+No orphans. Every sembla-precision* VM in the account is tracked in state.
+command=bash destroy-deadline.sh status
+not armed
+--- last log ---
+
+tracked in Terraform state: 0
+other VMs in the account (never touched): 0
+
+No orphans. Every sembla-precision* VM in the account is tracked in state.
+paid_plan_present=false
+ephemeral_host_key_dir_present=false
+known_hosts_present=false
+launchctl_TF_VAR_tailscale_auth_key_present=false
+launchctl_TF_VAR_console_password_hash_present=false
+launchctl_TF_VAR_evidence_deploy_key_present=false
+launchctl_TF_VAR_ssh_host_private_key_present=false
+launchctl_SSH_HOST_KEY_FINGERPRINT_present=false
+launchctl_SEMBLA_HOST_KEY_DIR_present=false
+github_deploy_key_158758219_present=false
+evidence_branch_commit=24d5973728a2129338a1d09a9c5b6177ae1d7b5e

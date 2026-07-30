@@ -1,0 +1,6 @@
+remote_manifest_entries=3170
+direct_path_matches=3169
+renamed_post_transfer_matches=1
+renamed_mapping=./README.md -> README.remote.md
+mismatches=0
+result=PASS

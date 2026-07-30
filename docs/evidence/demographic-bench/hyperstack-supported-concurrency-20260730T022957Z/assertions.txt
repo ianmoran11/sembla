@@ -1,0 +1,6 @@
+PASS targeted concurrency-only payload selected
+PASS workers 1/2/4 completed three independent-noise repetitions and one CRN repetition at 1M and 10M
+PASS complete output trees matched their sequential references
+PASS negative comparator controls rejected a deliberate perturbation
+PASS supported free-stream completion inversion preserved ordered publication and oversized capacity was rejected before output
+PASS Nsight Systems CUDA trace exported for overlap analysis

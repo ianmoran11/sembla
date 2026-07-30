@@ -1,0 +1,9 @@
+source_driver_log_sha256=a6cfa7cf35554372ec0dbf52b4cb3fd53c53a026b591f74da578d10d9d56caaf
+source_driver_log_name=bench-driver-supported-20260730T022957Z.log
+Evidence was pushed to branch: evidence/hyperstack-20260730T023904Z
+Transferred artifact checksums verified.
+Destroying the VM.
+Destroy complete! Resources: 2 destroyed.
+Terraform destroy completed and state is clean. Confirm in the Hyperstack console that no VM remains.
+Final evidence checksums verified.
+Evidence written to: /Users/ian/projects/sembla/docs/evidence/demographic-bench/hyperstack-l4-20260730T022957Z
