@@ -551,6 +551,136 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
 }
 
 #[test]
+fn supported_draw_workers_parse_validate_and_fail_before_scientific_output() {
+    let temp = temp_dir("supported-draw-workers-errors");
+    let population = temp.join("population.bin");
+    synth(&population, 20, 4, 1);
+
+    let run_case = |label: &str,
+                    workers: &str,
+                    backend: &str,
+                    hidden_workers: Option<&str>,
+                    extra_env: Option<(&str, &str)>| {
+        let out = temp.join(label);
+        let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+        process
+            .arg("sweep")
+            .arg(repository_path("examples/sir.json"))
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "3",
+                "--ticks",
+                "1",
+                "--backend",
+                backend,
+                "--draw-workers",
+                workers,
+                "--out",
+            ])
+            .arg(&out)
+            .env_remove("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS")
+            .env_remove("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS")
+            .env_remove("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS")
+            .env_remove("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS");
+        if let Some(hidden_workers) = hidden_workers {
+            process.env("SEMBLA_SWEEP_SPIKE_DRAW_WORKERS", hidden_workers);
+        }
+        if let Some((name, value)) = extra_env {
+            process.env(name, value);
+        }
+        (process.output().unwrap(), out)
+    };
+
+    for (label, workers, backend, hidden, extra, expected) in [
+        ("zero", "0", "cpu", None, None, "must be greater than zero"),
+        (
+            "malformed",
+            "many",
+            "cpu",
+            None,
+            None,
+            "invalid numeric value",
+        ),
+        ("too-many", "4", "cuda", None, None, "exceeds draw count 3"),
+        ("cpu-two", "2", "cpu", None, None, "requires --backend cuda"),
+        (
+            "worker-env-conflict",
+            "2",
+            "cuda",
+            Some("3"),
+            None,
+            "conflicts with SEMBLA_SWEEP_SPIKE_DRAW_WORKERS=3",
+        ),
+        (
+            "lockstep-conflict",
+            "1",
+            "cuda",
+            None,
+            Some(("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS", "1")),
+            "--draw-workers is incompatible",
+        ),
+        (
+            "fused-conflict",
+            "1",
+            "cuda",
+            None,
+            Some(("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", "2")),
+            "--draw-workers is incompatible",
+        ),
+        (
+            "free-one",
+            "1",
+            "cuda",
+            None,
+            Some(("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS", "1")),
+            "requires --draw-workers greater than 1",
+        ),
+    ] {
+        let (output, out) = run_case(label, workers, backend, hidden, extra);
+        assert!(!output.status.success(), "{label}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{label}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!out.exists(), "{label} created scientific output");
+    }
+
+    let explicit_one = temp.join("explicit-one");
+    let default_one = temp.join("default-one");
+    let (explicit_output, _) = run_case("explicit-one", "1", "cpu", None, None);
+    assert_success(&explicit_output);
+    sweep(&population, &default_one, 19, 3, 1, None);
+    assert_eq!(output_files(&explicit_one), output_files(&default_one));
+
+    if !cfg!(feature = "cuda") {
+        for (label, hidden, free) in [
+            ("same-worker-env", Some("2"), None),
+            (
+                "supported-free-alias",
+                None,
+                Some(("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS", "1")),
+            ),
+        ] {
+            let (output, out) = run_case(label, "2", "cuda", hidden, free);
+            assert!(!output.status.success(), "{label}");
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("cuda backend unavailable"),
+                "{label}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(!out.exists(), "{label} created scientific output");
+        }
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
 fn sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts() {
     let temp = temp_dir("sweep-concurrency-spike-errors");
     let population = temp.join("population.bin");

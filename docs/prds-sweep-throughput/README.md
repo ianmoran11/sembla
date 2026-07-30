@@ -483,10 +483,14 @@ operator decision (CUDA-capable production):
   PRD returns only if the CPU track reopens.
 - `0003-control-cpu-draw-resources` — **deferred** pending CPU Gate 1.
 - [`0004-run-cuda-draws-concurrently`](../prds-run-queue/0001-run-cuda-draws-concurrently.md) —
-  **queued as run item `0001`**. Self-contained for the CUDA track: supported
-  `--draw-workers` interface, bounded capacity preflight, per-lane
-  non-blocking streams, and the scheduler contract, on the measured
-  free-streams mechanism.
+  **implemented locally 2026-07-30; hardware criteria pending**. Self-contained
+  for the CUDA track: supported `--draw-workers` interface, bounded capacity
+  preflight, per-lane non-blocking streams, and the scheduler contract, on the
+  measured free-streams mechanism. The paid GPU rerun uses
+  `BENCH_CONCURRENCY_SPIKE=1`, `BENCH_CONCURRENCY_SUPPORTED=1`, and
+  `BENCH_CONCURRENCY_SPIKE_ONLY=1` as documented in the Hyperstack runbook.
+  Capacity-order tests inject `SEMBLA_SWEEP_TEST_CUDA_FREE_MEMORY_BYTES`; the
+  seam can only lower (never raise) the queried device-zero free-memory limit.
 - `0005-publish-concurrency-defaults` — **conditional** as written: any
   default or `auto` policy waits for repeated multi-shape evidence.
 

@@ -424,6 +424,34 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
+## Supported concurrent CUDA sweep stage
+
+Use the production-interface stage for this PRD's deferred GPU criteria:
+
+```bash
+BENCH_CONCURRENCY_SPIKE=1 \
+BENCH_CONCURRENCY_SUPPORTED=1 \
+BENCH_CONCURRENCY_SPIKE_ONLY=1 \
+  bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
+```
+
+`BENCH_CONCURRENCY_SUPPORTED=1` drives `sweep --draw-workers 1/2/4` directly;
+it does not export the hidden worker, free-stream, lockstep, or fused controls.
+At both 1M and 10M slots it runs three independent-noise repetitions and one
+CRN repetition, compares complete output trees to the sequential arm, exports
+pairs and grouped sidecars, and proves the comparator rejects a deliberate
+perturbation. The 1M arm forces a completion inversion and records an Nsight
+Systems trace for two non-default streams. The 10M arm requests 20 workers to
+exceed the conservative device-memory bound and requires the preflight error,
+a nonzero exit, and no scientific output directory.
+
+The supported stage is self-contained and cannot be combined with
+`BENCH_CONCURRENCY_LOCKSTEP`, `BENCH_CONCURRENCY_FREE_STREAMS`,
+`BENCH_CONCURRENCY_FUSED`, or `BENCH_CONCURRENCY_CRN`. It still requires
+`BENCH_CONCURRENCY_SPIKE=1` and may be paired with
+`BENCH_CONCURRENCY_SPIKE_ONLY=1` to skip the unrelated frozen §L4 gate. Running
+it requires the paid GPU host; local CUDA compilation is not GPU evidence.
+
 ## Concurrent sweep-draw spike stage
 
 Set both flags below to collect only the direct CUDA concurrency experiment,

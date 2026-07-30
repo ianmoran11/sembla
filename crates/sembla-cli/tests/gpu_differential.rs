@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
+use sembla_runtime::state_artifact::write;
+
 fn repository_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -49,6 +52,54 @@ fn output_files(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     files
 }
 
+fn supported_sweep_fixture(
+    model_name: &str,
+) -> (PathBuf, sembla_ir::ValidatedModel, Vec<TableInit>) {
+    let model_path = repository_path(&format!(
+        "crates/sembla-cli/tests/fixtures/{model_name}.json"
+    ));
+    let source = std::fs::read_to_string(&model_path).unwrap();
+    let features = if model_name == "grouped_observation" {
+        sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()])
+    } else {
+        sembla_ir::FeatureSet::new()
+    };
+    let model =
+        sembla_ir::validate_with_features(sembla_ir::parse_json(&source).unwrap(), &features)
+            .unwrap();
+    let tables = if model_name == "contest_competing_exits" {
+        vec![
+            TableInit::new("World", "slot_resource", 100, Vec::new()),
+            TableInit::new(
+                "World",
+                "slot",
+                100,
+                vec![
+                    ColumnInit::new("occupancy", ColumnData::Enum(vec![0; 100])),
+                    ColumnInit::new("cause", ColumnData::Enum(vec![0; 100])),
+                    ColumnInit::new("slot_resource", ColumnData::Ref((0_u32..100).collect())),
+                ],
+            ),
+        ]
+    } else {
+        vec![
+            TableInit::new("world", "area", 12, Vec::new()),
+            TableInit::new(
+                "world",
+                "person_slot",
+                5,
+                vec![
+                    ColumnInit::new("sex", ColumnData::Enum(vec![0, 0, 1, 1, 0])),
+                    ColumnInit::new("area", ColumnData::Ref(vec![10, 2, 10, 2, 2])),
+                    ColumnInit::new("age_months", ColumnData::Int(vec![-1, 0, 59, 60, 120])),
+                    ColumnInit::new("occupancy", ColumnData::Enum(vec![0; 5])),
+                ],
+            ),
+        ]
+    };
+    (model_path, model, tables)
+}
+
 fn plan_fixture_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
     for directory in ["fixtures/plans", "fixtures/plans/linked"] {
@@ -78,6 +129,149 @@ fn plan_uses_grouped_views(path: &Path) -> bool {
         .boxes
         .iter()
         .any(|model_box| !model_box.grouped_views.is_empty())
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; run explicitly as supported draw-worker hardware evidence"]
+fn supported_free_stream_sweep_is_draw_independent_and_publishes_in_k_order() {
+    let temp = temp_dir("supported-free-stream-sweep");
+    for model_name in ["contest_competing_exits", "grouped_observation"] {
+        let (model_path, model, tables) = supported_sweep_fixture(model_name);
+        let state = temp.join(format!("{model_name}.state"));
+        write(&state, &model, &tables).unwrap();
+        for noise in ["crn", "independent"] {
+            let sequential = temp.join(format!("{model_name}-{noise}-sequential"));
+            let concurrent = temp.join(format!("{model_name}-{noise}-concurrent"));
+            let timing = temp.join(format!("{model_name}-{noise}-timing.json"));
+            let common = [
+                "--seed",
+                "9182",
+                "--draws",
+                "4",
+                "--ticks",
+                "5",
+                "--noise",
+                noise,
+                "--backend",
+                "cuda",
+            ];
+            let mut sequential_command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            sequential_command
+                .arg("sweep")
+                .arg(&model_path)
+                .arg("--population")
+                .arg(&state)
+                .args(common)
+                .arg("--out")
+                .arg(&sequential);
+            if model_name == "grouped_observation" {
+                sequential_command.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
+            }
+            assert_success(&sequential_command.output().unwrap());
+
+            let mut concurrent_command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            concurrent_command
+                .arg("sweep")
+                .arg(&model_path)
+                .arg("--population")
+                .arg(&state)
+                .args(common)
+                .args(["--draw-workers", "2", "--timing-json"])
+                .arg(&timing)
+                .arg("--out")
+                .arg(&concurrent)
+                .env("SEMBLA_SWEEP_SPIKE_DELAY_DRAW_ZERO_MS", "100");
+            if model_name == "grouped_observation" {
+                concurrent_command.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
+            }
+            assert_success(&concurrent_command.output().unwrap());
+            assert_eq!(output_files(&concurrent), output_files(&sequential));
+
+            let document: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&timing).unwrap()).unwrap();
+            assert_eq!(
+                document["schema"],
+                "sembla-sweep-concurrency-spike-timing-v1"
+            );
+            assert_eq!(document["execution_mode"], "cuda-free-nonblocking-streams");
+            assert_eq!(document["requested_draw_workers"], 2);
+            assert_eq!(document["effective_draw_workers"], 2);
+            assert!(document["maximum_pending_results"].as_u64().unwrap() <= 4);
+            assert!(document["setup_wall_time_ms"].as_f64().unwrap() >= 0.0);
+            assert!(document["execution_window_wall_time_ms"].as_f64().unwrap() >= 0.0);
+            assert!(document["publication_wall_time_ms"].as_f64().unwrap() >= 0.0);
+            let draws = document["draw_timings"].as_array().unwrap();
+            assert_eq!(
+                draws
+                    .iter()
+                    .map(|draw| draw["k"].as_u64().unwrap())
+                    .collect::<Vec<_>>(),
+                vec![0, 1, 2, 3]
+            );
+            assert!(
+                draws[1]["finish_offset_ms"].as_f64().unwrap()
+                    < draws[0]["finish_offset_ms"].as_f64().unwrap()
+            );
+            assert!(
+                draws[2]["start_offset_ms"].as_f64().unwrap()
+                    < draws[0]["finish_offset_ms"].as_f64().unwrap(),
+                "the delayed low-k draw held up later free-running work"
+            );
+            let maximum_finish = draws
+                .iter()
+                .map(|draw| draw["finish_offset_ms"].as_f64().unwrap())
+                .fold(0.0_f64, f64::max);
+            assert!(
+                (document["execution_window_wall_time_ms"].as_f64().unwrap() - maximum_finish)
+                    .abs()
+                    < 0.001
+            );
+
+            let manifest: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(concurrent.join("run-manifest.json")).unwrap(),
+            )
+            .unwrap();
+            let seed = manifest["executions"][3]["seed"]
+                .as_u64()
+                .unwrap()
+                .to_string();
+            let fresh = temp.join(format!("{model_name}-{noise}-fresh.csv"));
+            let mut fresh_command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+            fresh_command
+                .arg("run")
+                .arg(&model_path)
+                .arg("--population")
+                .arg(&state)
+                .args([
+                    "--seed",
+                    &seed,
+                    "--ticks",
+                    "5",
+                    "--backend",
+                    "cuda",
+                    "--out",
+                ])
+                .arg(&fresh);
+            if model_name == "grouped_observation" {
+                fresh_command.args(["--enable", sembla_ir::GROUPED_OBSERVATIONS_FEATURE]);
+            }
+            assert_success(&fresh_command.output().unwrap());
+            assert_eq!(
+                std::fs::read(concurrent.join("draw_3.csv")).unwrap(),
+                std::fs::read(&fresh).unwrap()
+            );
+            if model_name == "grouped_observation" {
+                assert_eq!(
+                    std::fs::read(concurrent.join("draw_3.grouped.population_cells.csv")).unwrap(),
+                    std::fs::read(temp.join(format!(
+                        "{model_name}-{noise}-fresh.grouped.population_cells.csv"
+                    )))
+                    .unwrap()
+                );
+            }
+        }
+    }
+    std::fs::remove_dir_all(temp).unwrap();
 }
 
 #[test]

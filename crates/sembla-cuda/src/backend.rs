@@ -39,6 +39,25 @@ pub struct CudaDeviceIdentity {
     pub driver_version: String,
 }
 
+/// Conservative capacity bound for isolated retained CUDA sweep lanes.
+///
+/// `device_bytes` includes the complete per-lane device-buffer census, a
+/// context/module/stream reserve for every lane, one process-level reserve,
+/// allocation-granularity rounding, and a 25% safety margin. `host_bytes` is
+/// an assumption rather than an OS admission check: the caller must provide at
+/// least this much available host memory. It covers the coordinator state,
+/// four state-sized retained/readback copies per lane, per-lane working
+/// reserve, a process reserve, and the same safety margin.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CudaSweepCapacityEstimate {
+    pub workers: usize,
+    pub device_bytes: usize,
+    pub device_bytes_per_lane_before_margin: usize,
+    pub fixed_device_bytes_before_margin: usize,
+    pub host_bytes: usize,
+    pub safety_margin_percent: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct CudaTickObservation {
     pub tick: u32,
@@ -232,6 +251,288 @@ fn checked_arena_len(per_slot: usize, slots: usize, label: &str) -> Result<usize
         CudaError::InvalidInput(format!(
             "fused CUDA {label} arena size overflow for capacity {slots}"
         ))
+    })
+}
+
+const SWEEP_CAPACITY_MIB: usize = 1024 * 1024;
+const SWEEP_CAPACITY_ALLOCATION_GRANULARITY: usize = 64 * 1024;
+const SWEEP_CAPACITY_FIXED_DEVICE_RESERVE: usize = 512 * SWEEP_CAPACITY_MIB;
+const SWEEP_CAPACITY_CONTEXT_STREAM_RESERVE: usize = 512 * SWEEP_CAPACITY_MIB;
+const SWEEP_CAPACITY_MAX_GENERATED_SOURCE_BYTES: usize = 16 * SWEEP_CAPACITY_MIB;
+const SWEEP_CAPACITY_MODULE_SOURCE_MULTIPLIER: usize = 64;
+const SWEEP_CAPACITY_FUNCTION_RESERVE: usize = 4 * SWEEP_CAPACITY_MIB;
+const SWEEP_CAPACITY_MAX_LOADED_FUNCTIONS: usize = 4096;
+const SWEEP_CAPACITY_FIXED_LOADED_FUNCTIONS: usize = 48;
+const SWEEP_CAPACITY_FIXED_HOST_RESERVE: usize = 1024 * SWEEP_CAPACITY_MIB;
+const SWEEP_CAPACITY_PER_LANE_HOST_RESERVE: usize = 256 * SWEEP_CAPACITY_MIB;
+const SWEEP_CAPACITY_MARGIN_NUMERATOR: usize = 5;
+const SWEEP_CAPACITY_MARGIN_DENOMINATOR: usize = 4;
+
+fn checked_capacity_add(total: &mut usize, value: usize, label: &str) -> Result<(), CudaError> {
+    *total = total.checked_add(value).ok_or_else(|| {
+        CudaError::InvalidInput(format!("CUDA sweep {label} capacity estimate overflow"))
+    })?;
+    Ok(())
+}
+
+fn rounded_device_allocation(
+    elements: usize,
+    element_bytes: usize,
+    label: &str,
+) -> Result<usize, CudaError> {
+    let bytes = elements.checked_mul(element_bytes).ok_or_else(|| {
+        CudaError::InvalidInput(format!("CUDA sweep {label} buffer size overflow"))
+    })?;
+    let bytes = bytes.max(1);
+    bytes
+        .checked_add(SWEEP_CAPACITY_ALLOCATION_GRANULARITY - 1)
+        .map(|value| value / SWEEP_CAPACITY_ALLOCATION_GRANULARITY)
+        .and_then(|units| units.checked_mul(SWEEP_CAPACITY_ALLOCATION_GRANULARITY))
+        .ok_or_else(|| {
+            CudaError::InvalidInput(format!(
+                "CUDA sweep {label} allocation-rounded size overflow"
+            ))
+        })
+}
+
+fn with_capacity_safety_margin(bytes: usize, label: &str) -> Result<usize, CudaError> {
+    bytes
+        .checked_mul(SWEEP_CAPACITY_MARGIN_NUMERATOR)
+        .map(|value| value.div_ceil(SWEEP_CAPACITY_MARGIN_DENOMINATOR))
+        .ok_or_else(|| {
+            CudaError::InvalidInput(format!("CUDA sweep {label} safety margin overflow"))
+        })
+}
+
+fn isolated_lane_device_buffer_bytes(
+    layout: &Layout,
+    generated: &GeneratedCuda,
+    parameter_bytes: usize,
+) -> Result<usize, CudaError> {
+    let mut total = 0_usize;
+    let mut add = |elements: usize, element_bytes: usize, label: &str| {
+        checked_capacity_add(
+            &mut total,
+            rounded_device_allocation(elements, element_bytes, label)?,
+            label,
+        )
+    };
+    let nonempty_len = |length: usize| length.max(1);
+
+    for label in ["state", "next state", "pristine state"] {
+        add(layout.state_len, 1, label)?;
+    }
+    add(
+        nonempty_len(layout.column_offsets.len()),
+        8,
+        "column offsets",
+    )?;
+    add(nonempty_len(layout.row_counts.len()), 8, "row counts")?;
+    add(
+        nonempty_len(layout.resource_offsets.len()),
+        8,
+        "resource offsets",
+    )?;
+    add(layout.input_len.max(1), 1, "inputs")?;
+    add(layout.input_len.max(1), 1, "next inputs")?;
+    add(nonempty_len(layout.input_offsets.len()), 8, "input offsets")?;
+    add(layout.ports.len().max(1), 8, "input counts")?;
+    add(layout.ports.len().max(1), 8, "next input counts")?;
+    add(parameter_bytes.max(1), 1, "parameters")?;
+    add(layout.aggregate_len.max(1), 1, "aggregates")?;
+    add(
+        layout
+            .aggregate_len
+            .max(1)
+            .checked_mul(2)
+            .ok_or_else(|| CudaError::InvalidInput("aggregate partial size overflow".to_owned()))?,
+        1,
+        "aggregate partials",
+    )?;
+    add(
+        (layout.aggregate_max_groups + 2).max(2),
+        1,
+        "aggregate errors",
+    )?;
+    let aggregate_meta = generated.aggregate_group_tables.len().max(1);
+    add(aggregate_meta, 1, "aggregate facts")?;
+    add(aggregate_meta, 1, "aggregate active")?;
+    add(
+        nonempty_len(layout.aggregate_offsets.len()),
+        8,
+        "aggregate offsets",
+    )?;
+    add(
+        nonempty_len(layout.candidate_offsets.len()),
+        8,
+        "candidate offsets",
+    )?;
+    add(
+        nonempty_len(layout.claim_instance_offsets.len()),
+        8,
+        "claim instance offsets",
+    )?;
+    let candidates = layout.candidate_count.max(1);
+    add(candidates, 1, "enabled candidates")?;
+    add(candidates, 8, "candidate times")?;
+    add(
+        candidates
+            .checked_mul(2)
+            .ok_or_else(|| CudaError::InvalidInput("candidate error size overflow".to_owned()))?,
+        1,
+        "candidate errors",
+    )?;
+    add(candidates, 1, "candidate wins")?;
+    add(
+        candidates
+            .checked_mul(layout.row_counts.len().max(1))
+            .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?,
+        1,
+        "deferred metadata",
+    )?;
+    add(layout.candidate_offsets.len().max(1), 8, "fired counts")?;
+    add(layout.row_counts.len().max(1), 8, "deferred counts")?;
+    let claims = layout.claim_instance_count.max(1);
+    add(claims, 8, "instance resources")?;
+    add(claims, 8, "instance keys")?;
+    add(claims, 4, "instance rules")?;
+    add(claims, 4, "instance entities")?;
+    let resources = layout.resource_count.max(1);
+    add(resources, 8, "winner keys")?;
+    add(resources, 4, "winner rules")?;
+    add(resources, 4, "winner entities")?;
+    add(resources, 8, "winner instances")?;
+    add(nonempty_len(layout.write_offsets.len()), 8, "write offsets")?;
+    let owners = layout.owner_count.max(1);
+    add(owners, 4, "effect owners")?;
+    add(owners, 8, "effect values")?;
+    let output_fields = layout.input_offsets.len().max(1);
+    add(
+        output_fields
+            .checked_mul(2)
+            .ok_or_else(|| CudaError::InvalidInput("output partial size overflow".to_owned()))?,
+        8,
+        "output partials",
+    )?;
+    add(
+        output_fields
+            .checked_mul(3)
+            .ok_or_else(|| CudaError::InvalidInput("output error size overflow".to_owned()))?,
+        1,
+        "output errors",
+    )?;
+    add(
+        generated.observation_view_tables.len().max(1),
+        8,
+        "observation values",
+    )?;
+    add(
+        generated
+            .grouped_observation_band_axes
+            .checked_mul(2)
+            .ok_or_else(|| CudaError::InvalidInput("grouped extrema size overflow".to_owned()))?
+            .max(1),
+        8,
+        "grouped extrema",
+    )?;
+    let grouped_axes = generated
+        .grouped_observation_views
+        .iter()
+        .try_fold(0_usize, |count, view| count.checked_add(view.axes.len()))
+        .ok_or_else(|| CudaError::InvalidInput("grouped axis count overflow".to_owned()))?
+        .max(1);
+    add(grouped_axes, 8, "grouped axis minima")?;
+    add(grouped_axes, 8, "grouped axis cardinalities")?;
+    add(
+        if generated.grouped_observation_views.is_empty() {
+            1
+        } else {
+            GROUPED_OBSERVATION_KEY_SPACE_LIMIT
+        },
+        8,
+        "grouped histogram",
+    )?;
+    add(
+        generated.generic_enum_count.max(1),
+        8,
+        "generic enum counts",
+    )?;
+    add(12, 8, "validation status")?;
+    add(layout.candidate_offsets.len().max(1), 4, "effect active")?;
+    Ok(total)
+}
+
+fn estimate_isolated_sweep_capacity(
+    layout: &Layout,
+    generated: &GeneratedCuda,
+    parameter_bytes: usize,
+    workers: usize,
+) -> Result<CudaSweepCapacityEstimate, CudaError> {
+    if workers == 0 {
+        return Err(CudaError::InvalidInput(
+            "CUDA sweep worker count must be greater than zero".to_owned(),
+        ));
+    }
+    let census = isolated_lane_device_buffer_bytes(layout, generated, parameter_bytes)?;
+    if generated.source.len() > SWEEP_CAPACITY_MAX_GENERATED_SOURCE_BYTES {
+        return Err(CudaError::InvalidInput(format!(
+            "generated CUDA source is {} bytes; the conservative sweep capacity bound supports at most {} bytes",
+            generated.source.len(),
+            SWEEP_CAPACITY_MAX_GENERATED_SOURCE_BYTES
+        )));
+    }
+    let loaded_functions = generated
+        .transition_kernels
+        .len()
+        .checked_add(SWEEP_CAPACITY_FIXED_LOADED_FUNCTIONS)
+        .ok_or_else(|| CudaError::InvalidInput("CUDA function-count overflow".to_owned()))?;
+    if loaded_functions > SWEEP_CAPACITY_MAX_LOADED_FUNCTIONS {
+        return Err(CudaError::InvalidInput(format!(
+            "CUDA model loads {loaded_functions} functions; the conservative sweep capacity bound supports at most {SWEEP_CAPACITY_MAX_LOADED_FUNCTIONS}"
+        )));
+    }
+    // Module/JIT memory is model-dependent even though it is not represented by
+    // a CudaSlice. Bound it from generated source bytes and loaded-function
+    // count, then fail closed above rather than extrapolating to arbitrary
+    // codegen shapes. The deliberately large multipliers cover PTX/SASS/debug
+    // metadata and driver bookkeeping separately from the context/stream bound.
+    let module_reserve = generated
+        .source
+        .len()
+        .checked_mul(SWEEP_CAPACITY_MODULE_SOURCE_MULTIPLIER)
+        .and_then(|bytes| {
+            loaded_functions
+                .checked_mul(SWEEP_CAPACITY_FUNCTION_RESERVE)
+                .and_then(|functions| bytes.checked_add(functions))
+        })
+        .ok_or_else(|| CudaError::InvalidInput("CUDA module reserve overflow".to_owned()))?;
+    let per_lane_device = census
+        .checked_add(SWEEP_CAPACITY_CONTEXT_STREAM_RESERVE)
+        .and_then(|bytes| bytes.checked_add(module_reserve))
+        .ok_or_else(|| CudaError::InvalidInput("CUDA sweep lane reserve overflow".to_owned()))?;
+    let device_before_margin = per_lane_device
+        .checked_mul(workers)
+        .and_then(|bytes| bytes.checked_add(SWEEP_CAPACITY_FIXED_DEVICE_RESERVE))
+        .ok_or_else(|| CudaError::InvalidInput("CUDA sweep device estimate overflow".to_owned()))?;
+    let retained_host_state = layout
+        .state_len
+        .checked_mul(4)
+        .and_then(|bytes| bytes.checked_add(SWEEP_CAPACITY_PER_LANE_HOST_RESERVE))
+        .ok_or_else(|| {
+            CudaError::InvalidInput("CUDA sweep host lane estimate overflow".to_owned())
+        })?;
+    let host_before_margin = retained_host_state
+        .checked_mul(workers)
+        .and_then(|bytes| bytes.checked_add(layout.state_len))
+        .and_then(|bytes| bytes.checked_add(SWEEP_CAPACITY_FIXED_HOST_RESERVE))
+        .ok_or_else(|| CudaError::InvalidInput("CUDA sweep host estimate overflow".to_owned()))?;
+    Ok(CudaSweepCapacityEstimate {
+        workers,
+        device_bytes: with_capacity_safety_margin(device_before_margin, "device")?,
+        device_bytes_per_lane_before_margin: per_lane_device,
+        fixed_device_bytes_before_margin: SWEEP_CAPACITY_FIXED_DEVICE_RESERVE,
+        host_bytes: with_capacity_safety_margin(host_before_margin, "host")?,
+        safety_margin_percent: 25,
     })
 }
 
@@ -432,6 +733,54 @@ impl CudaBackend {
     /// machine running the test and never constructs another backend.
     pub fn check_availability(availability: CudaAvailability) -> Result<(), CudaError> {
         availability.require()
+    }
+
+    /// Computes a conservative admission bound without creating a CUDA
+    /// context, compiling a module, or allocating device memory.
+    pub fn estimate_isolated_sweep_capacity(
+        model: &ValidatedModel,
+        initial_tables: &[TableInit],
+        workers: usize,
+    ) -> Result<(usize, usize, usize, usize, usize), CudaError> {
+        let generated = generate(model)?;
+        let layout = build_layout(model, initial_tables, &generated)?;
+        let parameter_bytes = model
+            .model()
+            .params
+            .len()
+            .max(1)
+            .checked_mul(8)
+            .ok_or_else(|| {
+                CudaError::InvalidInput("CUDA sweep parameter size overflow".to_owned())
+            })?;
+        let estimate =
+            estimate_isolated_sweep_capacity(&layout, &generated, parameter_bytes, workers)?;
+        Ok((
+            estimate.device_bytes,
+            estimate.host_bytes,
+            estimate.device_bytes_per_lane_before_margin,
+            estimate.fixed_device_bytes_before_margin,
+            estimate.safety_margin_percent,
+        ))
+    }
+
+    /// Returns `(free, total)` bytes for device zero. The short-lived context
+    /// exists only for the capacity query and is dropped before worker lanes
+    /// are constructed; lane constructors independently select device zero.
+    pub fn device_zero_memory_info() -> Result<(usize, usize), CudaError> {
+        let driver_library = unsafe { cudarc::driver::sys::is_culib_present() };
+        if !driver_library {
+            return Err(CudaError::DriverMissing);
+        }
+        let device_count = classify_device_count(CudaContext::device_count())?;
+        if device_count <= 0 {
+            return Err(CudaError::NoDevice);
+        }
+        let context = CudaContext::new(0).map_err(|error| CudaError::Driver(error.to_string()))?;
+        context
+            .bind_to_thread()
+            .map_err(|error| CudaError::Driver(error.to_string()))?;
+        cudarc::driver::result::mem_get_info().map_err(|error| CudaError::Driver(error.to_string()))
     }
 
     /// Constructs the single native-f64 CUDA path. Driver/device/toolkit
@@ -4067,6 +4416,77 @@ mod diagnostic_equality_hardware {
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
+    }
+}
+
+#[cfg(test)]
+mod sweep_capacity_tests {
+    use super::{build_layout, estimate_isolated_sweep_capacity, generate, SWEEP_CAPACITY_MIB};
+    use sembla_runtime::state::TableInit;
+
+    fn demographic_shape(scale: usize) -> (sembla_ir::ValidatedModel, Vec<TableInit>) {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/demographic/benchmark/demographic_slots.full.json");
+        let source = std::fs::read_to_string(path).unwrap();
+        let features =
+            sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+        let model =
+            sembla_ir::validate_with_features(sembla_ir::parse_json(&source).unwrap(), &features)
+                .unwrap();
+        let composed = model.model().boxes.len() > 1 || !model.model().wires.is_empty();
+        // The estimator consumes only names and row counts. Avoid allocating a
+        // 10M-row test state; constructor validation remains unchanged and the
+        // production caller passes the already validated real tables.
+        let tables = model
+            .model()
+            .boxes
+            .iter()
+            .flat_map(|model_box| {
+                model_box.tables.iter().map(|table| {
+                    let rows = if composed && table.size_hint != 0 {
+                        usize::try_from(table.size_hint).unwrap()
+                    } else {
+                        scale
+                    };
+                    TableInit::new(&model_box.name, &table.name, rows, Vec::new())
+                })
+            })
+            .collect();
+        (model, tables)
+    }
+
+    #[test]
+    fn isolated_lane_estimate_is_conservative_against_measured_h100_arms() {
+        for (scale, observed_mib) in [
+            (1_000_000, [1_033_usize, 1_613, 2_733]),
+            (10_000_000, [6_025_usize, 11_597, 22_701]),
+        ] {
+            let (model, tables) = demographic_shape(scale);
+            let generated = generate(&model).unwrap();
+            let layout = build_layout(&model, &tables, &generated).unwrap();
+            let parameter_bytes = model.model().params.len().max(1) * 8;
+            for (workers, observed) in [1_usize, 2, 4].into_iter().zip(observed_mib) {
+                let estimate =
+                    estimate_isolated_sweep_capacity(&layout, &generated, parameter_bytes, workers)
+                        .unwrap();
+                assert!(
+                    estimate.device_bytes >= observed * SWEEP_CAPACITY_MIB,
+                    "{scale} rows/{workers} lanes: estimate {} MiB under measured {observed} MiB",
+                    estimate.device_bytes / SWEEP_CAPACITY_MIB
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn capacity_estimator_rejects_zero_workers() {
+        let (model, tables) = demographic_shape(1);
+        let generated = generate(&model).unwrap();
+        let layout = build_layout(&model, &tables, &generated).unwrap();
+        assert!(estimate_isolated_sweep_capacity(&layout, &generated, 8, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("greater than zero"));
     }
 }
 

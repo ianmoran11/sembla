@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Run direct sequential/concurrent sweep arms and prove output-tree equality.
 
-This is an evidence spike, not a production concurrency interface. It drives the
-hidden SEMBLA_SWEEP_SPIKE_DRAW_WORKERS seam and optional synchronized CUDA
-non-blocking-stream, free-running CUDA non-blocking-stream, or fused grid-y
-modes, keeps timing outside scientific output directories,
+This evidence driver can exercise either the supported --draw-workers option or
+the retained hidden spike seams for closed-design comparisons. It keeps timing
+outside scientific output directories,
 captures resource samples, compares every output byte, and proves the comparator
 with one deliberate perturbation.
 """
@@ -152,9 +151,15 @@ def run_arm(
         command.extend(["--export-pairs", str(pairs)])
     for feature in args.enable:
         command.extend(["--enable", feature])
+    if args.supported_draw_workers:
+        command.extend(["--draw-workers", str(workers)])
 
     environment = os.environ.copy()
-    environment[WORKERS_ENV] = "1" if args.cuda_fused_grid_y else str(workers)
+    if args.supported_draw_workers:
+        environment.pop(WORKERS_ENV, None)
+        environment.pop(CUDA_FREE_ENV, None)
+    else:
+        environment[WORKERS_ENV] = "1" if args.cuda_fused_grid_y else str(workers)
     if args.cuda_fused_grid_y and not sequential_reference:
         environment[CUDA_FUSED_ENV] = str(workers)
     else:
@@ -192,6 +197,7 @@ def run_arm(
         "repetition": repetition,
         "arm_kind": "sequential-reference" if sequential_reference else "candidate",
         "eval_threads_per_draw": eval_threads,
+        "supported_draw_workers": args.supported_draw_workers,
         "cuda_lockstep_streams": args.cuda_lockstep_streams and workers > 1,
         "cuda_free_streams": args.cuda_free_streams and workers > 1,
         "cuda_fused_grid_y": args.cuda_fused_grid_y and not sequential_reference,
@@ -258,6 +264,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cpu-total-threads", type=int)
     parser.add_argument("--params", type=Path)
     parser.add_argument("--export-pairs", action="store_true")
+    parser.add_argument("--supported-draw-workers", action="store_true")
     parser.add_argument("--cuda-lockstep-streams", action="store_true")
     parser.add_argument("--cuda-free-streams", action="store_true")
     parser.add_argument("--cuda-fused-grid-y", action="store_true")
@@ -275,6 +282,14 @@ def parse_args() -> argparse.Namespace:
         parser.error("--theta-file conflicts with --draws")
     if args.backend == "cpu" and not args.cpu_total_threads:
         parser.error("--cpu-total-threads is required for --backend cpu")
+    if args.supported_draw_workers and args.backend != "cuda":
+        parser.error("--supported-draw-workers requires --backend cuda")
+    if args.supported_draw_workers and (
+        args.cuda_lockstep_streams or args.cuda_free_streams or args.cuda_fused_grid_y
+    ):
+        parser.error(
+            "--supported-draw-workers conflicts with hidden lockstep, free-stream, and fused modes"
+        )
     if args.cuda_lockstep_streams and args.cuda_fused_grid_y:
         parser.error("--cuda-lockstep-streams conflicts with --cuda-fused-grid-y")
     if args.cuda_free_streams and args.cuda_lockstep_streams:
@@ -335,6 +350,7 @@ def main() -> int:
         "workers": args.workers,
         "repetitions": args.repetitions,
         "cpu_total_threads": args.cpu_total_threads,
+        "supported_draw_workers": args.supported_draw_workers,
         "cuda_lockstep_streams": args.cuda_lockstep_streams,
         "cuda_free_streams": args.cuda_free_streams,
         "cuda_fused_grid_y": args.cuda_fused_grid_y,
