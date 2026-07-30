@@ -1,0 +1,30 @@
+{
+  "runId": "2026-07-28T09-04-36-694Z",
+  "startedAt": "2026-07-28T09:04:36.694Z",
+  "updatedAt": "2026-07-28T09:44:06.940Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0001-decision-record-and-baseline.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0002-parallel-validation-kernels.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0003-diagnostic-equality-tests.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0004-differential-corpus-membership.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0005-measure-and-publish.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0006-segmented-argmin-conflict-resolution.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0007-linear-serial-kernels.md",
+    "/Users/ian/projects/sembla/docs/prds-cuda-validation-parallelism/0008-remove-the-validation-spin-lock.md"
+  ],
+  "currentIndex": 8,
+  "approved": [
+    "docs/prds-cuda-validation-parallelism/0008-remove-the-validation-spin-lock.md"
+  ],
+  "commits": [
+    "6b2fb82"
+  ],
+  "total": 8,
+  "status": "complete",
+  "stage": "review",
+  "attempt": 1,
+  "adviseEnabled": true
+}

@@ -1,0 +1,1 @@
+slots=5000000 areas=4 state=/home/ubuntu/demographic-bench/work/profile-5m.state companion_model=/home/ubuntu/demographic-bench/work/profile-5m.state.model.json

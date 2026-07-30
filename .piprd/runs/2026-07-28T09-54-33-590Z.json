@@ -1,0 +1,20 @@
+{
+  "runId": "2026-07-28T09-54-33-590Z",
+  "startedAt": "2026-07-28T09:54:33.590Z",
+  "updatedAt": "2026-07-28T10:45:33.075Z",
+  "cwd": "/Users/ian/projects/sembla",
+  "runner": "piprd",
+  "runDir": "/Users/ian/projects/sembla/docs/prds-sweep-throughput",
+  "prdPaths": [
+    "/Users/ian/projects/sembla/docs/prds-sweep-throughput/0001-reuse-the-backend-across-draws.md"
+  ],
+  "currentIndex": 0,
+  "approved": [],
+  "commits": [],
+  "total": 1,
+  "status": "stopped",
+  "stage": "review",
+  "attempt": 5,
+  "adviseEnabled": true,
+  "stoppedReason": "still needs revision after 5 attempt(s)"
+}
