@@ -137,29 +137,25 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
 }
 
 #[test]
-fn device_final_hash_experiment_is_opt_in_and_keeps_publication_shape() {
+fn final_state_diagnostic_reuses_one_packed_hash_and_forces_pageable_download() {
     let backend = include_str!("../src/backend.rs");
     let method = section(
         backend,
-        "    pub fn final_state_hash_device(&mut self)",
+        "    pub fn final_state_readback(",
         "\n    /// Returns the once-per-run IR eligibility decision",
     );
-    assert!(method.contains("self.fused_batch.is_some()"));
-    assert!(method.contains("memcpy_dtov(&self.hash_digest)"));
-    assert!(!method.contains("memcpy_dtov(&self.state)"));
-    assert!(!method.contains("download_state"));
+    assert!(method.contains("CudaFinalStateReadbackMode::Materialized"));
+    assert!(method.contains("CudaFinalStateReadbackMode::PackedPageable"));
+    assert!(method.contains("self.download_state_parts()?"));
+    assert!(method.contains("hash_state("));
+    assert!(!method.contains("final_state_hash_device"));
+    assert!(!backend.contains("struct DeviceHashPlan"));
+    assert!(!backend.contains("hash_digest: CudaSlice"));
 
     let cli = include_str!("../../sembla-cli/src/main.rs");
-    assert!(cli.contains("SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256"));
-    assert!(cli.contains("SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY"));
-    assert_eq!(
-        cli.matches("experimental_cuda_final_state_hash(backend)?")
-            .count(),
-        2
-    );
-    assert!(cli.contains(
-        "SweepDrawOutput {\n                    output,\n                    final_state_hash,"
-    ));
+    assert!(cli.contains("SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE"));
+    assert_eq!(cli.matches(".final_state_readback(").count(), 2);
+    assert!(cli.contains("sembla-cuda-final-state-readback-v1"));
 }
 
 #[test]

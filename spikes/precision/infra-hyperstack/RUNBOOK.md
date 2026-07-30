@@ -467,24 +467,16 @@ noise, and grouped observations. It records:
   `readback_control`;
 - equal four-draw Nsight Systems arms at `--draw-workers 1` and `4`, exporting
   CUDA GPU trace, kernel summary, and API summary CSVs;
-- 20-draw control/device-final-hash arms at `--draw-workers 1`, `2`, and `4`,
-  retaining timing, stdout/stderr, complete scientific output trees, and sorted
-  SHA-256 manifests; every treatment/worker manifest must equal worker-one
-  control, and a separate verification draw recomputes the host digest;
 - D2H call/byte/union/overlap statistics and per-kernel concurrent duration
   penalties in `cuda-readback-diagnostic/analysis.json`; and
 - bounded Nsight Compute reports: SOL/launch/occupancy for the three kernels
   with the largest Systems penalty, plus memory/scheduler/warp detail for at
   most two kernels.
 
-`SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256=1` enables the measurement-only
-single-lane device digest path. It preserves the canonical `SEMBLA_STATE_V1` or
-`V2` stream but copies only the 32-byte SHA-256 result to the host. The default
-remains the full final-state download. Setting
-`SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY=1` as well downloads the
-full final state and rejects a digest mismatch; verification is therefore for
-correctness evidence, not performance measurement. Both controls are rejected
-with the fused-draw spike.
+The scalar device-SHA treatment and its environment controls are retired after
+timing out at 900 seconds. See
+[`docs/prds-cuda-final-state-readback/README.md`](../../../docs/prds-cuda-final-state-readback/README.md)
+for the bounded negative result and replacement measurement plan.
 
 Nsight Systems decides real duration and concurrency. Nsight Compute runs only
 serial one-worker diagnostic launches because replay serializes kernels and

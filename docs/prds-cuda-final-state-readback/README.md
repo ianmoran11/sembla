@@ -49,6 +49,13 @@ The runner executes these serially. Do not promote a treatment, add async copy
 streams, or alter the default path inside this folder. A later PRD may promote a
 winner only after the hardware gate below passes.
 
+## Status
+
+- PRD 0001 is locally implemented: the scalar device-SHA path is retired and
+  the hidden materialized/pageable packed-host seams have versioned per-draw
+  diagnostics. Local, CUDA-feature compile, allowlist, link, and repository
+  checks pass; paid-hardware evidence remains deferred to PRD 0003.
+
 ## Binding contracts
 
 - **Canonical identity is frozen.** `final_state_sha256`, complete sweep output

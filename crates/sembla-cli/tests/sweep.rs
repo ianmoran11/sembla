@@ -22,15 +22,27 @@ fn temp_dir(label: &str) -> PathBuf {
     path
 }
 
+const FINAL_STATE_MODE_ENV: &str = "SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE";
+const RETIRED_DEVICE_SHA_ENV: &str = "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256";
+const RETIRED_DEVICE_SHA_VERIFY_ENV: &str = "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY";
+
+fn clean_final_state_env(command: &mut Command) -> &mut Command {
+    command
+        .env_remove(FINAL_STATE_MODE_ENV)
+        .env_remove(RETIRED_DEVICE_SHA_ENV)
+        .env_remove(RETIRED_DEVICE_SHA_VERIFY_ENV)
+}
+
 fn command(arguments: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_sembla"))
-        .args(arguments)
-        .output()
-        .unwrap()
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    clean_final_state_env(&mut command);
+    command.args(arguments).output().unwrap()
 }
 
 fn synth(path: &Path, persons: usize, employers: usize, infected: usize) {
-    let output = Command::new(env!("CARGO_BIN_EXE_sembla"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    clean_final_state_env(&mut command);
+    let output = command
         .args([
             "synth-pop",
             "--persons",
@@ -55,6 +67,7 @@ fn synth(path: &Path, persons: usize, employers: usize, infected: usize) {
 
 fn sweep(population: &Path, out: &Path, seed: u64, draws: u32, ticks: u32, params: Option<&Path>) {
     let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    clean_final_state_env(&mut process);
     process
         .arg("sweep")
         .arg(repository_path("examples/sir.json"))
@@ -94,6 +107,7 @@ fn custom_sweep(
     theta_file: Option<&Path>,
 ) -> Output {
     let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    clean_final_state_env(&mut process);
     process
         .arg("sweep")
         .arg(repository_path("examples/sir.json"))
@@ -133,6 +147,7 @@ fn model_sweep(
     options: ModelSweepOptions<'_>,
 ) -> Output {
     let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    clean_final_state_env(&mut process);
     process
         .arg("sweep")
         .arg(model)
@@ -173,6 +188,7 @@ fn pairs_sweep(
     options: PairsSweepOptions<'_>,
 ) -> Output {
     let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+    clean_final_state_env(&mut process);
     process
         .arg("sweep")
         .arg(model)
@@ -460,9 +476,14 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
 
     let document: serde_json::Value =
         serde_json::from_slice(&std::fs::read(timing).unwrap()).unwrap();
-    assert_eq!(document["schema"], "sembla-sweep-timing-v1");
+    assert_eq!(document["schema"], "sembla-sweep-timing-v2");
     assert_eq!(document["draws"], 3);
     assert_eq!(document["draw_timings"].as_array().unwrap().len(), 3);
+    assert!(document["draw_timings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|draw| draw["final_state"].is_null()));
     assert!(document["whole_sweep_wall_time_ms"].as_f64().unwrap() > 0.0);
     assert!(
         document["draw_zero_including_setup_wall_time_ms"]
@@ -507,7 +528,7 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
         serde_json::from_slice(&std::fs::read(concurrent_timing).unwrap()).unwrap();
     assert_eq!(
         concurrent_document["schema"],
-        "sembla-sweep-concurrency-spike-timing-v1"
+        "sembla-sweep-concurrency-spike-timing-v2"
     );
     assert_eq!(concurrent_document["requested_draw_workers"], 2);
     assert_eq!(concurrent_document["effective_draw_workers"], 2);
@@ -531,6 +552,7 @@ fn sweep_timing_json_is_opt_in_and_does_not_change_outputs() {
             draw["finish_offset_ms"].as_f64().unwrap() >= draw["start_offset_ms"].as_f64().unwrap()
         );
         assert!(draw["wall_time_ms"].as_f64().unwrap() >= 0.0);
+        assert!(draw["final_state"].is_null());
     }
     assert!(
         concurrent_draw_timings[1]["finish_offset_ms"]
@@ -675,6 +697,144 @@ fn supported_draw_workers_parse_validate_and_fail_before_scientific_output() {
             );
             assert!(!out.exists(), "{label} created scientific output");
         }
+    }
+
+    std::fs::remove_dir_all(temp).unwrap();
+}
+
+#[test]
+fn final_state_selector_scope_and_retired_variables_fail_before_output() {
+    let temp = temp_dir("final-state-selector-errors");
+    let population = temp.join("population.bin");
+    synth(&population, 20, 4, 1);
+    let model = repository_path("examples/sir.json");
+
+    let sweep_command = |out: &Path, backend: &str| {
+        let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+        clean_final_state_env(&mut process);
+        process
+            .arg("sweep")
+            .arg(&model)
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--draws",
+                "2",
+                "--ticks",
+                "1",
+                "--backend",
+                backend,
+                "--out",
+            ])
+            .arg(out);
+        process
+    };
+
+    for (label, backend, envs, expected) in [
+        (
+            "cpu-sweep",
+            "cpu",
+            vec![(FINAL_STATE_MODE_ENV, "packed-pageable")],
+            "accepted only for CUDA sweep execution",
+        ),
+        (
+            "invalid-value",
+            "cuda",
+            vec![(FINAL_STATE_MODE_ENV, "device")],
+            "expected 'materialized' or 'packed-pageable'",
+        ),
+        (
+            "fused-conflict",
+            "cuda",
+            vec![
+                (FINAL_STATE_MODE_ENV, "packed-pageable"),
+                ("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS", "2"),
+            ],
+            "incompatible with experimental SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS",
+        ),
+        (
+            "retired-enable",
+            "cuda",
+            vec![(RETIRED_DEVICE_SHA_ENV, "1")],
+            "retired CUDA device-SHA variable",
+        ),
+        (
+            "retired-verify-conflict",
+            "cuda",
+            vec![
+                (FINAL_STATE_MODE_ENV, "materialized"),
+                (RETIRED_DEVICE_SHA_VERIFY_ENV, "1"),
+            ],
+            "conflicts with retired final-state variables",
+        ),
+    ] {
+        let out = temp.join(label);
+        let mut process = sweep_command(&out, backend);
+        for (name, value) in envs {
+            process.env(name, value);
+        }
+        let output = process.output().unwrap();
+        assert!(!output.status.success(), "{label}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected),
+            "{label}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!out.exists(), "{label} created scientific output");
+    }
+
+    for backend in ["cpu", "cuda"] {
+        let out = temp.join(format!("run-{backend}.csv"));
+        let mut process = Command::new(env!("CARGO_BIN_EXE_sembla"));
+        clean_final_state_env(&mut process);
+        let output = process
+            .arg("run")
+            .arg(&model)
+            .arg("--population")
+            .arg(&population)
+            .args([
+                "--seed",
+                "19",
+                "--ticks",
+                "1",
+                "--backend",
+                backend,
+                "--out",
+            ])
+            .arg(&out)
+            .env(FINAL_STATE_MODE_ENV, "packed-pageable")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "run/{backend}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("accepted only for CUDA sweep execution, not 'run'"),
+            "run/{backend}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!out.exists(), "run/{backend} created scientific output");
+    }
+
+    #[cfg(unix)]
+    {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let out = temp.join("invalid-utf8");
+        let mut process = sweep_command(&out, "cuda");
+        let output = process
+            .env(FINAL_STATE_MODE_ENV, OsString::from_vec(vec![0xff]))
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("contains invalid UTF-8"),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!out.exists(), "invalid UTF-8 created scientific output");
     }
 
     std::fs::remove_dir_all(temp).unwrap();

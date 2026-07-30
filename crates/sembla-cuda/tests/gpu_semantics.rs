@@ -1,6 +1,6 @@
 #![cfg(feature = "cuda")]
 
-use sembla_cuda::{generate, CudaBackend, HashMode};
+use sembla_cuda::{generate, CudaBackend, CudaFinalStateReadbackMode, HashMode};
 use sembla_runtime::eval::ParamEnv;
 use sembla_runtime::executor::run_tick;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
@@ -55,7 +55,7 @@ fn reset_and_reseed_matches_a_fresh_backend_after_prior_draws() {
 }
 
 #[test]
-fn device_final_state_sha256_matches_host_for_state_and_dynamic_inputs() {
+fn packed_pageable_final_hash_forces_download_after_materialization() {
     let model = input_integer_ordering_model();
     let params = ParamEnv::defaults(&model);
     let mut backend = CudaBackend::new(
@@ -69,9 +69,16 @@ fn device_final_state_sha256_matches_host_for_state_and_dynamic_inputs() {
     for _ in 0..2 {
         backend.run_tick_observed_reused().unwrap();
     }
-    let device = backend.final_state_hash_device().unwrap();
-    let host = backend.ensure_observed_state().unwrap().state_hash();
-    assert_eq!(device, host);
+    let materialized = backend
+        .final_state_readback(CudaFinalStateReadbackMode::Materialized)
+        .unwrap();
+    let packed = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPageable)
+        .unwrap();
+    assert_eq!(packed.digest, materialized.digest);
+    assert!(packed.downloaded_bytes.total > 0);
+    assert_eq!(packed.host_state_reconstruction, None);
+    assert_eq!(packed.completion_wait, None);
 }
 
 fn claim_overflow_state() -> Vec<TableInit> {

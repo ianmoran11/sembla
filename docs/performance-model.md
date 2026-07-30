@@ -40,8 +40,9 @@ workload is RNG-bound**, and quoting the bandwidth floor becomes misleading.
 
 ### CUDA path, 5M rows over 2 ticks
 
-**Superseded twice. Current split, 2026-07-28** (`hyperstack-l4-20260728T072119Z/profile/`,
-after `prds-device-observation/0001` and `0002`, §L11), 5M rows over 2 ticks:
+**Historical split, superseded after 2026-07-28**
+(`hyperstack-l4-20260728T072119Z/profile/`, after
+`prds-device-observation/0001` and `0002`, §L11), 5M rows over 2 ticks:
 
 | phase | no-grouped | grouped | share (grouped) |
 |---|---:|---:|---:|
@@ -215,7 +216,17 @@ so run them from here rather than folder by folder.
 | 12 | [`prds-sweep-throughput/0004`](prds-sweep-throughput/0004-run-cuda-draws-concurrently.md) run CUDA draws concurrently | yes | **landed and hardware-verified**: explicit bounded `--draw-workers`; 10M speedups 1.584×/1.756× at workers 2/4, 24 complete-tree comparisons byte-equal |
 | 13 | **one GPU session** | yes | **done 2026-07-30**: supported flag, capacity failure, output parity, non-default streams, checksums, and teardown all verified in `hyperstack-supported-concurrency-20260730T022957Z` |
 | 14 | **profile the remaining CUDA readback/contended-kernel cost** | yes | **done 2026-07-30**: in each four-draw diagnostic arm, 776 tiny copies total only 0.096 MB and project to 1.098 ms unoverlapped at 20 draws; four pageable 480 MB final-state copies dominate at 906.710 ms unoverlapped, while total D2H projects to 4.535 s; kernel contention is secondary (`hyperstack-l4-20260730T072627Z`) |
-| 15 | **reduce or hide final-state materialization** | yes | **next**: trace the exact `final_state_sha256`/publication consumers, then prefer an exact device-side digest plus compact D2H when the artifact contract permits; otherwise test pinned asynchronous final-state transfer. Packed tiny-control readback is closed for the measured H100/10M shape (§M1) |
+| 15 | **measure final-state readback alternatives** | yes | **in progress**: retain materialized host state as A, measure canonical packed pageable host hashing as B, and measure retained pinned readback as C. Packed tiny-control readback remains closed for the measured H100/10M shape (§M1) |
+
+The attempted canonical device SHA-256 is a bounded negative result. Its single
+CUDA thread serially hashed the approximately 480 MB production stream; the H100
+arm timed out at 900 seconds after publishing 15 of 20 worker-one draws, with
+completed draws advancing at roughly 56–57 seconds each. This closes that scalar
+kernel, not every possible GPU hashing strategy. The replacement A/B/C plan uses
+one binary and adjacent arms: A materializes and hashes `StateStore`, B hashes an
+unconditional pageable packed download with the same canonical framing, and C
+uses retained pinned destinations plus cacheable staging. No treatment is
+promoted before the separate hardware decision gate.
 
 **Why 9 first.** Item 11 is a device-side change to a reduction, which is exactly
 the shape the differential corpus exists to check. Landing it while the corpus
