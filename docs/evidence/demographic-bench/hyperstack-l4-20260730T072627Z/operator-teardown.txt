@@ -1,0 +1,26 @@
+Operator teardown verification
+==============================
+
+Collector result: exit 0
+Collector Terraform destroy: 2 resources destroyed
+Terraform managed resources after destroy: 0
+Hyperstack reconciliation: 0 tracked VMs, 0 other VMs, 0 orphans
+Destroy watchdog: disarmed (PID 5135)
+Saved paid plan: absent
+GitHub deploy key: 158776955 revoked and absent from paginated key list
+launchctl session values: all cleared
+  TF_VAR_tailscale_auth_key
+  TF_VAR_console_password_hash
+  TF_VAR_evidence_deploy_key
+  TF_VAR_ssh_host_private_key
+  SSH_HOST_KEY_FINGERPRINT
+  SEMBLA_HOST_KEY_DIR
+  SEMBLA_EVIDENCE_DEPLOY_KEY_ID
+Pre-seeded host-key directory: removed
+GitHub main protection: verified
+  pull request required
+  one approval required
+  administrator enforcement enabled
+  force pushes disabled
+  deletion disabled
+Provider billing state: no Sembla VM remains
