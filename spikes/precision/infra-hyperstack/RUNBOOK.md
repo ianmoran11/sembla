@@ -367,15 +367,41 @@ progress rather than starting a second one. Check state directly with
 
 ## Known-good sequence
 
+Prepare every per-session credential and host identity with one interactive
+command. It prompts securely for the Tailscale key and console password,
+generates the deploy/host keys, verifies `main` protection, registers the write
+deploy key through `gh`, and stores values in `launchctl`. If setup fails after
+its first side effect, it attempts and verifies rollback; any incomplete GitHub,
+launchctl, or host-key cleanup is reported with an actionable warning:
+
 ```bash
 cd spikes/precision/infra-hyperstack
+bash prepare-paid-session.sh
+```
+
+It refuses to overwrite an existing session. `bash prepare-paid-session.sh
+--check` verifies tools, GitHub authentication, and branch protection without
+creating credentials. No secret is written to a tracked source/configuration
+file. The pre-seeded host private key is the deliberate exception: it lives
+mode `0600` in an ignored `.host-key-paid-*` directory until teardown, whose
+path is stored in `SEMBLA_HOST_KEY_DIR`.
+
+For a manual plan/apply in the same terminal, import the prepared launchctl
+values into that shell; an automated operator can read them directly from
+launchctl:
+
+```bash
 bash reconcile-orphans.sh                  # nothing should be billing yet
 rm -f hyperstack-paid.tfplan               # a consumed plan is a duplicate VM
 ssh-add ~/.ssh/sembla_hyperstack           # passphrase prompt
-eval "$(bash prepare-host-key.sh)"         # optional pre-seeded host key
 export HYPERSTACK_API_KEY=...
-export TF_VAR_tailscale_auth_key=...       # ephemeral, pre-authorized, tagged
-eval "$(bash prepare-console-password.sh)"
+export TF_VAR_tailscale_auth_key="$(launchctl getenv TF_VAR_tailscale_auth_key)"
+export TF_VAR_console_password_hash="$(launchctl getenv TF_VAR_console_password_hash)"
+export TF_VAR_evidence_deploy_key="$(launchctl getenv TF_VAR_evidence_deploy_key)"
+export TF_VAR_ssh_host_private_key="$(launchctl getenv TF_VAR_ssh_host_private_key)"
+export SSH_HOST_KEY_FINGERPRINT="$(launchctl getenv SSH_HOST_KEY_FINGERPRINT)"
+export SEMBLA_HOST_KEY_DIR="$(launchctl getenv SEMBLA_HOST_KEY_DIR)"
+export SEMBLA_EVIDENCE_DEPLOY_KEY_ID="$(launchctl getenv SEMBLA_EVIDENCE_DEPLOY_KEY_ID)"
 umask 077
 # confirm ssh_cidr matches: curl -s https://api.ipify.org
 terraform plan -var-file=terraform.tfvars \
@@ -605,18 +631,17 @@ driver becomes insurance rather than a dependency.
 
 ### One-time setup
 
-1. `eval "$(bash prepare-deploy-key.sh)"` — generates a fresh ED25519 deploy
-   key, prints the public half, and exports `TF_VAR_evidence_deploy_key`.
-2. Register the printed public key at
-   `https://github.com/<owner>/<repo>/settings/keys/new` with **Allow write
-   access** ticked.
-3. **Enable branch protection on `main`.** GitHub deploy keys cannot be scoped
-   to a branch, so protection on the trunk is the only thing preventing a
-   compromised VM from touching it. The payload refuses to push to `main` or
-   `master` and only ever pushes `evidence/*`, but that is the payload policing
-   itself; branch protection is the control that does not depend on the VM.
-4. Delete the deploy key from GitHub once the session's evidence is merged.
-   Keys are per-session by design — re-running the script makes a new one.
+Run `bash prepare-paid-session.sh`. It verifies **branch protection on `main`**
+before generating anything, creates the fresh ED25519 deploy key, registers its
+public half through the authenticated GitHub CLI with write access, and stores
+the private half in launchctl for the paid session. GitHub deploy keys cannot be
+scoped to a branch, so protection on trunk remains mandatory even though the
+payload itself refuses to push to `main` or `master` and only pushes
+`evidence/*`.
+
+`prepare-deploy-key.sh` remains available as the lower-level manual helper. In
+either workflow, delete the deploy key from GitHub once the session's evidence
+is merged. Keys are per-session by design; every paid host gets a fresh one.
 
 Leave `TF_VAR_evidence_deploy_key` unset to disable the push entirely; the SSH
 collection path is unchanged and remains the primary route.
