@@ -1,0 +1,132 @@
+[
+  {
+    "digest_parity": true,
+    "final_state_sha256": {
+      "left": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4"
+      ],
+      "right": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4"
+      ]
+    },
+    "label": "control-current-preflight",
+    "passed": true,
+    "record_ids": [
+      1,
+      2
+    ],
+    "tree": {
+      "changed": [],
+      "equal": true,
+      "extra_in_right": [],
+      "left": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/01-control-preflight-w1-materialized/output",
+      "left_file_count": 7,
+      "missing_from_right": [],
+      "right": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/02-current-preflight-w1-current/output",
+      "right_file_count": 7
+    },
+    "tree_parity": true
+  },
+  {
+    "digest_parity": true,
+    "final_state_sha256": {
+      "left": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4",
+        "39dde778922f17406261fe2ffd3829e18ee0976ac259555e2bf4d7b0e9d8b851",
+        "4bf90f7c35a95f245c56f3bccdecd6297ce62cf0baff1443f214b88419bc1b3b",
+        "c6e895875c84da8870dbda9c2e6ddb69c1e4c9938c9c0e0bfc1a548a3ce6a71c"
+      ],
+      "right": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4",
+        "39dde778922f17406261fe2ffd3829e18ee0976ac259555e2bf4d7b0e9d8b851",
+        "4bf90f7c35a95f245c56f3bccdecd6297ce62cf0baff1443f214b88419bc1b3b",
+        "c6e895875c84da8870dbda9c2e6ddb69c1e4c9938c9c0e0bfc1a548a3ce6a71c"
+      ]
+    },
+    "label": "current-3-4",
+    "passed": true,
+    "record_ids": [
+      3,
+      4
+    ],
+    "tree": {
+      "changed": [],
+      "equal": true,
+      "extra_in_right": [],
+      "left": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/03-timed-w4-current-r1/output",
+      "left_file_count": 19,
+      "missing_from_right": [],
+      "right": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/04-timed-w4-current-r2/output",
+      "right_file_count": 19
+    },
+    "tree_parity": true
+  },
+  {
+    "digest_parity": true,
+    "final_state_sha256": {
+      "left": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4",
+        "39dde778922f17406261fe2ffd3829e18ee0976ac259555e2bf4d7b0e9d8b851",
+        "4bf90f7c35a95f245c56f3bccdecd6297ce62cf0baff1443f214b88419bc1b3b",
+        "c6e895875c84da8870dbda9c2e6ddb69c1e4c9938c9c0e0bfc1a548a3ce6a71c"
+      ],
+      "right": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4",
+        "39dde778922f17406261fe2ffd3829e18ee0976ac259555e2bf4d7b0e9d8b851",
+        "4bf90f7c35a95f245c56f3bccdecd6297ce62cf0baff1443f214b88419bc1b3b",
+        "c6e895875c84da8870dbda9c2e6ddb69c1e4c9938c9c0e0bfc1a548a3ce6a71c"
+      ]
+    },
+    "label": "current-3-5",
+    "passed": true,
+    "record_ids": [
+      3,
+      5
+    ],
+    "tree": {
+      "changed": [],
+      "equal": true,
+      "extra_in_right": [],
+      "left": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/03-timed-w4-current-r1/output",
+      "left_file_count": 19,
+      "missing_from_right": [],
+      "right": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/05-timed-w4-current-r3/output",
+      "right_file_count": 19
+    },
+    "tree_parity": true
+  },
+  {
+    "digest_parity": true,
+    "final_state_sha256": {
+      "left": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4",
+        "39dde778922f17406261fe2ffd3829e18ee0976ac259555e2bf4d7b0e9d8b851",
+        "4bf90f7c35a95f245c56f3bccdecd6297ce62cf0baff1443f214b88419bc1b3b",
+        "c6e895875c84da8870dbda9c2e6ddb69c1e4c9938c9c0e0bfc1a548a3ce6a71c"
+      ],
+      "right": [
+        "d4dfb27ebabf45962be3ba891f6eab4480aab8c56f94a02f864d643edeb716c4",
+        "39dde778922f17406261fe2ffd3829e18ee0976ac259555e2bf4d7b0e9d8b851",
+        "4bf90f7c35a95f245c56f3bccdecd6297ce62cf0baff1443f214b88419bc1b3b",
+        "c6e895875c84da8870dbda9c2e6ddb69c1e4c9938c9c0e0bfc1a548a3ce6a71c"
+      ]
+    },
+    "label": "current-3-6",
+    "passed": true,
+    "record_ids": [
+      3,
+      6
+    ],
+    "tree": {
+      "changed": [],
+      "equal": true,
+      "extra_in_right": [],
+      "left": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/03-timed-w4-current-r1/output",
+      "left_file_count": 19,
+      "missing_from_right": [],
+      "right": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/06-profile-w4-current/output",
+      "right_file_count": 19
+    },
+    "tree_parity": true
+  }
+]
