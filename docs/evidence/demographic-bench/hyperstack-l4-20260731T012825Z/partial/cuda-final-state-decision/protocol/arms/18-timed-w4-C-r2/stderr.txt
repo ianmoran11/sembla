@@ -1,0 +1,382 @@
+CUDA draw-worker preflight admitted 4 lanes: conservative device bound 32203.2 MiB <= 80632.5 MiB free on device 0 (25% safety margin); host-memory assumption: at least 16865.1 MiB available, including requested packed-pinned page-locked bytes 1831.1 MiB and cacheable staging bytes 1831.1 MiB across 4 lanes (not a universal OS page-lock limit)
+CUDA sweep: 4 retained draw lanes on free-running non-blocking streams
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="demographic" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="invalid_age" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="males" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="females" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_00_04" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_20_24" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_65_69" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_85_plus" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="births_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="deaths_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="locked_out" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_birth_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_overseas_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_internal_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="max_generation" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="demographic" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="deaths_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="vacancy_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="demographic" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="invalid_age" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="males" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="females" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_00_04" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_20_24" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_65_69" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_85_plus" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="births_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="deaths_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="locked_out" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_birth_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_overseas_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_internal_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="max_generation" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="demographic" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="deaths_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="vacancy_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="demographic" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="invalid_age" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="males" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="females" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_00_04" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_20_24" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_65_69" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_85_plus" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="births_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="deaths_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="locked_out" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_birth_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_overseas_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_internal_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="max_generation" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="demographic" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="deaths_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="vacancy_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="demographic" view="population" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="invalid_age" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="males" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="females" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_00_04" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_20_24" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_65_69" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="age_85_plus" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="births_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="deaths_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="overseas_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_arrivals_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="internal_departures_this_tick" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="locked_out" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_birth_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_overseas_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="vacant_internal_slots" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="demographic" view="max_generation" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="demographic" view="population_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="deaths_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_observation_view box="demographic" view="vacancy_cells" eligible=true reason=grouped count with a row-local filter and exactly boundable keys
+cuda_device_grouped_observation tick=0 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=0 box="demographic" view="deaths_cells" key_space_size=38 occupied_groups=36 emitted_groups=36
+cuda_device_grouped_observation tick=0 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=0 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=0 box="demographic" view="deaths_cells" key_space_size=38 occupied_groups=36 emitted_groups=36
+cuda_device_grouped_observation tick=0 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=0 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=0 box="demographic" view="deaths_cells" key_space_size=38 occupied_groups=36 emitted_groups=36
+cuda_device_grouped_observation tick=0 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=0 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=0 box="demographic" view="deaths_cells" key_space_size=38 occupied_groups=36 emitted_groups=36
+cuda_device_grouped_observation tick=0 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=1 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=1 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=1 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=1 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=1 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=1 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=1 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=1 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=1 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=1 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=1 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=1 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=2 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=2 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=2 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=2 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=2 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=2 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=2 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=2 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=2 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=2 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=2 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=2 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=3 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=3 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=3 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=3 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=3 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=3 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=3 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=3 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=3 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=3 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=3 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=3 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=4 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=4 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=4 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=4 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=4 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=4 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=4 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=4 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=4 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=4 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=4 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=4 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=5 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=5 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=5 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=5 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=5 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=5 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=5 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=5 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=5 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=5 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=5 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=5 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=6 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=6 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=6 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=6 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=6 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=6 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=6 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=6 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=6 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=6 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=6 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=6 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=7 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=7 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=7 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=7 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=7 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=7 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=7 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=7 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=7 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=7 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=7 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=7 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=8 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=8 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=8 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=8 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=8 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=8 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=8 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=8 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=8 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=8 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=8 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=8 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=9 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=9 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=9 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=9 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=9 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=9 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=9 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=9 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=9 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=9 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=9 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=9 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=10 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=10 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=10 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=10 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=10 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=10 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=10 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=10 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=10 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=10 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=10 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=10 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=11 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=11 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=11 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=11 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=11 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=11 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=11 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=11 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=11 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=11 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=11 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=11 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=12 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=12 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=12 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=12 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=12 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=12 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=12 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=12 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=12 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=12 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=12 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=12 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=13 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=13 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=13 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=13 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=13 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=13 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=13 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=13 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=13 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=13 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=13 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=13 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=14 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=14 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=14 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=14 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=14 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=14 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=14 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=14 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=14 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=14 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=14 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=14 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=15 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=15 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=15 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=15 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=15 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=15 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=15 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=15 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=15 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=15 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=15 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=15 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=16 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=16 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=16 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=16 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=16 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=16 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=16 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=16 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=16 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=16 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=16 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=16 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=17 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=17 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=17 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=17 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=17 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=17 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=17 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=17 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=17 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=17 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=17 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=17 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=18 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=18 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=18 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=18 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=18 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=18 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=18 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=18 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=18 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=18 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=18 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=18 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=19 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=19 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=19 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=19 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=19 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=19 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=19 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=19 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=19 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=19 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=19 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=19 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=20 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=20 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=20 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=20 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=20 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=20 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=20 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=20 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=20 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=20 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=20 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=20 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=21 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=21 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=21 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=21 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=21 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=21 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=21 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=21 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=21 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=21 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=21 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=21 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=22 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=22 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=22 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=22 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=22 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=22 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=22 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=22 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=22 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=22 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=22 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=22 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=23 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=23 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=23 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=23 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=23 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=23 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=23 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=23 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=23 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12
+cuda_device_grouped_observation tick=23 box="demographic" view="population_cells" key_space_size=152 occupied_groups=152 emitted_groups=152
+cuda_device_grouped_observation tick=23 box="demographic" view="deaths_cells" key_space_size=40 occupied_groups=38 emitted_groups=38
+cuda_device_grouped_observation tick=23 box="demographic" view="vacancy_cells" key_space_size=12 occupied_groups=12 emitted_groups=12

@@ -1,0 +1,9 @@
+{
+  "completed": false,
+  "error": "missing Nsight report: /home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/25-profile-w4-A-r1/profile/final-state.nsys-rep",
+  "execution_count": 25,
+  "matrix_started": true,
+  "phase": "matrix",
+  "preflight_passed": true,
+  "schema": "sembla-cuda-final-state-decision-protocol-v1"
+}
