@@ -1,0 +1,27 @@
+Generating SQLite file /home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/27-profile-w4-C-r1/profile/final-state.sqlite from /home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/27-profile-w4-C-r1/profile/final-state.nsys-rep
+Processing [/home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/27-profile-w4-C-r1/profile/final-state.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+Time (%),Total Time (ns),Num Calls,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+44.4,4233960611,772,5484404.9,797535.0,9114,205558063,13143805.8,cuMemcpyDtoHAsync_v2
+31.1,2964613787,223956,13237.5,3656.0,1092,101252605,308197.2,cuEventRecord
+10.5,997305331,4,249326332.8,251296152.5,105809132,388903894,120515671.3,cuMemHostAlloc
+5.6,536362128,39552,13560.9,5608.0,2274,2165620,57755.4,cuLaunchKernel
+2.8,270591608,4,67647902.0,68614388.5,58738852,74623979,7043864.8,cuMemFreeHost
+2.5,235482482,275184,855.7,451.0,130,81342,1699.2,cuStreamWaitEvent
+0.8,80793405,260,310743.9,5648.0,1682,20162799,2442088.9,cuMemcpyHtoDAsync_v2
+0.8,79306755,12,6608896.3,9695958.0,13332,12295294,5917934.7,cuStreamSynchronize
+0.5,51745237,4,12936309.3,12870405.5,11883795,14120631,964859.8,cuStreamDestroy_v2
+0.4,41202435,192,214596.0,1181.5,551,2935168,421742.7,cuMemAllocAsync
+0.3,28130296,388,72500.8,241.0,100,18640378,1049337.2,cuEventCreate
+0.1,9750923,112,87061.8,52003.5,8613,890441,126101.1,cuMemcpyDtoDAsync_v2
+0.1,9479611,4,2369902.8,2373809.0,2352541,2379452,12202.0,cuModuleLoadData
+0.0,1833610,4,458402.5,268013.5,231258,1066325,406070.7,cuModuleUnload
+0.0,1060337,264,4016.4,3525.0,1352,22725,2710.7,cuMemsetD8Async
+0.0,339850,4,84962.5,20245.0,18758,280602,130429.1,cuStreamCreate
+0.0,200462,192,1044.1,821.5,370,6079,868.3,cuMemFreeAsync
+0.0,100079,388,257.9,195.5,89,4858,494.5,cuEventDestroy_v2
+0.0,44687,9,4965.2,4967.0,1973,7040,1716.6,cuInit
+0.0,29636,12,2469.7,2093.0,481,5889,1847.8,cuEventSynchronize
+0.0,25178,1,25178.0,25178.0,25178,25178,0.0,cuMemGetInfo_v2
+0.0,21341,4,5335.3,5202.5,4797,6139,631.4,cuCtxSynchronize
+0.0,14630,5,2926.0,3425.0,911,4907,1893.7,cuCtxSetCurrent
+

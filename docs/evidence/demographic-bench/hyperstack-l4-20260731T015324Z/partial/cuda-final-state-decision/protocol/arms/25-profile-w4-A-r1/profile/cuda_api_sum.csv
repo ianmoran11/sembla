@@ -1,0 +1,24 @@
+Generating SQLite file /home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/25-profile-w4-A-r1/profile/final-state.sqlite from /home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/25-profile-w4-A-r1/profile/final-state.nsys-rep
+Processing [/home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/25-profile-w4-A-r1/profile/final-state.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+Time (%),Total Time (ns),Num Calls,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+58.6,5930918727,772,7682537.2,822238.5,9204,744354795,37455924.2,cuMemcpyDtoHAsync_v2
+31.9,3226297269,223952,14406.2,3806.0,951,2340988,67962.6,cuEventRecord
+5.4,550331210,39552,13914.1,5558.0,1873,1810199,57001.8,cuLaunchKernel
+1.6,162661138,275180,591.1,310.0,130,80031,982.9,cuStreamWaitEvent
+0.9,89643295,260,344781.9,5418.5,1903,25429671,2732319.7,cuMemcpyHtoDAsync_v2
+0.5,48236890,4,12059222.5,12169902.5,11339114,12557971,551304.8,cuStreamDestroy_v2
+0.4,41509967,192,216197.7,1372.0,521,3177017,403928.1,cuMemAllocAsync
+0.2,22501679,4,5625419.8,6337745.5,3112030,6714158,1685738.2,cuStreamSynchronize
+0.2,16529264,384,43045.0,311.0,100,16317220,832664.0,cuEventCreate
+0.2,16203944,112,144678.1,97687.0,7752,1004874,166965.6,cuMemcpyDtoDAsync_v2
+0.1,9696162,4,2424040.5,2424243.0,2381399,2466277,43456.6,cuModuleLoadData
+0.0,2064001,4,516000.3,259155.5,216587,1329103,542694.6,cuModuleUnload
+0.0,1329326,264,5035.3,4206.0,1393,44017,3959.6,cuMemsetD8Async
+0.0,379873,4,94968.3,24547.5,17876,312902,145325.1,cuStreamCreate
+0.0,298109,1,298109.0,298109.0,298109,298109,0.0,cuMemGetInfo_v2
+0.0,179652,192,935.7,781.0,350,6059,830.2,cuMemFreeAsync
+0.0,78443,384,204.3,190.0,89,2504,202.2,cuEventDestroy_v2
+0.0,42966,9,4774.0,4727.0,1903,6520,1559.3,cuInit
+0.0,23745,4,5936.3,5909.0,5417,6510,448.5,cuCtxSynchronize
+0.0,10575,5,2115.0,1342.0,811,4036,1490.8,cuCtxSetCurrent
+
