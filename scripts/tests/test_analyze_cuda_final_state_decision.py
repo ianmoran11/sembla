@@ -221,6 +221,28 @@ class NsightTests(unittest.TestCase):
         rows.extend(kernel_rows)
         path.write_text("\n".join(rows) + "\n")
 
+    def test_context_alias_prefers_exact_ctx_over_greenctx(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "trace.csv"
+            path.write_text(
+                "Start (ms),Duration (ms),Name,Bytes,SrcMemKd,DstMemKd,Ctx,GreenCtx,Strm\n"
+                "0,3,[CUDA memcpy DtoH],2097152,Device,Pageable,1,0,7\n"
+            )
+            result = ANALYZER.analyze_nsys_trace(path, self.timing([2097152]), "B")
+            self.assertEqual(result["large_copy_count"], 1)
+
+    def test_zero_mb_rounded_tiny_dtoh_is_not_rejected_or_matched(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "trace.csv"
+            path.write_text(
+                "Start (ms),Duration (ms),Name,Bytes (MB),SrcMemKd,DstMemKd,Ctx,Strm\n"
+                "0,1,[CUDA memcpy DtoH],0.000,Device,Pageable,1,7\n"
+                "1,3,[CUDA memcpy DtoH],2.000,Device,Pageable,1,7\n"
+            )
+            result = ANALYZER.analyze_nsys_trace(path, self.timing([2_000_000]), "B")
+            self.assertEqual(result["large_copy_count"], 1)
+            self.assertEqual(result["unmatched_tiny_dtoh"][0]["bytes"], 0)
+
     def test_union_overlap_repeated_sizes_rounding_and_tiny_exclusion(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = pathlib.Path(temporary) / "trace.csv"

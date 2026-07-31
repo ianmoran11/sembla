@@ -264,7 +264,17 @@ def _column(header: Iterable[str], *terms: str) -> str:
 
 
 def _column_alias(header: Iterable[str], aliases: tuple[str, ...]) -> str:
-    matches = [name for name in header if name.lower() in aliases or any(alias in name.lower() for alias in aliases)]
+    names = list(header)
+    exact = [name for name in names if name.lower() in aliases]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        raise AnalysisError(
+            f"expected one exact Nsight column matching {aliases}, found {exact}"
+        )
+    matches = [
+        name for name in names if any(alias in name.lower() for alias in aliases)
+    ]
     if len(matches) != 1:
         raise AnalysisError(f"expected one Nsight column matching {aliases}, found {matches}")
     return matches[0]
@@ -454,7 +464,7 @@ def analyze_nsys_trace(path: pathlib.Path, timing: dict[str, Any], mode: str) ->
             try:
                 size = int(
                     round(
-                        finite(float(row[bytes_col]), f"{path}:bytes", positive=True)
+                        finite(float(row[bytes_col]), f"{path}:bytes")
                         * bytes_factor
                     )
                 )
