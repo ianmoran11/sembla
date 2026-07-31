@@ -1,0 +1,6 @@
+name_prefix: sembla-precision
+
+tracked in Terraform state: 0
+other VMs in the account (never touched): 0
+
+No orphans. Every sembla-precision* VM in the account is tracked in state.

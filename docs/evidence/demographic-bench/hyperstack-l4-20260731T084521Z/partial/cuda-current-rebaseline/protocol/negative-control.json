@@ -1,0 +1,18 @@
+{
+  "accepted": false,
+  "comparison": {
+    "changed": [
+      "draw_0.csv"
+    ],
+    "equal": false,
+    "extra_in_right": [],
+    "left": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/arms/01-control-preflight-w1-materialized/output",
+    "left_file_count": 7,
+    "missing_from_right": [],
+    "right": "/home/ubuntu/demographic-bench/cuda-current-rebaseline/protocol/negative-control-tree",
+    "right_file_count": 7
+  },
+  "mutation_bytes": 1,
+  "perturbed_relative_path": "draw_0.csv",
+  "rejected": true
+}
