@@ -515,9 +515,11 @@ other concurrency stages.
 Expected H100 time is roughly 2–3 hours, about **$5–$8** at the documented
 $2.50672/hour plus public-IP charges. Twenty-seven 1,200-second arm bounds plus
 bounded synthesis/exports give a conservative hard ceiling of 10 hours (about
-**$25.07** plus IP). Set `emergency_poweroff_hours` to at least 12 and arm the
-independent destroy watchdog beyond 10 hours before starting. Neither a guest
-poweroff nor a benchmark timeout proves billing stopped.
+**$25.07** plus IP). Set `emergency_poweroff_hours` to its validated maximum of
+8 and arm the independent destroy watchdog beyond 10 hours (11 hours is the
+standard setting) before starting. The guest timer intentionally stops work
+before the billing watchdog; neither a guest poweroff nor a benchmark timeout
+proves billing stopped.
 
 The evidence is written under
 `docs/evidence/demographic-bench/hyperstack-l4-<UTC>/cuda-final-state-decision/`.

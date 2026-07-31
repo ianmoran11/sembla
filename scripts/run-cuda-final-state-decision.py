@@ -676,6 +676,12 @@ def _kill_process_group(process: subprocess.Popen[Any], sig: signal.Signals) -> 
 def run_command(record: dict[str, Any], timeout_seconds: float = ARM_TIMEOUT_SECONDS) -> dict[str, Any]:
     arm = pathlib.Path(record["arm_dir"])
     arm.mkdir(parents=True, exist_ok=True)
+    if record.get("profiled"):
+        # Nsight does not create a missing parent for -o. When the directory is
+        # absent it silently writes a generated report under /tmp, after which
+        # the protocol correctly but confusingly reports its declared path as
+        # missing. Create the frozen report parent before starting the process.
+        pathlib.Path(record["nsys_report"]).parent.mkdir(parents=True, exist_ok=True)
     stdout_path, stderr_path = arm / "stdout.txt", arm / "stderr.txt"
     environment = os.environ.copy()
     for name in RETIRED_SELECTORS:

@@ -317,6 +317,29 @@ class ValidationAndBarrierTests(unittest.TestCase):
         self.assertGreaterEqual(sample["vram_bytes"], 0)
         self.assertGreaterEqual(sample["process_count"], 1)
 
+    def test_profile_run_creates_nsys_output_parent_before_launch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = ProtocolFixture(pathlib.Path(temporary))
+            record = copy.deepcopy(fixture.manifest["executions"][24])
+            report_parent = pathlib.Path(record["nsys_report"]).parent
+            self.assertFalse(report_parent.exists())
+            record["argv"] = [
+                sys.executable,
+                "-c",
+                f"import pathlib; assert pathlib.Path({str(report_parent)!r}).is_dir()",
+            ]
+            complete_sample = {
+                "rss_bytes": 1,
+                "vram_bytes": 1,
+                "process_count": 1,
+                "rss_query_succeeded": True,
+                "vram_query_succeeded": True,
+            }
+            with mock.patch.object(MODULE, "sample_resources", return_value=complete_sample):
+                result = MODULE.run_command(record, timeout_seconds=1)
+            self.assertEqual(result["return_code"], 0)
+            self.assertTrue(report_parent.is_dir())
+
     def test_successful_child_with_failed_resource_sampling_fails_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = ProtocolFixture(pathlib.Path(temporary))
