@@ -450,6 +450,122 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
+## Focused H100 final-state A/B/C decision
+
+Green `/piprd run` results and this procedure are **not paid-plan approval**.
+Before creating a VM, obtain explicit operator approval, run the existing
+report-only reconciliation, review a saved paid plan, and only then apply it:
+
+```bash
+bash reconcile-orphans.sh
+terraform plan -var-file=terraform.tfvars \
+  -var=create_instance=true -var=accept_paid_creation=true \
+  -out=hyperstack-paid.tfplan
+python3 review-paid-plan.py hyperstack-paid.tfplan
+# Stop here until a human explicitly approves the displayed H100 resources/cost.
+terraform apply hyperstack-paid.tfplan
+```
+
+Prefer the documented CLI/Tailscale route and pinned SSH host key. Do not install
+or retain a broad public SSH rule; the paid security rule remains the reviewed
+single `/32`, and Tailscale uses `--ssh=false`.
+
+After approval and provisioning, run exactly this opt-in stage. `KEEP_VM=1` is
+forbidden and rejected before the evidence directory is created:
+
+```bash
+set -o pipefail
+BENCH_CUDA_FINAL_STATE_DECISION=1 \
+  bash run-demographic-benchmark.sh 2>&1 | tee ~/final-state-decision-driver.log
+```
+
+Keep `pipefail` enabled: otherwise `tee` can mask a nonzero benchmark or
+teardown status.
+
+The checkout is verified clean and built once. One binary, model, synthesized
+10M-slot state, seed 9009, 24 ticks, and grouped-observation configuration are
+used throughout. Only `SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE` and the frozen worker
+count differ between A (`materialized`), B (`packed-pageable`), and C
+(`packed-pinned`). The two retired scalar device-hash selectors are removed from
+every child environment and are rejected if inherited.
+
+The first three benchmark executions are one-draw workers-1 A, B, and C. Each
+has a 1,200-second TERM/KILL bound. Complete file sets/bytes and separate
+`final_state_sha256` values must match; all v3/v2 timing fields must validate; C
+must report one bounded, nonzero pinned buffer set; and a deliberate one-byte
+comparator mutation must be rejected. Any failure or timeout packages
+checksummed partial evidence and makes the matrix unreachable.
+
+Only after that barrier does the fixed 27-execution ledger continue:
+
+| IDs | Class | Workers | Draws/noise | Frozen mode order |
+|---|---|---:|---|---|
+| 01–03 | correctness preflight | 1 | 1 / independent | A-B-C |
+| 04–12 | timed repetitions 1–3 | 1 | 4 / independent | A-B-C, C-B-A, A-B-C |
+| 13–21 | timed repetitions 1–3 | 4 | 4 / independent | C-B-A, A-B-C, C-B-A |
+| 22–24 | CRN correctness | 4 | 4 / CRN | A-B-C |
+| 25–27 | post-matrix Nsight Systems | 4 | 4 / independent | A-B-C |
+
+The driver asserts the count, dimensions, orders, and A/B plus B/C adjacency
+before execution. IDs 25–27 alone are wrapped by `nsys profile --trace=cuda`;
+they are excluded from performance aggregation. This flag cannot reach the
+historical 20-draw matrix, workers 2, Nsight Compute, corpus, broad profile, or
+other concurrency stages.
+
+Expected H100 time is roughly 2–3 hours, about **$5–$8** at the documented
+$2.50672/hour plus public-IP charges. Twenty-seven 1,200-second arm bounds plus
+bounded synthesis/exports give a conservative hard ceiling of 10 hours (about
+**$25.07** plus IP). Set `emergency_poweroff_hours` to its validated maximum of
+8 and arm the independent destroy watchdog beyond 10 hours (11 hours is the
+standard setting) before starting. The guest timer intentionally stops work
+before the billing watchdog; neither a guest poweroff nor a benchmark timeout
+proves billing stopped.
+
+The evidence is written under
+`docs/evidence/demographic-bench/hyperstack-l4-<UTC>/cuda-final-state-decision/`.
+`protocol/execution-manifest.json`, per-arm `record.json`/timing/output trees,
+`comparisons.json`, `negative-control.json`, raw resource samples, three
+`.nsys-rep` files and CUDA trace/API/kernel CSVs support audit. `decision.json`
+and `decision.md` contain labeled preflight and absolute command times, raw
+adjacent ratios, medians, phase/Nsight/resource evidence, and residual risks. On
+failure, `partial/` retains every completed per-arm output tree together with
+logs and `SHA256SUMS.partial`; only the generated 10M state is excluded. The
+remote job is detached, so rerunning the identical command rejoins its immutable
+payload rather than starting a second benchmark.
+
+The machine gate is frozen before execution: workers-4 median B/A and C/B must
+be `<= 0.95`; their workers-1 medians must be `<= 1.02`. C also needs either
+`(pinned_dtoh_enqueue_api_ms + wait_to_pinned_host_readable_ms) /
+pageable_dtoh_host_api_ms <= 0.90` over the adjacent workers-4 repetitions, or
+Nsight `C_exposed_final_state_dtoh_ms / B_exposed_final_state_dtoh_ms <= 0.90`.
+Staging-copy time remains in seam/wall totals but is excluded from both D2H
+mechanism ratios. A miss is a valid no-go and closes this route; do not lower a
+threshold or launch a 20-draw rescue matrix.
+
+The stage never relaxes GPU performance-counter access. It requires and records
+`RmProfilingAdminOnly: 1` before and after Nsight Systems. On success, command
+failure, timeout, TERM, or INT, one idempotent cleanup path records separate
+`benchmark-status.txt` and `teardown-status.txt`, attempts bounded
+`terraform destroy` and bounded state inspection, and invokes
+`reconcile-orphans.sh --delete --yes` after an incomplete destroy/state result
+or an explicit provider-reported orphan. A final bounded report-only
+reconciliation and state inspection are mandatory. Overall status preserves a
+nonzero benchmark status first; otherwise teardown status decides, and any
+destroy/reconciliation failure remains nonzero. Before leaving, require:
+
+```bash
+cat <evidence>/counter-restoration-status.txt
+cat <evidence>/terraform-state-final.txt       # no VM/security-rule resources
+cat <evidence>/reconcile-final.log             # tracked: 0 and no orphans
+(cd <evidence> && sha256sum -c SHA256SUMS)
+bash reconcile-orphans.sh
+```
+
+Finally confirm in the Hyperstack console that no VM or SSH rule remains and
+billing stopped. If automated cleanup is incomplete, use the recorded destroy
+and reconciliation logs, run `bash reconcile-orphans.sh --delete --yes`, rerun
+report-only reconciliation, and escalate to the provider console immediately.
+
 ## Focused CUDA readback/contended-kernel diagnostic
 
 Use this self-contained measurement stage before changing CUDA readback or
@@ -472,6 +588,11 @@ noise, and grouped observations. It records:
 - bounded Nsight Compute reports: SOL/launch/occupancy for the three kernels
   with the largest Systems penalty, plus memory/scheduler/warp detail for at
   most two kernels.
+
+The scalar device-SHA treatment and its environment controls are retired after
+timing out at 900 seconds. See
+[`docs/prds-cuda-final-state-readback/README.md`](../../../docs/prds-cuda-final-state-readback/README.md)
+for the bounded negative result and replacement measurement plan.
 
 Nsight Systems decides real duration and concurrency. Nsight Compute runs only
 serial one-worker diagnostic launches because replay serializes kernels and

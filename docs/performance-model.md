@@ -17,6 +17,9 @@ This is a reference, not a plan. Plans live in PRD folders; verdicts live in
 - Roughly **20× more** is available on the host, measured, from three changes.
 - After those, the system becomes **RNG-bound**, not memory-bound. That changes
   which floor applies.
+- CUDA sweeps now hash packed pageable final-state bytes directly. The focused
+  H100 gate measured this 15.2% faster at workers 1 and 7.3% faster at workers
+  4 than reconstructing a host `StateStore` first (`DECISIONS.md` §L14).
 
 ## Physical floors
 
@@ -40,8 +43,9 @@ workload is RNG-bound**, and quoting the bandwidth floor becomes misleading.
 
 ### CUDA path, 5M rows over 2 ticks
 
-**Superseded twice. Current split, 2026-07-28** (`hyperstack-l4-20260728T072119Z/profile/`,
-after `prds-device-observation/0001` and `0002`, §L11), 5M rows over 2 ticks:
+**Historical split, superseded after 2026-07-28**
+(`hyperstack-l4-20260728T072119Z/profile/`, after
+`prds-device-observation/0001` and `0002`, §L11), 5M rows over 2 ticks:
 
 | phase | no-grouped | grouped | share (grouped) |
 |---|---:|---:|---:|
@@ -215,7 +219,20 @@ so run them from here rather than folder by folder.
 | 12 | [`prds-sweep-throughput/0004`](prds-sweep-throughput/0004-run-cuda-draws-concurrently.md) run CUDA draws concurrently | yes | **landed and hardware-verified**: explicit bounded `--draw-workers`; 10M speedups 1.584×/1.756× at workers 2/4, 24 complete-tree comparisons byte-equal |
 | 13 | **one GPU session** | yes | **done 2026-07-30**: supported flag, capacity failure, output parity, non-default streams, checksums, and teardown all verified in `hyperstack-supported-concurrency-20260730T022957Z` |
 | 14 | **profile the remaining CUDA readback/contended-kernel cost** | yes | **done 2026-07-30**: in each four-draw diagnostic arm, 776 tiny copies total only 0.096 MB and project to 1.098 ms unoverlapped at 20 draws; four pageable 480 MB final-state copies dominate at 906.710 ms unoverlapped, while total D2H projects to 4.535 s; kernel contention is secondary (`hyperstack-l4-20260730T072627Z`) |
-| 15 | **reduce or hide final-state materialization** | yes | **next**: trace the exact `final_state_sha256`/publication consumers, then prefer an exact device-side digest plus compact D2H when the artifact contract permits; otherwise test pinned asynchronous final-state transfer. Packed tiny-control readback is closed for the measured H100/10M shape (§M1) |
+| 15 | **measure final-state readback alternatives** | yes | **done 2026-07-31**: B passed and is now the standard CUDA sweep route (15.2% faster at workers 1; 7.3% at workers 4). C reduced exposed D2H but failed whole-wall gates because cacheable staging dominated. Packed tiny-control readback remains closed for the measured H100/10M shape (§M1; `DECISIONS.md` §L14) |
+
+The attempted canonical device SHA-256 is a bounded negative result. Its single
+CUDA thread serially hashed the approximately 480 MB production stream; the H100
+arm timed out at 900 seconds after publishing 15 of 20 worker-one draws, with
+completed draws advancing at roughly 56–57 seconds each. This closes that scalar
+kernel, not every possible GPU hashing strategy.
+
+The replacement A/B/C gate is complete. A materialized and hashed `StateStore`;
+B hashed an unconditional pageable packed download with the same canonical
+framing; C used retained pinned destinations plus cacheable staging. B passed
+both whole-wall gates and is the standard path. C's transfer mechanism passed,
+but its required staging copy made the complete workload slower, so C remains a
+diagnostic-only negative result (`DECISIONS.md` §L14).
 
 **Why 9 first.** Item 11 is a device-side change to a reduction, which is exactly
 the shape the differential corpus exists to check. Landing it while the corpus

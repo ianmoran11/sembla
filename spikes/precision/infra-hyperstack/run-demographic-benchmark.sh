@@ -26,11 +26,14 @@
 #                                 --timing-json plus nsys). Additive: the frozen
 #                                 §L4 protocol is unchanged either way.
 #   BENCH_CUDA_READBACK_DIAGNOSTIC=1
-#                               - self-contained 10M grouped CUDA diagnostic:
-#                                 phase timing, equal four-draw sequential/four-
-#                                 worker Nsight Systems traces, and bounded
-#                                 evidence-selected Nsight Compute reports. Skips
-#                                 the unrelated frozen and concurrency gates.
+#                               - legacy self-contained readback/contended-kernel
+#                                 diagnostic retained for historical evidence.
+#   BENCH_CUDA_FINAL_STATE_DECISION=1
+#                               - focused H100 A/B/C final-state decision stage:
+#                                 mandatory one-draw preflight, frozen 18-command
+#                                 timed matrix, three-command CRN set, and three
+#                                 post-matrix Nsight Systems profiles. Exactly 27
+#                                 benchmark executions; rejects KEEP_VM=1.
 #   BENCH_SWEEP=1               - additionally collect retained-backend sweep
 #                                 evidence at 1M and 10M rows, 24 ticks, 20
 #                                 draws; requires BENCH_SWEEP_BASELINE_COMMIT
@@ -71,8 +74,9 @@
 #   SSH_FAILURE_LIMIT           - default 5 consecutive poll failures before the
 #                                 collector gives up and says why
 #
-# BENCH_PROFILE, BENCH_CUDA_READBACK_DIAGNOSTIC, BENCH_CORPUS, BENCH_SWEEP,
-# its baseline commit, and the concurrency-spike flags are baked into the content-addressed
+# BENCH_PROFILE, BENCH_CUDA_READBACK_DIAGNOSTIC,
+# BENCH_CUDA_FINAL_STATE_DECISION, BENCH_CORPUS, BENCH_SWEEP, its baseline
+# commit, and the concurrency-spike flags are baked into the content-addressed
 # payload hash, so a run with them set will not silently rejoin a plain gate run
 # already in progress -- it is correctly treated as a different payload.
 #
@@ -94,16 +98,116 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-$REPO_ROOT/docs/evidence/demographic-bench/hyperst
 DESTROYED=false
 REMOTE_SCRIPT=""
 POLL_ERR=""
+FOCUSED_RUN_REQUESTED=false
+[[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "0" ]] && FOCUSED_RUN_REQUESTED=true
+FOCUSED_ARTIFACT_STARTED=false
+FOCUSED_CLEANUP_RUNNING=false
+
+focused_paid_resources_in_state() {
+  local state
+  local terraform_bin="${FOCUSED_TERRAFORM_BIN:-terraform}"
+  local timeout_bin="${FOCUSED_TIMEOUT_BIN:-timeout}"
+  local timeout_seconds="${FOCUSED_TEARDOWN_TIMEOUT_SECONDS:-900}"
+  if ! state="$(
+    cd "$MODULE_DIR" 2>/dev/null \
+      && "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
+        "$terraform_bin" state list 2>/dev/null
+  )"; then
+    # Fail closed: a broken/missing Terraform probe must attempt bounded destroy
+    # and provider reconciliation rather than assume there are no paid resources.
+    return 0
+  fi
+  if grep -qE 'hyperstack_core_virtual_machine|hyperstack_core_security_rule|security_rule' \
+      <<<"$state"; then
+    return 0
+  fi
+  # A paid operator session can have an orphan even when local state is empty.
+  # The API key is intentionally the signal to run report/delete reconciliation;
+  # local flag-validation tests without paid credentials remain side-effect free.
+  [[ -n "${HYPERSTACK_API_KEY:-}" ]]
+}
+
+focused_finalize_checksums() {
+  [[ -d "$ARTIFACT_DIR" ]] || return 0
+  python3 - "$ARTIFACT_DIR" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+lines = []
+for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
+    lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(root).as_posix()}")
+(root / "SHA256SUMS").write_text("\n".join(lines) + "\n")
+PY
+  if command -v sha256sum >/dev/null; then
+    (cd "$ARTIFACT_DIR" && sha256sum -c SHA256SUMS >/dev/null)
+  else
+    (cd "$ARTIFACT_DIR" && shasum -a 256 -c SHA256SUMS >/dev/null)
+  fi
+}
+
+focused_term() { exit 143; }
+focused_int() { exit 130; }
+
 finish() {
-  local status=$?
+  local benchmark_status=$?
+  local teardown_status=0
+  local final_status="$benchmark_status"
+  trap - EXIT TERM INT
   [[ -n "$REMOTE_SCRIPT" ]] && rm -f "$REMOTE_SCRIPT"
   [[ -n "$POLL_ERR" ]] && rm -f "$POLL_ERR"
+
+  if [[ "$FOCUSED_RUN_REQUESTED" == true \
+        && "$FOCUSED_ARTIFACT_STARTED" != true \
+        && "$FOCUSED_CLEANUP_RUNNING" != true ]] \
+      && focused_paid_resources_in_state; then
+    local preflight_cleanup_dir
+    preflight_cleanup_dir="${TMPDIR:-/tmp}/sembla-final-state-preflight-cleanup-$STAMP"
+    mkdir -p "$preflight_cleanup_dir"
+    FOCUSED_CLEANUP_RUNNING=true
+    # shellcheck source=../../../scripts/cuda-final-state-teardown.sh
+    source "$REPO_ROOT/scripts/cuda-final-state-teardown.sh"
+    if cuda_final_state_teardown "$preflight_cleanup_dir" "$MODULE_DIR" "$TFVARS_FILE"; then
+      teardown_status=0
+      DESTROYED=true
+      rm -rf "$preflight_cleanup_dir"
+    else
+      teardown_status=$?
+      echo "Focused validation failed before artifacts; cleanup evidence remains at $preflight_cleanup_dir" >&2
+    fi
+    (( benchmark_status != 0 )) || final_status="$teardown_status"
+  fi
+
+  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+        && "$FOCUSED_ARTIFACT_STARTED" == true \
+        && "$FOCUSED_CLEANUP_RUNNING" != true ]]; then
+    FOCUSED_CLEANUP_RUNNING=true
+    printf '%s\n' "$benchmark_status" > "$ARTIFACT_DIR/benchmark-status.txt"
+    # shellcheck source=../../../scripts/cuda-final-state-teardown.sh
+    source "$REPO_ROOT/scripts/cuda-final-state-teardown.sh"
+    if cuda_final_state_teardown "$ARTIFACT_DIR" "$MODULE_DIR" "$TFVARS_FILE"; then
+      teardown_status=0
+      DESTROYED=true
+    else
+      teardown_status=$?
+    fi
+    printf '%s\n' "$teardown_status" > "$ARTIFACT_DIR/teardown-status.txt"
+    if ! focused_finalize_checksums; then
+      teardown_status=1
+      printf '%s\n' "$teardown_status" > "$ARTIFACT_DIR/teardown-status.txt"
+      focused_finalize_checksums || true
+    fi
+    if (( benchmark_status != 0 )); then
+      final_status="$benchmark_status"
+    else
+      final_status="$teardown_status"
+    fi
+  fi
+
   if [[ "$DESTROYED" != true ]]; then
     printf '\n%s\n' "IMPORTANT: a Hyperstack VM may still exist. Billing continues in SHUTOFF as well as ACTIVE." >&2
     printf '%s\n' "Destroy it now:  cd $MODULE_DIR && terraform destroy -var-file=$TFVARS_FILE" >&2
     printf '%s\n' "Then confirm in the Hyperstack console that no VM remains." >&2
   fi
-  exit "$status"
+  exit "$final_status"
 }
 trap finish EXIT
 
@@ -126,10 +230,18 @@ case "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" in
   0|1) ;;
   *) echo 'BENCH_CUDA_READBACK_DIAGNOSTIC must be 0 or 1' >&2; exit 2 ;;
 esac
+case "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" in
+  0|1) ;;
+  *) echo 'BENCH_CUDA_FINAL_STATE_DECISION must be 0 or 1' >&2; exit 2 ;;
+esac
+case "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" in
+  0|1) ;;
+  *) echo 'SEMBLA_FOCUSED_TEARDOWN_TEST_MODE must be 0 or 1' >&2; exit 2 ;;
+esac
 if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   for incompatible in \
-    BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP BENCH_CONCURRENCY_SPIKE \
-    BENCH_CONCURRENCY_SPIKE_ONLY BENCH_CONCURRENCY_SUPPORTED \
+    BENCH_CUDA_FINAL_STATE_DECISION BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP \
+    BENCH_CONCURRENCY_SPIKE BENCH_CONCURRENCY_SPIKE_ONLY BENCH_CONCURRENCY_SUPPORTED \
     BENCH_CONCURRENCY_LOCKSTEP BENCH_CONCURRENCY_FREE_STREAMS \
     BENCH_CONCURRENCY_FUSED BENCH_CONCURRENCY_CRN; do
     if [[ "${!incompatible:-0}" == "1" ]]; then
@@ -141,6 +253,39 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
     echo 'BENCH_CUDA_READBACK_DIAGNOSTIC is mutually exclusive with BENCH_SWEEP_BASELINE_COMMIT' >&2
     exit 2
   fi
+fi
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+  for incompatible in \
+    BENCH_CUDA_READBACK_DIAGNOSTIC BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP \
+    BENCH_SWEEP_NUMA BENCH_CONCURRENCY_SPIKE BENCH_CONCURRENCY_SPIKE_ONLY \
+    BENCH_CONCURRENCY_SUPPORTED BENCH_CONCURRENCY_LOCKSTEP \
+    BENCH_CONCURRENCY_FREE_STREAMS BENCH_CONCURRENCY_FUSED BENCH_CONCURRENCY_CRN; do
+    if [[ "${!incompatible:-0}" != "0" ]]; then
+      echo "BENCH_CUDA_FINAL_STATE_DECISION is mutually exclusive with $incompatible" >&2
+      exit 2
+    fi
+  done
+  if [[ -n "${BENCH_SWEEP_BASELINE_COMMIT:-}" ]]; then
+    echo 'BENCH_CUDA_FINAL_STATE_DECISION is mutually exclusive with BENCH_SWEEP_BASELINE_COMMIT' >&2
+    exit 2
+  fi
+  if [[ "${KEEP_VM:-0}" == "1" ]]; then
+    echo 'BENCH_CUDA_FINAL_STATE_DECISION rejects KEEP_VM=1; teardown is mandatory' >&2
+    exit 2
+  fi
+  for retired in \
+    SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256 \
+    SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY; do
+    if [[ -n "${!retired:-}" ]]; then
+      echo "BENCH_CUDA_FINAL_STATE_DECISION rejects retired selector $retired" >&2
+      exit 2
+    fi
+  done
+  trap focused_term TERM
+  trap focused_int INT
+elif [[ "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" == "1" ]]; then
+  echo 'SEMBLA_FOCUSED_TEARDOWN_TEST_MODE requires BENCH_CUDA_FINAL_STATE_DECISION=1' >&2
+  exit 2
 fi
 if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" == "1" \
       && "${BENCH_CONCURRENCY_SPIKE:-0}" != "1" ]]; then
@@ -192,10 +337,36 @@ if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" \
   exit 2
 fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
+  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+        && ( -e "$ARTIFACT_DIR/.cuda-final-state-teardown-started" \
+             || -s "$ARTIFACT_DIR/teardown-status.txt" ) \
+        && ! -e "$ARTIFACT_DIR/.cuda-final-state-teardown-complete" ]]; then
+    FOCUSED_ARTIFACT_STARTED=true
+    echo "incomplete focused teardown detected; retrying cleanup before rejecting existing evidence: $ARTIFACT_DIR" >&2
+  fi
   echo "evidence directory already exists; choose a new ARTIFACT_DIR: $ARTIFACT_DIR" >&2
   exit 2
 fi
 mkdir -p "$ARTIFACT_DIR"
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+  FOCUSED_ARTIFACT_STARTED=true
+  if [[ "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" == "1" ]]; then
+    case "${FOCUSED_TEST_SIGNAL:-}" in
+      TERM) kill -TERM "$$" ;;
+      INT) kill -INT "$$" ;;
+      "") ;;
+      *) echo 'FOCUSED_TEST_SIGNAL must be TERM or INT' >&2; exit 2 ;;
+    esac
+    set +e
+    "${FOCUSED_TIMEOUT_BIN:-timeout}" --signal=TERM --kill-after=1s \
+      "${FOCUSED_TEST_TIMEOUT_SECONDS:-30}s" \
+      bash -c "${FOCUSED_TEST_BENCHMARK_COMMAND:-true}" \
+      > "$ARTIFACT_DIR/focused-test-benchmark.log" 2>&1
+    focused_test_status=$?
+    set -e
+    exit "$focused_test_status"
+  fi
+fi
 
 cd "$MODULE_DIR"
 
@@ -493,6 +664,7 @@ REMOTE_SCRIPT="$(mktemp)"
 # treated as different payloads instead of one rejoining the other.
 printf 'export BENCH_PROFILE=%q\n' "${BENCH_PROFILE:-0}" > "$REMOTE_SCRIPT"
 printf 'export BENCH_CUDA_READBACK_DIAGNOSTIC=%q\n' "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CUDA_FINAL_STATE_DECISION=%q\n' "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
@@ -583,6 +755,16 @@ package_partial_on_error() {
   local partial_root="$HOME/demographic-bench-partial"
   rm -rf "$partial_root"
   mkdir -p "$partial_root"
+  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+    if cat /proc/driver/nvidia/params \
+        > "$partial_root/nvidia-driver-params-after-failure.txt" 2>&1 \
+        && grep -Fq 'RmProfilingAdminOnly: 1' \
+          "$partial_root/nvidia-driver-params-after-failure.txt"; then
+      restoration_status='remained-admin-only'
+    else
+      restoration_status='COUNTER-CHECK-FAILED'
+    fi
+  fi
   printf '%s\n' "$rc" > "$partial_root/remote-exit-code.txt"
   printf '%s\n' "$restoration_status" > "$partial_root/counter-restoration-status.txt"
   for name in gpu-provenance.txt cpu-provenance.txt ram-provenance.txt \
@@ -592,6 +774,11 @@ package_partial_on_error() {
   done
   if [[ -d "$OUT_ROOT/cuda-readback-diagnostic" ]]; then
     cp -a "$OUT_ROOT/cuda-readback-diagnostic" "$partial_root/"
+  fi
+  if [[ -d "$OUT_ROOT/cuda-final-state-decision" ]]; then
+    # Partial scientific outputs are required failure evidence. The generated
+    # 10M state remains under work/ and is excluded separately below.
+    cp -a "$OUT_ROOT/cuda-final-state-decision" "$partial_root/"
   fi
   (
     cd "$partial_root" || exit
@@ -614,7 +801,8 @@ diagnostic_exit_handler() {
     package_partial_on_error "$rc"
   fi
 }
-if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
+if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" \
+      || "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
   DIAGNOSTIC_FAILURE_HANDLED=0
   trap 'package_partial_on_error $?' ERR
   trap 'package_partial_on_error 143' TERM
@@ -651,6 +839,61 @@ cargo build --locked --release -p sembla-cli --features cuda
 BIN="$SPIKE_DIR/target/release/sembla"
 BIN_SHA="$(sha256sum "$BIN" | awk '{print $1}')"
 printf '%s  target/release/sembla\n' "$BIN_SHA" > "$OUT_ROOT/binary.sha256"
+
+# --- focused H100 final-state A/B/C decision ----------------------------------
+# This stage is deliberately self-contained and emits exactly 27 benchmark
+# executions. The Python driver makes the one-draw A/B/C correctness gate a
+# runtime barrier before any matrix command becomes reachable.
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+  echo '=== focused H100 final-state A/B/C decision (10M grouped) ==='
+  FINAL_STATE_DIR="$OUT_ROOT/cuda-final-state-decision"
+  FINAL_STATE_PROTOCOL_DIR="$FINAL_STATE_DIR/protocol"
+  mkdir -p "$FINAL_STATE_DIR"
+  command -v nsys >/dev/null \
+    || diagnostic_fail 'nsys is required for BENCH_CUDA_FINAL_STATE_DECISION'
+  [[ "$GPU_NAME" == *H100* ]] \
+    || diagnostic_fail "BENCH_CUDA_FINAL_STATE_DECISION requires an H100, found: $GPU_NAME"
+  cat /proc/driver/nvidia/params > "$FINAL_STATE_DIR/nvidia-driver-params-before.txt"
+  grep -Fq 'RmProfilingAdminOnly: 1' "$FINAL_STATE_DIR/nvidia-driver-params-before.txt" \
+    || diagnostic_fail 'GPU performance counters must begin in admin-only mode'
+  nsys --version > "$FINAL_STATE_DIR/nsys-version.txt" 2>&1
+
+  FINAL_STATE_STATE="$WORK/cuda-final-state-10m.state"
+  timeout --signal=TERM --kill-after=30s 900s \
+    "$BIN" synth-state \
+      --model fixtures/demographic/benchmark/demographic_slots.full.json \
+      --slots 10000000 --areas "$AREAS" \
+      --present-fraction "$PRESENT_FRACTION" --streams "$STREAMS" \
+      --seed "$SEED" --out "$FINAL_STATE_STATE" \
+      > "$FINAL_STATE_DIR/synth-state.stdout" \
+      2> "$FINAL_STATE_DIR/synth-state.stderr"
+  FINAL_STATE_MODEL="$FINAL_STATE_STATE.model.json"
+  sha256sum "$FINAL_STATE_STATE" > "$FINAL_STATE_DIR/state.sha256"
+  sha256sum "$FINAL_STATE_MODEL" > "$FINAL_STATE_DIR/model.sha256"
+
+  env -u SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256 \
+      -u SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY \
+    python3 scripts/run-cuda-final-state-decision.py \
+      --binary "$BIN" \
+      --model "$FINAL_STATE_MODEL" \
+      --state "$FINAL_STATE_STATE" \
+      --evidence "$FINAL_STATE_PROTOCOL_DIR" \
+      > "$FINAL_STATE_DIR/collector.stdout" \
+      2> "$FINAL_STATE_DIR/collector.stderr"
+  python3 scripts/analyze-cuda-final-state-decision.py "$FINAL_STATE_PROTOCOL_DIR" \
+    --json "$FINAL_STATE_DIR/decision.json" \
+    --markdown "$FINAL_STATE_DIR/decision.md" \
+    > "$FINAL_STATE_DIR/analyzer.stdout" \
+    2> "$FINAL_STATE_DIR/analyzer.stderr"
+
+  cat /proc/driver/nvidia/params > "$FINAL_STATE_DIR/nvidia-driver-params-after.txt"
+  grep -Fq 'RmProfilingAdminOnly: 1' "$FINAL_STATE_DIR/nvidia-driver-params-after.txt" \
+    || diagnostic_fail 'GPU performance-counter access was not restored to admin-only mode'
+  printf '%s\n' 'PASS RmProfilingAdminOnly remained 1 before/after focused profiling' \
+    > "$FINAL_STATE_DIR/counter-restoration.txt"
+  rm -f "$FINAL_STATE_STATE" "$FINAL_STATE_MODEL"
+  echo '=== focused final-state decision evidence complete ==='
+fi
 
 # --- focused CUDA readback/contended-kernel diagnostic ------------------------
 # This is a measurement-only stage. Nsight Systems compares real equal-work
@@ -1671,7 +1914,8 @@ PY
 fi
 
 if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" != "1" \
-      && "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" != "1" ]]; then
+      && "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" != "1" \
+      && "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "1" ]]; then
 STATE="$WORK/initial.state"
 echo '=== synthesizing one shared 10M state artifact ==='
 "$BIN" synth-state \
@@ -1950,6 +2194,21 @@ assert all(doc["assertions"].values())
     "PASS exactly three no-grouped replicates per backend\n"
 )
 PY
+elif [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+  cat > "$OUT_ROOT/README.md" <<EOF
+# Focused H100 CUDA final-state A/B/C decision evidence
+
+This separately approved paid session ran only the frozen 27-execution final-
+state protocol at repository commit \`$COMMIT_BEFORE\`. The mandatory one-draw
+A/B/C parity, diagnostic, and negative-control preflight completed before the
+18 timed commands, three CRN correctness commands, and three post-matrix Nsight
+Systems commands. No 20-draw or unrelated suite ran from this stage.
+
+The \`cuda-final-state-decision/\` tree contains the command ledger, absolute
+wall/phase/resource evidence, complete-tree comparisons, focused Nsight exports,
+and deterministic JSON/Markdown go/no-go analysis. A go result is only eligible
+for a later promotion PRD; it does not change production defaults.
+EOF
 elif [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   cat > "$OUT_ROOT/README.md" <<EOF
 # Focused CUDA readback/contended-kernel diagnostic evidence
@@ -1959,9 +2218,9 @@ repository commit \`$COMMIT_BEFORE\`. It did not rerun the unrelated frozen or
 concurrency gates.
 
 The \`cuda-readback-diagnostic/\` tree contains native 24-tick phase timing,
-equal four-draw worker-one/worker-four Nsight Systems traces, machine-derived
-D2H and per-kernel duration analysis, and bounded Nsight Compute reports for
-three evidence-selected kernels. Systems timings decide contention; Compute
+equal four-draw worker-one/worker-four Nsight Systems traces,
+machine-derived D2H and per-kernel duration analysis, and bounded Nsight Compute
+reports for three evidence-selected kernels. Systems timings decide contention; Compute
 reports occupancy, bandwidth, and stalls only because replay destroys overlap.
 EOF
 else
@@ -2216,6 +2475,26 @@ while (( SECONDS < poll_deadline )); do
   sleep 120
 done
 
+if [[ -z "$bench_status" \
+      && "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+      && $SECONDS -ge $poll_deadline ]]; then
+  echo 'Focused outer timeout reached; signalling the detached process group so its remote partial-evidence trap can run.' >&2
+  ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
+    'pid="$(cat ~/bench.pid 2>/dev/null || true)"; [[ "$pid" =~ ^[0-9]+$ ]] && kill -TERM -- "-$pid"' \
+    2>>"$poll_err" || true
+  partial_deadline=$((SECONDS + 90))
+  while (( SECONDS < partial_deadline )); do
+    bench_status="$(ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
+      'cat ~/bench.status 2>/dev/null || true' 2>>"$poll_err" || true)"
+    if [[ -n "$bench_status" ]] \
+        || ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
+          'test -s ~/demographic-bench-partial.tar.gz' 2>>"$poll_err"; then
+      break
+    fi
+    sleep 2
+  done
+fi
+
 if ! ssh "${SSH_OPTIONS[@]}" "$REMOTE" 'cat ~/bench.log' \
     > "$ARTIFACT_DIR/remote-run.log" 2>"$poll_err"; then
   echo "warning: could not retrieve ~/bench.log: $(tr '\n' ' ' <"$poll_err")" >&2
@@ -2284,7 +2563,9 @@ fi
 echo "Transferred artifact checksums verified."
 
 # --- mandatory teardown -------------------------------------------------------
-if [[ "${KEEP_VM:-0}" == "1" ]]; then
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+  echo 'Focused teardown is handled by the idempotent EXIT/TERM/INT cleanup path.'
+elif [[ "${KEEP_VM:-0}" == "1" ]]; then
   echo "KEEP_VM=1: leaving the VM running. Billing continues; destroy it yourself." >&2
 else
   : "${HYPERSTACK_API_KEY:?export HYPERSTACK_API_KEY so the VM can be destroyed}"

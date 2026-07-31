@@ -1356,6 +1356,7 @@ fn run_file(path: &str, options: RunOptions) -> i32 {
 }
 
 fn run_file_result(path: &str, options: RunOptions) -> Result<(), String> {
+    reject_cuda_sweep_final_state_selector_for_run()?;
     if let (Some(export_path), Some(out)) =
         (options.export_state.as_deref(), options.out.as_deref())
     {
@@ -1686,6 +1687,115 @@ const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DE
 const SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS";
 const SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS";
 const SWEEP_CUDA_FUSED_DRAWS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS";
+/// Hidden override for CUDA sweep final-state extraction. Packed pageable is
+/// the production default; this is not a supported CLI option and never enters
+/// scientific manifests.
+const SWEEP_CUDA_FINAL_STATE_MODE_ENV: &str = "SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE";
+const RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV: &str =
+    "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256";
+const RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV: &str =
+    "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY";
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum SweepCudaFinalStateMode {
+    Materialized,
+    #[default]
+    PackedPageable,
+    PackedPinned,
+}
+
+impl SweepCudaFinalStateMode {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Materialized => "materialized",
+            Self::PackedPageable => "packed-pageable",
+            Self::PackedPinned => "packed-pinned",
+        }
+    }
+
+    #[cfg(feature = "cuda")]
+    const fn cuda(self) -> sembla_cuda::CudaFinalStateReadbackMode {
+        match self {
+            Self::Materialized => sembla_cuda::CudaFinalStateReadbackMode::Materialized,
+            Self::PackedPageable => sembla_cuda::CudaFinalStateReadbackMode::PackedPageable,
+            Self::PackedPinned => sembla_cuda::CudaFinalStateReadbackMode::PackedPinned,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SweepCudaFinalStateSelection {
+    mode: SweepCudaFinalStateMode,
+    explicitly_set: bool,
+}
+
+fn sweep_cuda_final_state_selection(
+    backend: BackendSelection,
+) -> Result<SweepCudaFinalStateSelection, String> {
+    let selected = std::env::var_os(SWEEP_CUDA_FINAL_STATE_MODE_ENV);
+    let retired = [
+        RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV,
+        RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV,
+    ]
+    .into_iter()
+    .filter(|name| std::env::var_os(name).is_some())
+    .collect::<Vec<_>>();
+    if !retired.is_empty() {
+        let names = retired.join(", ");
+        if selected.is_some() {
+            return Err(format!(
+                "{SWEEP_CUDA_FINAL_STATE_MODE_ENV} conflicts with retired final-state variables: {names}"
+            ));
+        }
+        return Err(format!(
+            "retired CUDA device-SHA variable(s) are no longer accepted: {names}; use {SWEEP_CUDA_FINAL_STATE_MODE_ENV}=materialized|packed-pageable|packed-pinned for CUDA sweep diagnostics"
+        ));
+    }
+    let Some(raw) = selected else {
+        return Ok(SweepCudaFinalStateSelection::default());
+    };
+    let raw = raw
+        .into_string()
+        .map_err(|_| format!("{SWEEP_CUDA_FINAL_STATE_MODE_ENV} contains invalid UTF-8"))?;
+    let mode = match raw.as_str() {
+        "materialized" => SweepCudaFinalStateMode::Materialized,
+        "packed-pageable" => SweepCudaFinalStateMode::PackedPageable,
+        "packed-pinned" => SweepCudaFinalStateMode::PackedPinned,
+        _ => {
+            return Err(format!(
+                "invalid {SWEEP_CUDA_FINAL_STATE_MODE_ENV} value '{raw}' (expected 'materialized', 'packed-pageable', or 'packed-pinned')"
+            ));
+        }
+    };
+    if backend != BackendSelection::Cuda {
+        return Err(format!(
+            "{SWEEP_CUDA_FINAL_STATE_MODE_ENV} is accepted only for CUDA sweep execution"
+        ));
+    }
+    Ok(SweepCudaFinalStateSelection {
+        mode,
+        explicitly_set: true,
+    })
+}
+
+fn reject_cuda_sweep_final_state_selector_for_run() -> Result<(), String> {
+    if std::env::var_os(SWEEP_CUDA_FINAL_STATE_MODE_ENV).is_some() {
+        return Err(format!(
+            "{SWEEP_CUDA_FINAL_STATE_MODE_ENV} is accepted only for CUDA sweep execution, not 'run'"
+        ));
+    }
+    for name in [
+        RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV,
+        RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV,
+    ] {
+        if std::env::var_os(name).is_some() {
+            return Err(format!(
+                "retired CUDA device-SHA variable {name} is no longer accepted"
+            ));
+        }
+    }
+    Ok(())
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SweepConcurrencyMode {
@@ -1922,6 +2032,26 @@ fn capacity_mib(bytes: usize) -> f64 {
     bytes as f64 / (1024.0 * 1024.0)
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SweepFinalStateAdmission {
+    requested_lane_count: usize,
+    requested_pinned_bytes_per_lane: usize,
+    requested_cacheable_staging_bytes_per_lane: usize,
+    requested_pinned_bytes: usize,
+    requested_cacheable_staging_bytes: usize,
+    requested_buffer_set_count: usize,
+    requested_underlying_pinned_allocation_count: usize,
+}
+
+impl SweepFinalStateAdmission {
+    fn without_treatment(requested_lane_count: usize) -> Self {
+        Self {
+            requested_lane_count,
+            ..Self::default()
+        }
+    }
+}
+
 #[cfg(feature = "cuda")]
 struct CudaSweepCapacityDecision {
     workers: usize,
@@ -1932,13 +2062,15 @@ struct CudaSweepCapacityDecision {
     fixed: usize,
     margin_percent: usize,
     host_assumption: usize,
+    requested_pinned_bytes: usize,
+    requested_cacheable_staging_bytes: usize,
 }
 
 #[cfg(feature = "cuda")]
 fn ensure_cuda_sweep_capacity(decision: &CudaSweepCapacityDecision) -> Result<(), String> {
     if decision.required > decision.free {
         return Err(format!(
-            "insufficient CUDA device memory for --draw-workers {}: conservative bound {:.1} MiB exceeds {:.1} MiB free on device 0 ({:.1} MiB total); no lanes were constructed. The bound includes {:.1} MiB per lane plus {:.1} MiB fixed before a {}% safety margin. Host-memory assumption: at least {:.1} MiB available; host memory is not silently capped or overcommitted by this preflight",
+            "insufficient CUDA device memory for --draw-workers {}: conservative bound {:.1} MiB exceeds {:.1} MiB free on device 0 ({:.1} MiB total); no lanes were constructed. The bound includes {:.1} MiB per lane plus {:.1} MiB fixed before a {}% safety margin. Host-memory assumption: at least {:.1} MiB available, including requested packed-pinned page-locked bytes {:.1} MiB and cacheable staging bytes {:.1} MiB across {} lanes; this is not a universal OS page-lock limit and host memory is not silently capped or overcommitted by this preflight",
             decision.workers,
             capacity_mib(decision.required),
             capacity_mib(decision.free),
@@ -1947,6 +2079,9 @@ fn ensure_cuda_sweep_capacity(decision: &CudaSweepCapacityDecision) -> Result<()
             capacity_mib(decision.fixed),
             decision.margin_percent,
             capacity_mib(decision.host_assumption),
+            capacity_mib(decision.requested_pinned_bytes),
+            capacity_mib(decision.requested_cacheable_staging_bytes),
+            decision.workers,
         ));
     }
     Ok(())
@@ -1957,12 +2092,22 @@ fn preflight_cuda_sweep_capacity_with_memory(
     model: &sembla_ir::ValidatedModel,
     initial_tables: &[TableInit],
     workers: usize,
+    final_state_mode: SweepCudaFinalStateMode,
     actual_free: usize,
     total: usize,
-) -> Result<(), String> {
-    let (required, host_assumption, per_lane, fixed, margin_percent) =
-        CudaBackend::estimate_isolated_sweep_capacity(model, initial_tables, workers)
-            .map_err(|error| format!("could not establish conservative CUDA capacity: {error}"))?;
+) -> Result<SweepFinalStateAdmission, String> {
+    let estimate = CudaBackend::estimate_isolated_sweep_capacity(
+        model,
+        initial_tables,
+        workers,
+        final_state_mode.cuda(),
+    )
+    .map_err(|error| format!("could not establish conservative CUDA capacity: {error}"))?;
+    let required = estimate.device_bytes;
+    let host_assumption = estimate.host_bytes;
+    let per_lane = estimate.device_bytes_per_lane_before_margin;
+    let fixed = estimate.fixed_device_bytes_before_margin;
+    let margin_percent = estimate.safety_margin_percent;
     // Tests may lower, but never raise, the observed free-memory limit. This
     // makes rejection deterministic without providing a way to bypass safety.
     let free = match std::env::var_os(SWEEP_TEST_CUDA_FREE_MEMORY_ENV) {
@@ -1986,15 +2131,29 @@ fn preflight_cuda_sweep_capacity_with_memory(
         fixed,
         margin_percent,
         host_assumption,
+        requested_pinned_bytes: estimate.requested_pinned_bytes,
+        requested_cacheable_staging_bytes: estimate.requested_cacheable_staging_bytes,
     };
     ensure_cuda_sweep_capacity(&decision)?;
     eprintln!(
-        "CUDA draw-worker preflight admitted {workers} lanes: conservative device bound {:.1} MiB <= {:.1} MiB free on device 0 ({margin_percent}% safety margin); host-memory assumption: at least {:.1} MiB available",
+        "CUDA draw-worker preflight admitted {workers} lanes: conservative device bound {:.1} MiB <= {:.1} MiB free on device 0 ({margin_percent}% safety margin); host-memory assumption: at least {:.1} MiB available, including requested packed-pinned page-locked bytes {:.1} MiB and cacheable staging bytes {:.1} MiB across {workers} lanes (not a universal OS page-lock limit)",
         capacity_mib(required),
         capacity_mib(free),
         capacity_mib(host_assumption),
+        capacity_mib(estimate.requested_pinned_bytes),
+        capacity_mib(estimate.requested_cacheable_staging_bytes),
     );
-    Ok(())
+    Ok(SweepFinalStateAdmission {
+        requested_lane_count: workers,
+        requested_pinned_bytes_per_lane: estimate.requested_pinned_bytes_per_lane,
+        requested_cacheable_staging_bytes_per_lane: estimate
+            .requested_cacheable_staging_bytes_per_lane,
+        requested_pinned_bytes: estimate.requested_pinned_bytes,
+        requested_cacheable_staging_bytes: estimate.requested_cacheable_staging_bytes,
+        requested_buffer_set_count: estimate.requested_buffer_set_count,
+        requested_underlying_pinned_allocation_count: estimate
+            .requested_underlying_pinned_allocation_count,
+    })
 }
 
 #[cfg(feature = "cuda")]
@@ -2002,10 +2161,18 @@ fn preflight_cuda_sweep_capacity(
     model: &sembla_ir::ValidatedModel,
     initial_tables: &[TableInit],
     workers: usize,
-) -> Result<(), String> {
+    final_state_mode: SweepCudaFinalStateMode,
+) -> Result<SweepFinalStateAdmission, String> {
     let (actual_free, total) = CudaBackend::device_zero_memory_info()
         .map_err(|error| format!("could not query free CUDA device memory: {error}"))?;
-    preflight_cuda_sweep_capacity_with_memory(model, initial_tables, workers, actual_free, total)
+    preflight_cuda_sweep_capacity_with_memory(
+        model,
+        initial_tables,
+        workers,
+        final_state_mode,
+        actual_free,
+        total,
+    )
 }
 
 #[cfg(not(feature = "cuda"))]
@@ -2013,10 +2180,12 @@ fn preflight_cuda_sweep_capacity(
     _model: &sembla_ir::ValidatedModel,
     _initial_tables: &[TableInit],
     _workers: usize,
-) -> Result<(), String> {
+    _final_state_mode: SweepCudaFinalStateMode,
+) -> Result<SweepFinalStateAdmission, String> {
     Err("cuda backend unavailable: crate built without the 'cuda' feature; CUDA draw-worker capacity cannot be established".to_owned())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_concurrent_sweep_spike(
     model: &sembla_ir::ValidatedModel,
     initial_tables: &[TableInit],
@@ -2025,6 +2194,7 @@ fn run_concurrent_sweep_spike(
     workers: usize,
     prepared: &[SweepPreparedDraw],
     mode: SweepConcurrencyMode,
+    final_state_mode: SweepCudaFinalStateMode,
 ) -> Result<SweepConcurrentExecution, String> {
     let setup_started = Instant::now();
     let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
@@ -2100,14 +2270,19 @@ fn run_concurrent_sweep_spike(
                                 }
                                 let execution = std::panic::catch_unwind(
                                     std::panic::AssertUnwindSafe(|| {
-                                        backend.run_draw_lockstep(
-                                            model,
-                                            &draw.params,
-                                            draw.execution_seed,
-                                            options.ticks,
-                                            &options.enabled_features,
-                                            lockstep_tick,
-                                        )
+                                        backend
+                                            .run_draw_lockstep(
+                                                model,
+                                                &draw.params,
+                                                draw.execution_seed,
+                                                options.ticks,
+                                                &options.enabled_features,
+                                                lockstep_tick,
+                                                final_state_mode,
+                                            )
+                                            .map_err(|error| {
+                                                format!("lane {lane} of {workers}: {error}")
+                                            })
                                     }),
                                 )
                                 .unwrap_or_else(|_| {
@@ -2138,13 +2313,18 @@ fn run_concurrent_sweep_spike(
                                 if draw.k == 0 && !draw_zero_delay.is_zero() {
                                     std::thread::sleep(draw_zero_delay);
                                 }
-                                let execution = backend.run_draw(
-                                    model,
-                                    &draw.params,
-                                    draw.execution_seed,
-                                    options.ticks,
-                                    &options.enabled_features,
-                                );
+                                let execution = backend
+                                    .run_draw(
+                                        model,
+                                        &draw.params,
+                                        draw.execution_seed,
+                                        options.ticks,
+                                        &options.enabled_features,
+                                        final_state_mode,
+                                    )
+                                    .map_err(|error| {
+                                        format!("lane {lane} of {workers}: {error}")
+                                    });
                                 let elapsed = started.elapsed();
                                 completed.push(SweepConcurrentCompletedDraw {
                                     index,
@@ -2230,6 +2410,7 @@ struct SweepConcurrentInputs<'a> {
     construction_params: &'a ParamEnv,
     options: &'a SweepOptions,
     prepared: &'a [SweepPreparedDraw],
+    final_state_mode: SweepCudaFinalStateMode,
 }
 
 struct SweepBoundedConcurrentExecution {
@@ -2252,7 +2433,8 @@ trait SweepRuntime: Sync {
         model: &sembla_ir::ValidatedModel,
         initial_tables: &[TableInit],
         workers: usize,
-    ) -> Result<(), String>;
+        final_state_mode: SweepCudaFinalStateMode,
+    ) -> Result<SweepFinalStateAdmission, String>;
 
     fn new_backend(
         &self,
@@ -2282,8 +2464,9 @@ impl SweepRuntime for ProductionSweepRuntime {
         model: &sembla_ir::ValidatedModel,
         initial_tables: &[TableInit],
         workers: usize,
-    ) -> Result<(), String> {
-        preflight_cuda_sweep_capacity(model, initial_tables, workers)
+        final_state_mode: SweepCudaFinalStateMode,
+    ) -> Result<SweepFinalStateAdmission, String> {
+        preflight_cuda_sweep_capacity(model, initial_tables, workers, final_state_mode)
     }
 
     fn new_backend(
@@ -2327,6 +2510,7 @@ where
         construction_params,
         options,
         prepared,
+        final_state_mode,
     } = inputs;
     let setup_started = Instant::now();
     let draw_zero_delay = sweep_concurrency_spike_draw_zero_delay()?;
@@ -2436,13 +2620,16 @@ where
                         }
                         let execution =
                             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                                backend.run_draw(
-                                    model,
-                                    &draw.params,
-                                    draw.execution_seed,
-                                    options.ticks,
-                                    &options.enabled_features,
-                                )
+                                backend
+                                    .run_draw(
+                                        model,
+                                        &draw.params,
+                                        draw.execution_seed,
+                                        options.ticks,
+                                        &options.enabled_features,
+                                        final_state_mode,
+                                    )
+                                    .map_err(|error| format!("lane {lane} of {workers}: {error}"))
                             }))
                             .unwrap_or_else(|_| {
                                 Err(format!("draw {}: concurrent worker panicked", draw.k))
@@ -2539,12 +2726,20 @@ where
             }
             maximum_pending_results = maximum_pending_results.max(pending.len());
             while let Some(completed) = pending.remove(&next_publish) {
+                let final_state = completed
+                    .execution
+                    .as_ref()
+                    .ok()
+                    .and_then(|execution| execution.final_state.as_ref())
+                    .map(|diagnostic| SweepFinalStateTiming::new(diagnostic, completed.elapsed))
+                    .transpose()?;
                 timings.push(SweepConcurrencySpikeTimingDraw {
                     k: prepared[completed.index].k,
                     lane: completed.lane,
                     start_offset_ms: duration_ms(completed.start_offset),
                     finish_offset_ms: duration_ms(completed.finish_offset),
                     wall_time_ms: duration_ms(completed.elapsed),
+                    final_state,
                 });
                 if publication_error.is_none() {
                     let publication_started = Instant::now();
@@ -2814,6 +3009,7 @@ fn run_fused_sweep_spike(
                         Ok(SweepDrawOutput {
                             output,
                             final_state_hash: state.state_hash(),
+                            final_state: None,
                         })
                     })
             };
@@ -2950,8 +3146,14 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
         _ => unreachable!("sweep option exclusivity was checked while parsing"),
     };
     let supported_workers_present = options.draw_workers.is_some();
+    let final_state_selection = sweep_cuda_final_state_selection(options.backend)?;
     let fused_capacity =
         sweep_cuda_fused_draw_capacity(options.backend, supported_workers_present)?;
+    if fused_capacity.is_some() && final_state_selection.explicitly_set {
+        return Err(format!(
+            "{SWEEP_CUDA_FINAL_STATE_MODE_ENV} is incompatible with experimental {SWEEP_CUDA_FUSED_DRAWS_ENV}"
+        ));
+    }
     let draw_workers = sweep_draw_workers(draw_count, options.backend, options.draw_workers)?;
     let concurrency_mode = sweep_concurrency_mode(
         draw_count,
@@ -3010,10 +3212,21 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
     // Construction values are placeholders only: draw zero also follows the
     // same explicit reset and reseed path as every later draw.
     let construction_params = ParamEnv::defaults(&model);
-    if draw_workers > 1 && concurrency_mode == SweepConcurrencyMode::CudaFreeNonblocking {
+    let mut final_state_admission = SweepFinalStateAdmission::without_treatment(draw_workers);
+    if options.backend == BackendSelection::Cuda
+        && ((draw_workers > 1 && concurrency_mode == SweepConcurrencyMode::CudaFreeNonblocking)
+            || final_state_selection.mode == SweepCudaFinalStateMode::PackedPinned)
+    {
         // This is deliberately before output-directory creation and before any
-        // worker thread can construct a retained backend.
-        runtime.preflight_cuda_capacity(&model, &initial_tables, draw_workers)?;
+        // worker thread can construct a retained backend. Packed-pinned also
+        // takes this path for one worker so arithmetic/capacity rejection is
+        // pre-output even though actual page locking remains lazy per lane.
+        final_state_admission = runtime.preflight_cuda_capacity(
+            &model,
+            &initial_tables,
+            draw_workers,
+            final_state_selection.mode,
+        )?;
     }
     let out = Path::new(&options.out);
     std::fs::create_dir_all(out).map_err(|error| format!("{}: {error}", out.display()))?;
@@ -3109,6 +3322,7 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
     let mut all_series = Vec::with_capacity(draw_count as usize);
     let mut reported_columns: Option<Vec<String>> = None;
     let mut draw_durations = Vec::with_capacity(draw_count as usize);
+    let mut draw_final_state_timings = Vec::with_capacity(draw_count as usize);
     let mut concurrency_spike_timing = None;
     let mut fused_spike_timing = None;
     let setup_elapsed;
@@ -3246,14 +3460,25 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
                 manifest::NoiseMode::Independent => derive_sweep_replica_seed(options.seed, draw),
             };
             let draw_started = Instant::now();
-            let execution = backend.run_draw(
-                &model,
-                &params,
-                execution_seed,
-                options.ticks,
-                &options.enabled_features,
-            )?;
-            draw_durations.push(draw_started.elapsed());
+            let execution = backend
+                .run_draw(
+                    &model,
+                    &params,
+                    execution_seed,
+                    options.ticks,
+                    &options.enabled_features,
+                    final_state_selection.mode,
+                )
+                .map_err(|error| format!("lane 0 of 1: {error}"))?;
+            let draw_elapsed = draw_started.elapsed();
+            draw_final_state_timings.push(
+                execution
+                    .final_state
+                    .as_ref()
+                    .map(|diagnostic| SweepFinalStateTiming::new(diagnostic, draw_elapsed))
+                    .transpose()?,
+            );
+            draw_durations.push(draw_elapsed);
             all_series.push(publish_sweep_draw(
                 draw,
                 &params,
@@ -3331,6 +3556,7 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
                     construction_params: &construction_params,
                     options: &options,
                     prepared: &prepared,
+                    final_state_mode: final_state_selection.mode,
                 },
                 draw_workers,
                 concurrency_mode,
@@ -3378,6 +3604,7 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
                 draw_workers,
                 &prepared,
                 concurrency_mode,
+                final_state_selection.mode,
             )?;
             setup_elapsed = concurrent.setup_elapsed;
             run_manifest.backend_identity = Some(concurrent.identity);
@@ -3385,12 +3612,20 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
             let mut timing_draws = Vec::with_capacity(concurrent.draws.len());
             for completed in concurrent.draws {
                 let prepared_draw = &prepared[completed.index];
+                let final_state = completed
+                    .execution
+                    .as_ref()
+                    .ok()
+                    .and_then(|execution| execution.final_state.as_ref())
+                    .map(|diagnostic| SweepFinalStateTiming::new(diagnostic, completed.elapsed))
+                    .transpose()?;
                 timing_draws.push(SweepConcurrencySpikeTimingDraw {
                     k: prepared_draw.k,
                     lane: completed.lane,
                     start_offset_ms: duration_ms(completed.start_offset),
                     finish_offset_ms: duration_ms(completed.finish_offset),
                     wall_time_ms: duration_ms(completed.elapsed),
+                    final_state,
                 });
                 draw_durations.push(completed.elapsed);
                 let execution = completed
@@ -3486,8 +3721,15 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
             maximum_pending_results,
         )) = concurrency_spike_timing
         {
+            let final_state_buffer_accounting = aggregate_final_state_buffer_accounting(
+                final_state_selection.mode,
+                final_state_admission,
+                timing_draws
+                    .iter()
+                    .map(|timing| (timing.lane, &timing.final_state)),
+            )?;
             serde_json::to_string_pretty(&SweepConcurrencySpikeTimingDocument {
-                schema: "sembla-sweep-concurrency-spike-timing-v1",
+                schema: "sembla-sweep-concurrency-spike-timing-v3",
                 backend,
                 draws: draw_count,
                 ticks_per_draw: options.ticks,
@@ -3504,29 +3746,40 @@ fn sweep_file_result_with_runtime<R: SweepRuntime>(
                 setup_wall_time_ms: duration_ms(setup_elapsed),
                 execution_window_wall_time_ms: duration_ms(execution_window),
                 publication_wall_time_ms: duration_ms(publication_elapsed),
+                final_state_buffer_accounting,
                 draw_timings: timing_draws,
                 whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
                 repository_commit,
                 binary_sha256,
             })
         } else {
+            let draw_zero_duration = draw_durations[0];
+            let draw_timings = draw_durations
+                .into_iter()
+                .zip(draw_final_state_timings)
+                .enumerate()
+                .map(|(k, (elapsed, final_state))| SweepTimingDraw {
+                    k: u32::try_from(k).expect("draw count is u32"),
+                    wall_time_ms: duration_ms(elapsed),
+                    final_state,
+                })
+                .collect::<Vec<_>>();
+            let final_state_buffer_accounting = aggregate_final_state_buffer_accounting(
+                final_state_selection.mode,
+                final_state_admission,
+                draw_timings.iter().map(|timing| (0, &timing.final_state)),
+            )?;
             serde_json::to_string_pretty(&SweepTimingDocument {
-                schema: "sembla-sweep-timing-v1",
+                schema: "sembla-sweep-timing-v3",
                 backend,
                 draws: draw_count,
                 ticks_per_draw: options.ticks,
                 setup_wall_time_ms: duration_ms(setup_elapsed),
                 draw_zero_including_setup_wall_time_ms: duration_ms(
-                    setup_elapsed + draw_durations[0],
+                    setup_elapsed + draw_zero_duration,
                 ),
-                draw_timings: draw_durations
-                    .into_iter()
-                    .enumerate()
-                    .map(|(k, elapsed)| SweepTimingDraw {
-                        k: u32::try_from(k).expect("draw count is u32"),
-                        wall_time_ms: duration_ms(elapsed),
-                    })
-                    .collect(),
+                final_state_buffer_accounting,
+                draw_timings,
                 whole_sweep_wall_time_ms: duration_ms(sweep_started.elapsed()),
                 repository_commit,
                 binary_sha256,
@@ -3906,6 +4159,78 @@ static SWEEP_BACKEND_CONSTRUCTIONS: std::sync::atomic::AtomicUsize =
 #[cfg(test)]
 static SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SweepFinalStateDownloadedBytes {
+    state: usize,
+    inputs: usize,
+    input_counts: usize,
+    total: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SweepFinalStateBufferAccounting {
+    buffer_set_count: usize,
+    underlying_pinned_allocation_count: usize,
+    pinned_bytes: usize,
+    cacheable_staging_bytes: usize,
+}
+
+#[derive(Clone, Debug)]
+struct SweepFinalStateDiagnostic {
+    mode: SweepCudaFinalStateMode,
+    allocation: Duration,
+    pageable_dtoh_host_api: Option<Duration>,
+    pinned_dtoh_enqueue_api: Option<Duration>,
+    wait_to_pinned_host_readable: Option<Duration>,
+    pinned_to_cacheable_staging_copy: Option<Duration>,
+    host_state_reconstruction: Option<Duration>,
+    cpu_sha256: Duration,
+    total: Duration,
+    downloaded_bytes: SweepFinalStateDownloadedBytes,
+    buffer_accounting: SweepFinalStateBufferAccounting,
+}
+
+#[cfg(feature = "cuda")]
+impl From<sembla_cuda::CudaFinalStateReadback> for SweepFinalStateDiagnostic {
+    fn from(value: sembla_cuda::CudaFinalStateReadback) -> Self {
+        Self {
+            mode: match value.mode {
+                sembla_cuda::CudaFinalStateReadbackMode::Materialized => {
+                    SweepCudaFinalStateMode::Materialized
+                }
+                sembla_cuda::CudaFinalStateReadbackMode::PackedPageable => {
+                    SweepCudaFinalStateMode::PackedPageable
+                }
+                sembla_cuda::CudaFinalStateReadbackMode::PackedPinned => {
+                    SweepCudaFinalStateMode::PackedPinned
+                }
+            },
+            allocation: value.allocation,
+            pageable_dtoh_host_api: value.pageable_dtoh_host_api,
+            pinned_dtoh_enqueue_api: value.pinned_dtoh_enqueue_api,
+            wait_to_pinned_host_readable: value.wait_to_pinned_host_readable,
+            pinned_to_cacheable_staging_copy: value.pinned_to_cacheable_staging_copy,
+            host_state_reconstruction: value.host_state_reconstruction,
+            cpu_sha256: value.cpu_sha256,
+            total: value.total,
+            downloaded_bytes: SweepFinalStateDownloadedBytes {
+                state: value.downloaded_bytes.state,
+                inputs: value.downloaded_bytes.inputs,
+                input_counts: value.downloaded_bytes.input_counts,
+                total: value.downloaded_bytes.total,
+            },
+            buffer_accounting: SweepFinalStateBufferAccounting {
+                buffer_set_count: value.buffer_accounting.buffer_set_count,
+                underlying_pinned_allocation_count: value
+                    .buffer_accounting
+                    .underlying_pinned_allocation_count,
+                pinned_bytes: value.buffer_accounting.pinned_bytes,
+                cacheable_staging_bytes: value.buffer_accounting.cacheable_staging_bytes,
+            },
+        }
+    }
+}
+
 enum SweepBackend {
     Cpu {
         state: StateStore,
@@ -3913,11 +4238,19 @@ enum SweepBackend {
     },
     #[cfg(feature = "cuda")]
     Cuda(CudaBackend),
+    #[cfg(test)]
+    LocalConformance {
+        state: StateStore,
+        initial: Vec<TableInit>,
+        pinned_buffer_allocated: bool,
+        fail_pinned_allocation: bool,
+    },
 }
 
 struct SweepDrawOutput {
     output: RunOutput,
     final_state_hash: [u8; 32],
+    final_state: Option<SweepFinalStateDiagnostic>,
 }
 
 impl SweepBackend {
@@ -3955,6 +4288,29 @@ impl SweepBackend {
                 }
             }
         }
+    }
+
+    #[cfg(test)]
+    fn new_local_conformance(
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+    ) -> Result<Self, String> {
+        Self::new_local_conformance_with_pinned_failure(model, initial, false)
+    }
+
+    #[cfg(test)]
+    fn new_local_conformance_with_pinned_failure(
+        model: &sembla_ir::ValidatedModel,
+        initial: Vec<TableInit>,
+        fail_pinned_allocation: bool,
+    ) -> Result<Self, String> {
+        let state = StateStore::new(model, initial.clone()).map_err(|error| error.to_string())?;
+        Ok(Self::LocalConformance {
+            state,
+            initial,
+            pinned_buffer_allocated: false,
+            fail_pinned_allocation,
+        })
     }
 
     fn new_concurrency_lane(
@@ -4003,6 +4359,8 @@ impl SweepBackend {
     fn identity(&self) -> manifest::BackendIdentity {
         match self {
             Self::Cpu { .. } => manifest::BackendIdentity::cpu_oracle(),
+            #[cfg(test)]
+            Self::LocalConformance { .. } => manifest::BackendIdentity::cpu_oracle(),
             #[cfg(feature = "cuda")]
             Self::Cuda(backend) => {
                 let device = backend.device_identity();
@@ -4021,6 +4379,7 @@ impl SweepBackend {
         seed: u64,
         ticks: u32,
         enabled_features: &FeatureSet,
+        _final_state_mode: SweepCudaFinalStateMode,
     ) -> Result<SweepDrawOutput, String> {
         match self {
             Self::Cpu { state, initial } => {
@@ -4039,6 +4398,97 @@ impl SweepBackend {
                 Ok(SweepDrawOutput {
                     output,
                     final_state_hash: state.state_hash(),
+                    final_state: None,
+                })
+            }
+            #[cfg(test)]
+            Self::LocalConformance {
+                state,
+                initial,
+                pinned_buffer_allocated,
+                fail_pinned_allocation,
+            } => {
+                state
+                    .reset_backend_draw(model, initial)
+                    .map_err(|error| error.to_string())?;
+                let output = run_results_output_with_features(
+                    model,
+                    state,
+                    params,
+                    seed,
+                    ticks,
+                    HashMode::FinalOnly,
+                    enabled_features,
+                )?;
+                let allocation = if _final_state_mode == SweepCudaFinalStateMode::PackedPinned
+                    && !*pinned_buffer_allocated
+                {
+                    if *fail_pinned_allocation {
+                        return Err(
+                            "injected packed-pinned cacheable staging allocation failure: requested 1 byte for one lane; no pageable fallback"
+                                .to_owned(),
+                        );
+                    }
+                    *pinned_buffer_allocated = true;
+                    Duration::from_nanos(1)
+                } else {
+                    Duration::ZERO
+                };
+                let seam_started = Instant::now();
+                let hash_started = Instant::now();
+                let final_state_hash = state.state_hash();
+                let cpu_sha256 = hash_started.elapsed();
+                let downloaded_bytes = match _final_state_mode {
+                    SweepCudaFinalStateMode::Materialized => {
+                        SweepFinalStateDownloadedBytes::default()
+                    }
+                    SweepCudaFinalStateMode::PackedPageable
+                    | SweepCudaFinalStateMode::PackedPinned => SweepFinalStateDownloadedBytes {
+                        state: 1,
+                        inputs: 0,
+                        input_counts: 0,
+                        total: 1,
+                    },
+                };
+                let buffer_accounting =
+                    if _final_state_mode == SweepCudaFinalStateMode::PackedPinned {
+                        SweepFinalStateBufferAccounting {
+                            buffer_set_count: 1,
+                            underlying_pinned_allocation_count: 1,
+                            pinned_bytes: 1,
+                            cacheable_staging_bytes: 1,
+                        }
+                    } else {
+                        SweepFinalStateBufferAccounting::default()
+                    };
+                Ok(SweepDrawOutput {
+                    output,
+                    final_state_hash,
+                    final_state: Some(SweepFinalStateDiagnostic {
+                        mode: _final_state_mode,
+                        allocation,
+                        pageable_dtoh_host_api: (_final_state_mode
+                            != SweepCudaFinalStateMode::PackedPinned)
+                            .then_some(Duration::ZERO),
+                        pinned_dtoh_enqueue_api: (_final_state_mode
+                            == SweepCudaFinalStateMode::PackedPinned)
+                            .then_some(Duration::ZERO),
+                        wait_to_pinned_host_readable: (_final_state_mode
+                            == SweepCudaFinalStateMode::PackedPinned)
+                            .then_some(Duration::ZERO),
+                        pinned_to_cacheable_staging_copy: (_final_state_mode
+                            == SweepCudaFinalStateMode::PackedPinned)
+                            .then_some(Duration::ZERO),
+                        host_state_reconstruction: matches!(
+                            _final_state_mode,
+                            SweepCudaFinalStateMode::Materialized
+                        )
+                        .then_some(Duration::ZERO),
+                        cpu_sha256,
+                        total: seam_started.elapsed(),
+                        downloaded_bytes,
+                        buffer_accounting,
+                    }),
                 })
             }
             #[cfg(feature = "cuda")]
@@ -4088,18 +4538,20 @@ impl SweepBackend {
                     )?;
                 }
                 let output = output.finish(model, None)?;
-                let final_state_hash = backend
-                    .ensure_observed_state()
-                    .map_err(|error| error.to_string())?
-                    .state_hash();
+                let final_state = backend
+                    .final_state_readback(_final_state_mode.cuda())
+                    .map_err(|error| error.to_string())?;
+                let final_state_hash = final_state.digest;
                 Ok(SweepDrawOutput {
                     output,
                     final_state_hash,
+                    final_state: Some(final_state.into()),
                 })
             }
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn run_draw_lockstep(
         &mut self,
         model: &sembla_ir::ValidatedModel,
@@ -4108,9 +4560,10 @@ impl SweepBackend {
         ticks: u32,
         _enabled_features: &FeatureSet,
         tick_barrier: &std::sync::Barrier,
+        final_state_mode: SweepCudaFinalStateMode,
     ) -> Result<SweepDrawOutput, String> {
         #[cfg(not(feature = "cuda"))]
-        let _ = (model, params, seed);
+        let _ = (model, params, seed, final_state_mode);
         match self {
             Self::Cpu { .. } => {
                 // Preserve the barrier protocol even on an impossible route so
@@ -4120,6 +4573,14 @@ impl SweepBackend {
                     tick_barrier.wait();
                 }
                 Err("CUDA lockstep-stream spike requires --backend cuda".to_owned())
+            }
+            #[cfg(test)]
+            Self::LocalConformance { .. } => {
+                tick_barrier.wait();
+                for _ in 0..ticks {
+                    tick_barrier.wait();
+                }
+                Err("local conformance backend does not implement lockstep mode".to_owned())
             }
             #[cfg(feature = "cuda")]
             Self::Cuda(backend) => {
@@ -4224,13 +4685,14 @@ impl SweepBackend {
                 let output = output
                     .expect("healthy lockstep draw has an accumulator")
                     .finish(model, None)?;
-                let final_state_hash = backend
-                    .ensure_observed_state()
-                    .map_err(|error| error.to_string())?
-                    .state_hash();
+                let final_state = backend
+                    .final_state_readback(final_state_mode.cuda())
+                    .map_err(|error| error.to_string())?;
+                let final_state_hash = final_state.digest;
                 Ok(SweepDrawOutput {
                     output,
                     final_state_hash,
+                    final_state: Some(final_state.into()),
                 })
             }
         }
@@ -4357,10 +4819,266 @@ fn finish_tick_timing(
     })
 }
 
+#[derive(Clone, Serialize)]
+struct SweepFinalStateDownloadedBytesTiming {
+    state: usize,
+    inputs: usize,
+    input_counts: usize,
+    total: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct SweepFinalStateBufferAccountingTiming {
+    buffer_set_count: usize,
+    underlying_pinned_allocation_count: usize,
+    pinned_bytes: usize,
+    cacheable_staging_bytes: usize,
+}
+
+const FINAL_STATE_TIMER_TOLERANCE: Duration = Duration::from_micros(1);
+const FINAL_STATE_TIMER_TOLERANCE_MS: f64 = 0.001;
+
+#[derive(Clone, Serialize)]
+struct SweepFinalStateTiming {
+    schema: &'static str,
+    mode: &'static str,
+    one_time_allocation_ms: f64,
+    pageable_dtoh_host_api_ms: Option<f64>,
+    pinned_dtoh_enqueue_api_ms: Option<f64>,
+    wait_to_pinned_host_readable_ms: Option<f64>,
+    pinned_to_cacheable_staging_copy_ms: Option<f64>,
+    host_state_reconstruction_ms: Option<f64>,
+    cpu_sha256_ms: f64,
+    attributed_phase_sum_ms: f64,
+    unattributed_timer_overhead_ms: f64,
+    final_state_seam_total_ms: f64,
+    final_state_seam_total_excludes_one_time_allocation: bool,
+    timer_tolerance_ms: f64,
+    phases_reconcile: bool,
+    allocation_plus_seam_reconciles_with_draw_wall: bool,
+    downloaded_bytes: SweepFinalStateDownloadedBytesTiming,
+    buffer_accounting: SweepFinalStateBufferAccountingTiming,
+}
+
+impl SweepFinalStateTiming {
+    fn new(value: &SweepFinalStateDiagnostic, draw_wall: Duration) -> Result<Self, String> {
+        let attributed = [
+            value.pageable_dtoh_host_api,
+            value.pinned_dtoh_enqueue_api,
+            value.wait_to_pinned_host_readable,
+            value.pinned_to_cacheable_staging_copy,
+            value.host_state_reconstruction,
+            Some(value.cpu_sha256),
+        ]
+        .into_iter()
+        .flatten()
+        .try_fold(Duration::ZERO, |total, phase| total.checked_add(phase))
+        .ok_or_else(|| "final-state attributed phase duration overflow".to_owned())?;
+        let unattributed = value.total.checked_sub(attributed).ok_or_else(|| {
+            format!(
+                "{} final-state attributed phases exceed the measured seam total",
+                value.mode.label()
+            )
+        })?;
+        let allocation_plus_seam = value
+            .allocation
+            .checked_add(value.total)
+            .ok_or_else(|| "final-state allocation/seam duration overflow".to_owned())?;
+        let draw_with_tolerance = draw_wall
+            .checked_add(FINAL_STATE_TIMER_TOLERANCE)
+            .ok_or_else(|| "draw timing tolerance overflow".to_owned())?;
+        if allocation_plus_seam > draw_with_tolerance {
+            return Err(format!(
+                "{} final-state allocation plus seam time exceeds draw wall time by more than {:.3} ms",
+                value.mode.label(),
+                FINAL_STATE_TIMER_TOLERANCE_MS
+            ));
+        }
+        Ok(Self {
+            schema: "sembla-cuda-final-state-readback-v2",
+            mode: value.mode.label(),
+            one_time_allocation_ms: duration_ms(value.allocation),
+            pageable_dtoh_host_api_ms: value.pageable_dtoh_host_api.map(duration_ms),
+            pinned_dtoh_enqueue_api_ms: value.pinned_dtoh_enqueue_api.map(duration_ms),
+            wait_to_pinned_host_readable_ms: value.wait_to_pinned_host_readable.map(duration_ms),
+            pinned_to_cacheable_staging_copy_ms: value
+                .pinned_to_cacheable_staging_copy
+                .map(duration_ms),
+            host_state_reconstruction_ms: value.host_state_reconstruction.map(duration_ms),
+            cpu_sha256_ms: duration_ms(value.cpu_sha256),
+            attributed_phase_sum_ms: duration_ms(attributed),
+            unattributed_timer_overhead_ms: duration_ms(unattributed),
+            final_state_seam_total_ms: duration_ms(value.total),
+            final_state_seam_total_excludes_one_time_allocation: true,
+            timer_tolerance_ms: FINAL_STATE_TIMER_TOLERANCE_MS,
+            phases_reconcile: true,
+            allocation_plus_seam_reconciles_with_draw_wall: true,
+            downloaded_bytes: SweepFinalStateDownloadedBytesTiming {
+                state: value.downloaded_bytes.state,
+                inputs: value.downloaded_bytes.inputs,
+                input_counts: value.downloaded_bytes.input_counts,
+                total: value.downloaded_bytes.total,
+            },
+            buffer_accounting: SweepFinalStateBufferAccountingTiming {
+                buffer_set_count: value.buffer_accounting.buffer_set_count,
+                underlying_pinned_allocation_count: value
+                    .buffer_accounting
+                    .underlying_pinned_allocation_count,
+                pinned_bytes: value.buffer_accounting.pinned_bytes,
+                cacheable_staging_bytes: value.buffer_accounting.cacheable_staging_bytes,
+            },
+        })
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct SweepFinalStateBufferAccountingDocument {
+    mode: &'static str,
+    requested_lane_count: usize,
+    retained_lane_count: usize,
+    requested_pinned_bytes_per_lane: usize,
+    requested_cacheable_staging_bytes_per_lane: usize,
+    requested_pinned_bytes: usize,
+    effective_pinned_bytes: usize,
+    requested_cacheable_staging_bytes: usize,
+    effective_cacheable_staging_bytes: usize,
+    requested_buffer_set_count: usize,
+    buffer_set_count: usize,
+    requested_underlying_pinned_allocation_count: usize,
+    underlying_pinned_allocation_count: usize,
+}
+
+fn aggregate_final_state_buffer_accounting<'a>(
+    mode: SweepCudaFinalStateMode,
+    admission: SweepFinalStateAdmission,
+    lane_timings: impl IntoIterator<Item = (usize, &'a Option<SweepFinalStateTiming>)>,
+) -> Result<SweepFinalStateBufferAccountingDocument, String> {
+    let mut lanes = std::collections::BTreeMap::new();
+    for (lane, timing) in lane_timings {
+        let Some(timing) = timing else {
+            continue;
+        };
+        if let Some(previous) = lanes.insert(lane, timing.buffer_accounting.clone()) {
+            if previous != timing.buffer_accounting {
+                return Err(format!(
+                    "final-state buffer accounting changed across draws on lane {lane}"
+                ));
+            }
+        }
+    }
+    let retained_lane_count = admission.requested_lane_count;
+    let mut effective_pinned_bytes = 0_usize;
+    let mut effective_cacheable_staging_bytes = 0_usize;
+    let mut buffer_set_count = 0_usize;
+    let mut underlying_pinned_allocation_count = 0_usize;
+    for accounting in lanes.values() {
+        effective_pinned_bytes = effective_pinned_bytes
+            .checked_add(accounting.pinned_bytes)
+            .ok_or_else(|| "effective pinned-byte accounting overflow".to_owned())?;
+        effective_cacheable_staging_bytes = effective_cacheable_staging_bytes
+            .checked_add(accounting.cacheable_staging_bytes)
+            .ok_or_else(|| "effective cacheable staging-byte accounting overflow".to_owned())?;
+        buffer_set_count = buffer_set_count
+            .checked_add(accounting.buffer_set_count)
+            .ok_or_else(|| "effective pinned buffer-set count overflow".to_owned())?;
+        underlying_pinned_allocation_count = underlying_pinned_allocation_count
+            .checked_add(accounting.underlying_pinned_allocation_count)
+            .ok_or_else(|| "effective pinned allocation-count overflow".to_owned())?;
+    }
+    if buffer_set_count > retained_lane_count {
+        return Err(format!(
+            "packed-pinned buffer-set count {buffer_set_count} exceeds retained lane count {retained_lane_count}"
+        ));
+    }
+    let maximum_underlying = retained_lane_count
+        .checked_mul(3)
+        .ok_or_else(|| "retained lane allocation bound overflow".to_owned())?;
+    if underlying_pinned_allocation_count > maximum_underlying {
+        return Err(format!(
+            "packed-pinned underlying allocation count {underlying_pinned_allocation_count} exceeds three per retained lane ({maximum_underlying})"
+        ));
+    }
+    if mode == SweepCudaFinalStateMode::PackedPinned {
+        if admission.requested_buffer_set_count != admission.requested_lane_count
+            || buffer_set_count != lanes.len()
+            || buffer_set_count > admission.requested_buffer_set_count
+            || underlying_pinned_allocation_count
+                > admission.requested_underlying_pinned_allocation_count
+        {
+            return Err(format!(
+                "packed-pinned effective allocation counts exceed or disagree with admission: requested lanes/sets/allocations {}/{}/{}, effective used lanes/sets/allocations {}/{}/{}",
+                admission.requested_lane_count,
+                admission.requested_buffer_set_count,
+                admission.requested_underlying_pinned_allocation_count,
+                lanes.len(),
+                buffer_set_count,
+                underlying_pinned_allocation_count,
+            ));
+        }
+        let expected_pinned = admission
+            .requested_pinned_bytes_per_lane
+            .checked_mul(buffer_set_count)
+            .ok_or_else(|| "effective pinned-byte expectation overflow".to_owned())?;
+        let expected_staging = admission
+            .requested_cacheable_staging_bytes_per_lane
+            .checked_mul(buffer_set_count)
+            .ok_or_else(|| "effective staging-byte expectation overflow".to_owned())?;
+        let allocations_per_lane = admission
+            .requested_underlying_pinned_allocation_count
+            .checked_div(admission.requested_lane_count)
+            .ok_or_else(|| "packed-pinned requested lane count is zero".to_owned())?;
+        let expected_allocations = allocations_per_lane
+            .checked_mul(buffer_set_count)
+            .ok_or_else(|| "effective pinned allocation-count expectation overflow".to_owned())?;
+        if effective_pinned_bytes != expected_pinned
+            || effective_cacheable_staging_bytes != expected_staging
+            || underlying_pinned_allocation_count != expected_allocations
+        {
+            return Err(format!(
+                "packed-pinned effective used-lane accounting does not match admission: expected sets/allocations/pinned/staging bytes {}/{}/{}/{}, effective {}/{}/{}/{}",
+                buffer_set_count,
+                expected_allocations,
+                expected_pinned,
+                expected_staging,
+                buffer_set_count,
+                underlying_pinned_allocation_count,
+                effective_pinned_bytes,
+                effective_cacheable_staging_bytes,
+            ));
+        }
+    }
+    if mode != SweepCudaFinalStateMode::PackedPinned
+        && (buffer_set_count != 0
+            || underlying_pinned_allocation_count != 0
+            || effective_pinned_bytes != 0
+            || effective_cacheable_staging_bytes != 0)
+    {
+        return Err("non-pinned final-state mode allocated treatment buffers".to_owned());
+    }
+    Ok(SweepFinalStateBufferAccountingDocument {
+        mode: mode.label(),
+        requested_lane_count: admission.requested_lane_count,
+        retained_lane_count,
+        requested_pinned_bytes_per_lane: admission.requested_pinned_bytes_per_lane,
+        requested_cacheable_staging_bytes_per_lane: admission
+            .requested_cacheable_staging_bytes_per_lane,
+        requested_pinned_bytes: admission.requested_pinned_bytes,
+        effective_pinned_bytes,
+        requested_cacheable_staging_bytes: admission.requested_cacheable_staging_bytes,
+        effective_cacheable_staging_bytes,
+        requested_buffer_set_count: admission.requested_buffer_set_count,
+        buffer_set_count,
+        requested_underlying_pinned_allocation_count: admission
+            .requested_underlying_pinned_allocation_count,
+        underlying_pinned_allocation_count,
+    })
+}
+
 #[derive(Serialize)]
 struct SweepTimingDraw {
     k: u32,
     wall_time_ms: f64,
+    final_state: Option<SweepFinalStateTiming>,
 }
 
 #[derive(Serialize)]
@@ -4371,6 +5089,7 @@ struct SweepTimingDocument {
     ticks_per_draw: u32,
     setup_wall_time_ms: f64,
     draw_zero_including_setup_wall_time_ms: f64,
+    final_state_buffer_accounting: SweepFinalStateBufferAccountingDocument,
     draw_timings: Vec<SweepTimingDraw>,
     whole_sweep_wall_time_ms: f64,
     repository_commit: String,
@@ -4412,6 +5131,7 @@ struct SweepConcurrencySpikeTimingDraw {
     start_offset_ms: f64,
     finish_offset_ms: f64,
     wall_time_ms: f64,
+    final_state: Option<SweepFinalStateTiming>,
 }
 
 #[derive(Serialize)]
@@ -4427,6 +5147,7 @@ struct SweepConcurrencySpikeTimingDocument {
     setup_wall_time_ms: f64,
     execution_window_wall_time_ms: f64,
     publication_wall_time_ms: f64,
+    final_state_buffer_accounting: SweepFinalStateBufferAccountingDocument,
     draw_timings: Vec<SweepConcurrencySpikeTimingDraw>,
     whole_sweep_wall_time_ms: f64,
     repository_commit: String,
@@ -6686,17 +7407,22 @@ fn initialize_population(model: &sembla_ir::ValidatedModel, population: usize) -
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::{
         collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, duration_ms,
         fused_publishable_prefix, initialize_population, parse_backend, parse_diff_options,
         parse_sweep_options, run, run_bounded_concurrent_sweep, run_file_result,
-        run_results_output, run_results_output_with_features, sweep_file_result,
-        sweep_file_result_with_runtime, BackendSelection, HashMode, ProductionSweepRuntime,
-        RunOptions, SweepBackend, SweepConcurrencyMode, SweepConcurrentInputs, SweepOptions,
-        SweepPreparedDraw, SweepRuntime, SWEEP_BACKEND_CONSTRUCTIONS,
+        run_results_output, run_results_output_with_features, sweep_cuda_final_state_selection,
+        sweep_file_result, sweep_file_result_with_runtime, BackendSelection, HashMode,
+        ProductionSweepRuntime, RunOptions, SweepBackend, SweepConcurrencyMode,
+        SweepConcurrentInputs, SweepCudaFinalStateMode, SweepOptions, SweepPreparedDraw,
+        SweepRuntime, RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV,
+        RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV, SWEEP_BACKEND_CONSTRUCTIONS,
         SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK, SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV,
         SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV, SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV,
-        SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV, SWEEP_CUDA_FUSED_DRAWS_ENV, VERSION,
+        SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV, SWEEP_CUDA_FINAL_STATE_MODE_ENV,
+        SWEEP_CUDA_FUSED_DRAWS_ENV, VERSION,
     };
     use sembla_runtime::{
         eval::ParamEnv,
@@ -6718,16 +7444,32 @@ mod tests {
     /// It replaces only device-dependent construction and admission while the
     /// supported CUDA option, free-stream mode, bounded scheduler, ordered
     /// publication, manifest, and timing paths remain unchanged.
-    struct LocalConformanceSweepRuntime;
+    #[derive(Default)]
+    struct LocalConformanceSweepRuntime {
+        fail_pinned_allocation: bool,
+    }
 
     impl SweepRuntime for LocalConformanceSweepRuntime {
         fn preflight_cuda_capacity(
             &self,
             _model: &sembla_ir::ValidatedModel,
             _initial_tables: &[TableInit],
-            _workers: usize,
-        ) -> Result<(), String> {
-            Ok(())
+            workers: usize,
+            final_state_mode: SweepCudaFinalStateMode,
+        ) -> Result<super::SweepFinalStateAdmission, String> {
+            if final_state_mode == SweepCudaFinalStateMode::PackedPinned {
+                Ok(super::SweepFinalStateAdmission {
+                    requested_lane_count: workers,
+                    requested_pinned_bytes_per_lane: 1,
+                    requested_cacheable_staging_bytes_per_lane: 1,
+                    requested_pinned_bytes: workers,
+                    requested_cacheable_staging_bytes: workers,
+                    requested_buffer_set_count: workers,
+                    requested_underlying_pinned_allocation_count: workers,
+                })
+            } else {
+                Ok(super::SweepFinalStateAdmission::without_treatment(workers))
+            }
         }
 
         fn new_backend(
@@ -6738,7 +7480,12 @@ mod tests {
             seed: u64,
             _backend: BackendSelection,
         ) -> Result<SweepBackend, String> {
-            SweepBackend::new(model, initial, initial_params, seed, BackendSelection::Cpu)
+            let _ = (initial_params, seed);
+            if self.fail_pinned_allocation {
+                SweepBackend::new_local_conformance_with_pinned_failure(model, initial, true)
+            } else {
+                SweepBackend::new_local_conformance(model, initial)
+            }
         }
 
         fn new_concurrency_lane(
@@ -6750,7 +7497,12 @@ mod tests {
             _backend: BackendSelection,
             _mode: SweepConcurrencyMode,
         ) -> Result<SweepBackend, String> {
-            SweepBackend::new(model, initial, initial_params, seed, BackendSelection::Cpu)
+            let _ = (initial_params, seed);
+            if self.fail_pinned_allocation {
+                SweepBackend::new_local_conformance_with_pinned_failure(model, initial, true)
+            } else {
+                SweepBackend::new_local_conformance(model, initial)
+            }
         }
     }
 
@@ -6780,6 +7532,19 @@ mod tests {
                 None => std::env::remove_var(self.key),
             }
         }
+    }
+
+    #[test]
+    fn cuda_sweep_final_state_default_is_packed_pageable() {
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let _selector = ScopedEnv::remove(SWEEP_CUDA_FINAL_STATE_MODE_ENV);
+        let default = sweep_cuda_final_state_selection(BackendSelection::Cuda).unwrap();
+        assert_eq!(
+            SweepCudaFinalStateMode::default(),
+            SweepCudaFinalStateMode::PackedPageable
+        );
+        assert_eq!(default.mode, SweepCudaFinalStateMode::PackedPageable);
+        assert!(!default.explicitly_set);
     }
 
     #[test]
@@ -6897,6 +7662,10 @@ mod tests {
         let _hidden_lockstep = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV);
         let _hidden_free = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV);
         let _hidden_fused = ScopedEnv::remove(SWEEP_CUDA_FUSED_DRAWS_ENV);
+        let _final_state_mode = ScopedEnv::remove(SWEEP_CUDA_FINAL_STATE_MODE_ENV);
+        let _retired_device_sha = ScopedEnv::remove(RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV);
+        let _retired_device_sha_verify =
+            ScopedEnv::remove(RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV);
         let _delay = ScopedEnv::set(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV, "100");
 
         let nonce = SystemTime::now()
@@ -6909,7 +7678,7 @@ mod tests {
         ));
         std::fs::create_dir_all(&temp).unwrap();
         let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let runtime = LocalConformanceSweepRuntime;
+        let runtime = LocalConformanceSweepRuntime::default();
 
         for model_name in ["contest_competing_exits", "grouped_observation"] {
             let grouped = model_name == "grouped_observation";
@@ -7013,7 +7782,7 @@ mod tests {
                     serde_json::from_slice(&std::fs::read(&timing).unwrap()).unwrap();
                 assert_eq!(
                     timing_document["schema"],
-                    "sembla-sweep-concurrency-spike-timing-v1"
+                    "sembla-sweep-concurrency-spike-timing-v3"
                 );
                 assert_eq!(
                     timing_document["execution_mode"],
@@ -7052,6 +7821,23 @@ mod tests {
                         < draw_timings[0]["finish_offset_ms"].as_f64().unwrap(),
                     "delayed low-k draw held up later work for {model_name}/{noise}"
                 );
+                for draw in draw_timings {
+                    let final_state = &draw["final_state"];
+                    assert_eq!(final_state["schema"], "sembla-cuda-final-state-readback-v2");
+                    assert_eq!(final_state["mode"], "packed-pageable");
+                    assert!(final_state["pageable_dtoh_host_api_ms"].is_number());
+                    assert!(final_state["pinned_dtoh_enqueue_api_ms"].is_null());
+                    assert!(final_state["wait_to_pinned_host_readable_ms"].is_null());
+                    assert!(final_state["pinned_to_cacheable_staging_copy_ms"].is_null());
+                    assert!(final_state["host_state_reconstruction_ms"].is_null());
+                    assert_eq!(final_state["downloaded_bytes"]["total"], 1);
+                    assert_eq!(final_state["buffer_accounting"]["buffer_set_count"], 0);
+                }
+                let accounting = &timing_document["final_state_buffer_accounting"];
+                assert_eq!(accounting["buffer_set_count"], 0);
+                assert_eq!(accounting["underlying_pinned_allocation_count"], 0);
+                assert_eq!(accounting["effective_pinned_bytes"], 0);
+                assert_eq!(accounting["effective_cacheable_staging_bytes"], 0);
 
                 let concurrent_manifest: serde_json::Value = serde_json::from_slice(
                     &std::fs::read(concurrent.join("run-manifest.json")).unwrap(),
@@ -7114,6 +7900,292 @@ mod tests {
     }
 
     #[test]
+    fn packed_readback_modes_are_ordered_reused_and_scientifically_identical() {
+        use std::collections::BTreeMap;
+        use std::path::{Path, PathBuf};
+
+        fn output_tree(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+            let mut files = BTreeMap::new();
+            for entry in std::fs::read_dir(root).unwrap() {
+                let entry = entry.unwrap();
+                if entry.path().is_file() {
+                    files.insert(
+                        entry.path().strip_prefix(root).unwrap().to_owned(),
+                        std::fs::read(entry.path()).unwrap(),
+                    );
+                }
+            }
+            files
+        }
+
+        fn options(out: &Path, timing: Option<&Path>, workers: usize) -> SweepOptions {
+            SweepOptions {
+                seed: 91,
+                draws: Some(4),
+                theta_file: None,
+                noise_mode: super::manifest::NoiseMode::Independent,
+                ticks: 3,
+                population: "32".to_owned(),
+                out: out.display().to_string(),
+                params: None,
+                export_pairs: None,
+                timing_json: timing.map(|path| path.display().to_string()),
+                backend: BackendSelection::Cuda,
+                draw_workers: Some(workers),
+                enabled_features: sembla_ir::FeatureSet::new(),
+            }
+        }
+
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let _workers = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV);
+        let _lockstep = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV);
+        let _free = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV);
+        let _fused = ScopedEnv::remove(SWEEP_CUDA_FUSED_DRAWS_ENV);
+        let _retired = ScopedEnv::remove(RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV);
+        let _retired_verify = ScopedEnv::remove(RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV);
+        let _selector = ScopedEnv::remove(SWEEP_CUDA_FINAL_STATE_MODE_ENV);
+        let _delay = ScopedEnv::set(SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV, "100");
+
+        let root = std::env::temp_dir().join(format!(
+            "sembla-packed-pageable-local-conformance-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let model =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/reversible_ctmc.json");
+        let runtime = LocalConformanceSweepRuntime::default();
+        let control = root.join("control");
+        {
+            let _materialized = ScopedEnv::set(SWEEP_CUDA_FINAL_STATE_MODE_ENV, "materialized");
+            sweep_file_result_with_runtime(
+                model.to_str().unwrap(),
+                options(&control, None, 1),
+                &runtime,
+            )
+            .unwrap();
+        }
+
+        let default = root.join("default");
+        let default_timing = root.join("default-timing.json");
+        sweep_file_result_with_runtime(
+            model.to_str().unwrap(),
+            options(&default, Some(&default_timing), 1),
+            &runtime,
+        )
+        .unwrap();
+        assert_eq!(output_tree(&control), output_tree(&default));
+        let default_document: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&default_timing).unwrap()).unwrap();
+        assert!(default_document["draw_timings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|draw| draw["final_state"]["mode"] == "packed-pageable"));
+
+        for mode in ["packed-pageable", "packed-pinned"] {
+            let sequential = root.join(format!("{mode}-sequential"));
+            let sequential_timing = root.join(format!("{mode}-sequential-timing.json"));
+            let concurrent = root.join(format!("{mode}-concurrent"));
+            let concurrent_timing = root.join(format!("{mode}-concurrent-timing.json"));
+            {
+                let _packed = ScopedEnv::set(SWEEP_CUDA_FINAL_STATE_MODE_ENV, mode);
+                sweep_file_result_with_runtime(
+                    model.to_str().unwrap(),
+                    options(&sequential, Some(&sequential_timing), 1),
+                    &runtime,
+                )
+                .unwrap();
+                sweep_file_result_with_runtime(
+                    model.to_str().unwrap(),
+                    options(&concurrent, Some(&concurrent_timing), 2),
+                    &runtime,
+                )
+                .unwrap();
+            }
+
+            assert_eq!(output_tree(&control), output_tree(&sequential));
+            assert_eq!(output_tree(&control), output_tree(&concurrent));
+            for (path, workers) in [(&sequential_timing, 1_usize), (&concurrent_timing, 2)] {
+                let document: serde_json::Value =
+                    serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+                let draws = document["draw_timings"].as_array().unwrap();
+                assert_eq!(
+                    draws
+                        .iter()
+                        .map(|draw| draw["k"].as_u64().unwrap())
+                        .collect::<Vec<_>>(),
+                    vec![0, 1, 2, 3]
+                );
+                let mut allocation_draws_per_lane = std::collections::BTreeMap::new();
+                for draw in draws {
+                    let final_state = &draw["final_state"];
+                    assert_eq!(final_state["schema"], "sembla-cuda-final-state-readback-v2");
+                    assert_eq!(final_state["mode"], mode);
+                    assert!(final_state["host_state_reconstruction_ms"].is_null());
+                    assert_eq!(final_state["downloaded_bytes"]["state"], 1);
+                    assert_eq!(final_state["downloaded_bytes"]["total"], 1);
+                    assert!(final_state["cpu_sha256_ms"].as_f64().unwrap() >= 0.0);
+                    assert!(final_state["final_state_seam_total_ms"].as_f64().unwrap() >= 0.0);
+                    assert_eq!(final_state["phases_reconcile"], true);
+                    assert_eq!(
+                        final_state["final_state_seam_total_excludes_one_time_allocation"],
+                        true
+                    );
+                    assert_eq!(final_state["timer_tolerance_ms"], 0.001);
+                    assert_eq!(
+                        final_state["allocation_plus_seam_reconciles_with_draw_wall"],
+                        true
+                    );
+                    if mode == "packed-pinned" {
+                        assert!(final_state["pageable_dtoh_host_api_ms"].is_null());
+                        assert!(final_state["pinned_dtoh_enqueue_api_ms"].is_number());
+                        assert!(final_state["wait_to_pinned_host_readable_ms"].is_number());
+                        assert!(final_state["pinned_to_cacheable_staging_copy_ms"].is_number());
+                        assert_eq!(final_state["buffer_accounting"]["buffer_set_count"], 1);
+                        assert_eq!(
+                            final_state["buffer_accounting"]["underlying_pinned_allocation_count"],
+                            1
+                        );
+                        let lane = draw
+                            .get("lane")
+                            .and_then(serde_json::Value::as_u64)
+                            .unwrap_or(0);
+                        if final_state["one_time_allocation_ms"].as_f64().unwrap() > 0.0 {
+                            *allocation_draws_per_lane.entry(lane).or_insert(0_usize) += 1;
+                        }
+                    } else {
+                        assert!(final_state["pageable_dtoh_host_api_ms"].is_number());
+                        assert!(final_state["pinned_dtoh_enqueue_api_ms"].is_null());
+                        assert!(final_state["wait_to_pinned_host_readable_ms"].is_null());
+                        assert!(final_state["pinned_to_cacheable_staging_copy_ms"].is_null());
+                    }
+                }
+                let accounting = &document["final_state_buffer_accounting"];
+                if mode == "packed-pinned" {
+                    assert_eq!(accounting["buffer_set_count"], workers);
+                    assert_eq!(accounting["underlying_pinned_allocation_count"], workers);
+                    assert_eq!(accounting["requested_pinned_bytes"], workers);
+                    assert_eq!(accounting["effective_pinned_bytes"], workers);
+                    assert_eq!(accounting["requested_cacheable_staging_bytes"], workers);
+                    assert_eq!(accounting["effective_cacheable_staging_bytes"], workers);
+                    assert_eq!(allocation_draws_per_lane.len(), workers);
+                    assert!(allocation_draws_per_lane.values().all(|count| *count == 1));
+                } else {
+                    assert_eq!(accounting["buffer_set_count"], 0);
+                    assert_eq!(accounting["underlying_pinned_allocation_count"], 0);
+                    assert_eq!(accounting["effective_pinned_bytes"], 0);
+                    assert_eq!(accounting["effective_cacheable_staging_bytes"], 0);
+                }
+            }
+            let scientific_manifest =
+                std::fs::read_to_string(sequential.join("run-manifest.json")).unwrap();
+            assert!(!scientific_manifest.contains(mode));
+            assert!(!scientific_manifest.contains(SWEEP_CUDA_FINAL_STATE_MODE_ENV));
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn packed_pinned_injected_allocation_failure_has_no_fallback_or_publication() {
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let _selector = ScopedEnv::set(SWEEP_CUDA_FINAL_STATE_MODE_ENV, "packed-pinned");
+        let _workers = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV);
+        let _lockstep = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV);
+        let _free = ScopedEnv::remove(SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV);
+        let _fused = ScopedEnv::remove(SWEEP_CUDA_FUSED_DRAWS_ENV);
+        let root = std::env::temp_dir().join(format!(
+            "sembla-packed-pinned-allocation-failure-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let model = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/reversible_ctmc.json");
+        let runtime = LocalConformanceSweepRuntime {
+            fail_pinned_allocation: true,
+        };
+        let result = sweep_file_result_with_runtime(
+            model.to_str().unwrap(),
+            SweepOptions {
+                seed: 91,
+                draws: Some(3),
+                theta_file: None,
+                noise_mode: super::manifest::NoiseMode::Independent,
+                ticks: 1,
+                population: "8".to_owned(),
+                out: root.display().to_string(),
+                params: None,
+                export_pairs: None,
+                timing_json: None,
+                backend: BackendSelection::Cuda,
+                draw_workers: Some(1),
+                enabled_features: sembla_ir::FeatureSet::new(),
+            },
+            &runtime,
+        );
+        let error = result.unwrap_err();
+        assert!(error.contains("lane 0 of 1"));
+        assert!(error.contains("injected packed-pinned cacheable staging allocation failure"));
+        assert!(error.contains("requested 1 byte"));
+        assert!(error.contains("no pageable fallback"));
+        if root.exists() {
+            assert!(std::fs::read_dir(&root).unwrap().next().is_none());
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn pinned_accounting_allows_a_retained_lane_with_no_assigned_draw() {
+        let diagnostic = super::SweepFinalStateDiagnostic {
+            mode: SweepCudaFinalStateMode::PackedPinned,
+            allocation: Duration::from_nanos(1),
+            pageable_dtoh_host_api: None,
+            pinned_dtoh_enqueue_api: Some(Duration::ZERO),
+            wait_to_pinned_host_readable: Some(Duration::ZERO),
+            pinned_to_cacheable_staging_copy: Some(Duration::ZERO),
+            host_state_reconstruction: None,
+            cpu_sha256: Duration::ZERO,
+            total: Duration::ZERO,
+            downloaded_bytes: super::SweepFinalStateDownloadedBytes {
+                state: 1,
+                inputs: 0,
+                input_counts: 0,
+                total: 1,
+            },
+            buffer_accounting: super::SweepFinalStateBufferAccounting {
+                buffer_set_count: 1,
+                underlying_pinned_allocation_count: 1,
+                pinned_bytes: 1,
+                cacheable_staging_bytes: 1,
+            },
+        };
+        let timing =
+            Some(super::SweepFinalStateTiming::new(&diagnostic, Duration::from_millis(1)).unwrap());
+        let accounting = super::aggregate_final_state_buffer_accounting(
+            SweepCudaFinalStateMode::PackedPinned,
+            super::SweepFinalStateAdmission {
+                requested_lane_count: 2,
+                requested_pinned_bytes_per_lane: 1,
+                requested_cacheable_staging_bytes_per_lane: 1,
+                requested_pinned_bytes: 2,
+                requested_cacheable_staging_bytes: 2,
+                requested_buffer_set_count: 2,
+                requested_underlying_pinned_allocation_count: 2,
+            },
+            [(0, &timing)],
+        )
+        .unwrap();
+        assert_eq!(accounting.requested_lane_count, 2);
+        assert_eq!(accounting.retained_lane_count, 2);
+        assert_eq!(accounting.requested_buffer_set_count, 2);
+        assert_eq!(accounting.buffer_set_count, 1);
+        assert_eq!(accounting.requested_pinned_bytes, 2);
+        assert_eq!(accounting.effective_pinned_bytes, 1);
+        assert_eq!(accounting.requested_cacheable_staging_bytes, 2);
+        assert_eq!(accounting.effective_cacheable_staging_bytes, 1);
+    }
+
+    #[test]
     fn concurrent_scheduler_constructs_exactly_one_retained_backend_per_lane() {
         use std::sync::atomic::Ordering;
 
@@ -7154,6 +8226,7 @@ mod tests {
                 construction_params: &construction_params,
                 options: &options,
                 prepared: &prepared,
+                final_state_mode: SweepCudaFinalStateMode::Materialized,
             },
             2,
             SweepConcurrencyMode::IndependentDefaultStreams,
@@ -7220,6 +8293,7 @@ mod tests {
                 construction_params: &construction_params,
                 options: &options,
                 prepared: &prepared,
+                final_state_mode: SweepCudaFinalStateMode::Materialized,
             },
             2,
             SweepConcurrencyMode::IndependentDefaultStreams,
@@ -7255,6 +8329,7 @@ mod tests {
             &model,
             &initial,
             4,
+            SweepCudaFinalStateMode::PackedPinned,
             80 * 1024 * 1024 * 1024,
             80 * 1024 * 1024 * 1024,
         );
@@ -7262,7 +8337,27 @@ mod tests {
         let error = result.unwrap_err();
         assert!(error.contains("insufficient CUDA device memory"));
         assert!(error.contains("no lanes were constructed"));
+        assert!(error.contains("packed-pinned page-locked bytes"));
+        assert!(error.contains("cacheable staging bytes"));
         assert_eq!(SWEEP_BACKEND_CONSTRUCTIONS.load(Ordering::SeqCst), 0);
+
+        let admitted = preflight_cuda_sweep_capacity_with_memory(
+            &model,
+            &initial,
+            4,
+            SweepCudaFinalStateMode::PackedPinned,
+            usize::MAX,
+            usize::MAX,
+        )
+        .unwrap();
+        assert_eq!(admitted.requested_lane_count, 4);
+        assert_eq!(admitted.requested_buffer_set_count, 4);
+        assert!(admitted.requested_underlying_pinned_allocation_count <= 12);
+        assert!(admitted.requested_pinned_bytes > 0);
+        assert_eq!(
+            admitted.requested_pinned_bytes,
+            admitted.requested_cacheable_staging_bytes
+        );
     }
 
     #[test]
@@ -7466,6 +8561,10 @@ mod tests {
     fn plan_run_is_bitwise_deterministic_twice_in_process() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
+        // Other tests temporarily set hidden process-wide sweep selectors.
+        // Serialize this ordinary `run` so those diagnostic scopes cannot leak
+        // into its preflight when the test harness executes cases in parallel.
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
