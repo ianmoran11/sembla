@@ -1,0 +1,181 @@
+{
+  "schema": "sembla-sweep-concurrency-spike-timing-v3",
+  "backend": "cuda",
+  "draws": 4,
+  "ticks_per_draw": 24,
+  "requested_draw_workers": 4,
+  "effective_draw_workers": 4,
+  "maximum_pending_results": 4,
+  "execution_mode": "cuda-free-nonblocking-streams",
+  "setup_wall_time_ms": 3330.626349,
+  "execution_window_wall_time_ms": 3297.387568,
+  "publication_wall_time_ms": 1.721143,
+  "final_state_buffer_accounting": {
+    "mode": "packed-pageable",
+    "requested_lane_count": 4,
+    "retained_lane_count": 4,
+    "requested_pinned_bytes_per_lane": 0,
+    "requested_cacheable_staging_bytes_per_lane": 0,
+    "requested_pinned_bytes": 0,
+    "effective_pinned_bytes": 0,
+    "requested_cacheable_staging_bytes": 0,
+    "effective_cacheable_staging_bytes": 0,
+    "requested_buffer_set_count": 0,
+    "buffer_set_count": 0,
+    "requested_underlying_pinned_allocation_count": 0,
+    "underlying_pinned_allocation_count": 0
+  },
+  "draw_timings": [
+    {
+      "k": 0,
+      "lane": 3,
+      "start_offset_ms": 0.030555000000000002,
+      "finish_offset_ms": 3297.387568,
+      "wall_time_ms": 3297.3568320000004,
+      "final_state": {
+        "schema": "sembla-cuda-final-state-readback-v2",
+        "mode": "packed-pageable",
+        "one_time_allocation_ms": 0.0,
+        "pageable_dtoh_host_api_ms": 524.186461,
+        "pinned_dtoh_enqueue_api_ms": null,
+        "wait_to_pinned_host_readable_ms": null,
+        "pinned_to_cacheable_staging_copy_ms": null,
+        "host_state_reconstruction_ms": null,
+        "cpu_sha256_ms": 262.8545,
+        "attributed_phase_sum_ms": 787.040961,
+        "unattributed_timer_overhead_ms": 0.000542,
+        "final_state_seam_total_ms": 787.0415029999999,
+        "final_state_seam_total_excludes_one_time_allocation": true,
+        "timer_tolerance_ms": 0.001,
+        "phases_reconcile": true,
+        "allocation_plus_seam_reconciles_with_draw_wall": true,
+        "downloaded_bytes": {
+          "state": 480000032,
+          "inputs": 0,
+          "input_counts": 0,
+          "total": 480000032
+        },
+        "buffer_accounting": {
+          "buffer_set_count": 0,
+          "underlying_pinned_allocation_count": 0,
+          "pinned_bytes": 0,
+          "cacheable_staging_bytes": 0
+        }
+      }
+    },
+    {
+      "k": 1,
+      "lane": 1,
+      "start_offset_ms": 0.034520999999999996,
+      "finish_offset_ms": 3020.498863,
+      "wall_time_ms": 3020.4643619999997,
+      "final_state": {
+        "schema": "sembla-cuda-final-state-readback-v2",
+        "mode": "packed-pageable",
+        "one_time_allocation_ms": 0.0,
+        "pageable_dtoh_host_api_ms": 240.678709,
+        "pinned_dtoh_enqueue_api_ms": null,
+        "wait_to_pinned_host_readable_ms": null,
+        "pinned_to_cacheable_staging_copy_ms": null,
+        "host_state_reconstruction_ms": null,
+        "cpu_sha256_ms": 265.061386,
+        "attributed_phase_sum_ms": 505.74009499999994,
+        "unattributed_timer_overhead_ms": 0.00054,
+        "final_state_seam_total_ms": 505.740635,
+        "final_state_seam_total_excludes_one_time_allocation": true,
+        "timer_tolerance_ms": 0.001,
+        "phases_reconcile": true,
+        "allocation_plus_seam_reconciles_with_draw_wall": true,
+        "downloaded_bytes": {
+          "state": 480000032,
+          "inputs": 0,
+          "input_counts": 0,
+          "total": 480000032
+        },
+        "buffer_accounting": {
+          "buffer_set_count": 0,
+          "underlying_pinned_allocation_count": 0,
+          "pinned_bytes": 0,
+          "cacheable_staging_bytes": 0
+        }
+      }
+    },
+    {
+      "k": 2,
+      "lane": 0,
+      "start_offset_ms": 0.069264,
+      "finish_offset_ms": 2767.128584,
+      "wall_time_ms": 2767.058979,
+      "final_state": {
+        "schema": "sembla-cuda-final-state-readback-v2",
+        "mode": "packed-pageable",
+        "one_time_allocation_ms": 0.0,
+        "pageable_dtoh_host_api_ms": 235.332107,
+        "pinned_dtoh_enqueue_api_ms": null,
+        "wait_to_pinned_host_readable_ms": null,
+        "pinned_to_cacheable_staging_copy_ms": null,
+        "host_state_reconstruction_ms": null,
+        "cpu_sha256_ms": 262.21063100000003,
+        "attributed_phase_sum_ms": 497.542738,
+        "unattributed_timer_overhead_ms": 0.00045200000000000004,
+        "final_state_seam_total_ms": 497.54319000000004,
+        "final_state_seam_total_excludes_one_time_allocation": true,
+        "timer_tolerance_ms": 0.001,
+        "phases_reconcile": true,
+        "allocation_plus_seam_reconciles_with_draw_wall": true,
+        "downloaded_bytes": {
+          "state": 480000032,
+          "inputs": 0,
+          "input_counts": 0,
+          "total": 480000032
+        },
+        "buffer_accounting": {
+          "buffer_set_count": 0,
+          "underlying_pinned_allocation_count": 0,
+          "pinned_bytes": 0,
+          "cacheable_staging_bytes": 0
+        }
+      }
+    },
+    {
+      "k": 3,
+      "lane": 2,
+      "start_offset_ms": 0.07206800000000001,
+      "finish_offset_ms": 2527.770234,
+      "wall_time_ms": 2527.6981570000003,
+      "final_state": {
+        "schema": "sembla-cuda-final-state-readback-v2",
+        "mode": "packed-pageable",
+        "one_time_allocation_ms": 0.0,
+        "pageable_dtoh_host_api_ms": 245.742884,
+        "pinned_dtoh_enqueue_api_ms": null,
+        "wait_to_pinned_host_readable_ms": null,
+        "pinned_to_cacheable_staging_copy_ms": null,
+        "host_state_reconstruction_ms": null,
+        "cpu_sha256_ms": 262.226656,
+        "attributed_phase_sum_ms": 507.96954000000005,
+        "unattributed_timer_overhead_ms": 0.000522,
+        "final_state_seam_total_ms": 507.97006200000004,
+        "final_state_seam_total_excludes_one_time_allocation": true,
+        "timer_tolerance_ms": 0.001,
+        "phases_reconcile": true,
+        "allocation_plus_seam_reconciles_with_draw_wall": true,
+        "downloaded_bytes": {
+          "state": 480000032,
+          "inputs": 0,
+          "input_counts": 0,
+          "total": 480000032
+        },
+        "buffer_accounting": {
+          "buffer_set_count": 0,
+          "underlying_pinned_allocation_count": 0,
+          "pinned_bytes": 0,
+          "cacheable_staging_bytes": 0
+        }
+      }
+    }
+  ],
+  "whole_sweep_wall_time_ms": 9655.372069000001,
+  "repository_commit": "7b0e83e0b4284654c3fe1c73382fd939b0317616",
+  "binary_sha256": "b0839ea61262e6b6583070035f316da20ea1c0f7ae4076ac79bf48173aff1095"
+}

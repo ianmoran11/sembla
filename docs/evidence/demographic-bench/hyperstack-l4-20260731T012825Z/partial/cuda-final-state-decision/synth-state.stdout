@@ -1,0 +1,1 @@
+slots=10000000 areas=4 state=/home/ubuntu/demographic-bench/work/cuda-final-state-10m.state companion_model=/home/ubuntu/demographic-bench/work/cuda-final-state-10m.state.model.json

@@ -1,0 +1,17 @@
+{
+  "accepted": false,
+  "comparison": {
+    "changed": [
+      "draw_0.csv"
+    ],
+    "equal": false,
+    "extra_in_right": [],
+    "left": "/home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/arms/01-preflight-w1-A/output",
+    "left_file_count": 7,
+    "missing_from_right": [],
+    "right": "/home/ubuntu/demographic-bench/cuda-final-state-decision/protocol/negative-control-tree",
+    "right_file_count": 7
+  },
+  "perturbed_relative_path": "draw_0.csv",
+  "rejected": true
+}
