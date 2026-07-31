@@ -524,9 +524,10 @@ The evidence is written under
 `protocol/execution-manifest.json`, per-arm `record.json`/timing/output trees,
 `comparisons.json`, `negative-control.json`, raw resource samples, three
 `.nsys-rep` files and CUDA trace/API/kernel CSVs support audit. `decision.json`
-and `decision.md` contain absolute times, raw adjacent ratios, medians, phase and
-resource evidence, and residual risks. On failure inspect `partial/` and
-`SHA256SUMS.partial`; the generated 10M state is intentionally excluded. The
+and `decision.md` contain labeled preflight and absolute command times, raw
+adjacent ratios, medians, phase/Nsight/resource evidence, and residual risks. On
+failure, `partial/` retains every completed per-arm output tree together with
+logs and `SHA256SUMS.partial`; only the generated 10M state is excluded. The
 remote job is detached, so rerunning the identical command rejoins its immutable
 payload rather than starting a second benchmark.
 
@@ -543,10 +544,12 @@ The stage never relaxes GPU performance-counter access. It requires and records
 `RmProfilingAdminOnly: 1` before and after Nsight Systems. On success, command
 failure, timeout, TERM, or INT, one idempotent cleanup path records separate
 `benchmark-status.txt` and `teardown-status.txt`, attempts bounded
-`terraform destroy`, invokes `reconcile-orphans.sh --delete --yes` after an
-incomplete destroy, and always runs report-only reconciliation. Overall status
-preserves a nonzero benchmark status first; otherwise teardown status decides,
-and any destroy/reconciliation failure remains nonzero. Before leaving, require:
+`terraform destroy` and bounded state inspection, and invokes
+`reconcile-orphans.sh --delete --yes` after an incomplete destroy/state result
+or an explicit provider-reported orphan. A final bounded report-only
+reconciliation and state inspection are mandatory. Overall status preserves a
+nonzero benchmark status first; otherwise teardown status decides, and any
+destroy/reconciliation failure remains nonzero. Before leaving, require:
 
 ```bash
 cat <evidence>/counter-restoration-status.txt

@@ -126,7 +126,8 @@ class CollectorFlagValidationTest(unittest.TestCase):
     def test_focused_preflight_failures_and_outer_timeout_have_cleanup_paths(self):
         source = SCRIPT.read_text()
         self.assertIn("focused_paid_resources_in_state", source)
-        self.assertIn('if ! state="$(cd "$MODULE_DIR"', source)
+        self.assertIn('local timeout_bin="${FOCUSED_TIMEOUT_BIN:-timeout}"', source)
+        self.assertIn('"$terraform_bin" state list', source)
         self.assertIn('[[ -n "${HYPERSTACK_API_KEY:-}" ]]', source)
         self.assertIn("sembla-final-state-preflight-cleanup", source)
         self.assertIn("cuda_final_state_teardown", source)
@@ -212,12 +213,23 @@ class CollectorFlagValidationTest(unittest.TestCase):
         diagnostic = output / "cuda-readback-diagnostic"
         diagnostic.mkdir(parents=True)
         (diagnostic / "raw.ncu-rep").write_bytes(b"raw-report")
+        focused_output = (
+            output
+            / "cuda-final-state-decision"
+            / "protocol"
+            / "arms"
+            / "01-preflight-w1-A"
+            / "output"
+        )
+        focused_output.mkdir(parents=True)
+        (focused_output / "draw-0.csv").write_text("retained partial output\n")
         (output / "gpu-provenance.txt").write_text("gpu\n")
         work = output / "work"
         work.mkdir()
         (work / "large.state").write_bytes(b"excluded")
         script = f"""set -Eeuo pipefail
 export HOME={home!s}
+export BENCH_CUDA_FINAL_STATE_DECISION=1
 OUT_ROOT={output!s}
 PARTIAL_ARCHIVE="$HOME/demographic-bench-partial.tar.gz"
 {functions}
@@ -234,6 +246,17 @@ diagnostic_fail "forced explicit validation failure"
             bundle.extractall(extracted)
         root = extracted / "demographic-bench-partial"
         self.assertTrue((root / "cuda-readback-diagnostic" / "raw.ncu-rep").is_file())
+        self.assertTrue(
+            (
+                root
+                / "cuda-final-state-decision"
+                / "protocol"
+                / "arms"
+                / "01-preflight-w1-A"
+                / "output"
+                / "draw-0.csv"
+            ).is_file()
+        )
         self.assertFalse((root / "work").exists())
         for line in (root / "SHA256SUMS.partial").read_text().splitlines():
             expected, relative = line.split(maxsplit=1)

@@ -19,7 +19,10 @@ cuda_final_state_teardown() {
   local destroy_status=0
   local state_status=0
   local delete_status=0
-  local report_status=0
+  local initial_report_status=0
+  local final_report_status=0
+  local delete_attempted=false
+  local needs_delete=false
 
   mkdir -p "$artifact_dir"
   if [[ -e "$completed_marker" && -s "$status_file" ]] \
@@ -35,9 +38,8 @@ cuda_final_state_teardown() {
     > "$marker"
   rm -f "$completed_marker"
 
-  # Nsight Systems does not require changing RmProfilingAdminOnly.  The remote
-  # focused driver verifies it is 1 before and after profiling, so local
-  # teardown records that no counter relaxation needs restoration.
+  # Nsight Systems does not require changing RmProfilingAdminOnly. The remote
+  # focused driver verifies it is 1 before and after profiling.
   printf '%s\n' 'not-modified; remote evidence must show RmProfilingAdminOnly: 1 before/after' \
     > "$artifact_dir/counter-restoration-status.txt"
 
@@ -50,18 +52,29 @@ cuda_final_state_teardown() {
   ) > "$artifact_dir/terraform-destroy.log" 2>&1
   destroy_status=$?
   printf '%s\n' "$destroy_status" > "$artifact_dir/terraform-destroy-status.txt"
-  (( destroy_status == 0 )) || teardown_status=1
+  if (( destroy_status != 0 )); then
+    teardown_status=1
+    needs_delete=true
+  fi
 
   (
     cd "$module_dir" || exit 1
-    "$terraform_bin" state list
-  ) > "$artifact_dir/terraform-state-after-destroy.txt" 2> "$artifact_dir/terraform-state-after-destroy.stderr"
+    "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
+      "$terraform_bin" state list
+  ) > "$artifact_dir/terraform-state-after-destroy.txt" \
+    2> "$artifact_dir/terraform-state-after-destroy.stderr"
   state_status=$?
-  (( state_status == 0 )) || teardown_status=1
+  printf '%s\n' "$state_status" > "$artifact_dir/terraform-state-after-destroy-status.txt"
+  if (( state_status != 0 )); then
+    teardown_status=1
+    needs_delete=true
+  elif grep -qE 'hyperstack_core_virtual_machine|hyperstack_core_security_rule|security_rule' \
+      "$artifact_dir/terraform-state-after-destroy.txt"; then
+    teardown_status=1
+    needs_delete=true
+  fi
 
-  if (( destroy_status != 0 || state_status != 0 )) \
-      || grep -qE 'hyperstack_core_virtual_machine|hyperstack_core_security_rule|security_rule' \
-        "$artifact_dir/terraform-state-after-destroy.txt"; then
+  if [[ "$needs_delete" == true ]]; then
     (
       cd "$module_dir" || exit 1
       TFVARS_FILE="$tfvars_file" \
@@ -69,30 +82,62 @@ cuda_final_state_teardown() {
         "$reconcile_bin" --delete --yes
     ) > "$artifact_dir/reconcile-delete.log" 2>&1
     delete_status=$?
+    delete_attempted=true
     printf '%s\n' "$delete_status" > "$artifact_dir/reconcile-delete-status.txt"
     (( delete_status == 0 )) || teardown_status=1
-  else
+  fi
+
+  # Provider reconciliation can discover a VM absent from Terraform state.
+  # Run it after destroy/state inspection and use an explicit ORPHANED report
+  # to trigger the same bounded deletion fallback.
+  (
+    cd "$module_dir" || exit 1
+    TFVARS_FILE="$tfvars_file" \
+      "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
+      "$reconcile_bin"
+  ) > "$artifact_dir/reconcile-initial.log" 2>&1
+  initial_report_status=$?
+  printf '%s\n' "$initial_report_status" > "$artifact_dir/reconcile-initial-status.txt"
+  (( initial_report_status == 0 )) || teardown_status=1
+
+  if [[ "$delete_attempted" != true ]] \
+      && grep -Fq 'ORPHANED' "$artifact_dir/reconcile-initial.log"; then
+    (
+      cd "$module_dir" || exit 1
+      TFVARS_FILE="$tfvars_file" \
+        "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
+        "$reconcile_bin" --delete --yes
+    ) > "$artifact_dir/reconcile-delete.log" 2>&1
+    delete_status=$?
+    delete_attempted=true
+    printf '%s\n' "$delete_status" > "$artifact_dir/reconcile-delete-status.txt"
+    (( delete_status == 0 )) || teardown_status=1
+  fi
+  if [[ "$delete_attempted" != true ]]; then
     printf '%s\n' 'not-required' > "$artifact_dir/reconcile-delete.log"
     printf '%s\n' '0' > "$artifact_dir/reconcile-delete-status.txt"
   fi
 
-  # Report-only reconciliation is mandatory even when destroy/delete appeared
-  # successful.  It is the provider-account proof used with Terraform state.
+  # Final report-only reconciliation is mandatory after every path, including
+  # a successful delete fallback.
   (
     cd "$module_dir" || exit 1
     TFVARS_FILE="$tfvars_file" \
       "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
       "$reconcile_bin"
   ) > "$artifact_dir/reconcile-final.log" 2>&1
-  report_status=$?
-  printf '%s\n' "$report_status" > "$artifact_dir/reconcile-final-status.txt"
-  (( report_status == 0 )) || teardown_status=1
+  final_report_status=$?
+  printf '%s\n' "$final_report_status" > "$artifact_dir/reconcile-final-status.txt"
+  (( final_report_status == 0 )) || teardown_status=1
 
   (
     cd "$module_dir" || exit 1
-    "$terraform_bin" state list
-  ) > "$artifact_dir/terraform-state-final.txt" 2> "$artifact_dir/terraform-state-final.stderr"
+    "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
+      "$terraform_bin" state list
+  ) > "$artifact_dir/terraform-state-final.txt" \
+    2> "$artifact_dir/terraform-state-final.stderr"
   state_status=$?
+  printf '%s\n' "$state_status" > "$artifact_dir/terraform-state-final-status.txt"
   (( state_status == 0 )) || teardown_status=1
   if grep -qE 'hyperstack_core_virtual_machine|hyperstack_core_security_rule|security_rule' \
       "$artifact_dir/terraform-state-final.txt"; then
@@ -102,6 +147,7 @@ cuda_final_state_teardown() {
     || teardown_status=1
   grep -Eq 'No orphans|Verified: no .* VMs remain' "$artifact_dir/reconcile-final.log" \
     || teardown_status=1
+  grep -Fq 'ORPHANED' "$artifact_dir/reconcile-final.log" && teardown_status=1
 
   printf '%s\n' "$teardown_status" > "$status_file"
   if (( teardown_status == 0 )); then

@@ -105,7 +105,14 @@ FOCUSED_CLEANUP_RUNNING=false
 
 focused_paid_resources_in_state() {
   local state
-  if ! state="$(cd "$MODULE_DIR" 2>/dev/null && terraform state list 2>/dev/null)"; then
+  local terraform_bin="${FOCUSED_TERRAFORM_BIN:-terraform}"
+  local timeout_bin="${FOCUSED_TIMEOUT_BIN:-timeout}"
+  local timeout_seconds="${FOCUSED_TEARDOWN_TIMEOUT_SECONDS:-900}"
+  if ! state="$(
+    cd "$MODULE_DIR" 2>/dev/null \
+      && "$timeout_bin" --signal=TERM --kill-after=30s "${timeout_seconds}s" \
+        "$terraform_bin" state list 2>/dev/null
+  )"; then
     # Fail closed: a broken/missing Terraform probe must attempt bounded destroy
     # and provider reconciliation rather than assume there are no paid resources.
     return 0
@@ -769,9 +776,9 @@ package_partial_on_error() {
     cp -a "$OUT_ROOT/cuda-readback-diagnostic" "$partial_root/"
   fi
   if [[ -d "$OUT_ROOT/cuda-final-state-decision" ]]; then
+    # Partial scientific outputs are required failure evidence. The generated
+    # 10M state remains under work/ and is excluded separately below.
     cp -a "$OUT_ROOT/cuda-final-state-decision" "$partial_root/"
-    find "$partial_root/cuda-final-state-decision" -type d -name output \
-      -prune -exec rm -rf {} +
   fi
   (
     cd "$partial_root" || exit

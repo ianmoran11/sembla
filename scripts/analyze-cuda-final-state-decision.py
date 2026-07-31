@@ -9,8 +9,10 @@ import importlib.util
 import json
 import math
 import pathlib
-import statistics
+import re
 import sys
+from decimal import Decimal, InvalidOperation, localcontext
+from fractions import Fraction
 from typing import Any, Iterable
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -100,9 +102,59 @@ def finite(value: Any, label: str, *, positive: bool = False) -> float:
     return result
 
 
-def load_json(path: pathlib.Path) -> Any:
+def decimal_value(value: Any, label: str, *, positive: bool = False) -> Decimal:
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal, str)):
+        raise AnalysisError(f"{label} must be decimal-compatible")
     try:
-        return json.loads(path.read_text())
+        result = Decimal(str(value))
+    except InvalidOperation as error:
+        raise AnalysisError(f"{label} is not a decimal value") from error
+    if not result.is_finite() or result < 0 or (positive and result <= 0):
+        raise AnalysisError(
+            f"{label} must be finite and {'positive' if positive else 'non-negative'}"
+        )
+    return result
+
+
+def exact_ratio(numerator: Any, denominator: Any, label: str) -> Fraction:
+    numerator_fraction = (
+        numerator
+        if isinstance(numerator, Fraction)
+        else Fraction(decimal_value(numerator, f"{label} numerator"))
+    )
+    denominator_fraction = (
+        denominator
+        if isinstance(denominator, Fraction)
+        else Fraction(decimal_value(denominator, f"{label} denominator", positive=True))
+    )
+    if denominator_fraction <= 0:
+        raise AnalysisError(f"{label} denominator must be positive")
+    if numerator_fraction < 0:
+        raise AnalysisError(f"{label} numerator must be non-negative")
+    return numerator_fraction / denominator_fraction
+
+
+def ratio_decimal_text(value: Fraction) -> str:
+    digits = max(
+        len(str(abs(value.numerator))),
+        len(str(value.denominator)),
+    )
+    with localcontext() as context:
+        context.prec = max(50, digits * 2 + 10)
+        return format(Decimal(value.numerator) / Decimal(value.denominator), "f")
+
+
+def median_decimal(values: Iterable[Fraction]) -> Fraction:
+    ordered = sorted(values)
+    if not ordered or len(ordered) % 2 == 0:
+        raise AnalysisError("a non-empty odd number of ratios is required")
+    return ordered[len(ordered) // 2]
+
+
+def load_json(path: pathlib.Path, *, exact_decimals: bool = False) -> Any:
+    try:
+        options = {"parse_float": Decimal} if exact_decimals else {}
+        return json.loads(path.read_text(), **options)
     except (OSError, json.JSONDecodeError) as error:
         raise AnalysisError(f"invalid JSON {path}: {error}") from error
 
@@ -261,8 +313,10 @@ def analyze_nsys_kernel_summary(path: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, float]]:
-    merged: list[list[float]] = []
+def merge_intervals(
+    intervals: list[tuple[Fraction, Fraction]],
+) -> list[tuple[Fraction, Fraction]]:
+    merged: list[list[Fraction]] = []
     for start, end in sorted(intervals):
         if end <= start:
             raise AnalysisError("Nsight interval duration must be positive")
@@ -273,15 +327,19 @@ def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, f
     return [(start, end) for start, end in merged]
 
 
-def interval_duration(intervals: list[tuple[float, float]]) -> float:
-    return sum(end - start for start, end in merge_intervals(intervals))
+def interval_duration(intervals: list[tuple[Fraction, Fraction]]) -> Fraction:
+    return sum(
+        (end - start for start, end in merge_intervals(intervals)), Fraction(0)
+    )
 
 
-def interval_overlap(left: list[tuple[float, float]], right: list[tuple[float, float]]) -> float:
-    total = 0.0
+def interval_overlap(
+    left: list[tuple[Fraction, Fraction]], right: list[tuple[Fraction, Fraction]]
+) -> Fraction:
+    total = Fraction(0)
     for a0, a1 in merge_intervals(left):
         for b0, b1 in merge_intervals(right):
-            total += max(0.0, min(a1, b1) - max(a0, b0))
+            total += max(Fraction(0), min(a1, b1) - max(a0, b0))
     return total
 
 
@@ -298,6 +356,70 @@ def expected_final_state_copy_sizes(timing: dict[str, Any]) -> list[int]:
     return sorted(sizes)
 
 
+def _memory_kind(value: str) -> str:
+    lowered = value.strip().lower()
+    if "device" in lowered:
+        return "device"
+    if "pin" in lowered or "page-lock" in lowered:
+        return "pinned"
+    if "page" in lowered:
+        return "pageable"
+    if "host" in lowered:
+        return "host"
+    return "unknown"
+
+
+def _activity_direction(name: str) -> str | None:
+    compact = re.sub(r"[^a-z]", "", name.lower())
+    directions = {
+        direction
+        for direction, tokens in {
+            "dtoh": ("dtoh", "devicetohost"),
+            "htod": ("htod", "hosttodevice"),
+            "dtod": ("dtod", "devicetodevice"),
+        }.items()
+        if any(token in compact for token in tokens)
+    }
+    if len(directions) > 1:
+        raise AnalysisError(f"Nsight memcpy activity has ambiguous direction: {name}")
+    return next(iter(directions), None)
+
+
+def _memory_direction(source: str, destination: str) -> str | None:
+    source_kind = _memory_kind(source)
+    destination_kind = _memory_kind(destination)
+    host_kinds = {"pageable", "pinned", "host"}
+    if source_kind == "device" and destination_kind in host_kinds:
+        return "dtoh"
+    if source_kind in host_kinds and destination_kind == "device":
+        return "htod"
+    if source_kind == "device" and destination_kind == "device":
+        return "dtod"
+    return None
+
+
+def _is_dtoh_activity(name: str, source: str, destination: str) -> bool:
+    if "memcpy" not in name.lower():
+        return False
+    activity_direction = _activity_direction(name)
+    memory_direction = _memory_direction(source, destination)
+    if (
+        activity_direction is not None
+        and memory_direction is not None
+        and activity_direction != memory_direction
+    ):
+        raise AnalysisError(
+            "Nsight memcpy activity direction disagrees with source/destination memory kinds"
+        )
+    if activity_direction == "dtoh" and memory_direction != "dtoh":
+        raise AnalysisError(
+            "Nsight D2H activity lacks matching device-to-host memory kinds"
+        )
+    # Both independent sources must explicitly identify D2H. Unknown or
+    # directionless memcpy rows cannot satisfy final-state copy completeness.
+    return activity_direction == "dtoh" and memory_direction == "dtoh"
+
+
 def analyze_nsys_trace(path: pathlib.Path, timing: dict[str, Any], mode: str) -> dict[str, Any]:
     header, rows = _header_and_rows(path, ("start", "duration", "name", "bytes"))
     start_col = _column(header, "start")
@@ -308,25 +430,27 @@ def analyze_nsys_trace(path: pathlib.Path, timing: dict[str, Any], mode: str) ->
     dst_col = _column(header, "dst")
     context_col = _column_alias(header, ("context", "ctx"))
     stream_col = _column_alias(header, ("stream", "strm"))
-    start_factor = _unit_factor(start_col)
-    duration_factor = _unit_factor(duration_col)
+    start_factor = Fraction(Decimal(str(_unit_factor(start_col))))
+    duration_factor = Fraction(Decimal(str(_unit_factor(duration_col))))
     bytes_factor = _unit_factor(bytes_col, bytes_value=True)
 
     copies: list[dict[str, Any]] = []
-    kernels: list[tuple[float, float]] = []
+    kernels: list[tuple[Fraction, Fraction]] = []
     unmatched_tiny: list[dict[str, Any]] = []
     for row in rows:
         name = row.get(name_col, "")
+        source = row.get(src_col, "")
+        destination = row.get(dst_col, "")
         try:
-            start = finite(float(row[start_col]), f"{path}:start") * start_factor
-            duration = finite(
-                float(row[duration_col]), f"{path}:duration", positive=True
+            start = Fraction(decimal_value(row[start_col], f"{path}:start")) * start_factor
+            duration = Fraction(
+                decimal_value(row[duration_col], f"{path}:duration", positive=True)
             ) * duration_factor
         except (KeyError, ValueError) as error:
             raise AnalysisError(f"malformed relevant Nsight row in {path}: {row}") from error
         end = start + duration
         lowered = name.lower()
-        if "dtoh" in lowered or ("memcpy" in lowered and "device" in row.get(src_col, "").lower()):
+        if _is_dtoh_activity(name, source, destination):
             try:
                 size = int(
                     round(
@@ -337,13 +461,17 @@ def analyze_nsys_trace(path: pathlib.Path, timing: dict[str, Any], mode: str) ->
             except (KeyError, ValueError) as error:
                 raise AnalysisError(f"malformed D2H byte value in {path}: {row}") from error
             item = {
-                "start_ms": start,
-                "end_ms": end,
-                "duration_ms": duration,
+                "start_ms": float(start),
+                "end_ms": float(end),
+                "duration_ms": float(duration),
+                "start_ms_decimal": ratio_decimal_text(start),
+                "end_ms_decimal": ratio_decimal_text(end),
+                "duration_ms_decimal": ratio_decimal_text(duration),
                 "bytes": size,
                 "name": name,
-                "source": row.get(src_col, ""),
-                "destination": row.get(dst_col, ""),
+                "source": source,
+                "destination": destination,
+                "destination_kind": _memory_kind(destination),
                 "context": row.get(context_col, ""),
                 "stream": row.get(stream_col, ""),
             }
@@ -367,27 +495,44 @@ def analyze_nsys_trace(path: pathlib.Path, timing: dict[str, Any], mode: str) ->
         matched.append(chosen)
     if remaining:
         raise AnalysisError(f"unmatched >=1 MiB D2H rows remain in {path}: {len(remaining)}")
-    destinations = " ".join(item["destination"].lower() for item in matched)
-    if mode in ("A", "B") and "page" not in destinations:
-        raise AnalysisError(f"{mode} Nsight copies do not identify pageable destinations")
-    if mode == "C" and "pin" not in destinations:
-        raise AnalysisError("C Nsight copies do not identify pinned/page-locked destinations")
-    copy_intervals = [(item["start_ms"], item["end_ms"]) for item in matched]
+    expected_destination = "pageable" if mode in ("A", "B") else "pinned"
+    if any(item["destination_kind"] != expected_destination for item in matched):
+        raise AnalysisError(
+            f"{mode} Nsight final-state copies must all use {expected_destination} destinations"
+        )
+    copy_intervals = [
+        (
+            Fraction(Decimal(item["start_ms_decimal"])),
+            Fraction(Decimal(item["end_ms_decimal"])),
+        )
+        for item in matched
+    ]
     copy_union = interval_duration(copy_intervals)
     overlap = interval_overlap(copy_intervals, kernels)
+    summed_duration = sum(
+        (Fraction(Decimal(item["duration_ms_decimal"])) for item in matched),
+        Fraction(0),
+    )
+    exposed = copy_union - overlap
+    kernel_union = interval_duration(kernels) if kernels else Fraction(0)
     return {
         "matched_final_state_copies": matched,
         "unmatched_tiny_dtoh": unmatched_tiny,
         "large_copy_count": len(matched),
         "large_copy_bytes": sum(item["bytes"] for item in matched),
-        "large_copy_summed_duration_ms": sum(item["duration_ms"] for item in matched),
-        "copy_union_duration_ms": copy_union,
-        "copy_kernel_overlap_ms": overlap,
-        "exposed_final_state_dtoh_ms": copy_union - overlap,
-        "destination_kinds": sorted({item["destination"] for item in matched}),
+        "large_copy_summed_duration_ms": float(summed_duration),
+        "large_copy_summed_duration_ms_decimal": ratio_decimal_text(summed_duration),
+        "copy_union_duration_ms": float(copy_union),
+        "copy_union_duration_ms_decimal": ratio_decimal_text(copy_union),
+        "copy_kernel_overlap_ms": float(overlap),
+        "copy_kernel_overlap_ms_decimal": ratio_decimal_text(overlap),
+        "exposed_final_state_dtoh_ms": float(exposed),
+        "exposed_final_state_dtoh_ms_decimal": ratio_decimal_text(exposed),
+        "destination_kinds": sorted({item["destination_kind"] for item in matched}),
         "streams": sorted({item["stream"] for item in matched}),
         "contexts": sorted({item["context"] for item in matched}),
-        "kernel_union_duration_ms": interval_duration(kernels) if kernels else 0.0,
+        "kernel_union_duration_ms": float(kernel_union),
+        "kernel_union_duration_ms_decimal": ratio_decimal_text(kernel_union),
     }
 
 
@@ -428,32 +573,104 @@ def analyze_nsys_api(path: pathlib.Path) -> dict[str, Any]:
 
 def _timing_metrics(timing: dict[str, Any]) -> dict[str, Any]:
     finals = [draw["final_state"] for draw in timing["draw_timings"]]
-    def total(field: str) -> float:
-        return sum(float(final.get(field) or 0.0) for final in finals)
-    return {
-        "whole_sweep_wall_time_ms": finite(timing["whole_sweep_wall_time_ms"], "whole sweep wall", positive=True),
-        "setup_wall_time_ms": finite(timing["setup_wall_time_ms"], "setup wall"),
-        "execution_window_wall_time_ms": finite(timing.get("execution_window_wall_time_ms", sum(draw["wall_time_ms"] for draw in timing["draw_timings"])), "execution wall"),
-        "publication_wall_time_ms": finite(timing.get("publication_wall_time_ms", 0.0), "publication wall"),
-        "final_state_seam_total_ms": total("final_state_seam_total_ms"),
-        "pageable_dtoh_host_api_ms": total("pageable_dtoh_host_api_ms"),
-        "pinned_dtoh_enqueue_api_ms": total("pinned_dtoh_enqueue_api_ms"),
-        "wait_to_pinned_host_readable_ms": total("wait_to_pinned_host_readable_ms"),
-        "pinned_to_cacheable_staging_copy_ms": total("pinned_to_cacheable_staging_copy_ms"),
-        "host_state_reconstruction_ms": total("host_state_reconstruction_ms"),
-        "cpu_sha256_ms": total("cpu_sha256_ms"),
-        "buffer_accounting": timing["final_state_buffer_accounting"],
+
+    def fraction_value(value: Any, label: str, *, positive: bool = False) -> Fraction:
+        if isinstance(value, Fraction):
+            result = value
+            if result < 0 or (positive and result <= 0):
+                raise AnalysisError(
+                    f"{label} must be {'positive' if positive else 'non-negative'}"
+                )
+            return result
+        return Fraction(decimal_value(value, label, positive=positive))
+
+    def total_fraction(field: str) -> Fraction:
+        return sum(
+            (
+                fraction_value(final.get(field) or 0, field)
+                for final in finals
+            ),
+            Fraction(0),
+        )
+
+    execution_default = sum(
+        (
+            fraction_value(draw["wall_time_ms"], "draw wall")
+            for draw in timing["draw_timings"]
+        ),
+        Fraction(0),
+    )
+    accounting = timing["final_state_buffer_accounting"]
+    accounting_fields = (
+        "requested_lane_count",
+        "retained_lane_count",
+        "requested_buffer_set_count",
+        "buffer_set_count",
+        "requested_underlying_pinned_allocation_count",
+        "underlying_pinned_allocation_count",
+        "effective_pinned_bytes",
+        "effective_cacheable_staging_bytes",
+        "requested_pinned_bytes",
+        "requested_cacheable_staging_bytes",
+    )
+    exact_values = {
+        "whole_sweep_wall_time_ms": fraction_value(
+            timing["whole_sweep_wall_time_ms"], "whole sweep wall", positive=True
+        ),
+        "setup_wall_time_ms": fraction_value(
+            timing["setup_wall_time_ms"], "setup wall"
+        ),
+        "execution_window_wall_time_ms": fraction_value(
+            timing.get("execution_window_wall_time_ms", execution_default),
+            "execution wall",
+        ),
+        "publication_wall_time_ms": fraction_value(
+            timing.get("publication_wall_time_ms", 0), "publication wall"
+        ),
     }
+    for field in (
+        "final_state_seam_total_ms",
+        "pageable_dtoh_host_api_ms",
+        "pinned_dtoh_enqueue_api_ms",
+        "wait_to_pinned_host_readable_ms",
+        "pinned_to_cacheable_staging_copy_ms",
+        "host_state_reconstruction_ms",
+        "cpu_sha256_ms",
+    ):
+        exact_values[field] = total_fraction(field)
+
+    metrics = {field: float(value) for field, value in exact_values.items()}
+    metrics["buffer_accounting"] = {
+        field: accounting[field] for field in accounting_fields
+    }
+    for field, value in exact_values.items():
+        metrics[f"{field}_decimal"] = ratio_decimal_text(value)
+        metrics[f"{field}_fraction"] = {
+            "numerator": value.numerator,
+            "denominator": value.denominator,
+        }
+    return metrics
 
 
-def _threshold(name: str, actual: float) -> dict[str, Any]:
+def _threshold(name: str, actual: Any) -> dict[str, Any]:
     definition = dict(THRESHOLDS[name])
-    definition.update({"actual": actual, "passed": actual <= definition["value"]})
+    if isinstance(actual, Fraction):
+        actual_ratio = actual
+    else:
+        actual_ratio = Fraction(decimal_value(actual, f"{name} actual"))
+    threshold_ratio = Fraction(Decimal(str(definition["value"])))
+    definition.update(
+        {
+            "actual": float(actual_ratio),
+            "actual_decimal": ratio_decimal_text(actual_ratio),
+            "passed": actual_ratio <= threshold_ratio,
+        }
+    )
     return definition
 
 
 def evaluate_thresholds(
-    ratios: dict[str, float], host_ratio: float, nsight_ratio: float
+    ratios: dict[str, Any], host_ratio: Any, nsight_ratio: Any
 ) -> dict[str, Any]:
     results = {
         "B_workers4_wall": _threshold("B_workers4_wall", ratios["B_A_workers4"]),
@@ -484,13 +701,26 @@ def _records_by_key(records: list[dict[str, Any]]) -> dict[tuple[Any, ...], dict
 
 def _ratios(records: dict[tuple[Any, ...], dict[str, Any]], metrics: dict[int, dict[str, Any]], workers: int, numerator: str, denominator: str, field: str) -> dict[str, Any]:
     raw = []
+    exact_values: list[Fraction] = []
     for repetition in (1, 2, 3):
         num_record = records[("timed", workers, repetition, numerator)]
         den_record = records[("timed", workers, repetition, denominator)]
         num = metrics[num_record["id"]][field]
         den = metrics[den_record["id"]][field]
-        if den <= 0:
-            raise AnalysisError(f"zero denominator for {numerator}/{denominator} workers {workers}")
+        fraction_field = f"{field}_fraction"
+        try:
+            num_encoded = metrics[num_record["id"]][fraction_field]
+            den_encoded = metrics[den_record["id"]][fraction_field]
+            num_exact = Fraction(num_encoded["numerator"], num_encoded["denominator"])
+            den_exact = Fraction(den_encoded["numerator"], den_encoded["denominator"])
+        except (KeyError, TypeError, ZeroDivisionError) as error:
+            raise AnalysisError(f"exact metric is missing: {fraction_field}") from error
+        ratio = exact_ratio(
+            num_exact,
+            den_exact,
+            f"{numerator}/{denominator} workers {workers} repetition {repetition}",
+        )
+        exact_values.append(ratio)
         raw.append(
             {
                 "repetition": repetition,
@@ -498,10 +728,172 @@ def _ratios(records: dict[tuple[Any, ...], dict[str, Any]], metrics: dict[int, d
                 "denominator_record_id": den_record["id"],
                 "numerator_ms": num,
                 "denominator_ms": den,
-                "ratio": num / den,
+                "numerator_ms_decimal": ratio_decimal_text(num_exact),
+                "denominator_ms_decimal": ratio_decimal_text(den_exact),
+                "ratio": float(ratio),
+                "ratio_decimal": ratio_decimal_text(ratio),
             }
         )
-    return {"raw": raw, "median_ratio": statistics.median(item["ratio"] for item in raw)}
+    median = median_decimal(exact_values)
+    return {
+        "raw": raw,
+        "median_ratio": float(median),
+        "median_ratio_decimal": ratio_decimal_text(median),
+        "median_ratio_fraction": {
+            "numerator": median.numerator,
+            "denominator": median.denominator,
+        },
+    }
+
+
+def _comparison_groups(manifest: dict[str, Any]) -> list[tuple[str, list[dict[str, Any]]]]:
+    executions = manifest["executions"]
+    groups: list[tuple[str, list[dict[str, Any]]]] = [
+        ("preflight-independent", executions[:3])
+    ]
+    for offset in range(3, 21, 3):
+        group = executions[offset : offset + 3]
+        groups.append(
+            (
+                f"{group[0]['class']}-{group[0]['workers']}-{group[0]['repetition']}",
+                group,
+            )
+        )
+    groups.append(("crn-4-1", executions[21:24]))
+    groups.append(("profile-4-1", executions[24:27]))
+    return groups
+
+
+def _recompute_comparison(
+    root: pathlib.Path,
+    manifest: dict[str, Any],
+    label: str,
+    group: list[dict[str, Any]],
+) -> dict[str, Any]:
+    by_mode = {record["mode"]: record for record in group}
+    if set(by_mode) != set(protocol.MODES):
+        raise AnalysisError(f"{label} does not contain exactly A/B/C")
+    outputs = {
+        mode: evidence_path(
+            root,
+            manifest,
+            record["output_dir"],
+            record.get("output_relative"),
+        )
+        for mode, record in by_mode.items()
+    }
+    ab = protocol.compare_output_trees(outputs["A"], outputs["B"])
+    ac = protocol.compare_output_trees(outputs["A"], outputs["C"])
+    hashes = {
+        mode: protocol.final_state_hashes(output) for mode, output in outputs.items()
+    }
+    return {
+        "label": label,
+        "record_ids": [record["id"] for record in group],
+        "A_B": ab,
+        "A_C": ac,
+        "final_state_sha256": hashes,
+        "tree_parity": ab["equal"] and ac["equal"],
+        "digest_parity": hashes["A"] == hashes["B"] == hashes["C"],
+    }
+
+
+def validate_comparisons(
+    root: pathlib.Path,
+    manifest: dict[str, Any],
+    comparisons: Any,
+) -> None:
+    groups = _comparison_groups(manifest)
+    if not isinstance(comparisons, list) or len(comparisons) != len(groups):
+        raise AnalysisError("independent/CRN/profile output parity evidence is incomplete")
+    for recorded, (label, group) in zip(comparisons, groups):
+        if not isinstance(recorded, dict):
+            raise AnalysisError(f"comparison {label} is malformed")
+        recomputed = _recompute_comparison(root, manifest, label, group)
+        if recorded.get("label") != label or recorded.get("record_ids") != recomputed["record_ids"]:
+            raise AnalysisError(f"comparison {label} identity is inconsistent")
+        for field in ("tree_parity", "digest_parity", "passed"):
+            if recorded.get(field) is not True:
+                raise AnalysisError(f"comparison {label} reports failed {field}")
+        for field in ("A_B", "A_C"):
+            nested = recorded.get(field)
+            if (
+                not isinstance(nested, dict)
+                or nested.get("equal") is not True
+                or nested.get("missing_from_right") != []
+                or nested.get("extra_in_right") != []
+                or nested.get("changed") != []
+                or nested.get("left_file_count") != nested.get("right_file_count")
+                or nested.get("left_file_count", 0) <= 0
+            ):
+                raise AnalysisError(f"comparison {label} has contradictory {field} evidence")
+        if recorded.get("final_state_sha256") != recomputed["final_state_sha256"]:
+            raise AnalysisError(f"comparison {label} digest evidence disagrees with output trees")
+        if not recomputed["tree_parity"] or not recomputed["digest_parity"]:
+            raise AnalysisError(f"comparison {label} output parity failed on recomputation")
+
+
+def validate_negative_control(negative: Any) -> None:
+    if not isinstance(negative, dict):
+        raise AnalysisError("deliberate negative control is malformed")
+    comparison = negative.get("comparison")
+    target = negative.get("perturbed_relative_path")
+    if (
+        negative.get("accepted") is not False
+        or negative.get("rejected") is not True
+        or not isinstance(comparison, dict)
+        or comparison.get("equal") is not False
+        or not isinstance(target, str)
+        or not target
+        or comparison.get("changed") != [target]
+        or comparison.get("missing_from_right") != []
+        or comparison.get("extra_in_right") != []
+    ):
+        raise AnalysisError("deliberate negative control was not consistently rejected")
+
+
+def _strict_nonnegative_int(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise AnalysisError(f"{label} must be a non-negative integer")
+    return value
+
+
+def validate_resource_samples(record: dict[str, Any]) -> tuple[int, int]:
+    samples = record.get("resource_samples")
+    if record.get("resource_sampling_complete") is not True or not isinstance(samples, list) or not samples:
+        raise AnalysisError(f"record {record['id']} has incomplete resource evidence")
+    successful_rss: list[int] = []
+    successful_vram: list[int] = []
+    for index, sample in enumerate(samples):
+        if not isinstance(sample, dict):
+            raise AnalysisError(f"record {record['id']} resource sample {index} is malformed")
+        rss = _strict_nonnegative_int(
+            sample.get("rss_bytes"), f"record {record['id']} sample {index} RSS"
+        )
+        vram = _strict_nonnegative_int(
+            sample.get("vram_bytes"), f"record {record['id']} sample {index} VRAM"
+        )
+        rss_succeeded = sample.get("rss_query_succeeded")
+        vram_succeeded = sample.get("vram_query_succeeded")
+        if not isinstance(rss_succeeded, bool) or not isinstance(vram_succeeded, bool):
+            raise AnalysisError(f"record {record['id']} resource query flags are malformed")
+        if rss_succeeded:
+            successful_rss.append(rss)
+        elif rss != 0:
+            raise AnalysisError(f"record {record['id']} failed RSS query reported bytes")
+        if vram_succeeded:
+            successful_vram.append(vram)
+        elif vram != 0:
+            raise AnalysisError(f"record {record['id']} failed VRAM query reported bytes")
+    if not successful_rss or max(successful_rss) <= 0 or not successful_vram or max(successful_vram) <= 0:
+        raise AnalysisError(f"record {record['id']} has no positive successful RSS/VRAM sample")
+    peak_rss = max(successful_rss)
+    peak_vram = max(successful_vram)
+    if _strict_nonnegative_int(record.get("peak_rss_bytes"), f"record {record['id']} peak RSS") != peak_rss:
+        raise AnalysisError(f"record {record['id']} peak RSS does not match samples")
+    if _strict_nonnegative_int(record.get("peak_vram_bytes"), f"record {record['id']} peak VRAM") != peak_vram:
+        raise AnalysisError(f"record {record['id']} peak VRAM does not match samples")
+    return peak_rss, peak_vram
 
 
 def analyze(root: pathlib.Path) -> dict[str, Any]:
@@ -515,11 +907,9 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
     if status.get("completed") is not True or status.get("execution_count") != 27:
         raise AnalysisError("focused protocol is incomplete")
     negative = load_json(root / "negative-control.json")
-    if negative.get("accepted") is not False or negative.get("rejected") is not True:
-        raise AnalysisError("deliberate negative control was not rejected")
+    validate_negative_control(negative)
     comparisons = load_json(root / "comparisons.json")
-    if len(comparisons) != 9 or any(item.get("passed") is not True for item in comparisons):
-        raise AnalysisError("independent/CRN/profile output parity evidence is incomplete")
+    validate_comparisons(root, manifest, comparisons)
 
     records: list[dict[str, Any]] = []
     metrics: dict[int, dict[str, Any]] = {}
@@ -547,24 +937,9 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
                 raise AnalysisError(f"record {expected['id']} changed command field {field}")
         if record.get("return_code") != 0 or record.get("timed_out") is not False:
             raise AnalysisError(f"record {expected['id']} did not complete successfully")
-        samples = record.get("resource_samples")
-        if (
-            record.get("resource_sampling_complete") is not True
-            or not isinstance(samples, list)
-            or not samples
-            or int(record.get("peak_rss_bytes", 0)) <= 0
-            or int(record.get("peak_vram_bytes", 0)) <= 0
-        ):
-            raise AnalysisError(f"record {expected['id']} has incomplete resource evidence")
-        if any(
-            not isinstance(sample, dict)
-            or not isinstance(sample.get("rss_bytes"), int)
-            or not isinstance(sample.get("vram_bytes"), int)
-            or sample["rss_bytes"] < 0
-            or sample["vram_bytes"] < 0
-            for sample in samples
-        ):
-            raise AnalysisError(f"record {expected['id']} has malformed resource samples")
+        peak_rss, peak_vram = validate_resource_samples(record)
+        record["peak_rss_bytes"] = peak_rss
+        record["peak_vram_bytes"] = peak_vram
         if expected["profiled"]:
             raw_report = evidence_path(
                 root,
@@ -574,15 +949,16 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
             )
             if not raw_report.is_file() or raw_report.stat().st_size == 0:
                 raise AnalysisError(f"profile {expected['id']} is missing its raw Nsight report")
+        timing_path = evidence_path(
+            root, manifest, expected["timing_json"], expected.get("timing_relative")
+        )
         try:
-            timing = protocol.validate_timing(
-                evidence_path(
-                    root, manifest, expected["timing_json"], expected.get("timing_relative")
-                ),
-                expected,
-            )
+            protocol.validate_timing(timing_path, expected)
         except protocol.ProtocolError as error:
             raise AnalysisError(str(error)) from error
+        # Structural validation above remains shared with the collector. Re-read
+        # the same bytes without binary-float coercion for every gate operand.
+        timing = load_json(timing_path, exact_decimals=True)
         metrics[expected["id"]] = _timing_metrics(timing)
         records.append(record)
 
@@ -595,20 +971,56 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
     }
     host_ratios = _ratios(keyed, metrics, 4, "C", "B", "pageable_dtoh_host_api_ms")
     # Replace the C numerator with the exact pinned host-blocking definition.
+    def metric_fraction(item: dict[str, Any], field: str) -> Fraction:
+        encoded = item[f"{field}_fraction"]
+        return Fraction(encoded["numerator"], encoded["denominator"])
+
+    host_exact: list[Fraction] = []
     for item in host_ratios["raw"]:
         c_record = keyed[("timed", 4, item["repetition"], "C")]
+        b_record = keyed[("timed", 4, item["repetition"], "B")]
         c_metrics = metrics[c_record["id"]]
-        numerator = c_metrics["pinned_dtoh_enqueue_api_ms"] + c_metrics["wait_to_pinned_host_readable_ms"]
-        item["numerator_ms"] = numerator
-        item["ratio"] = numerator / item["denominator_ms"]
-    host_ratios["median_ratio"] = statistics.median(item["ratio"] for item in host_ratios["raw"])
+        b_metrics = metrics[b_record["id"]]
+        numerator = (
+            metric_fraction(c_metrics, "pinned_dtoh_enqueue_api_ms")
+            + metric_fraction(c_metrics, "wait_to_pinned_host_readable_ms")
+        )
+        denominator = metric_fraction(b_metrics, "pageable_dtoh_host_api_ms")
+        ratio = exact_ratio(
+            numerator,
+            denominator,
+            f"C/B host mechanism repetition {item['repetition']}",
+        )
+        host_exact.append(ratio)
+        item["numerator_ms"] = float(numerator)
+        item["denominator_ms"] = float(denominator)
+        item["numerator_ms_decimal"] = ratio_decimal_text(numerator)
+        item["denominator_ms_decimal"] = ratio_decimal_text(denominator)
+        item["ratio"] = float(ratio)
+        item["ratio_decimal"] = ratio_decimal_text(ratio)
+    host_median = median_decimal(host_exact)
+    host_ratios["median_ratio"] = float(host_median)
+    host_ratios["median_ratio_decimal"] = ratio_decimal_text(host_median)
+    host_ratios["median_ratio_fraction"] = {
+        "numerator": host_median.numerator,
+        "denominator": host_median.denominator,
+    }
 
     profiles: dict[str, Any] = {}
     for mode in "ABC":
         record = keyed[("profile", 4, 1, mode)]
         exports = record.get("nsys_exports")
-        if not isinstance(exports, dict):
-            raise AnalysisError(f"profile {mode} is missing Nsight exports")
+        expected_record = manifest["executions"][record["id"] - 1]
+        expected_exports = {
+            name: (
+                pathlib.Path(expected_record["arm_relative"])
+                / "profile"
+                / f"{name}.csv"
+            ).as_posix()
+            for name in ("cuda_gpu_trace", "cuda_api_sum", "cuda_gpu_kern_sum")
+        }
+        if exports != expected_exports:
+            raise AnalysisError(f"profile {mode} exports are not bound to their owning arm")
         timing = load_json(
             evidence_path(
                 root, manifest, record["timing_json"], record.get("timing_relative")
@@ -627,19 +1039,32 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
         }
     b_exposed = profiles["B"]["trace"]["exposed_final_state_dtoh_ms"]
     c_exposed = profiles["C"]["trace"]["exposed_final_state_dtoh_ms"]
-    if b_exposed <= 0:
-        raise AnalysisError("B exposed final-state D2H denominator is zero")
-    nsight_ratio = c_exposed / b_exposed
+    b_exposed_decimal = profiles["B"]["trace"][
+        "exposed_final_state_dtoh_ms_decimal"
+    ]
+    c_exposed_decimal = profiles["C"]["trace"][
+        "exposed_final_state_dtoh_ms_decimal"
+    ]
+    nsight_ratio_exact = exact_ratio(
+        c_exposed_decimal,
+        b_exposed_decimal,
+        "C/B Nsight exposed final-state D2H",
+    )
+    nsight_ratio = float(nsight_ratio_exact)
+
+    def median_fraction(name: str) -> Fraction:
+        encoded = ratio_sets[name]["median_ratio_fraction"]
+        return Fraction(encoded["numerator"], encoded["denominator"])
 
     threshold_results = evaluate_thresholds(
         {
-            "B_A_workers4": ratio_sets["B_A_workers4"]["median_ratio"],
-            "B_A_workers1": ratio_sets["B_A_workers1"]["median_ratio"],
-            "C_B_workers4": ratio_sets["C_B_workers4"]["median_ratio"],
-            "C_B_workers1": ratio_sets["C_B_workers1"]["median_ratio"],
+            "B_A_workers4": median_fraction("B_A_workers4"),
+            "B_A_workers1": median_fraction("B_A_workers1"),
+            "C_B_workers4": median_fraction("C_B_workers4"),
+            "C_B_workers1": median_fraction("C_B_workers1"),
         },
-        host_ratios["median_ratio"],
-        nsight_ratio,
+        host_median,
+        nsight_ratio_exact,
     )
     mechanism_passed = threshold_results["C_mechanism_OR"]["passed"]
 
@@ -737,6 +1162,28 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
         and mechanism_passed
         and c_resources_bounded
     )
+    command_metrics: dict[str, dict[str, Any]] = {}
+    for record in sorted(records, key=lambda item: item["id"]):
+        command_metrics[str(record["id"])] = {
+            "id": record["id"],
+            "class": record["class"],
+            "mode": record["mode"],
+            "selector": record["selector"],
+            "workers": record["workers"],
+            "draws": record["draws"],
+            "noise": record["noise"],
+            "repetition": record["repetition"],
+            "profiled": record["profiled"],
+            "included_in_performance": record["included_in_performance"],
+            "peak_rss_bytes": record["peak_rss_bytes"],
+            "peak_vram_bytes": record["peak_vram_bytes"],
+            **metrics[record["id"]],
+        }
+    preflight_performance = [
+        command_metrics[str(record["id"])]
+        for record in records
+        if record["class"] == "preflight"
+    ]
     result = {
         "schema": SCHEMA,
         "complete": True,
@@ -749,8 +1196,14 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
             "B_exposed_final_state_dtoh_ms": b_exposed,
             "C_exposed_final_state_dtoh_ms": c_exposed,
             "ratio": nsight_ratio,
+            "ratio_decimal": ratio_decimal_text(nsight_ratio_exact),
         },
-        "absolute_command_metrics": {str(key): value for key, value in sorted(metrics.items())},
+        "preflight_performance": {
+            "informational_only": True,
+            "excluded_from_promotion": True,
+            "commands": preflight_performance,
+        },
+        "absolute_command_metrics": command_metrics,
         "profiles": profiles,
         "resources_by_workers": resources_by_workers,
         "eligibility": {
@@ -769,10 +1222,118 @@ def analyze(root: pathlib.Path) -> dict[str, Any]:
 
 
 def markdown(result: dict[str, Any]) -> str:
+    def ms(value: Any) -> str:
+        return f"{float(value):.3f}"
+
     lines = [
         "# CUDA final-state A/B/C decision",
         "",
         f"Verdict: **{result['eligibility']['verdict']}**",
+        "",
+        "## Preflight performance (informational only)",
+        "",
+        "These one-draw results establish correctness and diagnostics only; they are excluded from promotion.",
+        "",
+        "| ID | Mode | whole_sweep_wall_time_ms | setup_wall_time_ms | execution_window_wall_time_ms | publication_wall_time_ms | final_state_seam_total_ms |",
+        "|---:|:---:|---:|---:|---:|---:|---:|",
+    ]
+    for item in result["preflight_performance"]["commands"]:
+        lines.append(
+            f"| {item['id']} | {item['mode']} | {ms(item['whole_sweep_wall_time_ms'])} | "
+            f"{ms(item['setup_wall_time_ms'])} | {ms(item['execution_window_wall_time_ms'])} | "
+            f"{ms(item['publication_wall_time_ms'])} | {ms(item['final_state_seam_total_ms'])} |"
+        )
+
+    lines += [
+        "",
+        "## Absolute command and phase evidence",
+        "",
+        "| ID | Class | Mode | Workers | Rep | whole_sweep_wall_time_ms | setup_wall_time_ms | execution_window_wall_time_ms | publication_wall_time_ms | final_state_seam_total_ms | pageable_dtoh_host_api_ms | pinned_dtoh_enqueue_api_ms | wait_to_pinned_host_readable_ms | pinned_to_cacheable_staging_copy_ms | host_state_reconstruction_ms | cpu_sha256_ms |",
+        "|---:|---|:---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for item in result["absolute_command_metrics"].values():
+        repetition = "-" if item["repetition"] is None else str(item["repetition"])
+        lines.append(
+            f"| {item['id']} | {item['class']} | {item['mode']} | {item['workers']} | {repetition} | "
+            f"{ms(item['whole_sweep_wall_time_ms'])} | {ms(item['setup_wall_time_ms'])} | "
+            f"{ms(item['execution_window_wall_time_ms'])} | {ms(item['publication_wall_time_ms'])} | "
+            f"{ms(item['final_state_seam_total_ms'])} | {ms(item['pageable_dtoh_host_api_ms'])} | "
+            f"{ms(item['pinned_dtoh_enqueue_api_ms'])} | {ms(item['wait_to_pinned_host_readable_ms'])} | "
+            f"{ms(item['pinned_to_cacheable_staging_copy_ms'])} | {ms(item['host_state_reconstruction_ms'])} | "
+            f"{ms(item['cpu_sha256_ms'])} |"
+        )
+
+    lines += [
+        "",
+        "## Raw adjacent repetitions",
+        "",
+        "| Comparison | Repetition | Numerator ms | Denominator ms | Ratio | Median ratio |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for name, values in result["ratios"].items():
+        for item in values["raw"]:
+            lines.append(
+                f"| {name} | {item['repetition']} | {ms(item['numerator_ms'])} | "
+                f"{ms(item['denominator_ms'])} | {item['ratio_decimal']} | "
+                f"{values['median_ratio_decimal']} |"
+            )
+
+    lines += [
+        "",
+        "## C mechanism evidence",
+        "",
+        "| Mechanism | Repetition | B denominator ms | C numerator ms | Ratio |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for item in result["host_mechanism_ratios"]["raw"]:
+        lines.append(
+            f"| Host blocking | {item['repetition']} | {ms(item['denominator_ms'])} | "
+            f"{ms(item['numerator_ms'])} | {item['ratio_decimal']} |"
+        )
+    nsight = result["nsight_mechanism"]
+    lines.append(
+        f"| Nsight exposed D2H | - | {ms(nsight['B_exposed_final_state_dtoh_ms'])} | "
+        f"{ms(nsight['C_exposed_final_state_dtoh_ms'])} | {nsight['ratio_decimal']} |"
+    )
+
+    lines += [
+        "",
+        "## Nsight final-state copy evidence",
+        "",
+        "| Mode | large_copy_count | large_copy_bytes | large_copy_summed_duration_ms | copy_union_duration_ms | copy_kernel_overlap_ms | exposed_final_state_dtoh_ms |",
+        "|:---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for mode, profile in result["profiles"].items():
+        trace = profile["trace"]
+        lines.append(
+            f"| {mode} | {trace['large_copy_count']} | {trace['large_copy_bytes']} | "
+            f"{ms(trace['large_copy_summed_duration_ms'])} | {ms(trace['copy_union_duration_ms'])} | "
+            f"{ms(trace['copy_kernel_overlap_ms'])} | {ms(trace['exposed_final_state_dtoh_ms'])} |"
+        )
+
+    lines += [
+        "",
+        "## Resource evidence by worker count",
+        "",
+        "| Workers | Mode | peak_rss_bytes | peak_vram_bytes | requested_pinned_bytes | requested_staging_bytes | buffer_sets_per_retained_lane | pinned_allocations_per_retained_lane | Pass |",
+        "|---:|:---:|---:|---:|---:|---:|---:|---:|:---:|",
+    ]
+    for workers, resource in result["resources_by_workers"].items():
+        for mode in "ABC":
+            sets = ",".join(f"{value:.3f}" for value in resource["buffer_sets_per_retained_lane"])
+            allocations = ",".join(
+                f"{value:.3f}" for value in resource["pinned_allocations_per_retained_lane"]
+            )
+            lines.append(
+                f"| {workers} | {mode} | {resource['peak_rss_bytes_by_mode'][mode]} | "
+                f"{resource['peak_vram_bytes_by_mode'][mode]} | "
+                f"{resource['requested_pinned_bytes'] if mode == 'C' else 0} | "
+                f"{resource['requested_staging_bytes'] if mode == 'C' else 0} | "
+                f"{sets if mode == 'C' else '0'} | {allocations if mode == 'C' else '0'} | "
+                f"{'yes' if resource['memory_passed'] else 'no'} |"
+            )
+
+    lines += [
         "",
         "## Frozen thresholds",
         "",
@@ -784,12 +1345,9 @@ def markdown(result: dict[str, Any]) -> str:
             lines.append(f"| {name} | OR | host or Nsight | {'yes' if gate['passed'] else 'no'} |")
         else:
             lines.append(
-                f"| {name} | {gate['actual']:.6f} | {gate['direction']} {gate['value']:.2f} | {'yes' if gate['passed'] else 'no'} |"
+                f"| {name} | {gate['actual_decimal']} | {gate['direction']} {gate['value']:.2f} | "
+                f"{'yes' if gate['passed'] else 'no'} |"
             )
-    lines += ["", "## Raw adjacent repetitions", ""]
-    for name, values in result["ratios"].items():
-        ratios = ", ".join(f"{item['ratio']:.6f}" for item in values["raw"])
-        lines.append(f"- `{name}`: {ratios}; median **{values['median_ratio']:.6f}**")
     lines += [
         "",
         "## Eligibility",
