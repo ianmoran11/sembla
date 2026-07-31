@@ -3101,9 +3101,9 @@ mod tests {
     use sembla_ir::{Expr, ViewReduce};
 
     use super::{
-        cuda_f64_order_key, decode_grouped_histogram, generate, grouped_observation_layout,
-        host_observation_fallback, GeneratedGroupedObservation, GroupedObservationAxis,
-        GroupedViewValue, DUMP_ENV, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
+        cuda_f64_order_key, decode_grouped_histogram, generate, generate_fused_batch,
+        grouped_observation_layout, host_observation_fallback, GeneratedGroupedObservation,
+        GroupedObservationAxis, GroupedViewValue, DUMP_ENV, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
     };
 
     fn example_model(name: &str) -> sembla_ir::ValidatedModel {
@@ -3378,6 +3378,18 @@ mod tests {
         assert!(!resolver.contains("atomicMin"));
         assert!(!resolver.contains("atomicAdd"));
         assert!(!resolver.contains("other_row"));
+    }
+
+    #[test]
+    fn generated_sources_contain_no_scalar_final_state_sha_kernel() {
+        for generated in [
+            generate(&sir_model()).unwrap(),
+            generate_fused_batch(&sir_model()).unwrap(),
+        ] {
+            assert!(!generated.source.contains("sembla_final_state_sha256"));
+            assert!(!generated.source.contains("sembla_sha256_compress"));
+            assert!(!generated.source.contains("sembla_sha256_context"));
+        }
     }
 
     #[test]

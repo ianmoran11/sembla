@@ -1,6 +1,6 @@
 #![cfg(feature = "cuda")]
 
-use sembla_cuda::{generate, CudaBackend, HashMode};
+use sembla_cuda::{generate, CudaBackend, CudaFinalStateReadbackMode, HashMode};
 use sembla_runtime::eval::ParamEnv;
 use sembla_runtime::executor::run_tick;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
@@ -52,6 +52,101 @@ fn reset_and_reseed_matches_a_fresh_backend_after_prior_draws() {
     }
     let fresh_hash = fresh.ensure_observed_state().unwrap().state_hash();
     assert_eq!(retained_hash, fresh_hash);
+}
+
+#[test]
+fn packed_pageable_and_reusable_pinned_final_hashes_match_materialized() {
+    let model = input_integer_ordering_model();
+    let params = ParamEnv::defaults(&model);
+    let mut backend = CudaBackend::new(
+        &model,
+        input_integer_ordering_state(),
+        &params,
+        29,
+        HashMode::FinalOnly,
+    )
+    .unwrap();
+    for _ in 0..2 {
+        backend.run_tick_observed_reused().unwrap();
+    }
+    let materialized = backend
+        .final_state_readback(CudaFinalStateReadbackMode::Materialized)
+        .unwrap();
+    let pageable = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPageable)
+        .unwrap();
+    let pinned = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPinned)
+        .unwrap();
+    assert_eq!(pageable.digest, materialized.digest);
+    assert_eq!(pinned.digest, materialized.digest);
+    assert_eq!(pinned.downloaded_bytes, pageable.downloaded_bytes);
+    assert!(pageable.downloaded_bytes.total > 0);
+    assert_eq!(pageable.host_state_reconstruction, None);
+    assert!(pageable.pageable_dtoh_host_api.is_some());
+    assert_eq!(pageable.pinned_dtoh_enqueue_api, None);
+    assert_eq!(pinned.pageable_dtoh_host_api, None);
+    assert!(pinned.pinned_dtoh_enqueue_api.is_some());
+    assert!(pinned.wait_to_pinned_host_readable.is_some());
+    assert!(pinned.pinned_to_cacheable_staging_copy.is_some());
+    assert_eq!(pinned.buffer_accounting.buffer_set_count, 1);
+    assert!(pinned.buffer_accounting.underlying_pinned_allocation_count <= 3);
+    assert_eq!(
+        pinned.buffer_accounting.pinned_bytes,
+        pinned.downloaded_bytes.total
+    );
+    assert!(pinned.buffer_accounting.cacheable_staging_bytes >= pinned.downloaded_bytes.total);
+
+    backend.reset_draw(&params, 31).unwrap();
+    backend.run_tick_observed_reused().unwrap();
+    let pinned_reused = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPinned)
+        .unwrap();
+    let pageable_after_reset = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPageable)
+        .unwrap();
+    assert_eq!(pinned_reused.digest, pageable_after_reset.digest);
+    assert_eq!(pinned_reused.allocation, std::time::Duration::ZERO);
+    assert_eq!(pinned_reused.buffer_accounting, pinned.buffer_accounting);
+}
+
+#[test]
+fn packed_pinned_zero_components_allocate_and_copy_nothing() {
+    let source = r#"{"name":"empty","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[],"transitions":[],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
+    let model = sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap();
+    let params = ParamEnv::defaults(&model);
+    let mut backend =
+        CudaBackend::new(&model, Vec::new(), &params, 7, HashMode::FinalOnly).unwrap();
+    let materialized = backend
+        .final_state_readback(CudaFinalStateReadbackMode::Materialized)
+        .unwrap();
+    let pageable = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPageable)
+        .unwrap();
+    let pinned = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPinned)
+        .unwrap();
+    assert_eq!(pageable.digest, materialized.digest);
+    assert_eq!(pinned.digest, materialized.digest);
+    assert_eq!(pinned.downloaded_bytes.total, 0);
+    assert_eq!(pinned.downloaded_bytes.state, 0);
+    assert_eq!(pinned.downloaded_bytes.inputs, 0);
+    assert_eq!(pinned.downloaded_bytes.input_counts, 0);
+    assert_eq!(pinned.buffer_accounting.buffer_set_count, 1);
+    assert_eq!(
+        pinned.buffer_accounting.underlying_pinned_allocation_count,
+        0
+    );
+    assert_eq!(pinned.buffer_accounting.pinned_bytes, 0);
+    assert_eq!(pinned.buffer_accounting.cacheable_staging_bytes, 0);
+
+    backend.reset_draw(&params, 11).unwrap();
+    let reused = backend
+        .final_state_readback(CudaFinalStateReadbackMode::PackedPinned)
+        .unwrap();
+    assert_eq!(reused.digest, pinned.digest);
+    assert_eq!(reused.allocation, std::time::Duration::ZERO);
+    assert_eq!(reused.buffer_accounting, pinned.buffer_accounting);
 }
 
 fn claim_overflow_state() -> Vec<TableInit> {
