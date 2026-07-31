@@ -1687,8 +1687,9 @@ const SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV: &str = "SEMBLA_SWEEP_SPIKE_DE
 const SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS";
 const SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS";
 const SWEEP_CUDA_FUSED_DRAWS_ENV: &str = "SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS";
-/// Hidden diagnostic seam for CUDA sweep final-state extraction. This is not a
-/// supported CLI option and never enters scientific manifests.
+/// Hidden override for CUDA sweep final-state extraction. Packed pageable is
+/// the production default; this is not a supported CLI option and never enters
+/// scientific manifests.
 const SWEEP_CUDA_FINAL_STATE_MODE_ENV: &str = "SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE";
 const RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV: &str =
     "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256";
@@ -1697,8 +1698,8 @@ const RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV: &str =
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum SweepCudaFinalStateMode {
-    #[default]
     Materialized,
+    #[default]
     PackedPageable,
     PackedPinned,
 }
@@ -7412,11 +7413,11 @@ mod tests {
         collect_diff_corpus_paths, compare_per_tick_hashes, csv_field, duration_ms,
         fused_publishable_prefix, initialize_population, parse_backend, parse_diff_options,
         parse_sweep_options, run, run_bounded_concurrent_sweep, run_file_result,
-        run_results_output, run_results_output_with_features, sweep_file_result,
-        sweep_file_result_with_runtime, BackendSelection, HashMode, ProductionSweepRuntime,
-        RunOptions, SweepBackend, SweepConcurrencyMode, SweepConcurrentInputs,
-        SweepCudaFinalStateMode, SweepOptions, SweepPreparedDraw, SweepRuntime,
-        RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV,
+        run_results_output, run_results_output_with_features, sweep_cuda_final_state_selection,
+        sweep_file_result, sweep_file_result_with_runtime, BackendSelection, HashMode,
+        ProductionSweepRuntime, RunOptions, SweepBackend, SweepConcurrencyMode,
+        SweepConcurrentInputs, SweepCudaFinalStateMode, SweepOptions, SweepPreparedDraw,
+        SweepRuntime, RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_ENV,
         RETIRED_SWEEP_CUDA_DEVICE_FINAL_SHA256_VERIFY_ENV, SWEEP_BACKEND_CONSTRUCTIONS,
         SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK, SWEEP_CONCURRENCY_SPIKE_CUDA_FREE_STREAMS_ENV,
         SWEEP_CONCURRENCY_SPIKE_CUDA_LOCKSTEP_ENV, SWEEP_CONCURRENCY_SPIKE_DELAY_DRAW_ZERO_ENV,
@@ -7531,6 +7532,26 @@ mod tests {
                 None => std::env::remove_var(self.key),
             }
         }
+    }
+
+    #[test]
+    fn cuda_sweep_final_state_default_is_packed_pageable() {
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
+        let _selector = ScopedEnv::remove(SWEEP_CUDA_FINAL_STATE_MODE_ENV);
+        let default = sweep_cuda_final_state_selection(BackendSelection::Cuda).unwrap();
+        assert_eq!(
+            SweepCudaFinalStateMode::default(),
+            SweepCudaFinalStateMode::PackedPageable
+        );
+        assert_eq!(default.mode, SweepCudaFinalStateMode::PackedPageable);
+        assert!(!default.explicitly_set);
+
+        let explicit = {
+            let _materialized = ScopedEnv::set(SWEEP_CUDA_FINAL_STATE_MODE_ENV, "materialized");
+            sweep_cuda_final_state_selection(BackendSelection::Cuda).unwrap()
+        };
+        assert_eq!(explicit.mode, SweepCudaFinalStateMode::Materialized);
+        assert!(explicit.explicitly_set);
     }
 
     #[test]
@@ -7810,13 +7831,13 @@ mod tests {
                 for draw in draw_timings {
                     let final_state = &draw["final_state"];
                     assert_eq!(final_state["schema"], "sembla-cuda-final-state-readback-v2");
-                    assert_eq!(final_state["mode"], "materialized");
+                    assert_eq!(final_state["mode"], "packed-pageable");
                     assert!(final_state["pageable_dtoh_host_api_ms"].is_number());
                     assert!(final_state["pinned_dtoh_enqueue_api_ms"].is_null());
                     assert!(final_state["wait_to_pinned_host_readable_ms"].is_null());
                     assert!(final_state["pinned_to_cacheable_staging_copy_ms"].is_null());
-                    assert!(final_state["host_state_reconstruction_ms"].is_number());
-                    assert_eq!(final_state["downloaded_bytes"]["total"], 0);
+                    assert!(final_state["host_state_reconstruction_ms"].is_null());
+                    assert_eq!(final_state["downloaded_bytes"]["total"], 1);
                     assert_eq!(final_state["buffer_accounting"]["buffer_set_count"], 0);
                 }
                 let accounting = &timing_document["final_state_buffer_accounting"];
@@ -7942,12 +7963,32 @@ mod tests {
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/reversible_ctmc.json");
         let runtime = LocalConformanceSweepRuntime::default();
         let control = root.join("control");
+        {
+            let _materialized = ScopedEnv::set(SWEEP_CUDA_FINAL_STATE_MODE_ENV, "materialized");
+            sweep_file_result_with_runtime(
+                model.to_str().unwrap(),
+                options(&control, None, 1),
+                &runtime,
+            )
+            .unwrap();
+        }
+
+        let default = root.join("default");
+        let default_timing = root.join("default-timing.json");
         sweep_file_result_with_runtime(
             model.to_str().unwrap(),
-            options(&control, None, 1),
+            options(&default, Some(&default_timing), 1),
             &runtime,
         )
         .unwrap();
+        assert_eq!(output_tree(&control), output_tree(&default));
+        let default_document: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&default_timing).unwrap()).unwrap();
+        assert!(default_document["draw_timings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|draw| draw["final_state"]["mode"] == "packed-pageable"));
 
         for mode in ["packed-pageable", "packed-pinned"] {
             let sequential = root.join(format!("{mode}-sequential"));

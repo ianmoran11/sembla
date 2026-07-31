@@ -2032,3 +2032,47 @@ that runs, no CPU claim is made for `prds-sweep-throughput/0001` at 10M.
 **§L4 reads MET at 3.435x and remains retired**, per §L9 and §L11. CUDA median
 14.630s, CPU 50.250s, all six collector assertions passing. Ageing share 40.65%
 median, a fifth consecutive reading near 40% against §K2's 10% threshold.
+
+### L14. Packed pageable hashing is the standard CUDA sweep final-state path (2026-07-31)
+
+**Decision.** CUDA sweeps now hash the downloaded packed final-state bytes
+directly. This is treatment B from the final-state A/B/C experiment. The hidden
+`materialized` A and `packed-pinned` C modes remain available as explicit
+focused diagnostics, but unset ordinary CUDA sweep execution selects B.
+Canonical SHA-256, its framing, scientific manifests and output bytes are
+unchanged.
+
+**Evidence.** The focused H100 protocol completed all 27 executions at commit
+`7b0e83e`; raw evidence, the local post-schema analysis and checksums are on
+branch `evidence/cuda-final-state-decision-20260731`, commit `88319de`, under
+`docs/evidence/demographic-bench/hyperstack-l4-20260731T015324Z/`. Every A/B/C
+complete-tree comparison was byte-identical, every final-state digest matched,
+independent and CRN noise both passed, and the deliberate one-byte negative
+control was rejected.
+
+Against adjacent A controls, B's median whole-command ratio was **0.847878 at
+workers 1 (15.21% faster)** and **0.926732 at workers 4 (7.33% faster)**. Both
+predeclared gates passed. One workers-4 B repetition was slower because setup
+rose to 4.169 s; the other two ratios were 0.927 and 0.903. The frozen median
+supports promotion, while the individual result remains a warning not to claim
+zero run-to-run variability.
+
+**Interpretation.** B does not make PCIe faster. It removes unnecessary host
+work after the same pageable download: rebuilding a large `StateStore` before
+hashing it. In the representative workers-4 profile, the complete final-state
+seam fell from 4,785 ms to 2,298 ms. This is the narrow change supported by the
+measurement: select the already-tested packed canonical path by default, not a
+new serializer, digest or GPU algorithm.
+
+**Pinned C is rejected.** Its exposed final-state D2H fell from 923.9 ms to
+46.0 ms, proving that pinned transfer worked, but copying write-combined pinned
+memory into cacheable staging cost roughly 8.0–8.8 s across four draws. Whole
+wall time was therefore 80.62% slower at workers 1 and 20.99% slower at workers
+4, with four lanes retaining about 1.92 GB pinned plus 1.92 GB staging memory.
+Do not add copy streams, double buffering or more staging work without a new
+direct measurement that avoids this second-copy cost.
+
+**Safety.** Both paid attempts tore down successfully. Final Terraform state and
+Hyperstack reconciliation showed zero VMs/orphans, performance-counter access
+was restored to admin-only, and the destroy watchdog was disarmed only after
+zero resources were confirmed.

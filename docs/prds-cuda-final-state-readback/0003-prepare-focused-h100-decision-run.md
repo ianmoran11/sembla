@@ -1,5 +1,9 @@
 # PRD 0003: Prepare the focused H100 A/B/C decision run
 
+> Completed experiment contract: this PRD deliberately did not authorize
+> promotion. The later H100 result and operator promotion of B are recorded in
+> `DECISIONS.md` §L14.
+
 ## Context
 
 Read `docs/prds-cuda-final-state-readback/README.md` first; its contracts bind.

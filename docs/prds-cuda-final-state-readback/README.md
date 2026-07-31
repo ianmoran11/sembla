@@ -45,9 +45,10 @@ page-locked destinations. Those are the two treatments this folder measures.
 3. `0003` adds the focused A/B/C collector, preflight, analyzer, and runbook.
    It prepares hardware evidence but does not provision paid infrastructure.
 
-The runner executes these serially. Do not promote a treatment, add async copy
-streams, or alter the default path inside this folder. A later PRD may promote a
-winner only after the hardware gate below passes.
+The runner executed these serially without changing the production default.
+The later H100 gate passed for B and failed for C; the post-experiment promotion
+record is in `DECISIONS.md` §L14. Async copy streams and further pinned staging
+remain outside this track.
 
 ## Status
 
@@ -60,12 +61,14 @@ winner only after the hardware gate below passes.
   admission/reuse accounting and attributable timing. Local, CUDA-feature
   compile, allowlist, link, and complete repository checks pass; H100/Nsight
   evidence remains deferred to PRD 0003.
-- PRD 0003 is locally implemented: the opt-in H100 collector freezes the exact
-  27-command A/B/C protocol behind a mandatory preflight, the analyzer enforces
-  the frozen host/Nsight gates, and bounded idempotent teardown preserves
-  separate benchmark and cleanup status. Local synthetic, allowlist, link, and
-  complete repository checks pass. No paid VM was provisioned and no hardware
-  verdict or treatment promotion is claimed.
+- PRD 0003 and its hardware phase are complete. The focused H100 run executed
+  all 27 commands with byte-identical scientific outputs and canonical hashes.
+  B passed the frozen workers-1 and workers-4 wall-time gates; C failed both
+  whole-wall gates despite faster D2H. Raw evidence and analysis are preserved
+  on branch `evidence/cuda-final-state-decision-20260731` at commit `88319de`.
+- Post-experiment decision: packed pageable B is the standard CUDA sweep
+  final-state route. Materialized A and packed-pinned C remain explicit hidden
+  diagnostic controls and do not enter scientific manifests.
 
 ## Binding contracts
 
@@ -78,9 +81,11 @@ winner only after the hardware gate below passes.
   pinned buffers, copies into retained cacheable staging buffers, and hashes
   those bytes. Kernels, tick scheduling, RNG, observations, draw admission,
   seeds, and ascending-`k` publication are identical.
-- **Default behavior remains A.** Experimental selectors are hidden,
-  default-off, rejected on non-CUDA paths, and fail clearly on invalid or
-  conflicting values. They do not enter scientific manifests.
+- **Default CUDA sweep behavior is B.** An unset selector hashes the ordinary
+  pageable packed download directly with canonical framing. Hidden explicit
+  `materialized` and `packed-pinned` values remain diagnostic-only, are rejected
+  on non-CUDA paths, and fail clearly on invalid or conflicting values. The
+  selector does not enter scientific manifests.
 - **No silent fallback.** If pinned allocation or transfer cannot be used, C
   fails before publishing that draw; it never falls back to pageable memory.
 - **One retained buffer set per lane.** Buffers are sized from the actual packed
@@ -117,6 +122,10 @@ tear down the VM and SSH rule even on failure and run orphan reconciliation.
 
 ## Hardware decision gate
 
+This frozen gate has now been executed. B passed; C did not. The definitions
+below remain as the predeclared interpretation contract rather than a new run
+request.
+
 The collector first runs one 10M draw for A, B and C. Hash/output parity and all
 diagnostic fields must pass before any multi-draw arm. It then runs the bounded
 four-draw workers-1/workers-4 matrix with adjacent repeated arms; it does not
@@ -145,8 +154,8 @@ A treatment is only eligible for a promotion PRD when:
   Nsight. Staging-copy time is excluded from these D2H mechanism ratios but
   remains included in final-seam and whole-sweep time.
 
-These values and comparison directions are frozen before hardware execution
-and must appear verbatim as machine-readable threshold objects. If neither
+These values and comparison directions were frozen before hardware execution
+and appear verbatim as machine-readable threshold objects. If neither
 treatment passes, close this path and next decompose the measured 3.345 s sweep
 setup aggregate. Do not rescue a miss by changing the threshold after observing
 it.

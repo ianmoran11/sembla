@@ -1,5 +1,9 @@
 # PRD 0002: Add reusable pinned final-state readback
 
+> Historical experiment contract: its default-A requirement applied while C was
+> being measured. B is now the production CUDA sweep default and C remains an
+> explicit diagnostic negative result; see `DECISIONS.md` §L14.
+
 ## Context
 
 Read `docs/prds-cuda-final-state-readback/README.md` first; its contracts bind.

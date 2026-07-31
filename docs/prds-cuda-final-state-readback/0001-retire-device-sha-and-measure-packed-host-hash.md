@@ -1,5 +1,9 @@
 # PRD 0001: Retire scalar device SHA and measure packed host hashing
 
+> Historical experiment contract: its unset=`materialized` requirement was
+> necessary to preserve a real A control during measurement. It is superseded
+> for production CUDA sweeps by the B promotion in `DECISIONS.md` §L14.
+
 ## Context
 
 Read `docs/prds-cuda-final-state-readback/README.md` first; its contracts bind.

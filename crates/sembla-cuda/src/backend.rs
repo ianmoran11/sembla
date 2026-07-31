@@ -34,7 +34,9 @@ pub struct CudaRunResult {
     pub per_tick_state_hashes: Vec<[u8; 32]>,
 }
 
-/// Hidden diagnostic selector for the CUDA sweep final-state seam.
+/// Hidden final-state readback routes used by CUDA sweeps. The CLI selects its
+/// production default explicitly; this diagnostic API retains its legacy
+/// materialized default for compatibility.
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CudaFinalStateReadbackMode {
@@ -2053,8 +2055,8 @@ impl CudaBackend {
         Ok(allocation)
     }
 
-    /// Produces the canonical final-state digest through the selected hidden
-    /// diagnostic seam. Packed modes always download every logical component,
+    /// Produces the canonical final-state digest through the selected readback
+    /// route. Packed modes always download every logical component,
     /// even if the retained materialized host snapshot is already current.
     #[doc(hidden)]
     pub fn final_state_readback(
