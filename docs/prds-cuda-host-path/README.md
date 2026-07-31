@@ -11,7 +11,7 @@ largest item. Run from the Sembla repository with:
 first; the constraints below are binding.
 
 **Where this sits in the overall order:** see the work queue in
-[`docs/performance-model.md`](../performance-model.md#work-queue). Briefly, this
+[`docs/performance/model.md`](../performance/model.md#work-queue). Briefly, this
 folder's local criteria can be satisfied at any time, but its hardware criteria
 should be batched into a single GPU session together with re-measuring the CUDA
 phase split.
@@ -153,4 +153,4 @@ Local tests cover allocation retention, validation/error parity, shape mismatch,
 prepared-write behavior, backend structure, and both CLI paths. CUDA-feature
 checking, tests, and clippy pass locally without claiming GPU execution. Full
 implementation notes and the §J14.2 hardware-pending phase table are in
-[`docs/evidence/cuda-host-state-reuse-local-20260727/`](../evidence/cuda-host-state-reuse-local-20260727/).
+[`docs/evidence/cuda-host-state-reuse-local-20260727/`](../evidence/cuda-host-state-reuse-local-20260727).

@@ -39,7 +39,7 @@ points whose documentation and CI behavior agree.
 5. Update `.github/workflows/ci.yml` so the Rust job calls the Rust-only/proof
    checks and does not repeat equivalent Cargo build/test commands. The Lean job
    remains responsible for full parity.
-6. Update `README.md`, `frontend/README.md`, and `docs/ci.md` with one canonical
+6. Update `README.md`, `frontend/README.md`, and `docs/contributing/ci.md` with one canonical
    table or concise list: fast Rust check, complete local check, determinism,
    NPE smoke, and GPU manual evidence. Preserve existing honest environment
    caveats.
@@ -52,7 +52,7 @@ points whose documentation and CI behavior agree.
 - `scripts/check-determinism.sh` only if needed for consistent lock flags
 - `frontend/scripts/check-parity.sh`
 - `.github/workflows/ci.yml`
-- `README.md`, `frontend/README.md`, `docs/ci.md`
+- `README.md`, `frontend/README.md`, `docs/contributing/ci.md`
 - Managed implementation notes/artifacts
 
 ## Non-goals

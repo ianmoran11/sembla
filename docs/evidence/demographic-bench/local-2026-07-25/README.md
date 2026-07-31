@@ -81,7 +81,7 @@ cannot both be describing a smooth trend.
 
 This matters for the DECISIONS §K2 trigger, which asks whether the monthly
 `age_months` write costs more than 10% of tick wall time. The 10M measurement is
-**11.6%, above that threshold**, and `docs/demographic-benchmark.md`'s standing
+**11.6%, above that threshold**, and `docs/performance/demographic-benchmark.md`'s standing
 recommendation says to revisit if hardware measurements exceed 10%. But one
 unreplicated point over a threshold is not evidence that the threshold is
 crossed; the honest reading is that the share is unresolved at every scale and

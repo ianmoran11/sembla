@@ -48,7 +48,7 @@ or workflow changes.
 - `.github/workflows/gpu-differential.yml`
 - `.github/dependabot.yml` (new)
 - `scripts/check-workflow-yaml.rb`
-- `docs/ci.md`
+- `docs/contributing/ci.md`
 - Managed implementation notes/artifacts
 
 ## Non-goals

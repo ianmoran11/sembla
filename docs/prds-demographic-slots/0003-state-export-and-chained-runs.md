@@ -93,10 +93,10 @@ In `crates/sembla-cli/tests/` (new `chained_runs.rs`):
 
 ### 4. Documentation
 
-Extend `docs/state-format.md` with a "Chained runs" section: the
+Extend `docs/guides/state-format.md` with a "Chained runs" section: the
 export/load cycle, the manifest tuples, the non-equivalence caveat stated
 plainly, and a worked two-window example (commands + which manifest fields
-link). One paragraph in `docs/composition.md` only if it already documents
+link). One paragraph in `docs/guides/composition.md` only if it already documents
 `run` flags (read first; keep minimal).
 
 ## Allowed files
@@ -105,7 +105,7 @@ link). One paragraph in `docs/composition.md` only if it already documents
   `crates/sembla-cli/tests/**` (+ new goldens per existing conventions)
 - `crates/sembla-runtime/src/state_artifact.rs`, `lib.rs` (only if export
   needs a missing accessor for final committed state)
-- `docs/state-format.md`, `docs/composition.md` (minimal)
+- `docs/guides/state-format.md`, `docs/guides/composition.md` (minimal)
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals
@@ -128,5 +128,5 @@ link). One paragraph in `docs/composition.md` only if it already documents
    does not perturb the run.
 5. The CUDA decision (reject vs supported-via-existing-sync) is recorded
    in the implementation notes with the code evidence that justified it.
-6. `docs/state-format.md` documents the chain with the non-equivalence
+6. `docs/guides/state-format.md` documents the chain with the non-equivalence
    caveat; `git diff --check` passes.

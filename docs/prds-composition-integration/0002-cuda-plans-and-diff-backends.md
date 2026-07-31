@@ -66,7 +66,7 @@ Two invariants to preserve exactly:
 
 1. **Legacy bit-identity.** For legacy models `rule_word == rule_id`, so
    every existing CUDA golden, the differential corpus expectations, and
-   `docs/cuda-differential-harness.md` evidence remain valid unchanged. Any
+   `docs/performance/cuda-differential-harness.md` evidence remain valid unchanged. Any
    needed change to a checked-in CUDA expectation means the split leaked;
    fix the code.
 2. **CPU/CUDA agreement is the contract.** The CPU oracle is ground truth
@@ -116,7 +116,7 @@ any help text.
   fixtures using the **same GPU-availability gating convention the file
   already uses** (tests skip cleanly, never fail, without CUDA — read the
   file first and copy its pattern).
-- Update `docs/cuda-differential-harness.md`: add the composition corpus
+- Update `docs/performance/cuda-differential-harness.md`: add the composition corpus
   section, state the rule-word keying decision (pointer to DECISIONS §J14),
   and state explicitly that existing legacy evidence remains valid because
   legacy words equal dense ids.
@@ -143,7 +143,7 @@ simulate these results.
 - `crates/sembla-cli/src/main.rs`, `crates/sembla-cli/tests/**`
 - `crates/sembla-ir/src/plan.rs` (only if a small accessor is missing;
   no schema or validation change)
-- `docs/cuda-differential-harness.md`
+- `docs/performance/cuda-differential-harness.md`
 - `Cargo.lock` (should be unchanged; no new dependencies)
 - implementation notes/artifacts created by the managed run
 
@@ -153,7 +153,7 @@ simulate these results.
   untouched.
 - Sweep/compare plan support (PRDs 0003–0004).
 - Plan-schema or identity changes; mailbox identities do not enter CUDA.
-- Running or claiming GPU evidence in hosted CI (docs/ci.md discipline).
+- Running or claiming GPU evidence in hosted CI (docs/contributing/ci.md discipline).
 
 ## Acceptance criteria
 

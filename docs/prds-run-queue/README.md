@@ -48,7 +48,7 @@ context. Status notes and evidence go to the real folders per each PRD's
 allowed-file list. When a PRD is approved, move it back.
 
 The authority on what should be queued is the work queue in
-[`docs/performance-model.md`](../performance-model.md#work-queue).
+[`docs/performance/model.md`](../performance/model.md#work-queue).
 
 ## Last cleared 2026-07-28
 

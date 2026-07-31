@@ -11,13 +11,13 @@ linker, flat executable plan, semantics and proof boundary, stable identities,
 artifacts, compatibility, validation, migration, rollout, and acceptance tests.
 
 **Authority:** This document refines
-[`composition-options.md`](composition-options.md), especially Option D and the
+[`composition-options.md`](../archive/design/composition-options-2026-07-21.md), especially Option D and the
 recommended hybrid pipeline. It is constrained by [`DESIGN.md`](../../DESIGN.md)
 and [`DECISIONS.md`](../../DECISIONS.md). Once accepted, its normative choices
 should be recorded in `DECISIONS.md` and implemented through focused PRDs.
 
 **Implementation status:** The first release (document Phases 0–4) is implemented
-through [`docs/prds-composition/`](../prds-composition/); remaining phases are
+through [`docs/prds-composition/`](../prds-composition); remaining phases are
 unimplemented.
 
 The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** describe the proposed

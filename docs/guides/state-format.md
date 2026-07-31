@@ -126,4 +126,4 @@ checked-in fixture, validate and load both valid artifacts, and assert the
 specific failure for every invalid artifact.
 
 The checked-in state artifact used by the aggregate birth/death model is
-documented in [Aggregate demographic slot model](demographic-model.md).
+documented in [Aggregate demographic slot model](../models/demographic.md).

@@ -38,7 +38,7 @@ implement nor validate it.
 
 Values are medians of three native `whole_sweep_wall_time_ms` measurements.
 The isolated-backend comparison is the accepted adjacent H100 evidence in
-[`hyperstack-concurrency-20260729T064051Z`](../hyperstack-concurrency-20260729T064051Z/).
+[`hyperstack-concurrency-20260729T064051Z`](../hyperstack-concurrency-20260729T064051Z).
 
 | Scale | Workers | Lockstep streams | Speedup vs lockstep workers=1 | Isolated backends | Lockstep vs isolated |
 |---:|---:|---:|---:|---:|---:|

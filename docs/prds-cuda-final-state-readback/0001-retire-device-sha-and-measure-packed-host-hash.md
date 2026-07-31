@@ -46,7 +46,7 @@ pointer-classification test or leave dormant generated code.
 Retain or add a regression test proving generated CUDA source contains no
 `sembla_final_state_sha256` kernel and that ordinary/fused pointer inventories
 are green. Record the timeout as a negative result in the folder README and
-`docs/performance-model.md`; do not claim canonical GPU SHA is universally
+`docs/performance/model.md`; do not claim canonical GPU SHA is universally
 impossible.
 
 ### 2. Add one hidden final-state mode selector
@@ -124,7 +124,7 @@ control.
   collector belongs to 0003
 - `spikes/precision/infra-hyperstack/RUNBOOK.md` — retire obsolete device-hash
   instructions only
-- `docs/performance-model.md`
+- `docs/performance/model.md`
 - `docs/prds-cuda-final-state-readback/README.md` (status notes only)
 - `docs/evidence/**` (new analysis/checksum text only; do not rewrite raw runs)
 

@@ -19,7 +19,7 @@ corrected in the same commit that records them.
 ## Goal
 
 `DECISIONS.md` gains section L covering this track's decisions;
-`docs/demographic-benchmark.md` records the CUDA/CPU comparison as measured
+`docs/performance/demographic-benchmark.md` records the CUDA/CPU comparison as measured
 evidence; the benchmark case and numeric gate are frozen so later PRDs cannot
 move the target. No code changes.
 
@@ -90,7 +90,7 @@ Both arms run on one host in one session. Replicates: **three per backend**, and
 the reported figure is the median; a single run is not evidence for a gate (the
 ageing-share readings this year show why).
 
-### 3. Record the measurement in `docs/demographic-benchmark.md`
+### 3. Record the measurement in `docs/performance/demographic-benchmark.md`
 
 Add a section reporting the CUDA/CPU comparison, the host, the toolchain, the
 evidence directories, and the §L1 cause. State plainly that the current CUDA
@@ -99,7 +99,7 @@ existing SIR throughput figures do not generalise to them.
 
 ### 4. Correct the forward roadmap's scale note
 
-`docs/forward-roadmap.md` (once adopted) assumes CUDA is the answer for
+`docs/archive/roadmaps/forward-roadmap-2026-07-25.md` (once adopted) assumes CUDA is the answer for
 national-scale sweeps and that grouped observations are the blocker. Record that
 this is superseded: the blocker is §L1, and the CUDA path is unusable for the
 driver model until this track lands or is closed.
@@ -107,8 +107,8 @@ driver model until this track lands or is closed.
 ## Allowed files
 
 - `DECISIONS.md`
-- `docs/demographic-benchmark.md`
-- `docs/forward-roadmap.md` (if present in-repo at the time)
+- `docs/performance/demographic-benchmark.md`
+- `docs/archive/roadmaps/forward-roadmap-2026-07-25.md` (if present in-repo at the time)
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
 
 ## Non-goals
@@ -123,7 +123,7 @@ will be judged.
    alternatives rejected, and reason.
 2. The frozen benchmark case appears in §L verbatim, including the replicate
    count and the median rule.
-3. `docs/demographic-benchmark.md` reports the 12.3× measurement, names both
+3. `docs/performance/demographic-benchmark.md` reports the 12.3× measurement, names both
    evidence directories, and states the §L1 cause.
 4. The forward roadmap's CUDA assumption is marked superseded with a pointer to
    §L1.

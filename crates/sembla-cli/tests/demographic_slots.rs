@@ -647,7 +647,7 @@ fn internal_balance_residual_is_visible_and_documented() {
         .iter()
         .any(|row| { row["internal_arrivals_this_tick"] != row["internal_departures_this_tick"] }));
     let documentation =
-        std::fs::read_to_string(repository_path("docs/demographic-model.md")).unwrap();
+        std::fs::read_to_string(repository_path("docs/models/demographic.md")).unwrap();
     assert!(documentation.contains(
         "National internal-migration balance holds only in expectation; the residual is always reported and never silently reconciled."
     ));
@@ -814,7 +814,7 @@ fn overseas_capacity_exhaustion_is_visible_and_deterministic() {
         .any(|row| { row["births_this_tick"] > 0 && row["internal_arrivals_this_tick"] > 0 }));
     assert!(rows.iter().all(|row| row["deferred_total"] == 0));
     let documentation =
-        std::fs::read_to_string(repository_path("docs/demographic-model.md")).unwrap();
+        std::fs::read_to_string(repository_path("docs/models/demographic.md")).unwrap();
     assert!(
         documentation.contains("a run that saturates a slot stratum is not calibrated evidence")
     );

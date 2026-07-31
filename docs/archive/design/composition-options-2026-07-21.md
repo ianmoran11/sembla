@@ -1,5 +1,7 @@
 # Composition options: product, wiring, nesting, and constrained systems
 
+> **Archived design exploration — 2026-07-21.** Option D was selected. Current architecture is documented in [`../../design/option-d-architecture.md`](../../design/option-d-architecture.md), with normative decisions in [`../../../DECISIONS.md`](../../../DECISIONS.md).
+
 **Status:** Design options / discussion note, 2026-07-21. No option in this
 note is implemented merely by being described here.
 Option D was selected and recorded in DECISIONS.md §J;
@@ -13,8 +15,8 @@ boundaries. This note does not propose a relational Cartesian product of table
 rows.
 
 **Authority:** This note develops the original commitments in
-[`DESIGN.md`](../../DESIGN.md) §1 and §4.4. After an option is selected, the
-normative decision should be recorded in [`DECISIONS.md`](../../DECISIONS.md)
+[`DESIGN.md`](../../../DESIGN.md) §1 and §4.4. After an option is selected, the
+normative decision should be recorded in [`DECISIONS.md`](../../../DECISIONS.md)
 and implemented through focused PRDs.
 
 ---
@@ -71,7 +73,7 @@ code block:
 
 The primary running example is the existing workplace SIR population plus a
 policy controller. Its complete current source is
-[`Step05_PolicyFeedback.lean`](../../frontend/Sembla/Tutorial/Step05_PolicyFeedback.lean).
+[`Step05_PolicyFeedback.lean`](../../../frontend/Sembla/Tutorial/Step05_PolicyFeedback.lean).
 
 **Current/implemented Sembla syntax (abridged):**
 
@@ -251,7 +253,7 @@ The Rust IR has the same shape. `Box` has no child/component field, and `Model`
 has no composition expression. The surface language collects boxes and wires
 directly into that flat representation.
 
-The checked-in [`sir_policy.json`](../../examples/sir_policy.json) is a separate
+The checked-in [`sir_policy.json`](../../../examples/sir_policy.json) is a separate
 model with the same two-box/two-wire topology as the running Lean example. It is
 not a serialization of `Step05_PolicyFeedback.lean`: its thresholds, restriction
 encoding, and population sizes differ. It is used here only to show the current
@@ -1644,7 +1646,7 @@ traces, and observations—not only selected final hashes.
 > nestings, reassociations, renamings), link, run, and check projection,
 > flattening, and delay laws on committed states **and** draw coordinates.
 > Feed the same generated corpus through the existing CPU/CUDA differential
-> harness (`docs/cuda-differential-harness.md`) so composition equivalence
+> harness (`docs/performance/cuda-differential-harness.md`) so composition equivalence
 > and backend equivalence share one generator. Include the adversarial
 > identity case as a first-class property: alpha-rename every instance/port,
 > reassociate all nesting, flatten, and require **byte-identical draw

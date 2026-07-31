@@ -3,7 +3,7 @@
 Sembla spans Rust, Lean, and a quarantined Python calibration environment. Keep
 changes narrow, use the pinned environments, and treat checked-in evidence as
 part of the reproducibility contract. The maintained check matrix is in
-[`docs/ci.md`](docs/ci.md).
+[`docs/contributing/ci.md`](docs/contributing/ci.md).
 
 ## Pinned environments
 
@@ -60,7 +60,7 @@ Linux/amd64 lock validation and reduced smoke test described in the NPE README:
 Before handing off a change, run `git diff --check` and inspect the complete
 staged and unstaged diff. Additional workflow and manual GPU checks, including
 their environment requirements, are documented in the
-[check matrix](docs/ci.md#local-check-contract).
+[check matrix](docs/contributing/ci.md#local-check-contract).
 
 ## Local cache cleanup
 

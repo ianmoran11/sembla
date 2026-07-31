@@ -88,7 +88,7 @@ work) is the narrative version of §2.2. Add one CLI test (or extend the
 demo's existing golden test — read `frontend/Sembla/Demos/Composition*.lean`
 and the demo goldens first to follow their conventions) running its plan
 under two θ vectors via `compare` and checking the output against a
-checked-in golden. Update `docs/composition.md`'s CRN section with the
+checked-in golden. Update `docs/guides/composition.md`'s CRN section with the
 exact commands. If the demo's fixtures make this awkward (e.g. no exported
 plan file), fall back to documenting §2.2's fixture-based contrast and note
 why in the implementation notes — do not restructure the demos to fit.
@@ -101,7 +101,7 @@ why in the implementation notes — do not restructure the demos to fit.
   a params-form golden, and determinism (same compare twice → identical
   bytes).
 - `USAGE` mentions `<model-or-plan.json>` for both compare forms.
-- `docs/composition.md` gains the CRN contrast walkthrough (§2.1 and §2.2
+- `docs/guides/composition.md` gains the CRN contrast walkthrough (§2.1 and §2.2
   narrated, with the "why content-addressing makes this principled"
   sentence pointing at DECISIONS §J4/§J14).
 
@@ -109,7 +109,7 @@ why in the implementation notes — do not restructure the demos to fit.
 
 - `crates/sembla-cli/src/main.rs`, `crates/sembla-cli/tests/**` (+ new
   golden files per existing conventions)
-- `docs/composition.md`
+- `docs/guides/composition.md`
 - `frontend/Sembla/Demos/**` only if §3's demo test genuinely requires a
   hook (prefer not; never change demo goldens)
 - implementation notes/artifacts created by the managed run
@@ -132,7 +132,7 @@ why in the implementation notes — do not restructure the demos to fit.
 4. Mixed-arm rejection: exact deterministic error, no partial output —
    covered by a test.
 5. Both compare forms have plan goldens and a bitwise determinism test.
-6. `docs/composition.md` documents the CRN contrast with runnable
+6. `docs/guides/composition.md` documents the CRN contrast with runnable
    commands; `USAGE` updated.
 7. `git diff --check` passes; no new dependencies; demos' goldens
    untouched.

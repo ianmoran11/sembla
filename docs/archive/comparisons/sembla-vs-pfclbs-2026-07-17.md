@@ -11,6 +11,8 @@ updated: 2026-07-17
 
 # Sembla compared with PFCLBS
 
+> **Archived comparison — 2026-07-17.** This document compares two working trees at that date. It is retained for historical analysis and does not describe current project status.
+
 > [!note] Scope
 > This is a comparison of the two repositories as they exist in the working trees on **2026-07-14**, not only of their design aspirations. The sibling `../PFCLBS` repository calls its implementation the **Semantic Kernel Simulation System (SKS)** and exposes an `sks` binary. Both repositories are under active development, and PFCLBS had uncommitted work when inspected.
 
@@ -225,9 +227,9 @@ The strongest long-term design would not blindly merge the repositories. A bette
 
 > [!important] Resolved 2026-07-17 — this list is no longer open
 > A conservative review worked through this list and dispositioned every item.
-> The outcomes are now normative in [`DESIGN.md`](../DESIGN.md) (§4.6, §5.3,
-> §5.4, §5.5, §8), sequenced in [`ROADMAP.md`](ROADMAP.md), and argued in
-> [`DECISIONS.md`](../DECISIONS.md) (§A6, §E7–E9). Those documents win; the
+> The outcomes are now normative in [`DESIGN.md`](../../../DESIGN.md) (§4.6, §5.3,
+> §5.4, §5.5, §8), sequenced in [`ROADMAP.md`](../roadmaps/version-roadmap-2026-07-25.md), and argued in
+> [`DECISIONS.md`](../../../DECISIONS.md) (§A6, §E7–E9). Those documents win; the
 > table below is kept to record what was decided and why, so the list is not
 > re-derived from scratch. The test applied was: **does this make a commitment
 > Sembla already made checkable, or does it add a new one?**

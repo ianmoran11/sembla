@@ -31,7 +31,7 @@ deep embedding's evaluator. Every document written by these PRDs must say so
 plainly: this is *target 1a (specification level, proved)*; *target 1b
 (binding to the deep-embedding evaluator)* remains open on the proof track.
 Overclaiming is a review-rejection offense in this repository
-(`docs/sembla-assessment.md` lists the proof gap as risk #1 precisely because
+(`docs/archive/assessments/sembla-assessment-2026-07-18.md` lists the proof gap as risk #1 precisely because
 claims outran proofs elsewhere).
 
 ## Run order

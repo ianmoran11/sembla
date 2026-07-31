@@ -111,7 +111,7 @@ with `bundle_integrity` omitted — each failing with the named record.
 
 ### 5. Documentation
 
-- New `docs/composition.md`: a practical guide — authoring components
+- New `docs/guides/composition.md`: a practical guide — authoring components
   (PRD 0011 syntax), exporting sources, linking (`sembla-link`, single-file
   and bundle modes), validating/running plans, reading identity tuples in
   manifests, the identity grammar and what refactors preserve identity
@@ -119,7 +119,7 @@ with `bundle_integrity` omitted — each failing with the named record.
   moving across composite boundaries), and the legacy/`direct_stable`/
   `linked` origin distinctions. Link to DECISIONS §J for normative rules.
 - `DESIGN.md`: one short amendment note in §4.4 (composition) pointing at
-  `docs/composition.md` and DECISIONS §J — follow the existing amendment
+  `docs/guides/composition.md` and DECISIONS §J — follow the existing amendment
   style in the file header (dated, one sentence per addition). Do not
   rewrite any existing prose.
 - `docs/design/option-d-architecture.md`: extend the Status line: first
@@ -153,7 +153,7 @@ git diff --check
   `crates/sembla-cli/tests/**`
 - `frontend/scripts/check-parity.sh` (append only)
 - `fixtures/bundles/**` (new)
-- `docs/composition.md` (new), `DESIGN.md` (§4.4 amendment note + header
+- `docs/guides/composition.md` (new), `DESIGN.md` (§4.4 amendment note + header
   amendment line only), `docs/design/option-d-architecture.md` (Status
   only), `README.md` (minimal additions)
 - implementation notes/artifacts created by the managed run
@@ -163,7 +163,7 @@ git diff --check
 - Archive formats, provenance databases, event streams, replay bundles
   (DESIGN.md §5.4's explicit exclusions).
 - Relinking tooling, historical-linker retention automation (doc §20.3) —
-  note as future work in `docs/composition.md`.
+  note as future work in `docs/guides/composition.md`.
 - Any new linker/runtime/schema behavior; this PRD only packages, verifies,
   records, and documents.
 - Sweep/NPE/CUDA integration with plans.
@@ -179,7 +179,7 @@ git diff --check
    complete tuples with the correct source digest; `direct_stable` runs
    carry no `linked_source`; `verify-run` works for plan runs and is
    unchanged for legacy runs.
-4. `docs/composition.md` exists and covers authoring→link→run, identity
+4. `docs/guides/composition.md` exists and covers authoring→link→run, identity
    preservation rules, and origins; DESIGN.md and the architecture doc carry
    their amendment lines; no other prose rewritten.
 5. The implementation notes contain the complete 20-point §26.2 sweep with

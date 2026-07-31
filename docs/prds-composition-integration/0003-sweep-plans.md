@@ -120,7 +120,7 @@ following its conventions):
 ### 5. Documentation
 
 Update `USAGE` (`sweep <model-or-plan.json>`) and the sweep section of
-`docs/composition.md` with one worked plan-sweep + pairs-export example.
+`docs/guides/composition.md` with one worked plan-sweep + pairs-export example.
 Mention in `calibration/` docs only if they name input constraints
 (read before editing; keep the diff minimal).
 
@@ -129,7 +129,7 @@ Mention in `calibration/` docs only if they name input constraints
 - `crates/sembla-cli/src/main.rs`, `crates/sembla-cli/src/manifest.rs`
   (helper reuse only — no new manifest fields), `crates/sembla-cli/tests/**`
 - new golden files under the existing CLI test fixture conventions
-- `docs/composition.md`, `calibration/**` (docs only, if needed)
+- `docs/guides/composition.md`, `calibration/**` (docs only, if needed)
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals
@@ -150,6 +150,6 @@ Mention in `calibration/` docs only if they name input constraints
    matches the checked-in source fixture hash.
 4. `--export-pairs` produces the checked-in `(θ, x)` golden for the plan
    sweep; format and sidecar schema unchanged.
-5. `USAGE` and `docs/composition.md` document plan sweeps.
+5. `USAGE` and `docs/guides/composition.md` document plan sweeps.
 6. `git diff --check` passes; no new dependencies; no frozen artifact
    changed.

@@ -101,7 +101,7 @@ canonical model's IR minus the named pieces).
   chunk-write enough to build the artifact without holding 2× copies
   (verify; fix `write` with a streaming path in `state_artifact.rs` if
   needed, byte-identical output, round-trip test at small scale).
-- `docs/demographic-benchmark.md`: the evidence template — machine
+- `docs/performance/demographic-benchmark.md`: the evidence template — machine
   requirements (≥ 32 GB RAM for 50M CPU; H100-class for CUDA), the exact
   commands, the table skeleton with **pending** entries for 10M/50M CPU
   and CUDA runs, and the interpretation section (below). The CUDA row
@@ -111,7 +111,7 @@ canonical model's IR minus the named pieces).
 
 ### 5. The §K2 trigger determination
 
-`docs/demographic-benchmark.md` ends with a **Determination** section:
+`docs/performance/demographic-benchmark.md` ends with a **Determination** section:
 from the 1M local numbers (and extrapolation clearly labelled as such),
 state whether the ageing-write share is material (suggested line: >10%
 of tick wall time at 1M, or a stated reason the number does not
@@ -127,8 +127,8 @@ recommendation in the implementation notes.
   needed)
 - `scripts/bench-demographic.sh` (new), benchmark variant model fixtures
   under `fixtures/demographic/**`
-- `docs/demographic-benchmark.md` (new),
-  `docs/evidence/demographic-bench/**` (new), `docs/demographic-model.md`
+- `docs/performance/demographic-benchmark.md` (new),
+  `docs/evidence/demographic-bench/**` (new), `docs/models/demographic.md`
   (link only)
 - implementation notes/artifacts created by the managed run
 
@@ -152,7 +152,7 @@ recommendation in the implementation notes.
 3. Ageing and grouped-observation cost shares are computed and present in
    the evidence; the Determination section states the §K2 recommendation
    with its threshold reasoning.
-4. `docs/demographic-benchmark.md` carries the 50M/CUDA template with
+4. `docs/performance/demographic-benchmark.md` carries the 50M/CUDA template with
    explicit pending entries and exact commands; the implementation notes
    list them as pending.
 5. The 50M path is structurally safe (streaming/chunked artifact write

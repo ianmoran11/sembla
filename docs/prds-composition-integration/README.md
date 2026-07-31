@@ -17,7 +17,7 @@ README, this README wins.
 ## Preconditions
 
 The managed run requires a clean relevant working tree. The pending
-composition-demos work (modified `README.md`, `docs/composition.md`,
+composition-demos work (modified `README.md`, `docs/guides/composition.md`,
 `frontend/Main.lean`, `frontend/Sembla/Demos.lean`,
 `frontend/scripts/check-parity.sh`, plus `fixtures/demos/composition/` and
 `frontend/Sembla/Demos/Composition*.lean`) must be committed (or reverted)
@@ -53,7 +53,7 @@ composition-demos work (modified `README.md`, `docs/composition.md`,
 2. **GPU evidence discipline.** Hosted CI has no GPU; the differential
    corpus runs via the PRD-0009 remote runbook
    (`crates/sembla-cuda/scripts/run-differential-corpus.sh`) and its stub
-   workflow is never presented as evidence (`docs/ci.md`). PRDs in this
+   workflow is never presented as evidence (`docs/contributing/ci.md`). PRDs in this
    folder therefore split acceptance into **local criteria** (must pass in
    the managed run without a GPU: compilation, corpus listing, graceful
    skips, legacy goldens unchanged) and **hardware criteria** (recorded in

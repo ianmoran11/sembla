@@ -4,7 +4,7 @@
 
 Implemented and locally approved in `d862a91`; hardware-verified on H100 at
 `d72057f`. All acceptance criteria pass. Evidence and calculations:
-[`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
+[`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z).
 
 ## Context
 
@@ -230,7 +230,7 @@ failing on a deliberate perturbation (§M4) — both already exist in
 criteria 10–13 were subsequently executed on H100 at `d72057f`; all pass.
 The supported collector completed the independent/CRN matrix, capacity-failure
 arm, and Nsight trace, with evidence at
-[`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
+[`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z).
 The earlier local approval was not presented as GPU evidence.
 
 ## Note on expectations

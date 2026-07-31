@@ -58,7 +58,7 @@ theorem plan_rewrite_congr {α : Type} (f : Nat → α)
   the evaluator; the folder README's scope paragraph may be condensed but
   its meaning must survive intact).
 - Do **not** edit `DECISIONS.md` (no decision changed — this executes an
-  existing one), and do not touch `docs/sembla-assessment.md` (a dated
+  existing one), and do not touch `docs/archive/assessments/sembla-assessment-2026-07-18.md` (a dated
   snapshot; the proof-gap risk it names is *reduced*, not gone, and the
   next assessment can say so).
 

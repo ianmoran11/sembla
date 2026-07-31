@@ -248,4 +248,4 @@ The CUDA sidecar records `backend=cuda-native-f64`, `precision=f64`,
 CPU oracle.
 
 For CPU-oracle differential testing and the hardware policy, see
-[`docs/cuda-differential-harness.md`](../cuda-differential-harness.md).
+the [CUDA differential harness](../performance/cuda-differential-harness.md).

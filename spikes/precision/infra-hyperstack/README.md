@@ -251,7 +251,7 @@ ignored by Git.
 trust model, same `/32` rule — with a different remote payload: it builds
 `sembla-cli --features cuda` and runs `scripts/bench-demographic.sh` for both
 backends, filling all four pending hardware rows of
-[`docs/demographic-benchmark.md`](../../../docs/demographic-benchmark.md) from
+[`docs/performance/demographic-benchmark.md`](../../../docs/performance/demographic-benchmark.md) from
 one session. A GPU host carries both the CUDA device and the ≥32 GiB the 50M CPU
 row needs, so CPU and CUDA scales come from the same machine and the same commit.
 

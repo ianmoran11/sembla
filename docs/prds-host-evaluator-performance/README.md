@@ -16,7 +16,7 @@ this README wins.
 ~7.6 s and the §L4 gate passed at 4.207× (`DECISIONS.md` §L8). Follow-on work is
 in `docs/prds-evaluator-throughput/`, and the durable findings — including this
 folder's measurement protocol and the lessons behind it — are consolidated in
-[`docs/performance-model.md`](../performance-model.md).
+[`docs/performance/model.md`](../performance/model.md).
 
 ## Why this folder exists
 

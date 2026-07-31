@@ -45,9 +45,9 @@ serial, and close the track.
 
 ### 4. Correct every document carrying the old conclusion
 
-- `docs/demographic-benchmark.md` — supersede the 12.3× row with the new
+- `docs/performance/demographic-benchmark.md` — supersede the 12.3× row with the new
   measurement; keep the old figure visible as the before value.
-- `docs/forward-roadmap.md` — the Stage 1 scale-note amendment and the Preflight
+- `docs/archive/roadmaps/forward-roadmap-2026-07-25.md` — the Stage 1 scale-note amendment and the Preflight
   prerequisite both assume the defect stands. Update both to the measured
   outcome.
 - `spikes/precision/infra-hyperstack/RUNBOOK.md` — if anything about the run
@@ -65,8 +65,8 @@ here**; that trigger has its own process.
 
 - `docs/evidence/demographic-bench/**` — new directory only
 - `DECISIONS.md` (§L dated note only)
-- `docs/demographic-benchmark.md`
-- `docs/forward-roadmap.md`
+- `docs/performance/demographic-benchmark.md`
+- `docs/archive/roadmaps/forward-roadmap-2026-07-25.md`
 - `spikes/precision/infra-hyperstack/RUNBOOK.md`
 - `spikes/precision/infra-hyperstack/run-demographic-benchmark.sh` — benchmark-harness-only revision needed to enforce the frozen protocol
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
@@ -84,7 +84,7 @@ grouped-observation work.
    spread, one host, one commit, verified `SHA256SUMS`.
 2. The recorded commit is identical in both arms — asserted, not assumed.
 3. `DECISIONS.md` §L carries the dated verdict with the measured ratio.
-4. `docs/demographic-benchmark.md` and `docs/forward-roadmap.md` no longer
+4. `docs/performance/demographic-benchmark.md` and `docs/archive/roadmaps/forward-roadmap-2026-07-25.md` no longer
    assert the superseded conclusion anywhere; the old figure survives as a
    labelled before value.
 5. The ageing share is reported with its spread and explicitly not decided.

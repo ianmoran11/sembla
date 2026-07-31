@@ -13,4 +13,4 @@ and a negative comparator control.
 See [`ANALYSIS.md`](ANALYSIS.md): every CRN comparison is byte-equal and both
 negative controls were rejected, discharging the CRN correctness case of CUDA
 Gate 1 for the free-running non-blocking-stream design. Timing evidence lives
-in [`hyperstack-freestream-20260729T152534Z`](../hyperstack-freestream-20260729T152534Z/).
+in [`hyperstack-freestream-20260729T152534Z`](../hyperstack-freestream-20260729T152534Z).

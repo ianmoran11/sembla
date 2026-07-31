@@ -1,7 +1,7 @@
 # Demographic slot benchmark
 
 For what limits the system, where the time goes, and what has already been
-measured or ruled out, see [`docs/performance-model.md`](performance-model.md).
+measured or ruled out, see the [performance model](model.md).
 Read that before scoping optimisation work; this document is the measurement
 tooling it draws on.
 
@@ -61,7 +61,7 @@ and byte identity.
 ## Local evidence
 
 The managed-run evidence is in
-[`evidence/demographic-bench/local-2026-07-24/`](evidence/demographic-bench/local-2026-07-24/README.md).
+[`evidence/demographic-bench/local-2026-07-24/`](../evidence/demographic-bench/local-2026-07-24/README.md).
 It was produced with:
 
 ```sh
@@ -86,7 +86,7 @@ measurement; multiplication to larger scales below is only extrapolation.
 
 ### Extended curve — 2026-07-25
 
-[`evidence/demographic-bench/local-2026-07-25/`](evidence/demographic-bench/local-2026-07-25/README.md)
+[`evidence/demographic-bench/local-2026-07-25/`](../evidence/demographic-bench/local-2026-07-25/README.md)
 extends the same machine class to 10M:
 
 | Slots | s/tick | × vs 1M | Peak RSS | Artifact B/slot | Ageing share | Grouped share |
@@ -125,9 +125,9 @@ uses the no-grouped variant and does not report grouped or ageing shares.
 **Automated collection (2026-07-25).** All four rows come from one provisioned
 Hyperstack GPU VM — it carries both the CUDA device and the RAM the 50M CPU row
 needs — via
-[`spikes/precision/infra-hyperstack/run-demographic-benchmark.sh`](../spikes/precision/infra-hyperstack/run-demographic-benchmark.sh)
+[`spikes/precision/infra-hyperstack/run-demographic-benchmark.sh`](../../spikes/precision/infra-hyperstack/run-demographic-benchmark.sh)
 (module README §4b, with operating notes in
-[`spikes/precision/infra-hyperstack/RUNBOOK.md`](../spikes/precision/infra-hyperstack/RUNBOOK.md)). After that module's reviewed paid apply, the script waits
+[`spikes/precision/infra-hyperstack/RUNBOOK.md`](../../spikes/precision/infra-hyperstack/RUNBOOK.md)). After that module's reviewed paid apply, the script waits
 for bootstrap, builds `sembla-cli --features cuda`, runs both backends, retrieves
 a checksummed evidence directory with GPU/RAM/commit provenance, and then runs
 the mandatory destroy itself, failing loudly if any paid resource survives in
@@ -188,8 +188,8 @@ as diagnostic baseline evidence, but this evidence pair does not establish an
 identical binary or state artifact and does not satisfy §L4's same-commit,
 same-artifact, three-replicate gate. The evidence directories are:
 
-- [`hyperstack-cuda-10m-20260725/`](evidence/demographic-bench/hyperstack-cuda-10m-20260725/)
-- [`hyperstack-cpu-10m-20260725/`](evidence/demographic-bench/hyperstack-cpu-10m-20260725/)
+- [`hyperstack-cuda-10m-20260725/`](../evidence/demographic-bench/hyperstack-cuda-10m-20260725)
+- [`hyperstack-cpu-10m-20260725/`](../evidence/demographic-bench/hyperstack-cpu-10m-20260725)
 
 DECISIONS §L1 records the cause: the generated CUDA simulation kernels are
 parallel, but `sembla_validate_claims`, `sembla_validate_transition`,

@@ -23,7 +23,7 @@ available:
 
 The complete command requires Cargo, Git, and Lake; it runs Rust validation,
 Lean proof hygiene, and frontend parity without silently skipping a missing
-tool. The canonical [check matrix](docs/ci.md#local-check-contract) also lists
+tool. The canonical [check matrix](docs/contributing/ci.md#local-check-contract) also lists
 the determinism check, reduced NPE smoke test, and manual GPU evidence command
 with their environment requirements.
 
@@ -43,7 +43,7 @@ standalone plan with three commands:
 cargo run -p sembla-cli -- run /tmp/epidemic_policy.plan.json --population 1000 --seed 55 --ticks 40
 ```
 
-See [`docs/composition.md`](docs/composition.md) for component syntax, bundles,
+See the [composition guide](docs/guides/composition.md) for component syntax, bundles,
 identity and provenance rules, validation, and run verification. The
 [`composition showcase`](docs/examples/composition-showcase.md) provides four
 runnable models covering counterfactuals, policy fan-out, surveillance, and
@@ -57,12 +57,12 @@ IR enums use snake-case `kind` tags, declarations retain source order, and the c
 
 The flagship [`examples/sir.json`](examples/sir.json) model uses the
 frequency-dependent workplace hazard `beta * I_workplace / N_workplace` and
-recovery hazard `gamma`. See [`docs/examples/sir.md`](docs/examples/sir.md)
+recovery hazard `gamma`. See the [workplace SIR guide](docs/examples/sir.md)
 for deterministic population generation, the versioned population format,
 CSV runs, parameter and `dt` overrides, and hash-based verification. The
 [`examples/sir_policy.json`](examples/sir_policy.json) two-box feedback demo
 and common-random-numbers `sembla compare` workflow are documented in
-[`docs/examples/sir_policy.md`](docs/examples/sir_policy.md).
+the [SIR policy guide](docs/examples/sir_policy.md).
 
 ## Canonical finite-state examples
 
@@ -71,9 +71,15 @@ radioactive decay chain, SIS with importation, SEIRS with waning immunity, and
 mean-field noisy voter dynamics. Each checked-in JSON model validates and runs
 from numeric `--population` initialization using deterministic generic
 state-count/firing CSV output. See
-[`docs/examples/canonical-models.md`](docs/examples/canonical-models.md) for
+the [canonical-model guide](docs/examples/canonical-models.md) for
 the formulas, commands, output schema, initialization semantics, and honest
 expressiveness limits.
+
+## Documentation
+
+Start at the [documentation home](docs/README.md) for the project overview,
+authoring guides, examples, design notes, performance evidence, roadmap, and
+historical archive.
 
 ## Contributing and security
 

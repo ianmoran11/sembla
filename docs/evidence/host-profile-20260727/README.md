@@ -97,4 +97,4 @@ combined ~4×; it was identified on 2026-07-27 and has never been scoped.
    idea; conflict resolution's sequential winner order is load-bearing.
 4. **Join imbalance** — diagnose before extending tiling further.
 
-`docs/performance-model.md` carries the durable version of this.
+`docs/performance/model.md` carries the durable version of this.

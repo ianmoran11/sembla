@@ -1,5 +1,7 @@
 # Sembla: Project Description
 
+> **Archived snapshot — 2026-07-30.** This comprehensive description records the project at a named commit. The maintained summary is [`../../overview.md`](../../overview.md).
+
 **Status:** Descriptive summary. Written 29 July 2026 and revised 30 July 2026, against branch `main` at commit `133f87b`.
 
 **Language:** This document uses ASD-STE100 Simplified Technical English. The sentences are short. The voice is active. Each technical name has one meaning. Section 11 gives the technical names.
@@ -140,8 +142,8 @@ The repository has many documents. Some of them are authorities. Some of them ar
 | --- | --- |
 | `DESIGN.md` | The design authority. It gives the semantics and the scope. |
 | `DECISIONS.md` | The decision record. Sections A to M. Each entry gives a decision, the alternatives, and the reason. |
-| `docs/ROADMAP.md` | The version milestones v0.2 to v1.0. |
-| `docs/forward-roadmap.md` | A second roadmap of record. It gives the two driver models and the staged work tracks. |
+| `docs/archive/roadmaps/version-roadmap-2026-07-25.md` | The version milestones v0.2 to v1.0. |
+| `docs/archive/roadmaps/forward-roadmap-2026-07-25.md` | A second roadmap of record. It gives the two driver models and the staged work tracks. |
 | `docs/prds-*/` | The work specifications. One folder for each track. Each folder has a `README.md` index. |
 | `docs/evidence/` | The measured results. Each directory holds the data for one measurement. |
 | `docs/decisions/0001-gpu-precision.md` | The architecture decision record for GPU precision. |
@@ -876,7 +878,7 @@ The final layout and the colours stay a manual check. `frontend/README.md` gives
 
 ### 4.5 The visual guide
 
-`docs/sembla-visual-guide.md` has a different job. A widget draws *your* model. The visual guide draws *the language*. Its diagrams are inline SVG. They render in the Obsidian reading view and follow the light or dark theme of Obsidian.
+`docs/guides/visual-guide.md` has a different job. A widget draws *your* model. The visual guide draws *the language*. Its diagrams are inline SVG. They render in the Obsidian reading view and follow the light or dark theme of Obsidian.
 
 The guide has six parts.
 

@@ -4,7 +4,7 @@
 Amended 2026-07-17: §4.6 (observation as a sink), §5.4 (the run manifest), §5.5
 (default-off flags), and two §8 rejections were adopted from a conservative
 review of the sibling PFCLBS/SKS repository — see
-[`docs/sembla-vs-pfclbs.md`](docs/sembla-vs-pfclbs.md). Each addition records a
+[`docs/archive/comparisons/sembla-vs-pfclbs-2026-07-17.md`](docs/archive/comparisons/sembla-vs-pfclbs-2026-07-17.md). Each addition records a
 commitment Sembla had already made but not made checkable; the rejections are
 load-bearing and should be read as part of the adoption.
 Amended 2026-07-18: §10.4 resolved (amortized neural posterior estimation, run
@@ -238,7 +238,7 @@ coarse-graining *theorem*, not an analogy.
   globals. The only sanctioned globals are the synchronous tick and θ.
 
 The implemented first-release composition workflow is documented in
-[`docs/composition.md`](docs/composition.md); [`DECISIONS.md` §J](DECISIONS.md#j-composition-and-the-option-d-architecture-accepted-2026-07-21) is normative.
+[`docs/guides/composition.md`](docs/guides/composition.md); [`DECISIONS.md` §J](DECISIONS.md#j-composition-and-the-option-d-architecture-accepted-2026-07-21) is normative.
 
 ### 4.5 Meaning: the Lean layer
 

@@ -11,13 +11,13 @@ floor to within a small factor of it. Run from the Sembla repository with:
 first; the constraints below are binding. When a PRD conflicts with this README,
 this README wins.
 
-`docs/performance-model.md` is the durable synthesis of everything below,
+`docs/performance/model.md` is the durable synthesis of everything below,
 plus the CUDA-side picture and the open questions. This folder is the plan;
 that document is the reference, and it outlives this folder.
 
 **Where this sits in the overall order:** this folder's 0001 and 0002 are steps
 1 and 2 of the work queue in
-[`docs/performance-model.md`](../performance-model.md#work-queue), which
+[`docs/performance/model.md`](../performance/model.md#work-queue), which
 interleaves them with `docs/prds-cuda-host-path/`. Run from the queue, not
 folder by folder — both folders eventually touch `state.rs`.
 
@@ -248,7 +248,7 @@ workers. Thus single-worker user time is near-flat while ten workers reduce wall
 time 1.41× at the cost of more aggregate CPU. The separated tile sweep,
 threshold sweep, every official run, contention flags, live-set arithmetic, and
 hashes are under
-[`docs/evidence/evaluator-tiled-tick-20260727/`](../evidence/evaluator-tiled-tick-20260727/).
+[`docs/evidence/evaluator-tiled-tick-20260727/`](../evidence/evaluator-tiled-tick-20260727).
 
 ## PRD 0002 implementation status
 
@@ -272,7 +272,7 @@ candidates computed `ln`; the two deliberate `1e300` transitions remained at
 wall time, while all outputs and final-state hashes remained byte-identical.
 Full five-run measurements, per-transition fractions,
 structural argument, tests, and hashes are under
-[`docs/evidence/evaluator-guarded-racing-clock-20260727/`](../evidence/evaluator-guarded-racing-clock-20260727/).
+[`docs/evidence/evaluator-guarded-racing-clock-20260727/`](../evidence/evaluator-guarded-racing-clock-20260727).
 
 ## PRD 0003 implementation status
 
@@ -303,7 +303,7 @@ to 6.69/5.51 seconds. Headline CPU efficiency rose from 13.54% to 15.18%, and
 the coarse Amdahl serial-fraction estimate fell from 74.22% to 68.78%. All 20
 official outputs, summaries, manifests, and final-state hashes are byte-identical.
 Full measurements and the structural argument are under
-[`docs/evidence/evaluator-tiled-views-20260727/`](../evidence/evaluator-tiled-views-20260727/).
+[`docs/evidence/evaluator-tiled-views-20260727/`](../evidence/evaluator-tiled-views-20260727).
 
 ## PRD 0004 implementation status
 
@@ -329,7 +329,7 @@ with less CPU work on an effectively flat wall-time critical path. All outputs,
 summaries, manifests, and final-state hashes remain byte-identical. Full
 measurements, per-transition counts, tests, hashes, and the structural argument
 are under
-[`docs/evidence/evaluator-degenerate-hazard-fast-path-20260727/`](../evidence/evaluator-degenerate-hazard-fast-path-20260727/).
+[`docs/evidence/evaluator-degenerate-hazard-fast-path-20260727/`](../evidence/evaluator-degenerate-hazard-fast-path-20260727).
 
 ## PRD 0005 implementation status
 
@@ -358,7 +358,7 @@ estimates that the serial fraction fell from 75.58% to 72.49%.
 All 20 before/after outputs, summaries, manifests, stdout, and final-state hashes
 remain byte-identical. Full reasoning, measurements, formulas, tests, and hashes
 are under
-[`docs/evidence/evaluator-write-identity-once-20260727/`](../evidence/evaluator-write-identity-once-20260727/).
+[`docs/evidence/evaluator-write-identity-once-20260727/`](../evidence/evaluator-write-identity-once-20260727).
 
 ## PRD 0006 implementation status
 
@@ -383,7 +383,7 @@ seconds. CPU efficiency changed from 14.68% to 15.41%, and PRD 0003's Amdahl
 inversion estimates that the serial fraction fell from 72.49% to 68.66%. All 20
 outputs, summaries, manifests, stdout, and final-state hashes remain
 byte-identical. Full counts, measurements, formulas, tests, and hashes are under
-[`docs/evidence/evaluator-effect-gather-20260727/`](../evidence/evaluator-effect-gather-20260727/).
+[`docs/evidence/evaluator-effect-gather-20260727/`](../evidence/evaluator-effect-gather-20260727).
 
 ## PRD 0007 implementation status
 
@@ -408,7 +408,7 @@ from 5.92/5.05 to 4.78/4.08 seconds. CPU efficiency changed from 15.41% to
 from 68.66% to 66.06%. All 20 outputs, summaries, manifests, stdout, and
 final-state hashes remain byte-identical. Full scratch reasoning, profile,
 measurements, tests, and hashes are under
-[`docs/evidence/evaluator-bitmap-double-write-20260727/`](../evidence/evaluator-bitmap-double-write-20260727/).
+[`docs/evidence/evaluator-bitmap-double-write-20260727/`](../evidence/evaluator-bitmap-double-write-20260727).
 
 The map outcome and its correction are the measurement process working as
 intended: the accepted implementation met its semantic criteria, the next
@@ -436,4 +436,4 @@ user minimum/median 4.64/4.65 to 4.62/4.64. The canary improved default wall
 2.44/2.47 to 0.31/0.32 seconds and single-worker wall/user 2.41/1.85 to
 1.56/1.54. Every paired output remained byte-identical. Full profiles,
 threshold decisions, 40 runs, and hashes are under
-[`docs/evidence/generalised-tiling-constants-20260728/`](../evidence/generalised-tiling-constants-20260728/).
+[`docs/evidence/generalised-tiling-constants-20260728/`](../evidence/generalised-tiling-constants-20260728).

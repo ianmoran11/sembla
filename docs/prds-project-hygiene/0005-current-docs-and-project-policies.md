@@ -5,7 +5,7 @@ max_review_cycles: 3
 ## Context
 
 Read this folder's `README.md` first. The root README's workspace list omits
-`crates/sembla-cuda`. `docs/sembla-assessment.md` is a dated assessment but is
+`crates/sembla-cuda`. `docs/archive/assessments/sembla-assessment-2026-07-18.md` is a dated assessment but is
 not prominently marked historical; it now makes false current-sounding claims,
 including “no LICENSE”, “no CI”, and “exactly one external dependency”. The
 repository has dual licenses, two workflows, and the runtime allowlist permits
@@ -22,10 +22,10 @@ source for checks, frozen-artifact discipline, and security reporting.
 ## Requirements
 
 1. Add a prominent dated historical-snapshot notice near the top of
-   `docs/sembla-assessment.md`. Preserve the assessment as historical analysis,
+   `docs/archive/assessments/sembla-assessment-2026-07-18.md`. Preserve the assessment as historical analysis,
    but add a concise errata/current-status paragraph correcting objectively
    superseded operational claims and linking to `README.md`, `docs/ROADMAP.md`,
-   and `docs/ci.md`. Do not rewrite opinions merely because the project evolved.
+   and `docs/contributing/ci.md`. Do not rewrite opinions merely because the project evolved.
 2. Update the root README workspace layout to include `crates/sembla-cuda` and
    verify all listed crate descriptions against their manifests/current roles.
 3. Add `CONTRIBUTING.md` covering pinned Rust/Lean/Python setup, the canonical
@@ -50,10 +50,10 @@ source for checks, frozen-artifact discipline, and security reporting.
 ## Allowed files
 
 - `README.md`
-- `docs/sembla-assessment.md`
+- `docs/archive/assessments/sembla-assessment-2026-07-18.md`
 - `CONTRIBUTING.md` (new)
 - `SECURITY.md` (new)
-- `docs/ci.md` only for a broken/current cross-reference
+- `docs/contributing/ci.md` only for a broken/current cross-reference
 - Managed implementation notes/artifacts
 
 ## Non-goals

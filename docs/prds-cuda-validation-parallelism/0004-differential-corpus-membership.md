@@ -31,7 +31,7 @@ byte-identical. The corpus gains a member; nothing already in it changes.
 
 ### 3. Document the coverage gap this closes
 
-Record in `docs/cuda-differential-harness.md` that the corpus previously
+Record in `docs/performance/cuda-differential-harness.md` that the corpus previously
 contained no model exercising contests or `Ref` dereferences, which is why a
 12.3× regression on that path went undetected while every differential test
 passed. Correctness testing and usability testing are different things, and the
@@ -49,7 +49,7 @@ If the model enters through a plan fixture, it enters via `--all-plan-fixtures`.
 - `crates/sembla-cli/tests/gpu_differential.rs` — grouped-rejection and supported-plan corpus tests only
 - `crates/sembla-cli/src/main.rs` — only if corpus enumeration needs it
 - `fixtures/plans/**` — new fixtures only
-- `docs/cuda-differential-harness.md`
+- `docs/performance/cuda-differential-harness.md`
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
 
 ## Non-goals

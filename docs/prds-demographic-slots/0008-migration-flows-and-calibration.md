@@ -89,7 +89,7 @@ the run, `vacant_overseas_slots` reaches 0 and stays there while the
 other streams continue. Assert the vacancy view shows the exhaustion and
 the run completes deterministically — then assert the documentation
 (§K1: "a run that saturates a slot stratum is not calibrated evidence")
-is present in `docs/demographic-model.md`'s calibration section. If the
+is present in `docs/models/demographic.md`'s calibration section. If the
 runtime's deferred-loser saturation counter surfaces here, assert its
 value too (read the plumbing first).
 
@@ -119,7 +119,7 @@ All against the `direct_stable` plan export of the extended model
 
 ### 5. Documentation
 
-Extend `docs/demographic-model.md`: the full flow set, competing-exit
+Extend `docs/models/demographic.md`: the full flow set, competing-exit
 semantics, the residual-reporting contract (§K9 verbatim), stratified
 capacity and the saturation rule (§K1), the calibration workflow
 (sweep → pairs → external fitting → chained windows), and the explicit
@@ -135,7 +135,7 @@ for when those become design work).
 - `fixtures/state/**`, `fixtures/demographic/**` (regeneration noted)
 - `crates/sembla-cli/tests/**` (+ θ-grid/params fixture files per test
   conventions)
-- `docs/demographic-model.md`
+- `docs/models/demographic.md`
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals
@@ -160,5 +160,5 @@ for when those become design work).
 5. Sweep, pairs-export, CRN-compare, and chained-window fixtures all
    pass with goldens; the CRN test pins the first divergence and its
    §J4 rationale.
-6. `docs/demographic-model.md` covers flows, capacity, calibration, and
+6. `docs/models/demographic.md` covers flows, capacity, calibration, and
    the non-claims; `git diff --check` passes.

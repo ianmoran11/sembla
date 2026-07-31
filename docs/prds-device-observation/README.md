@@ -142,7 +142,7 @@ Both **landed 2026-07-28** and are verified on hardware per §L11.
 **0002 is required, not optional.** The demographic model's calibration and
 validation outputs *are* grouped views — `population_cells` (sex × area ×
 five-year age band), `deaths_cells`, `vacancy_cells` — and
-`docs/demographic-model.md` runs the calibration workflow with
+`docs/models/demographic.md` runs the calibration workflow with
 `--enable grouped-observations` throughout. The §L4 benchmark uses the
 *no-grouped* configuration only because `main.rs:2660` rejects grouped views on
 CUDA.

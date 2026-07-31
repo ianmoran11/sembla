@@ -157,11 +157,11 @@ model), asserting the chain-link hash equality and window-2 determinism.
 
 ### 6. Documentation
 
-New `docs/demographic-model.md`: the slot architecture as implemented,
+New `docs/models/demographic.md`: the slot architecture as implemented,
 the state machine diagram, the lockout contract with its measured
 magnitude at the golden seed, the §K10 caveats verbatim, and how to run
 the model (flags, state artifact, grouped outputs). Link from
-`docs/state-format.md`.
+`docs/guides/state-format.md`.
 
 ## Allowed files
 
@@ -170,7 +170,7 @@ the model (flags, state artifact, grouped outputs). Link from
   `frontend/scripts/check-parity.sh` (append only)
 - `fixtures/state/**`, `fixtures/demographic/**` (new)
 - `crates/sembla-cli/tests/**` (invariant + chained tests, regen test)
-- `docs/demographic-model.md` (new), `docs/state-format.md` (link only)
+- `docs/models/demographic.md` (new), `docs/guides/state-format.md` (link only)
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals
@@ -196,5 +196,5 @@ the model (flags, state artifact, grouped outputs). Link from
 4. Slot reuse with strict generation increase is pinned; the lockout is
    measured and documented with §K10 cited.
 5. The chained-window smoke passes with the manifest chain link asserted.
-6. `docs/demographic-model.md` exists with the state machine, lockout
+6. `docs/models/demographic.md` exists with the state machine, lockout
    contract, and run instructions; `git diff --check` passes.

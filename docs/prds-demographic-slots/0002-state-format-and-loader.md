@@ -125,11 +125,11 @@ identity-scheme-specific). Update `USAGE`.
 
 ### 5. Documentation
 
-New `docs/state-format.md`: the format spec (copy the README's frozen
+New `docs/guides/state-format.md`: the format spec (copy the README's frozen
 section as the normative text), validation rules, the `rows :=`
 enforcement note, hash record, and the explicit statement that the
 artifact carries no execution metadata. Cross-link from
-`docs/composition.md`'s running-models section and USAGE.
+`docs/guides/composition.md`'s running-models section and USAGE.
 
 ## Allowed files
 
@@ -138,7 +138,7 @@ artifact carries no execution metadata. Cross-link from
   no new external deps)
 - `crates/sembla-cli/src/main.rs`, `crates/sembla-cli/tests/**`
 - `crates/sembla-runtime/tests/**`
-- `fixtures/state/**` (new), `docs/state-format.md` (new), `Cargo.lock`
+- `fixtures/state/**` (new), `docs/guides/state-format.md` (new), `Cargo.lock`
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals

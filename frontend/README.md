@@ -374,7 +374,7 @@ silently skips frontend validation:
 git diff --check
 ```
 
-The canonical [local check contract](../docs/ci.md#local-check-contract) also
+The canonical [local check contract](../docs/contributing/ci.md#local-check-contract) also
 lists determinism, the reduced NPE smoke test, and manual GPU evidence with the
 required environments.
 

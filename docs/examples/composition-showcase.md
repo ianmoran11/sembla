@@ -141,7 +141,7 @@ Open a plan and inspect `identity.leaves`, `identity.transitions`, and
 
 Display-label changes do not affect these identities. Stable instance, port,
 wire, or transition renames do. See
-[`docs/composition.md`](../composition.md) for the complete grammar and
+the [composition guide](../guides/composition.md) for the complete grammar and
 refactoring rules.
 
 ## What each model teaches

@@ -145,7 +145,7 @@ order.
   demographic no-grouped model joins it, closing the coverage gap that let this
   regression pass every differential test.
 - `0005-measure-and-publish` — re-run the frozen case, commit evidence, correct
-  `docs/demographic-benchmark.md` and the forward roadmap's scale note.
+  `docs/performance/demographic-benchmark.md` and the forward roadmap's scale note.
 - `0006-segmented-argmin-conflict-resolution` — **the decisive one.** Profiling
   at 500k/2M/5M showed `resolve_conflicts` is quadratic (exponent 1.96) and
   77.9% of GPU time at 5M. Replaces the nested scan with the segmented argmin
@@ -158,7 +158,7 @@ order.
   warp contending, while passing at `1x1`. Found 2026-07-28 on the first
   hardware execution of code approved on local criteria three sessions earlier.
   See `DECISIONS.md` §L12 and
-  [`docs/evidence/cuda-validation-deadlock-20260728/`](../evidence/cuda-validation-deadlock-20260728/).
+  [`docs/evidence/cuda-validation-deadlock-20260728/`](../evidence/cuda-validation-deadlock-20260728).
 
 ## A note this folder should carry
 
@@ -275,8 +275,8 @@ magnitude made further replicates uninformative and each CUDA replicate costs
 fully met**, and `DECISIONS.md` §L6 records the result as a measured verdict
 rather than §L4 gate evidence.
 
-Its §4 documentation obligations are complete: `docs/demographic-benchmark.md`
-and `docs/forward-roadmap.md` both carry the corrected conclusion, and §5's
+Its §4 documentation obligations are complete: `docs/performance/demographic-benchmark.md`
+and `docs/archive/roadmaps/forward-roadmap-2026-07-25.md` both carry the corrected conclusion, and §5's
 ageing share is reported as unresolved rather than decided.
 
 The §L4 gate itself is re-run by PRD 0006 under the unchanged protocol, at which
@@ -351,6 +351,6 @@ constant. The ignored GPU lib test executes in a killable child with a
 120-second internal deadline. The checked-in generated SIR fixture and every
 existing CSV/hash, manifest, state, and differential evidence file remain
 byte-identical. Local evidence and the exact equivalence argument are in
-[`cuda-validation-lock-free-20260728`](../evidence/cuda-validation-lock-free-20260728/).
+[`cuda-validation-lock-free-20260728`](../evidence/cuda-validation-lock-free-20260728).
 Hardware criteria 8–10 remain **pending** under §J14.2 and are runnable through
 `BENCH_CORPUS=1 bash run-demographic-benchmark.sh`.

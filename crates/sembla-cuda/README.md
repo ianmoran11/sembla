@@ -71,7 +71,7 @@ valid on any compatible CUDA GPU. Performance claims are valid only on verified
 full-rate hardware, following [`spikes/precision/README.md`](../../spikes/precision/README.md).
 
 The CLI differential workflow is documented in
-[`docs/cuda-differential-harness.md`](../../docs/cuda-differential-harness.md)
+[`docs/performance/cuda-differential-harness.md`](../../docs/performance/cuda-differential-harness.md)
 and its clean-checkout evidence runner is
 [`scripts/run-differential-corpus.sh`](scripts/run-differential-corpus.sh).
 CUDA transitions remain device-executed; the CLI's downloaded committed-state

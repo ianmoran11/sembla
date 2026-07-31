@@ -117,7 +117,7 @@ Accepted 2026-07-21 as amended by docs/prds-composition/README.md and
 DECISIONS.md §J; the README's amendments win over this document.
 ```
 
-In `docs/design/composition-options.md`, extend its `**Status:**` line with a
+In `docs/archive/design/composition-options-2026-07-21.md`, extend its `**Status:**` line with a
 sentence noting that Option D was selected and recorded in DECISIONS.md §J,
 and that `option-d-architecture.md` plus `docs/prds-composition/README.md`
 supersede this note's open decisions.
@@ -134,7 +134,7 @@ implement against these strings.
 
 - `DECISIONS.md` (append section J only)
 - `docs/design/option-d-architecture.md` (Status line only)
-- `docs/design/composition-options.md` (Status line only)
+- `docs/archive/design/composition-options-2026-07-21.md` (Status line only)
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals

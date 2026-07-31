@@ -168,7 +168,7 @@ must not interpret this PRD as paid-plan approval.
   diagnostic sidecar needs minimal collector-facing serialization support
 - `docs/prds-cuda-final-state-readback/README.md` (status notes only)
 - `docs/evidence/**` (new hardware evidence only, after separate approval)
-- `docs/performance-model.md`, `DECISIONS.md` — only after real hardware evidence
+- `docs/performance/model.md`, `DECISIONS.md` — only after real hardware evidence
   exists; no projected verdict
 
 If a required local gate fails outside this list, stop and report it on the

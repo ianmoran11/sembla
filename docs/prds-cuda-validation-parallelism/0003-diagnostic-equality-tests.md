@@ -81,7 +81,7 @@ are listed as pending.
 - `crates/sembla-cli/tests/**` (only if the CPU arm needs a harness hook)
 - `fixtures/**` — **new negative fixtures only**; no existing fixture may change
 - `crates/sembla-cuda/scripts/run-differential-corpus.sh`
-- `docs/cuda-differential-harness.md`
+- `docs/performance/cuda-differential-harness.md`
 - `docs/prds-cuda-validation-parallelism/README.md` (status notes only)
 - `docs/prds-cuda-validation-parallelism/0003-diagnostic-equality-tests.md`
   (this approved contract correction only)

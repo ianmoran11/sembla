@@ -133,4 +133,4 @@ green. The implementation itself was sound and is not preserved here.
 **The measurement is kept because its finding stands independently of that
 mess**, and it redirected the plan: per-node parallel regions do not pay at
 realistic scale, so parallelism belongs inside whole-tick tiling rather than in
-a PRD of its own. See `docs/performance-model.md`.
+a PRD of its own. See `docs/performance/model.md`.

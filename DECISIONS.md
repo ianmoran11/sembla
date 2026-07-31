@@ -1767,7 +1767,7 @@ deliberately weakened variant failed by ~40×, which is the only reason to
 believe the screen could reject anything.
 
 **Consequence.** Spikes are committed, runnable, and cited by the PRDs they
-justify — see `crates/sembla-runtime/examples/` and `docs/performance-model.md`.
+justify — see `crates/sembla-runtime/examples/` and `docs/performance/model.md`.
 They are not implementations and carry no acceptance obligations, but they are
 evidence and are kept.
 

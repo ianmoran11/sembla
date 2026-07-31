@@ -19,7 +19,7 @@ README, this README wins; when this README conflicts with
 ## Authority and scope
 
 - `docs/design/option-d-architecture.md` is the architecture authority.
-  `docs/design/composition-options.md` is background. This README plus PRD
+  `docs/archive/design/composition-options-2026-07-21.md` is background. This README plus PRD
   0001's decision record are the accepted, amended form of both.
 - `DESIGN.md` §4 (semantics), §5 (determinism, manifest, flags) and
   `DECISIONS.md` §§A5, E1, E7, I1–I6 bind everything here.

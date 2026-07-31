@@ -59,7 +59,7 @@ artifacts remain byte-identical.
 - `calibration/npe/tests/**` for lock-structure tests
 - `.github/workflows/ci.yml`
 - `scripts/check-npe-smoke.sh` only if needed to consume/verify the lock
-- `docs/ci.md`
+- `docs/contributing/ci.md`
 - Managed implementation notes/artifacts
 
 ## Non-goals

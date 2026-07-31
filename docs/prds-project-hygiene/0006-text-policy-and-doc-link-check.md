@@ -38,7 +38,7 @@ no-dependency check before merge.
    Anchor-fragment validation is optional and must not be claimed if absent.
 5. Wire the link check into the canonical local/CI hygiene path established by
    PRDs 0002–0003. Keep the script directly runnable and document it in
-   `CONTRIBUTING.md` and `docs/ci.md`.
+   `CONTRIBUTING.md` and `docs/contributing/ci.md`.
 6. Add focused tests for spaces/URL encoding, fragments, fenced examples,
    images, missing targets, and ignored managed paths. Tests must use a temporary
    fixture tree rather than modifying documentation.
@@ -51,7 +51,7 @@ no-dependency check before merge.
 - Focused script tests under `scripts/tests/**` (new) or an equivalent existing
   test location
 - Check entry point/workflow files introduced by PRDs 0002–0003
-- `CONTRIBUTING.md`, `docs/ci.md`
+- `CONTRIBUTING.md`, `docs/contributing/ci.md`
 - Managed implementation notes/artifacts
 
 ## Non-goals

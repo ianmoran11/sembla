@@ -150,7 +150,7 @@ against the PRD where it currently lives.
   hardware-verified on H100 at commit `d72057f`. All criteria pass: 24 complete
   output-tree comparisons are byte-equal, capacity failure precedes lane/output
   creation, and Nsight proves two non-default streams. Evidence:
-  [`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
+  [`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z).
 
 The concurrent-draw candidate was scoped below so the measurement could answer
 the architectural questions before an implementation specification froze them;
@@ -234,13 +234,13 @@ arm. The output root must not exist, so an arm cannot silently reuse evidence.
 
 Measure CPU and CUDA separately; a positive result for one does not authorize
 the other. Preliminary 100k/1M CPU arms are recorded in
-[`sweep-concurrency-spike-20260729`](../evidence/sweep-concurrency-spike-20260729/):
+[`sweep-concurrency-spike-20260729`](../evidence/sweep-concurrency-spike-20260729):
 workers 1/2/4 are byte-identical and four lanes improve whole-sweep wall by
 3.22–3.29× under a fixed ten-thread budget. That is a feasibility result, not a
 completed gate: repeated 10M/second-shape CPU evidence remains open.
 
 The CUDA complete-backend lower-bound arm is recorded in
-[`hyperstack-concurrency-20260729T064051Z`](../evidence/demographic-bench/hyperstack-concurrency-20260729T064051Z/).
+[`hyperstack-concurrency-20260729T064051Z`](../evidence/demographic-bench/hyperstack-concurrency-20260729T064051Z).
 Across three repetitions, workers 1/2/4 are byte-identical at 1M and 10M. Median
 whole-sweep speedups are 1.321×/1.265× at 1M and 1.487×/1.658× at 10M for two/four
 workers. Capacity reaches 22,699 MiB VRAM and 9,032 MiB RSS at 10M/four workers.
@@ -251,7 +251,7 @@ scoped shared-context/non-blocking-stream prototype; CUDA Gate 1 is not complete
 until that direct arm is measured.
 
 The synchronized lockstep-stream arm is recorded in
-[`hyperstack-lockstep-20260729T092302Z`](../evidence/demographic-bench/hyperstack-lockstep-20260729T092302Z/).
+[`hyperstack-lockstep-20260729T092302Z`](../evidence/demographic-bench/hyperstack-lockstep-20260729T092302Z).
 `--cuda-lockstep-streams` gives each active lane an explicitly non-blocking CUDA
 stream and advances equal-sized lane groups through tick boundaries together.
 It remains hidden and default-off; production sweeps remain sequential.
@@ -320,7 +320,7 @@ One launch per logical phase must be confirmed with Nsight; launch reduction or
 occupancy alone is not success.
 
 The completed fused arm is recorded in
-[`hyperstack-fused-20260729T121444Z`](../evidence/demographic-bench/hyperstack-fused-20260729T121444Z/).
+[`hyperstack-fused-20260729T121444Z`](../evidence/demographic-bench/hyperstack-fused-20260729T121444Z).
 The capacity-four/two-active-draw compute-sanitizer shakedown reports zero errors,
 and every complete output-tree comparison passes. Nsight confirms 19,776 kernel
 launches with `gridDim.y = 2`, one context, and one stream—half the corresponding
@@ -382,7 +382,7 @@ The complete-backend/default-stream, complete-backend/lockstep-stream, and
 fused grid-y CUDA mechanisms are all negative and closed. The fourth and final
 scheduling/stream quadrant — **free-running non-blocking streams** — is
 recorded in
-[`hyperstack-freestream-20260729T152534Z`](../evidence/demographic-bench/hyperstack-freestream-20260729T152534Z/):
+[`hyperstack-freestream-20260729T152534Z`](../evidence/demographic-bench/hyperstack-freestream-20260729T152534Z):
 `SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS=1` gives each lane an isolated retained
 backend on an explicitly non-blocking stream, claims draws dynamically with no
 tick barriers, and publishes ascending `k`.
@@ -406,7 +406,7 @@ capacity admission rather than an `auto` worker count. CPU Gate 1 remains
 separate and open.
 
 **Gate 1 discharged (CUDA).** The CRN correctness arm is recorded in
-[`hyperstack-crn-20260729T221234Z`](../evidence/demographic-bench/hyperstack-crn-20260729T221234Z/):
+[`hyperstack-crn-20260729T221234Z`](../evidence/demographic-bench/hyperstack-crn-20260729T221234Z):
 workers 1/2/4 at 1M and 10M under CRN noise, one repetition per scale, every
 complete output-tree comparison byte-equal, both negative controls rejected.
 With independent noise as the timing case and both noise modes as correctness
@@ -494,7 +494,7 @@ operator decision (CUDA-capable production):
   and 1.584×/1.756× (10M), with all 24 complete-tree comparisons byte-equal,
   four negative controls rejected, bounded capacity failure before lane/output
   creation, and two non-default streams in Nsight. Evidence:
-  [`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z/).
+  [`hyperstack-supported-concurrency-20260730T022957Z`](../evidence/demographic-bench/hyperstack-supported-concurrency-20260730T022957Z).
   Capacity-order tests inject `SEMBLA_SWEEP_TEST_CUDA_FREE_MEMORY_BYTES`; the
   seam can only lower (never raise) the queried device-zero free-memory limit.
 - `0005-publish-concurrency-defaults` — **conditional** as written: any

@@ -20,4 +20,4 @@ scripts/bench-demographic.sh \
 
 These are single-run local measurements rather than a regression gate. The
 10M/50M CPU and CUDA measurements remain pending on the hardware specified in
-`docs/demographic-benchmark.md`.
+`docs/performance/demographic-benchmark.md`.

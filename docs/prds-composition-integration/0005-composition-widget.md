@@ -141,7 +141,7 @@ diagnostics anchoring must not change (the negative suite proves it).
 
 ### 5. Documentation
 
-`docs/composition.md`: add a short "Inspecting compositions" section with a
+`docs/guides/composition.md`: add a short "Inspecting compositions" section with a
 screenshot-free description of what the panel shows and the wire-vs-exposure
 visual distinction (this doubles as the §10.7 tick-delay teaching surface).
 Update the demo suite doc-comment only if `Demos/Composition*.lean` already
@@ -154,7 +154,7 @@ narrates widgets (read first; keep demos' goldens untouched).
 - `frontend/Sembla/WidgetDisplay.lean` (additive rendering; existing
   renderers byte-unchanged), `frontend/Sembla/Widgets.lean` (only if a
   shared helper genuinely belongs there)
-- `frontend/Sembla.lean` (imports), `docs/composition.md`
+- `frontend/Sembla.lean` (imports), `docs/guides/composition.md`
 - implementation notes/artifacts created by the managed run
 
 ## Non-goals
@@ -184,5 +184,5 @@ narrates widgets (read first; keep demos' goldens untouched).
 5. Negative suite, parity script, existing widget tests, and
    `./scripts/check.sh` all pass unchanged; no Rust diff; no new
    dependencies.
-6. `docs/composition.md` gains the inspection section including the
+6. `docs/guides/composition.md` gains the inspection section including the
    wire/exposure distinction; `git diff --check` passes.

@@ -7,11 +7,11 @@ Lean surface syntax → canonical composition source → Lean linker
   → canonical executable plan → Rust validation → deterministic run
 ```
 
-The normative rules are in [`DECISIONS.md` §J](../DECISIONS.md#j-composition-and-the-option-d-architecture-accepted-2026-07-21).
+The normative rules are in [`DECISIONS.md` §J](../../DECISIONS.md#j-composition-and-the-option-d-architecture-accepted-2026-07-21).
 The architecture and rollout boundaries are described in
-[`docs/design/option-d-architecture.md`](design/option-d-architecture.md).
+the [Option D architecture](../design/option-d-architecture.md).
 For four runnable worked models, see the
-[`composition showcase`](examples/composition-showcase.md).
+[`composition showcase`](../examples/composition-showcase.md).
 
 ## Author components and a root composition
 
@@ -51,7 +51,7 @@ sembla_composition epidemicPolicyModel
 ```
 
 See
-[`frontend/Sembla/Composition/SurfaceModels.lean`](../frontend/Sembla/Composition/SurfaceModels.lean)
+[`frontend/Sembla/Composition/SurfaceModels.lean`](../../frontend/Sembla/Composition/SurfaceModels.lean)
 for complete primitive, composite, nested, and root examples.
 
 ## Inspecting compositions

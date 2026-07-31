@@ -69,4 +69,4 @@ and the geometry sweep is the only thing that caught it.
 | `gpu-provenance.txt` | full `nvidia-smi` detail |
 
 The successful parts of the same session are in
-[`demographic-bench/hyperstack-l4-20260728T072119Z/`](../demographic-bench/hyperstack-l4-20260728T072119Z/).
+[`demographic-bench/hyperstack-l4-20260728T072119Z/`](../demographic-bench/hyperstack-l4-20260728T072119Z).

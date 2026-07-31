@@ -19,8 +19,8 @@ Generated text-to-speech audio (18/07/2026, 1:32:41 pm):
 > policy that permits `sha2` plus exact-pinned `libm` (in addition to the
 > workspace IR crate). The historical “no LICENSE”, “no CI”, and “exactly one
 > external dependency” statements below are therefore no longer current. See
-> the [project README](../README.md), [roadmap](ROADMAP.md), and
-> [CI/check contract](ci.md) for maintained status and commands.
+> the [project README](../../../README.md), [roadmap](../roadmaps/version-roadmap-2026-07-25.md), and
+> [CI/check contract](../../contributing/ci.md) for maintained status and commands.
 
 **What it is:** a compositional simulation framework with a Lean 4 frontend (DSL, IR exporter, ProofWidgets) and a deterministic Rust runtime, joined by a versioned JSON IR. The thesis: *seed + IR + θ + determinism level ⇒ reproducible results*. Current state: ~7k lines of Rust, ~5k lines of Lean, 74 tests passing, v0.1 success criteria (`DESIGN.md:583`) appear substantially met, with a GPU precision spike just concluded.
 
@@ -32,7 +32,7 @@ Generated text-to-speech audio (18/07/2026, 1:32:41 pm):
 
 3. **Exceptional engineering discipline for its age.** PRD-driven development (19 PRDs with review artifacts in `.piprd/reviews/`), an adversarially reviewed design doc, an ADR with an explicit selection rule (`docs/decisions/0001-gpu-precision.md`), a dependency allowlist enforced in `scripts/check.sh` (runtime has exactly one external dep: `sha2`), zero TODOs/stubs in the tree.
 
-4. **Intellectual honesty as process.** `spikes/precision/RESULTS.md` is generated atomically, leaves unavailable cells "explicitly unanswered," and refuses to fabricate numbers ("No throughput or accuracy number was fabricated"). The comparison doc (`docs/sembla-vs-pfclbs.md`) concedes the sibling project is more mature. The ADR is marked "measured; decision pending" rather than prematurely closed. This culture is the strongest predictor the project's claims can be trusted later.
+4. **Intellectual honesty as process.** `spikes/precision/RESULTS.md` is generated atomically, leaves unavailable cells "explicitly unanswered," and refuses to fabricate numbers ("No throughput or accuracy number was fabricated"). The comparison doc (`docs/archive/comparisons/sembla-vs-pfclbs-2026-07-17.md`) concedes the sibling project is more mature. The ADR is marked "measured; decision pending" rather than prematurely closed. This culture is the strongest predictor the project's claims can be trusted later.
 
 5. **De-risking by spike before commitment.** GPU throughput and precision were benchmarked on real hardware (including rented H100s via Terraform) *before* the v0.2 numeric contract was written.
 

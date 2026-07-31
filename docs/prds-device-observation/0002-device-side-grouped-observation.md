@@ -9,7 +9,7 @@ predicate rather than building a second mechanism.
 
 **This is the PRD that makes the folder matter.** The demographic model's
 calibration and validation outputs *are* grouped views, and
-`docs/demographic-model.md` runs the workflow with
+`docs/models/demographic.md` runs the workflow with
 `--enable grouped-observations` throughout:
 
 | view | table | keys |

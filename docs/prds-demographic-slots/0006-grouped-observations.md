@@ -148,7 +148,7 @@ test with one new fixture under `fixtures/plans/`).
 
 ### 7. Documentation
 
-`docs/composition.md` or the observation docs (find where views/summaries
+`docs/guides/composition.md` or the observation docs (find where views/summaries
 are documented — extend there): the construct, the flag, the CSV format,
 the CPU-only status, and the sink invariant. `DESIGN.md` is **not**
 edited (its §4.6 exclusion list said "until a real model needs more" —

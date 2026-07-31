@@ -1,7 +1,7 @@
 # CUDA differential corpus — 2026-07-19
 
 Answered from the retrieved evidence bundle in
-[`cuda-differential-corpus-20260719/`](cuda-differential-corpus-20260719/).
+[`cuda-differential-corpus-20260719/`](cuda-differential-corpus-20260719).
 Every retrieved file's SHA-256 matches the value printed on the remote machine
 during the run (`SHA256SUMS` verified locally; the five hashes also match the
 operator's session transcript).

@@ -150,7 +150,7 @@ contract, and C(i)/E deferrals. Update the relevant Lean/surface example in
 `DESIGN.md` only as needed so the authority document no longer presents stale
 nested-list syntax. Do not alter IR/runtime/proof claims.
 
-Do not edit the dated `docs/sembla-assessment.md` snapshot.
+Do not edit the dated `docs/archive/assessments/sembla-assessment-2026-07-18.md` snapshot.
 
 ### 6. Prove literal canonical parity
 
