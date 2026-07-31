@@ -23,7 +23,13 @@ _SPEC = importlib.util.spec_from_file_location("cuda_final_state_support", HERE 
 if _SPEC is None or _SPEC.loader is None:
     raise RuntimeError("could not load CUDA final-state support")
 support = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(support)
+_previous_dont_write_bytecode = sys.dont_write_bytecode
+try:
+    # Loading support must not dirty the pinned evidence checkout with a .pyc.
+    sys.dont_write_bytecode = True
+    _SPEC.loader.exec_module(support)
+finally:
+    sys.dont_write_bytecode = _previous_dont_write_bytecode
 
 SCHEMA = "sembla-cuda-current-rebaseline-protocol-v1"
 TIMING_SCHEMAS = {1: "sembla-sweep-timing-v3", 4: "sembla-sweep-concurrency-spike-timing-v3"}

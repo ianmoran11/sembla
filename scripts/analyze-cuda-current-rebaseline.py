@@ -16,7 +16,15 @@ HERE = pathlib.Path(__file__).resolve().parent
 def load(name: str, path: pathlib.Path):
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None: raise RuntimeError(f"could not load {path}")
-    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module); return module
+    module = importlib.util.module_from_spec(spec)
+    previous = sys.dont_write_bytecode
+    try:
+        # Analysis must not dirty the pinned evidence checkout with support .pyc files.
+        sys.dont_write_bytecode = True
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
+    return module
 
 protocol = load("cuda_current_rebaseline_protocol", HERE / "run-cuda-current-rebaseline.py")
 nsight_support = load("cuda_final_state_analysis_support", HERE / "analyze-cuda-final-state-decision.py")
