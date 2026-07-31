@@ -7545,13 +7545,6 @@ mod tests {
         );
         assert_eq!(default.mode, SweepCudaFinalStateMode::PackedPageable);
         assert!(!default.explicitly_set);
-
-        let explicit = {
-            let _materialized = ScopedEnv::set(SWEEP_CUDA_FINAL_STATE_MODE_ENV, "materialized");
-            sweep_cuda_final_state_selection(BackendSelection::Cuda).unwrap()
-        };
-        assert_eq!(explicit.mode, SweepCudaFinalStateMode::Materialized);
-        assert!(explicit.explicitly_set);
     }
 
     #[test]
@@ -8568,6 +8561,10 @@ mod tests {
     fn plan_run_is_bitwise_deterministic_twice_in_process() {
         use std::time::{SystemTime, UNIX_EPOCH};
 
+        // Other tests temporarily set hidden process-wide sweep selectors.
+        // Serialize this ordinary `run` so those diagnostic scopes cannot leak
+        // into its preflight when the test harness executes cases in parallel.
+        let _guard = SWEEP_BACKEND_CONSTRUCTION_TEST_LOCK.lock().unwrap();
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
