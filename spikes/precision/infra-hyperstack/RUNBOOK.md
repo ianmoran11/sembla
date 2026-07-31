@@ -450,6 +450,78 @@ Run the collector under `tmux` if driving from a phone or an unreliable link:
 the *remote* job survives disconnection, but the local driver — which performs
 collection and teardown — does not.
 
+## Focused H100 CUDA current-path rebaseline
+
+Running `/piprd run`, implementing the current-path PRD, and passing local tests
+**do not approve or create paid resources**. Local preparation stops at code,
+synthetic evidence, and validation. A later H100 session requires a fresh
+report-only orphan reconciliation and explicit human approval of the exact saved
+paid plan before `terraform apply`:
+
+```bash
+bash reconcile-orphans.sh
+terraform plan -var-file=terraform.tfvars \
+  -var=create_instance=true -var=accept_paid_creation=true \
+  -out=hyperstack-paid.tfplan
+python3 review-paid-plan.py hyperstack-paid.tfplan
+# Stop until a human explicitly approves this exact saved plan and displayed cost.
+terraform apply hyperstack-paid.tfplan
+```
+
+After that separate approval and provisioning, use only the strict flag below.
+It rejects `KEEP_VM=1`, all other benchmark selectors, the sweep baseline
+selector, `SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE`, and both retired device-SHA
+variables before creating the evidence directory:
+
+```bash
+set -o pipefail
+BENCH_CUDA_CURRENT_REBASELINE=1 \
+  bash run-demographic-benchmark.sh 2>&1 | tee ~/cuda-current-rebaseline-driver.log
+```
+
+The clean pinned checkout is built once and one 10M state/model is synthesized
+with seed 9009. The fixed ledger is exactly six executions and 18 draws:
+
+| ID | Class | Workers | Draws | Selector | Profiled |
+|---:|---|---:|---:|---|:---:|
+| 01 | explicit-materialized correctness preflight | 1 | 1 | `materialized` | no |
+| 02 | promoted-current correctness preflight | 1 | 1 | absent | no |
+| 03 | current timed repetition 1 | 4 | 4 | absent | no |
+| 04 | current timed repetition 2 | 4 | 4 | absent | no |
+| 05 | current timed repetition 3 | 4 | 4 | absent | no |
+| 06 | separate current Nsight Systems profile | 4 | 4 | absent | yes |
+
+Every command uses 24 ticks, grouped observations, independent noise and a
+1,200-second bound. IDs 01–02 must pass complete scientific-file byte parity,
+separate final-state SHA-256 parity, timing/diagnostic invariants, and the
+one-byte comparator negative control before ID 03 can start. IDs 03–06 must be
+mutually byte-identical. There is no extra verification download, CRN, workers
+1/2 timing matrix, 20-draw matrix, NCU, or adaptive follow-up.
+
+Evidence is under
+`<evidence>/cuda-current-rebaseline/`: `protocol/execution-manifest.json`,
+per-arm output/timing/record/resource samples, `comparisons.json`,
+`negative-control.json`, the raw `.nsys-rep` and CUDA trace/API/kernel exports,
+and `current-rebaseline.json`/`.md`. The analysis reports the three raw timed
+repetitions plus median/minimum/maximum/range for wall, setup, execution,
+publication, per-draw, final-state D2H/SHA attribution, downloaded bytes, RSS
+and VRAM. Prior 2026-07-31 H100 B values are historical and non-binding; this is
+not a paired speedup, has no performance threshold, and does not authorize an
+optimization. If spread is high, preserve this six-command result and propose a
+separately reviewed follow-up rather than extending the paid session.
+
+Nsight Systems leaves admin-only NVIDIA counter policy unchanged. Require
+`RmProfilingAdminOnly: 1` before and after collection and retain both records.
+Success, failure, timeout, TERM and INT all enter the existing bounded,
+idempotent teardown. A nonzero benchmark status takes precedence; otherwise
+teardown status decides. Empty final Terraform state, final report-only orphan
+reconciliation, checksum verification, and provider-console confirmation are
+mandatory. If reconciliation reports an orphan, use the recorded bounded delete
+path and reconcile again. Disarm the independent billing watchdog **only after**
+`teardown-status.txt` is zero, `terraform-state-final.txt` has no paid resource,
+`reconcile-final.log` proves tracked zero/no orphans, and the provider console
+confirms billing stopped.
+
 ## Focused H100 final-state A/B/C decision
 
 Green `/piprd run` results and this procedure are **not paid-plan approval**.

@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.tests.test_cuda_final_state_teardown import TeardownFixture
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "spikes" / "precision" / "infra-hyperstack" / "run-demographic-benchmark.sh"
@@ -23,6 +25,7 @@ INCOMPATIBLE = (
 )
 FOCUSED_INCOMPATIBLE = (
     "BENCH_CUDA_READBACK_DIAGNOSTIC",
+    "BENCH_CUDA_CURRENT_REBASELINE",
     "BENCH_PROFILE",
     "BENCH_CORPUS",
     "BENCH_SWEEP",
@@ -53,9 +56,11 @@ class CollectorFlagValidationTest(unittest.TestCase):
         for name in (
             "BENCH_CUDA_READBACK_DIAGNOSTIC",
             "BENCH_CUDA_FINAL_STATE_DECISION",
+            "BENCH_CUDA_CURRENT_REBASELINE",
             "BENCH_SWEEP_BASELINE_COMMIT",
             "KEEP_VM",
             "SEMBLA_FOCUSED_TEARDOWN_TEST_MODE",
+            "SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE",
             "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256",
             "SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY",
             *INCOMPATIBLE,
@@ -91,6 +96,12 @@ class CollectorFlagValidationTest(unittest.TestCase):
         self.assertIn("must be 0 or 1", result.stderr)
         self.assertFalse(self.artifact.exists())
 
+    def test_rejects_malformed_current_rebaseline_value(self):
+        result = self.run_script(BENCH_CUDA_CURRENT_REBASELINE="yes")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("must be 0 or 1", result.stderr)
+        self.assertFalse(self.artifact.exists())
+
     def test_rejects_every_incompatible_stage(self):
         for incompatible in INCOMPATIBLE:
             with self.subTest(incompatible=incompatible):
@@ -122,6 +133,72 @@ class CollectorFlagValidationTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn(expected, result.stderr)
             self.assertFalse(self.artifact.exists())
+
+    def test_current_rebaseline_rejects_every_conflict_keep_vm_and_selectors_before_artifacts(self):
+        conflicts = (
+            "BENCH_CUDA_READBACK_DIAGNOSTIC", "BENCH_CUDA_FINAL_STATE_DECISION",
+            "BENCH_PROFILE", "BENCH_CORPUS", "BENCH_SWEEP", "BENCH_SWEEP_NUMA",
+            "BENCH_CONCURRENCY_SPIKE", "BENCH_CONCURRENCY_SPIKE_ONLY",
+            "BENCH_CONCURRENCY_SUPPORTED", "BENCH_CONCURRENCY_LOCKSTEP",
+            "BENCH_CONCURRENCY_FREE_STREAMS", "BENCH_CONCURRENCY_FUSED",
+            "BENCH_CONCURRENCY_CRN",
+        )
+        for conflict in conflicts:
+            with self.subTest(conflict=conflict):
+                result = self.run_script(BENCH_CUDA_CURRENT_REBASELINE="1", **{conflict: "1"})
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("mutually exclusive", result.stderr)
+                self.assertIn(conflict, result.stderr)
+                self.assertFalse(self.artifact.exists())
+        for environment, expected in [
+            ({"KEEP_VM": "1"}, "rejects KEEP_VM=1"),
+            ({"BENCH_SWEEP_BASELINE_COMMIT": "deadbeef"}, "BENCH_SWEEP_BASELINE_COMMIT"),
+            ({"SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE": "packed-pageable"}, "inherited selector"),
+            ({"SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256": "1"}, "inherited selector"),
+            ({"SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY": "1"}, "inherited selector"),
+        ]:
+            result = self.run_script(BENCH_CUDA_CURRENT_REBASELINE="1", **environment)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn(expected, result.stderr)
+            self.assertFalse(self.artifact.exists())
+
+    def test_current_stage_is_baked_into_payload_and_cannot_reach_old_matrix(self):
+        source = SCRIPT.read_text()
+        self.assertIn("export BENCH_CUDA_CURRENT_REBASELINE=%q", source)
+        self.assertIn("scripts/run-cuda-current-rebaseline.py", source)
+        self.assertIn("scripts/analyze-cuda-current-rebaseline.py", source)
+        self.assertIn("fixed six-execution", source)
+        self.assertIn('&& "${BENCH_CUDA_CURRENT_REBASELINE:-0}" != "1"', source)
+
+    def test_current_stage_preserves_status_and_teardown_for_success_failure_timeout_and_signals(self):
+        scenarios = [
+            ("success", {"FOCUSED_TEST_BENCHMARK_COMMAND": "true"}, 0, ("0", "0")),
+            ("failure", {"FOCUSED_TEST_BENCHMARK_COMMAND": "exit 7"}, 7, ("7", "0")),
+            ("timeout", {"FOCUSED_TEST_BENCHMARK_COMMAND": "sleep 5", "FOCUSED_TEST_TIMEOUT_SECONDS": "0.1"}, 124, ("124", "0")),
+            ("term", {"FOCUSED_TEST_SIGNAL": "TERM"}, 143, ("143", "0")),
+            ("int", {"FOCUSED_TEST_SIGNAL": "INT"}, 130, ("130", "0")),
+        ]
+        for label, overrides, expected_return, expected_statuses in scenarios:
+            with self.subTest(label=label):
+                fixture = TeardownFixture(Path(self.temp.name) / f"current-{label}")
+                environment = fixture.environment(**overrides)
+                environment.pop("BENCH_CUDA_FINAL_STATE_DECISION", None)
+                environment["BENCH_CUDA_CURRENT_REBASELINE"] = "1"
+                result = subprocess.run(
+                    ["bash", str(SCRIPT)],
+                    cwd=SCRIPT.parent,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=30,
+                )
+                self.assertEqual(result.returncode, expected_return, result.stderr)
+                statuses = (
+                    (fixture.artifact / "benchmark-status.txt").read_text().strip(),
+                    (fixture.artifact / "teardown-status.txt").read_text().strip(),
+                )
+                self.assertEqual(statuses, expected_statuses)
+                self.assertIn("terraform destroy", fixture.calls.read_text())
 
     def test_focused_preflight_failures_and_outer_timeout_have_cleanup_paths(self):
         source = SCRIPT.read_text()

@@ -169,3 +169,11 @@ production regression threshold or new optimization decision.
    script unit tests, `bash -n` on wrapper/teardown, Markdown-link checks,
    `python3 scripts/check-prd-allowlist.py` on this PRD, `git diff --check`, and
    the repository standard local check.
+
+## Implementation status
+
+Locally complete. The collector freezes six executions/18 draws, the analyzer
+reports absolute current-path statistics without an eligibility gate, and the
+wrapper reuses mandatory focused teardown. Synthetic and existing final-state
+protocol tests pass. Paid H100 execution is intentionally pending a separate
+operator-approved plan.

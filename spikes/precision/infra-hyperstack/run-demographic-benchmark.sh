@@ -34,6 +34,10 @@
 #                                 timed matrix, three-command CRN set, and three
 #                                 post-matrix Nsight Systems profiles. Exactly 27
 #                                 benchmark executions; rejects KEEP_VM=1.
+#   BENCH_CUDA_CURRENT_REBASELINE=1
+#                               - focused six-execution/18-draw observation of
+#                                 the unset-selector promoted current path; three
+#                                 workers-4 repetitions and one Nsight profile.
 #   BENCH_SWEEP=1               - additionally collect retained-backend sweep
 #                                 evidence at 1M and 10M rows, 24 ticks, 20
 #                                 draws; requires BENCH_SWEEP_BASELINE_COMMIT
@@ -75,7 +79,7 @@
 #                                 collector gives up and says why
 #
 # BENCH_PROFILE, BENCH_CUDA_READBACK_DIAGNOSTIC,
-# BENCH_CUDA_FINAL_STATE_DECISION, BENCH_CORPUS, BENCH_SWEEP, its baseline
+# BENCH_CUDA_FINAL_STATE_DECISION, BENCH_CUDA_CURRENT_REBASELINE, BENCH_CORPUS, BENCH_SWEEP, its baseline
 # commit, and the concurrency-spike flags are baked into the content-addressed
 # payload hash, so a run with them set will not silently rejoin a plain gate run
 # already in progress -- it is correctly treated as a different payload.
@@ -99,7 +103,10 @@ DESTROYED=false
 REMOTE_SCRIPT=""
 POLL_ERR=""
 FOCUSED_RUN_REQUESTED=false
-[[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "0" ]] && FOCUSED_RUN_REQUESTED=true
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "0" \
+      || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" != "0" ]]; then
+  FOCUSED_RUN_REQUESTED=true
+fi
 FOCUSED_ARTIFACT_STARTED=false
 FOCUSED_CLEANUP_RUNNING=false
 
@@ -176,7 +183,8 @@ finish() {
     (( benchmark_status != 0 )) || final_status="$teardown_status"
   fi
 
-  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+  if [[ ( "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+          || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ) \
         && "$FOCUSED_ARTIFACT_STARTED" == true \
         && "$FOCUSED_CLEANUP_RUNNING" != true ]]; then
     FOCUSED_CLEANUP_RUNNING=true
@@ -234,13 +242,17 @@ case "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" in
   0|1) ;;
   *) echo 'BENCH_CUDA_FINAL_STATE_DECISION must be 0 or 1' >&2; exit 2 ;;
 esac
+case "${BENCH_CUDA_CURRENT_REBASELINE:-0}" in
+  0|1) ;;
+  *) echo 'BENCH_CUDA_CURRENT_REBASELINE must be 0 or 1' >&2; exit 2 ;;
+esac
 case "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" in
   0|1) ;;
   *) echo 'SEMBLA_FOCUSED_TEARDOWN_TEST_MODE must be 0 or 1' >&2; exit 2 ;;
 esac
 if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   for incompatible in \
-    BENCH_CUDA_FINAL_STATE_DECISION BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP \
+    BENCH_CUDA_FINAL_STATE_DECISION BENCH_CUDA_CURRENT_REBASELINE BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP \
     BENCH_CONCURRENCY_SPIKE BENCH_CONCURRENCY_SPIKE_ONLY BENCH_CONCURRENCY_SUPPORTED \
     BENCH_CONCURRENCY_LOCKSTEP BENCH_CONCURRENCY_FREE_STREAMS \
     BENCH_CONCURRENCY_FUSED BENCH_CONCURRENCY_CRN; do
@@ -256,7 +268,7 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
 fi
 if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
   for incompatible in \
-    BENCH_CUDA_READBACK_DIAGNOSTIC BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP \
+    BENCH_CUDA_READBACK_DIAGNOSTIC BENCH_CUDA_CURRENT_REBASELINE BENCH_PROFILE BENCH_CORPUS BENCH_SWEEP \
     BENCH_SWEEP_NUMA BENCH_CONCURRENCY_SPIKE BENCH_CONCURRENCY_SPIKE_ONLY \
     BENCH_CONCURRENCY_SUPPORTED BENCH_CONCURRENCY_LOCKSTEP \
     BENCH_CONCURRENCY_FREE_STREAMS BENCH_CONCURRENCY_FUSED BENCH_CONCURRENCY_CRN; do
@@ -283,8 +295,42 @@ if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
   done
   trap focused_term TERM
   trap focused_int INT
-elif [[ "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" == "1" ]]; then
-  echo 'SEMBLA_FOCUSED_TEARDOWN_TEST_MODE requires BENCH_CUDA_FINAL_STATE_DECISION=1' >&2
+fi
+if [[ "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
+  for incompatible in \
+    BENCH_CUDA_READBACK_DIAGNOSTIC BENCH_CUDA_FINAL_STATE_DECISION BENCH_PROFILE \
+    BENCH_CORPUS BENCH_SWEEP BENCH_SWEEP_NUMA BENCH_CONCURRENCY_SPIKE \
+    BENCH_CONCURRENCY_SPIKE_ONLY BENCH_CONCURRENCY_SUPPORTED BENCH_CONCURRENCY_LOCKSTEP \
+    BENCH_CONCURRENCY_FREE_STREAMS BENCH_CONCURRENCY_FUSED BENCH_CONCURRENCY_CRN; do
+    if [[ "${!incompatible:-0}" != "0" ]]; then
+      echo "BENCH_CUDA_CURRENT_REBASELINE is mutually exclusive with $incompatible" >&2
+      exit 2
+    fi
+  done
+  if [[ -n "${BENCH_SWEEP_BASELINE_COMMIT:-}" ]]; then
+    echo 'BENCH_CUDA_CURRENT_REBASELINE is mutually exclusive with BENCH_SWEEP_BASELINE_COMMIT' >&2
+    exit 2
+  fi
+  if [[ "${KEEP_VM:-0}" == "1" ]]; then
+    echo 'BENCH_CUDA_CURRENT_REBASELINE rejects KEEP_VM=1; teardown is mandatory' >&2
+    exit 2
+  fi
+  for selector in \
+    SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE \
+    SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256 \
+    SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY; do
+    if declare -p "$selector" >/dev/null 2>&1; then
+      echo "BENCH_CUDA_CURRENT_REBASELINE rejects inherited selector $selector" >&2
+      exit 2
+    fi
+  done
+  trap focused_term TERM
+  trap focused_int INT
+fi
+if [[ "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" == "1" \
+      && "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "1" \
+      && "${BENCH_CUDA_CURRENT_REBASELINE:-0}" != "1" ]]; then
+  echo 'SEMBLA_FOCUSED_TEARDOWN_TEST_MODE requires a focused CUDA stage' >&2
   exit 2
 fi
 if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" == "1" \
@@ -337,7 +383,8 @@ if [[ "${BENCH_CONCURRENCY_SUPPORTED:-0}" == "1" \
   exit 2
 fi
 if [[ -e "$ARTIFACT_DIR" ]]; then
-  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+  if [[ ( "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+          || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ) \
         && ( -e "$ARTIFACT_DIR/.cuda-final-state-teardown-started" \
              || -s "$ARTIFACT_DIR/teardown-status.txt" ) \
         && ! -e "$ARTIFACT_DIR/.cuda-final-state-teardown-complete" ]]; then
@@ -348,7 +395,8 @@ if [[ -e "$ARTIFACT_DIR" ]]; then
   exit 2
 fi
 mkdir -p "$ARTIFACT_DIR"
-if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+      || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
   FOCUSED_ARTIFACT_STARTED=true
   if [[ "${SEMBLA_FOCUSED_TEARDOWN_TEST_MODE:-0}" == "1" ]]; then
     case "${FOCUSED_TEST_SIGNAL:-}" in
@@ -665,6 +713,7 @@ REMOTE_SCRIPT="$(mktemp)"
 printf 'export BENCH_PROFILE=%q\n' "${BENCH_PROFILE:-0}" > "$REMOTE_SCRIPT"
 printf 'export BENCH_CUDA_READBACK_DIAGNOSTIC=%q\n' "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CUDA_FINAL_STATE_DECISION=%q\n' "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" >> "$REMOTE_SCRIPT"
+printf 'export BENCH_CUDA_CURRENT_REBASELINE=%q\n' "${BENCH_CUDA_CURRENT_REBASELINE:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_CORPUS=%q\n' "${BENCH_CORPUS:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP=%q\n' "${BENCH_SWEEP:-0}" >> "$REMOTE_SCRIPT"
 printf 'export BENCH_SWEEP_BASELINE_COMMIT=%q\n' "${BENCH_SWEEP_BASELINE_COMMIT:-}" >> "$REMOTE_SCRIPT"
@@ -755,7 +804,8 @@ package_partial_on_error() {
   local partial_root="$HOME/demographic-bench-partial"
   rm -rf "$partial_root"
   mkdir -p "$partial_root"
-  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+  if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+        || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
     if cat /proc/driver/nvidia/params \
         > "$partial_root/nvidia-driver-params-after-failure.txt" 2>&1 \
         && grep -Fq 'RmProfilingAdminOnly: 1' \
@@ -780,6 +830,9 @@ package_partial_on_error() {
     # 10M state remains under work/ and is excluded separately below.
     cp -a "$OUT_ROOT/cuda-final-state-decision" "$partial_root/"
   fi
+  if [[ -d "$OUT_ROOT/cuda-current-rebaseline" ]]; then
+    cp -a "$OUT_ROOT/cuda-current-rebaseline" "$partial_root/"
+  fi
   (
     cd "$partial_root" || exit
     find . -type f ! -name SHA256SUMS.partial -print0 \
@@ -802,7 +855,8 @@ diagnostic_exit_handler() {
   fi
 }
 if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" \
-      || "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+      || "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+      || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
   DIAGNOSTIC_FAILURE_HANDLED=0
   trap 'package_partial_on_error $?' ERR
   trap 'package_partial_on_error 143' TERM
@@ -893,6 +947,55 @@ if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
     > "$FINAL_STATE_DIR/counter-restoration.txt"
   rm -f "$FINAL_STATE_STATE" "$FINAL_STATE_MODEL"
   echo '=== focused final-state decision evidence complete ==='
+fi
+
+# --- focused H100 current-path rebaseline -------------------------------------
+if [[ "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
+  echo '=== focused H100 CUDA current-path rebaseline (10M grouped) ==='
+  CURRENT_DIR="$OUT_ROOT/cuda-current-rebaseline"
+  CURRENT_PROTOCOL_DIR="$CURRENT_DIR/protocol"
+  mkdir -p "$CURRENT_DIR"
+  command -v nsys >/dev/null \
+    || diagnostic_fail 'nsys is required for BENCH_CUDA_CURRENT_REBASELINE'
+  [[ "$GPU_NAME" == *H100* ]] \
+    || diagnostic_fail "BENCH_CUDA_CURRENT_REBASELINE requires an H100, found: $GPU_NAME"
+  cat /proc/driver/nvidia/params > "$CURRENT_DIR/nvidia-driver-params-before.txt"
+  grep -Fq 'RmProfilingAdminOnly: 1' "$CURRENT_DIR/nvidia-driver-params-before.txt" \
+    || diagnostic_fail 'GPU performance counters must begin in admin-only mode'
+  nsys --version > "$CURRENT_DIR/nsys-version.txt" 2>&1
+
+  CURRENT_STATE="$WORK/cuda-current-rebaseline-10m.state"
+  timeout --signal=TERM --kill-after=30s 900s \
+    "$BIN" synth-state \
+      --model fixtures/demographic/benchmark/demographic_slots.full.json \
+      --slots 10000000 --areas "$AREAS" \
+      --present-fraction "$PRESENT_FRACTION" --streams "$STREAMS" \
+      --seed "$SEED" --out "$CURRENT_STATE" \
+      > "$CURRENT_DIR/synth-state.stdout" \
+      2> "$CURRENT_DIR/synth-state.stderr"
+  CURRENT_MODEL="$CURRENT_STATE.model.json"
+  sha256sum "$CURRENT_STATE" > "$CURRENT_DIR/state.sha256"
+  sha256sum "$CURRENT_MODEL" > "$CURRENT_DIR/model.sha256"
+
+  env -u SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE \
+      -u SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256 \
+      -u SEMBLA_SWEEP_EXPERIMENT_DEVICE_FINAL_SHA256_VERIFY \
+    python3 scripts/run-cuda-current-rebaseline.py \
+      --binary "$BIN" --model "$CURRENT_MODEL" --state "$CURRENT_STATE" \
+      --evidence "$CURRENT_PROTOCOL_DIR" \
+      > "$CURRENT_DIR/collector.stdout" 2> "$CURRENT_DIR/collector.stderr"
+  python3 scripts/analyze-cuda-current-rebaseline.py "$CURRENT_PROTOCOL_DIR" \
+    --json "$CURRENT_DIR/current-rebaseline.json" \
+    --markdown "$CURRENT_DIR/current-rebaseline.md" \
+    > "$CURRENT_DIR/analyzer.stdout" 2> "$CURRENT_DIR/analyzer.stderr"
+
+  cat /proc/driver/nvidia/params > "$CURRENT_DIR/nvidia-driver-params-after.txt"
+  grep -Fq 'RmProfilingAdminOnly: 1' "$CURRENT_DIR/nvidia-driver-params-after.txt" \
+    || diagnostic_fail 'GPU performance-counter access was not restored to admin-only mode'
+  printf '%s\n' 'PASS RmProfilingAdminOnly remained 1 before/after current-path profiling' \
+    > "$CURRENT_DIR/counter-restoration.txt"
+  rm -f "$CURRENT_STATE" "$CURRENT_MODEL"
+  echo '=== focused current-path rebaseline evidence complete ==='
 fi
 
 # --- focused CUDA readback/contended-kernel diagnostic ------------------------
@@ -1915,7 +2018,8 @@ fi
 
 if [[ "${BENCH_CONCURRENCY_SPIKE_ONLY:-0}" != "1" \
       && "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" != "1" \
-      && "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "1" ]]; then
+      && "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" != "1" \
+      && "${BENCH_CUDA_CURRENT_REBASELINE:-0}" != "1" ]]; then
 STATE="$WORK/initial.state"
 echo '=== synthesizing one shared 10M state artifact ==='
 "$BIN" synth-state \
@@ -2194,6 +2298,20 @@ assert all(doc["assertions"].values())
     "PASS exactly three no-grouped replicates per backend\n"
 )
 PY
+elif [[ "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
+  cat > "$OUT_ROOT/README.md" <<EOF
+# Focused H100 CUDA current-path rebaseline evidence
+
+This separately approved paid session ran only the fixed six-execution,
+18-draw current-path protocol at repository commit \`$COMMIT_BEFORE\`. The
+materialized/current correctness preflights gated three workers-4 current-path
+repetitions and one separate Nsight Systems profile.
+
+The \`cuda-current-rebaseline/\` tree contains complete scientific parity,
+absolute timing/phase/resource evidence and Nsight exports. Historical H100 B
+values are contextual only. This report has no performance threshold and does
+not authorize another optimization.
+EOF
 elif [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
   cat > "$OUT_ROOT/README.md" <<EOF
 # Focused H100 CUDA final-state A/B/C decision evidence
@@ -2476,7 +2594,8 @@ while (( SECONDS < poll_deadline )); do
 done
 
 if [[ -z "$bench_status" \
-      && "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+      && ( "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+           || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ) \
       && $SECONDS -ge $poll_deadline ]]; then
   echo 'Focused outer timeout reached; signalling the detached process group so its remote partial-evidence trap can run.' >&2
   ssh "${SSH_OPTIONS[@]}" "$REMOTE" \
@@ -2563,7 +2682,8 @@ fi
 echo "Transferred artifact checksums verified."
 
 # --- mandatory teardown -------------------------------------------------------
-if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" ]]; then
+if [[ "${BENCH_CUDA_FINAL_STATE_DECISION:-0}" == "1" \
+      || "${BENCH_CUDA_CURRENT_REBASELINE:-0}" == "1" ]]; then
   echo 'Focused teardown is handled by the idempotent EXIT/TERM/INT cleanup path.'
 elif [[ "${KEEP_VM:-0}" == "1" ]]; then
   echo "KEEP_VM=1: leaving the VM running. Billing continues; destroy it yourself." >&2

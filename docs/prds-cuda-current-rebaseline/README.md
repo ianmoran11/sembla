@@ -60,5 +60,9 @@ paid session silently.
 
 ## Status
 
-- PRD 0001 is ready for local implementation.
-- No paid resource is approved or created by this folder.
+- PRD 0001 is locally implemented: the strict six-execution collector,
+  fail-closed analyzer, wrapper integration, synthetic protocol/Nsight tests and
+  runbook are complete. Focused and existing final-state tests plus the standard
+  repository check pass.
+- Hardware execution remains pending separate approval of an exact paid plan.
+  No paid resource was approved or created by this folder.
