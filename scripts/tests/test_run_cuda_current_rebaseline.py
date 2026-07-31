@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -43,6 +44,35 @@ class Fixture:
             result = {**record, "return_code": 124 if record["id"] == fail else 0, "timed_out": record["id"] == fail, "resource_sampling_complete": True, "resource_samples": [{"rss_bytes": 10, "vram_bytes": 20, "rss_query_succeeded": True, "vram_query_succeeded": True}], "peak_rss_bytes": 10, "peak_vram_bytes": 20, "stdout": str(stdout), "stderr": str(stderr)}
             MODULE.atomic_json(arm / "record.json", result); return result
         return execute
+
+class BytecodeHygieneTests(unittest.TestCase):
+    def test_collector_and_analyzer_help_do_not_create_support_bytecode(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            for name in (
+                "run-cuda-current-rebaseline.py",
+                "analyze-cuda-current-rebaseline.py",
+                "run-cuda-final-state-decision.py",
+                "analyze-cuda-final-state-decision.py",
+            ):
+                shutil.copy2(ROOT / "scripts" / name, scripts / name)
+            environment = os.environ.copy()
+            environment.pop("PYTHONDONTWRITEBYTECODE", None)
+            environment.pop("PYTHONPYCACHEPREFIX", None)
+            for script in ("run-cuda-current-rebaseline.py", "analyze-cuda-current-rebaseline.py"):
+                result = subprocess.run(
+                    [sys.executable, str(scripts / script), "--help"],
+                    cwd=root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(any(root.rglob("__pycache__")))
+            self.assertFalse(any(root.rglob("*.pyc")))
+
 
 class ManifestTests(unittest.TestCase):
     def test_exact_six_executions_eighteen_draws_and_selector_scope(self):
