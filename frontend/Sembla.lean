@@ -1,4 +1,6 @@
 import Sembla.IR
+import Sembla.Semantics
+import Sembla.Frontend.Builders
 import Sembla.Json
 import Sembla.Hash
 import Sembla.HashTests

@@ -2,9 +2,10 @@
 
 This Lean 4 package contains Sembla's pure deep IR, the public command-style
 modeling language, a supported compatibility syntax, structure widgets, proofs,
-and eight Lean-authored canonical models. It deliberately does not depend on
-mathlib. `lean-toolchain` pins Lean 4.13.0, so an `elan` installation selects the
-same compiler automatically.
+and eight Lean-authored canonical models. The foundational IR-semantics track
+pins Mathlib for future checked and semantic layers; the existing raw IR and
+surface remain separate. `lean-toolchain` pins Lean 4.13.0, so an `elan`
+installation selects the same compiler automatically.
 
 ## Setup and build
 
@@ -15,9 +16,9 @@ root:
 cd frontend && lake build
 ```
 
-Lake resolves Lean's standard library plus pinned ProofWidgets4, the package's
-only direct external dependency. ProofWidgets inherits Batteries transitively;
-both revisions are recorded in `lake-manifest.json`.
+Lake resolves pinned Mathlib and ProofWidgets4 dependencies compatible with
+Lean 4.13.0. Their complete transitive revisions are recorded in
+`lake-manifest.json`.
 
 ## Public command surface
 
@@ -382,6 +383,14 @@ The canonical-model catalog, formulas, run commands, and current limits are in
 [`docs/examples/canonical-models.md`](../docs/examples/canonical-models.md).
 
 ## Proofs
+
+`Sembla.Semantics` and `Sembla.Frontend.Builders` are importable architecture
+umbrellas for the proposed foundational formalization; PRD 0001 adds no
+semantic definitions. `Sembla.Semantics.ProofAudit` provides the deterministic
+environment inventory used by `scripts/check-proofs.sh`. It enumerates every
+theorem/lemma in the covered module roots, rejects transitive axioms outside
+`{propext, Classical.choice, Quot.sound}`, and is paired with mechanical source
+policy and cleaned-up negative self-tests.
 
 `Sembla.LumpingProof` proves `groupedCount_eq_naiveCount`, exact agreement of
 the grouped and naive coworker-count plans, and `plan_rewrite_congr`, which

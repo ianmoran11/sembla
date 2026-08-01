@@ -3,6 +3,11 @@ version = "0.1.0"
 defaultTargets = ["Sembla", "sembla-export", "sembla-link"]
 
 [[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.13.0"
+
+[[require]]
 name = "proofwidgets"
 git = "https://github.com/leanprover-community/ProofWidgets4"
 rev = "v0.0.44"

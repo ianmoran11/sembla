@@ -56,7 +56,8 @@ keeps doors open to each (see §10).
 │  • surface DSL: "systems with states and hazard         │
 │    transitions" (Poly-flavored syntax)                  │
 │  • elaborates to the IR (deep embedding)                │
-│  • denotational semantics defined here (ground truth)   │
+│  • planned denotational semantics (ground truth; not    │
+│    yet complete)                                        │
 │  • infoview structure widgets (state diagrams, wiring   │
 │    views, prior plots)                                  │
 └──────────────────────────┬──────────────────────────────┘
@@ -95,13 +96,15 @@ This was the most contested question in the design review. The settled position:
    - state-machine diagram of a system's states and transitions;
    - wiring/composition diagrams of how boxes connect;
    - rendered prior distributions (plots, not just parameter text).
-2. **Semantic ground truth.** The DSL's denotational semantics is *defined in
-   Lean* as a mathematical object (a deep embedding with a meaning function).
-   This makes compiler transformations — operator fusion, the group-by lumping
+2. **Semantic ground truth.** The DSL's denotational semantics is intended to be
+   defined in Lean as a mathematical object over the deep embedding. The current
+   raw embedding does not yet have a complete meaning function; the Lean IR
+   foundational-formalization track adds it incrementally. Completing that layer
+   will make compiler transformations — operator fusion, the group-by lumping
    rewrite (§7), coarse-grainings, eventually symbolic gradients — into
    *statable theorems*. Proofs are deferred (and expected to get cheaper as
-   AI-assisted proving matures), but the specification cost is paid in v1,
-   because it cannot be retrofitted.
+   AI-assisted proving matures), but the specification cost will be paid by the
+   V1 formalization track because it cannot be retrofitted.
 
 **Honest accounting (constraints accepted during review):**
 
@@ -242,11 +245,12 @@ The implemented first-release composition workflow is documented in
 
 ### 4.5 Meaning: the Lean layer
 
-A box denotes a coalgebra (a Poly-flavored lens whose positions are
-table-valued); composition is an operad-algebra structure; the ideal semantics
-is over ℝ; determinism levels (§5.2) and tau-leaping are *documented deviations*
-from the ideal. The IR is a deep embedding in Lean with a meaning function into
-this semantics.
+In the intended Lean semantics, a box denotes a coalgebra (a Poly-flavored lens
+whose positions are table-valued); composition is an operad-algebra structure;
+the ideal semantics is over ℝ; determinism levels (§5.2) and tau-leaping are
+*documented deviations* from the ideal. The raw IR is already a deep embedding
+in Lean; its checked core and complete meaning function are deliverables of the
+Lean IR foundational-formalization track and do not exist yet.
 
 ### 4.6 Observation: a sink, never a feedback path
 
@@ -257,18 +261,24 @@ observations generically; it never knows what a model *means*.
 
 The governing invariant:
 
-> Enabling, disabling, filtering, or serializing an observation cannot change
-> state, draws, draw coordinates, conflict resolution, or any scheduling
-> decision. Observation is a **sink**: there is no path in the IR from a view or
-> summary back to a parameter, input, hazard, transition, or wire.
+> For every successfully completed trace prefix, enabling, disabling, filtering,
+> or serializing an observation cannot change transition state, draws, draw
+> coordinates, conflict resolution, or any scheduling decision. Observation is
+> a **sink**: there is no path in the IR from a view or summary back to a
+> parameter, input, hazard, transition, or wire.
 
-This is not a style rule. It is what makes observation *free* with respect to
-the run contract (§5.4): two runs differing only in what they observed are the
-same run, and their state hashes must match bitwise. It is also a statable
-property of the Lean semantics — the meaning function ignores the observation
-layer — and it is cheap to enforce in types rather than by reviewer vigilance.
-The same invariant forces the honest converse: a quantity a model wants to *act*
-on is a state or an input, and must be declared as one.
+This is not a style rule. It makes observation *free* with respect to the
+transition/draw kernel (§5.4): two runs differing only in successful
+observations have bitwise-identical state hashes, and runs with a common
+completed prefix have identical state, draws, and scheduling on that prefix. An
+observation may nevertheless return an explicit semantic error after commit;
+that error terminates trace production without rolling back the committed state
+or prior events and emits no value for the failed observation. Disabling that
+failing observation may permit a longer trace, but it cannot alter the common
+completed prefix. This prefix noninterference is a required theorem for the
+planned Lean semantics and is owned by PRD 0017. The same invariant forces the
+honest converse: a quantity a model wants to *act* on is a state or an input,
+and must be declared as one.
 
 **Current status — a known violation.** v0.1's CLI branches on a hard-coded SIR
 box name to decide its output columns, and `sembla sweep` refuses models that
@@ -567,7 +577,8 @@ performance spike.
 ### In
 
 - Surface DSL in Lean 4 for systems/states/hazard transitions, elaborating to
-  a deep-embedded IR with a defined ℝ-semantics.
+  a deep-embedded IR; its planned exact ℝ-semantics is a Lean IR
+  foundational-formalization track deliverable and is not yet complete.
 - **First-class parameters with declared priors** (§4.1): symbolic `Param`
   references in the IR, per-run θ supplied at the CLI, and a
   **prior-predictive sweep runner** (`sembla sweep`) that samples θ from the

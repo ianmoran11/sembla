@@ -56,13 +56,15 @@ formal *specification* to point proofs at. An agent cannot prove properties
 of a pile of untyped macros; it needs the DSL's meaning defined as a
 mathematical object.
 
-**Rationale.** We adopted position (C): the IR is a **deep embedding** with a
-denotational semantics defined in Lean; proofs are deferred, but the
-specification is written from day one. This reverses the original "no proofs"
-stance, and we accepted the reversal explicitly because it is the only thing
-that makes Lean *load-bearing* rather than decorative. Cost knowingly
-accepted: v1 must include a semantics, and every guarantee is over ℝ and
-stops at the IR boundary (the Rust/GPU compiler is trusted, not verified).
+**Rationale.** We adopted position (C): the IR is a **deep embedding** whose
+denotational semantics is to be defined in Lean; proofs are staged, and the
+specification obligation was accepted from day one. This reverses the original
+"no proofs" stance, and we accepted the reversal explicitly because it is the
+only thing that makes Lean *load-bearing* rather than decorative. Cost knowingly
+accepted: v1 must include a semantics. The current raw IR does not yet have the
+complete meaning function; the Lean IR foundational-formalization track delivers
+it incrementally. Every guarantee is over ℝ and stops at the IR boundary (the
+Rust/GPU compiler is trusted, not verified).
 
 ### A4. Gradients/HMC do not constrain the v1 IR
 
