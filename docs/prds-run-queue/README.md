@@ -1,8 +1,16 @@
 # Run queue
 
-**Pending:** `0001-scalar-schema-and-state-domains.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-typed-term-syntax.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-01 — raw coverage
+## Last cleared 2026-08-01 — scalar, schema and finite-state domains
+
+`0001-scalar-schema-and-state-domains` was approved and returned as
+[`prds-lean-ir-formalization/0003`](../prds-lean-ir-formalization/0003-scalar-schema-and-state-domains.md)
+in implementation commit `38a1ef1`. It established exact scalar denotation,
+owner-indexed ordered schemas, finite typed state and supplied-state boundaries
+with exact erasure, compile-fail ownership fixtures and an audited proof surface.
+
+## Earlier cleared 2026-08-01 — raw coverage
 
 `0001-raw-ir-and-plan-coverage` was approved and returned as
 [`prds-lean-ir-formalization/0002`](../prds-lean-ir-formalization/0002-raw-ir-and-plan-coverage.md)
@@ -50,7 +58,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved scalar/schema/state-domain PRD.
+Running it now executes only the approved typed-term-syntax PRD.
 
 ## How to use it
 
