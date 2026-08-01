@@ -1,6 +1,13 @@
 # Run queue
 
-**Pending:** `0001-semantic-charter-and-proof-policy.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-raw-ir-and-plan-coverage.md` from the approved Lean IR foundational formalization track.
+
+## Last cleared 2026-08-01
+
+`0001-semantic-charter-and-proof-policy` was approved and returned as
+[`prds-lean-ir-formalization/0001`](../prds-lean-ir-formalization/0001-semantic-charter-and-proof-policy.md)
+in implementation commit `e95570f`. It established the semantic charter,
+Mathlib pin, exact module map and automated proof-policy gate.
 
 ## Last cleared 2026-07-30
 
@@ -34,7 +41,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved semantic-charter and proof-policy PRD.
+Running it now executes only the approved raw IR/plan coverage PRD.
 
 ## How to use it
 

@@ -1,6 +1,6 @@
 # Lean IR foundational formalization PRDs
 
-Status: **approved; PRD 0001 enqueued**. This track makes Sembla's current V1 Lean frontend and IR reason-able through proof-complete, pathwise tau-leap semantics. It ends at the Lean-produced structural plan/export-data boundary.
+Status: **approved; PRD 0001 accepted; PRD 0002 enqueued**. This track makes Sembla's current V1 Lean frontend and IR reason-able through proof-complete, pathwise tau-leap semantics. It ends at the Lean-produced structural plan/export-data boundary.
 
 This README is binding on every numbered PRD.
 
@@ -93,8 +93,8 @@ All PRDs are serial and require every numerically earlier PRD to be accepted.
 
 | # | Increment |
 | --- | --- |
-| [0001](../prds-run-queue/0001-semantic-charter-and-proof-policy.md) | semantic charter, Mathlib, module map and proof audit — enqueued |
-| [0002](0002-raw-ir-and-plan-coverage.md) | raw IR/plan constructor coverage |
+| [0001](0001-semantic-charter-and-proof-policy.md) | semantic charter, Mathlib, module map and proof audit — accepted in `e95570f` |
+| [0002](../prds-run-queue/0001-raw-ir-and-plan-coverage.md) | raw IR/plan constructor and field coverage — enqueued |
 | [0003](0003-scalar-schema-and-state-domains.md) | scalar values, schemas and finite state domains |
 | [0004](0004-typed-term-syntax.md) | typed expressions, aggregates, effects and claims |
 | [0005](0005-declaration-and-reference-checking.md) | declaration/reference checking |
