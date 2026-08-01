@@ -1,8 +1,9 @@
-# Lean raw IR and plan coverage
+# Lean IR coverage
 
-Status: **PRD 0002 raw inventory**. This document classifies the current
-serialization-friendly declarations; it does not claim checked or behavioral
-semantics.
+Status: **PRD 0002 raw inventory plus PRD 0003 checked scalar/schema/state
+domains**. This document distinguishes serialization declarations from their
+accepted checked representations. It does not claim typed expressions,
+raw-declaration checking, supplied-state validation, or behavioral semantics.
 
 ## Exact boundary and exclusions
 
@@ -38,6 +39,33 @@ meaning/invariant owner PRD 0005 and theorem dependencies PRDs 0010 and 0016.
 Dependencies may be prerequisites or later consumers; the arrow does not imply
 numeric run order. `FC` means the explicitly deferred future composition
 formalization track. It is an owner, not a theorem claimed by the present track.
+
+## PRD 0003 checked-domain discharge
+
+The following table discharges every inventory item whose meaning owner is PRD
+0003. Definitions and theorem families live in
+[`Sembla.Semantics.Types`][checked-types] and
+[`Sembla.Semantics.State`][checked-state]; positive and checked-failure evidence
+lives in [`Sembla.Semantics.TypesTests`][checked-fixtures]. Source order and an
+explicit resolved scope identity are held in one `OrderedContext`; lookups are
+derived from that list rather than a second map.
+
+| Raw items owned by 0003 | Checked definition and invariant | Proof / fixture evidence |
+| --- | --- | --- |
+| `Scientific.coefficient`, `Scientific.exponent` | `scientificDenote` interprets `coefficient × 10^exponent` in `ℝ`; `ScientificLiteral` separately retains raw-origin syntax | `scientificDenote_equation`, `scientificDenote_congruent`, `scientific_one_eq_ten_tenth`, `ScientificLiteral.erase_exact`; fixtures preserve both `1 × 10^0` and `10 × 10^-1` |
+| `ParamType.real`, `ParamType.int`, `ParamValue.real`, `ParamValue.int`, `ParamDecl.ty`, `Model.params` | `ParamSort`, dependent `ParamLiteral`, `CheckedParamDecl`, model-global `ParamContext` and `ParameterId` | exact default/prior erasure; `ParamContext.erase_exact`, `parameterLookup_name`, `parameterLookup_unique`; real and integer fixtures |
+| `AttrType.real`, `AttrType.int`, `AttrType.enum`, `AttrType.ref`, `Attr.ty` | `AttrShape`, `EnumSchema`, `CheckedAttribute`, owner-indexed `AttributeId` and `VariantId`, and intrinsically typed `ScalarValue` | nonempty/duplicate-free ordered enums; exact `CheckedAttribute.erase_exact`; attr/enum lookup theorems; expected failures for cross-sort, cross-attr enum and cross-target references |
+| `Table.sizeHint`, `Table.attrs`, `Box.tables` | phase-one `SchemaUniverse`/`TableTarget`, phase-two `TableSchema`/`ModelSchema`, owner-indexed `RowId`, `TypedRow`, `ValidTableState` and `ValidModelState` | table/box lookup theorems; `RowId.bound`, `RowId.zero_size_elim`; exact table/schema erasure; typed projection and row/table/model reconstruction/extensionality theorems; zero/nonzero, same-name cross-box, equal-cardinality and forward/mutual-reference fixtures |
+
+`SchemaUniverse` establishes every ordered unique box/table header before
+`ModelSchema.tableSchemas` resolves attrs. This is the constructor boundary for
+forward and mutual table references. PRD 0005 remains responsible for checking
+raw declaration lists, proving uniqueness inputs, resolving raw names and
+choosing structured diagnostic precedence. `SuppliedValue`, `SuppliedRow`,
+`SuppliedTable` and `SuppliedState` deliberately admit wrong row counts, column
+layouts, scalar types, enum ordinals and reference ordinals; PRD 0011 remains
+responsible for their validation, state lookup, `invalidState` and
+`invalidReference` behavior.
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match
@@ -174,3 +202,6 @@ change.
 
 [raw-classifiers]: ../../frontend/Sembla/Semantics/Raw.lean
 [raw-fixtures]: ../../frontend/Sembla/Semantics/RawTests.lean
+[checked-types]: ../../frontend/Sembla/Semantics/Types.lean
+[checked-state]: ../../frontend/Sembla/Semantics/State.lean
+[checked-fixtures]: ../../frontend/Sembla/Semantics/TypesTests.lean
