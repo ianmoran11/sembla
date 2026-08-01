@@ -1,9 +1,10 @@
 # Lean IR coverage
 
 Status: **PRD 0002 raw inventory plus PRD 0003 checked scalar/schema/state
-domains**. This document distinguishes serialization declarations from their
-accepted checked representations. It does not claim typed expressions,
-raw-declaration checking, supplied-state validation, or behavioral semantics.
+and PRD 0004 intrinsically typed term domains**. This document distinguishes
+serialization declarations from their accepted checked representations. It does
+not claim raw-declaration checking, supplied-state validation, evaluation,
+output materialization, or behavioral semantics.
 
 ## Exact boundary and exclusions
 
@@ -66,6 +67,34 @@ choosing structured diagnostic precedence. `SuppliedValue`, `SuppliedRow`,
 layouts, scalar types, enum ordinals and reference ordinals; PRD 0011 remains
 responsible for their validation, state lookup, `invalidState` and
 `invalidReference` behavior.
+
+## PRD 0004 typed-term discharge
+
+Every expression, aggregate, effect and claim item whose meaning owner is PRD
+0004 now has an intrinsically typed representation and structural eraser in
+[`Sembla.Semantics.Syntax`][typed-syntax]. Positive constructor, erasure,
+ordering-domain and transition-payload evidence plus elaboration-failure
+boundaries live in [`Sembla.Semantics.SyntaxTests`][typed-syntax-fixtures].
+`ModelSchema`, `TableTarget`, `ParameterId`, `AttributeId` and `VariantId` remain
+the accepted PRD 0003 owners; no parallel identifier context was introduced.
+Proof-only dependent `Packed*Id` sigma views expose catalog, parameter-context,
+box, table-schema, enum and reference-target ownership when identities are
+equal.
+
+| Raw items owned by 0004 | Typed definition and invariant | Proof / fixture evidence |
+| --- | --- | --- |
+| Every `Expr` constructor | `Expr model current inputs scope sort`; `NumericSort`; explicit `Expr.intToReal`; `RowScope` table/input indices | `PackedExpr.resultSort_unique`; `packedOwner_ne_of_owner_ne`; `PackedParameterId.owner_eq_of_eq`, `PackedBoxId.catalog_eq_of_eq`, `PackedTableId.box_heq_of_eq`, and the attribute/variant/reference packed-owner theorem families; one exact-erasure fixture for all 22 constructors; same-looking cross-model/box/table/enum and Boolean/reference arithmetic failures |
+| `AggOp.count`, `AggOp.sum`, `Aggregate.mk`, `Expr.input`, `Expr.agg` | `AggOp` fixes count to Int and sum to its numeric sort; `Aggregate.unfiltered`/`filtered` preserves raw `none`/`some`; `ReferenceAttributeId` gives both join attrs one target index | `AggOp.erase_count`/`erase_sum`; `Aggregate.erase_unfiltered`/`erase_filtered`; `ReferenceAttributeId.attributeSort_eq_ref`; `Expr.relationalJoin_compatible`; a distinct-owner `events.eventRegion = self.homeRegion` erasure fixture; nonnumeric value, non-Boolean filter and incompatible-join failures |
+| `Effect.setAttr` | `Effect.setAttr` indexes its value by the exact destination `attributeSort` | `Effect.erase_setAttr`; exact erasure fixture; wrong-destination-sort failure |
+| `ClaimOrdering.raceTime`, `ClaimOrdering.key`; both `ResourceClaim` fields | `OrderingDomain` admits only Real, Int and owner-indexed enum; `OrderingAvailability` distinguishes surface-produced race time from raw-checkable keys; `ResourceClaim.resource` is indexed by `.ref resourceTarget` | ordering-domain exclusion theorems; `surface_domain_real`, `raw_checkable_is_key`; race/Real/Int/enum erasure fixtures; non-reference resource and Boolean/reference key failures |
+| `Transition.guard`, `Transition.hazard`, `Transition.effects` | `TransitionTerms` fixes guard to Boolean, hazard to Real and preserves effect/claim list order without assembling deferred raw name/table fields | `eraseGuard_exact`, `eraseHazard_exact`, `eraseEffects_eq_map`, `eraseClaims_eq_map`; transition projection fixtures; non-Boolean guard and non-Real hazard failures |
+
+Inserted coercions erase transparently through `Expr.erase_intToReal`; raw Real
+literals use `ScientificLiteral` and therefore retain `IR.Scientific` coefficient
+and exponent exactly. All other non-coercion constructors have named structural
+erasure equations in `Syntax.lean`. Output fields/builders and snapshot values
+remain assigned to PRD 0012, and transition-name/table assembly, checking,
+evaluation, claim compatibility and winner selection remain later work.
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match
@@ -205,3 +234,5 @@ change.
 [checked-types]: ../../frontend/Sembla/Semantics/Types.lean
 [checked-state]: ../../frontend/Sembla/Semantics/State.lean
 [checked-fixtures]: ../../frontend/Sembla/Semantics/TypesTests.lean
+[typed-syntax]: ../../frontend/Sembla/Semantics/Syntax.lean
+[typed-syntax-fixtures]: ../../frontend/Sembla/Semantics/SyntaxTests.lean
