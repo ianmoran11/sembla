@@ -5,6 +5,21 @@ frontend_root="$(cd "$(dirname "$0")/.." && pwd)"
 temporary_root="$(mktemp -d "${TMPDIR:-/tmp}/sembla-proof-audit.XXXXXX")"
 escape_source=""
 escape_module_leaf=""
+audit_lock="$frontend_root/.lake/sembla-proof-audit.lock"
+audit_lock_owned=""
+
+# The namespace-escape self-test briefly adds a synthetic module beneath
+# `Sembla/`. Concurrent audits would discover or remove each other's module, so
+# reject overlapping runs before either can report a misleading proof failure.
+mkdir -p "$frontend_root/.lake"
+if ! mkdir "$audit_lock" 2>/dev/null; then
+  echo "another Lean proof audit is already using this worktree: $audit_lock" >&2
+  echo "if no audit is running, remove the stale lock directory and retry" >&2
+  rm -rf "$temporary_root"
+  exit 2
+fi
+audit_lock_owned=1
+printf '%s\n' "$$" > "$audit_lock/pid"
 
 cleanup_escape_artifacts() {
   if [[ -n "$escape_source" ]]; then
@@ -19,8 +34,14 @@ cleanup_escape_artifacts() {
 cleanup() {
   cleanup_escape_artifacts
   rm -rf "$temporary_root"
+  if [[ -n "$audit_lock_owned" ]]; then
+    rm -rf "$audit_lock"
+  fi
 }
 trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 existing_proof_sources=(
   "$frontend_root"/Sembla/Lumping*.lean

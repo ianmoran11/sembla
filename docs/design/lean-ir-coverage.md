@@ -34,9 +34,10 @@ The two classification axes are independent:
   input.
 
 An entry such as `dt (S/CR/0005 → 0010,0016)` means role `S`, status `CR`,
-meaning/invariant owner PRD 0005 and later theorem dependencies PRDs 0010 and
-0016. `FC` means the explicitly deferred future composition formalization
-track. It is an owner, not a theorem claimed by the present track.
+meaning/invariant owner PRD 0005 and theorem dependencies PRDs 0010 and 0016.
+Dependencies may be prerequisites or later consumers; the arrow does not imply
+numeric run order. `FC` means the explicitly deferred future composition
+formalization track. It is an owner, not a theorem claimed by the present track.
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match
@@ -57,14 +58,14 @@ constructor arity changes fail compilation. Every function is exercised by
 | `AggOp` | `count`, `sum` (S/SP/0004 → 0006,0012) | `classifyAggOpConstructor`; `aggregateVariants` |
 | `Aggregate` | `mk` (S/SP/0004 → 0006,0012) | `classifyAggregateConstructor`; `aggregateVariants` |
 | `Effect` | `setAttr` (S/SP/0004 → 0006,0016) | `classifyEffectConstructor`; `transitionFixture` |
-| `ClaimOrdering` | `raceTime`, `key` (S/SP/0004 → 0006,0015) | `classifyClaimOrderingConstructor`; `claimOrderingVariants` |
+| `ClaimOrdering` | `raceTime` (S/SP/0004 → 0006,0015); `key` (S/RO/0004 → 0006,0015) | `classifyClaimOrderingConstructor`; `claimOrderingVariants` |
 | `OutputBuilder` | `perTable` (O/SP/0012 → 0005,0006,0009) | `classifyOutputBuilderConstructor`; `outputFixture` |
 | `ViewReduce` | `sum`, `count` (O/SP/0013 → 0005,0006); `min`, `max` (O/SP/0013 → 0005,0006,0017) | `classifyViewReduceConstructor`; `viewFixtures` |
 | `SummaryReduce` | `sum`, `min`, `max`, `last`, `argmaxTick` (O/SP/0013 → 0017) | `classifySummaryReduceConstructor`; `summaryFixtures` |
 
 ## `Sembla.IR` structure fields
 
-| Declaration | Every field: role/status/meaning owner → later dependencies | Guard / fixture |
+| Declaration | Every field: role/status/meaning owner → theorem dependencies | Guard / fixture |
 | --- | --- | --- |
 | `Scientific` | `coefficient`, `exponent` (S/SP/0003 → 0010,0020) | `classifyScientificFields`; `rawModelFixture` |
 | `Prior` | `family` (S/SP/0005 → 0007); `args` (S/CR/0005 → 0007) | `classifyPriorFields`; `parameterFixtures` |
@@ -121,7 +122,7 @@ All source-map fields are `P/DC/FC`.
 
 ## Plan inventory
 
-| Declaration | Constructors or fields: role/status/meaning owner → later dependencies | Guard / fixture |
+| Declaration | Constructors or fields: role/status/meaning owner → theorem dependencies | Guard / fixture |
 | --- | --- | --- |
 | `PlanOrigin` | `linked`, `directStable` (T/RO/0019 → 0020) | `classifyPlanOriginConstructor`; linked/direct plan fixtures |
 | `HashRecordV1` | `algorithm`, `domain`, `digest` (P/RO/0020) | `classifyHashRecordFields`; `hashFixture` |

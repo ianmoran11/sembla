@@ -1,8 +1,17 @@
 # Run queue
 
-**Pending:** `0001-raw-ir-and-plan-coverage.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-scalar-schema-and-state-domains.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-01
+## Last cleared 2026-08-01 — raw coverage
+
+`0001-raw-ir-and-plan-coverage` was approved and returned as
+[`prds-lean-ir-formalization/0002`](../prds-lean-ir-formalization/0002-raw-ir-and-plan-coverage.md)
+in implementation commit `837360e`. It established exhaustive coverage for 55
+constructors and 163 fields without changing the raw contract. A follow-up
+corrected `ClaimOrdering.key` from surface-produced to raw-only accepted, in
+line with the existing DSL boundary and PRD 0004.
+
+## Earlier cleared 2026-08-01 — charter and proof policy
 
 `0001-semantic-charter-and-proof-policy` was approved and returned as
 [`prds-lean-ir-formalization/0001`](../prds-lean-ir-formalization/0001-semantic-charter-and-proof-policy.md)
@@ -41,7 +50,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved raw IR/plan coverage PRD.
+Running it now executes only the approved scalar/schema/state-domain PRD.
 
 ## How to use it
 
@@ -54,8 +63,11 @@ Each PRD keeps naming the README that binds it, and that stays the binding
 context. Status notes and evidence go to the real folders per each PRD's
 allowed-file list. When a PRD is approved, move it back.
 
-The authority on what should be queued is the work queue in
-[`docs/performance/model.md`](../performance/model.md#work-queue).
+This directory only orders work that an authoritative track has already
+approved. Performance work is authorized and ordered by the work queue in
+[`docs/performance/model.md`](../performance/model.md#work-queue); other work
+requires explicit approval in its binding track README and must agree with the
+canonical [`ROADMAP.md`](../ROADMAP.md).
 
 ## Last cleared 2026-07-28
 
@@ -67,9 +79,13 @@ Three PRDs ran from here and all landed:
 | device observation, grouped | `prds-device-observation/0002` |
 | generalise the tiling constants | `prds-evaluator-throughput/0008` |
 
-## What is next is not a PRD
+## Historical 2026-07-28 paid-session note
 
-A single Hyperstack session, which three things now wait on:
+The following was the queue state after the 2026-07-28 clear and is retained as
+a workflow record; later performance decisions and evidence supersede its
+pending-status claims.
+
+A single Hyperstack session, which three things then waited on:
 
 - `prds-device-observation/0001` and `0002` have **never been compiled** with
   `--features cuda`; their §J14.2 hardware criteria are pending.

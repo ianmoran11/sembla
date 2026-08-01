@@ -53,18 +53,18 @@ structure ItemCoverage where
   role : FoundationalRole
   frontendStatus : FrontendStatus
   meaningOwner : MeaningOwner
-  laterTheoremDependencies : List Nat
+  theoremDependencies : List Nat
 deriving Repr, BEq
 
 private def covered (item : String) (role : FoundationalRole)
     (frontendStatus : FrontendStatus) (meaningOwner : MeaningOwner)
-    (laterTheoremDependencies : List Nat := []) : ItemCoverage :=
+    (theoremDependencies : List Nat := []) : ItemCoverage :=
   { item
     rawInventoryOwner := 2
     role
     frontendStatus
     meaningOwner
-    laterTheoremDependencies }
+    theoremDependencies }
 
 /-! ## `Sembla.IR` inductive-constructor classifiers -/
 
@@ -123,7 +123,7 @@ def classifyEffectConstructor : IR.Effect → ItemCoverage
 
 def classifyClaimOrderingConstructor : IR.ClaimOrdering → ItemCoverage
   | .raceTime => covered "IR.ClaimOrdering.raceTime" .semantic .surfaceProduced .prd0004 [6, 15]
-  | .key _ => covered "IR.ClaimOrdering.key" .semantic .surfaceProduced .prd0004 [6, 15]
+  | .key _ => covered "IR.ClaimOrdering.key" .semantic .rawOnlyAccepted .prd0004 [6, 15]
 
 def classifyOutputBuilderConstructor : IR.OutputBuilder → ItemCoverage
   | .perTable _ _ => covered "IR.OutputBuilder.perTable" .observational .surfaceProduced .prd0012 [5, 6, 9]
