@@ -42,6 +42,12 @@ Mathlib supplies mathematical reals, finite structures, and proof
 infrastructure in the new checked/semantic layers; it does not replace the raw
 wire-oriented structures.
 
+The exhaustive raw declaration inventory, its independent role/checking-status
+classifications, compile-time constructor/field guards and computed fixtures
+are recorded in [`lean-ir-coverage.md`](lean-ir-coverage.md). That PRD 0002
+evidence establishes coverage only; the checked and pathwise definitions named
+below remain later deliverables.
+
 ## Distinct layers and failures
 
 These categories must not be collapsed:

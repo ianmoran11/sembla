@@ -1,5 +1,6 @@
 import Sembla.IR
 import Sembla.Semantics
+import Sembla.Semantics.RawTests
 import Sembla.Frontend.Builders
 import Sembla.Json
 import Sembla.Hash
