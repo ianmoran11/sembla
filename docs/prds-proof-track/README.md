@@ -34,6 +34,13 @@ Overclaiming is a review-rejection offense in this repository
 (`docs/archive/assessments/sembla-assessment-2026-07-18.md` lists the proof gap as risk #1 precisely because
 claims outran proofs elsewhere).
 
+The approved successor track is
+[`docs/prds-lean-ir-formalization/`](../prds-lean-ir-formalization/README.md).
+Its PRD 0018 is intended to close target 1b after the foundational evaluator
+exists. Target 1b remains open until that PRD is implemented and accepted. The
+successor is a separate track and may use Mathlib; that does not amend this
+completed track's no-new-dependency constraint.
+
 ## Run order
 
 | # | PRD | Layer |

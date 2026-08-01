@@ -11,6 +11,7 @@ The executable pending-work source is [`../prds-run-queue/README.md`](../prds-ru
 | [`prds-composition-integration/`](../prds-composition-integration/README.md) | plan execution, comparison, CUDA, and widgets |
 | [`prds-surface-syntax/`](../prds-surface-syntax/README.md) | mathematical Lean surface language |
 | [`prds-proof-track/`](../prds-proof-track/README.md) | initial Lean proof work |
+| [`prds-lean-ir-formalization/`](../prds-lean-ir-formalization/README.md) | approved proof-complete Lean frontend and V1 IR semantics track |
 | [`prds-npe-path/`](../prds-npe-path/README.md) | neural posterior estimation workflow |
 | [`prds-demographic-slots/`](../prds-demographic-slots/README.md) | demographic fixed-slot model, state artifacts, and grouped observations |
 | [`prds-precision-spike/`](../prds-precision-spike/README.md) | GPU precision decision evidence |

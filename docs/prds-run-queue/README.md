@@ -1,6 +1,6 @@
 # Run queue
 
-**Empty.** Nothing is pending.
+**Pending:** `0001-semantic-charter-and-proof-policy.md` from the approved Lean IR foundational formalization track.
 
 ## Last cleared 2026-07-30
 
@@ -34,7 +34,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now would do nothing.
+Running it now executes only the approved semantic-charter and proof-policy PRD.
 
 ## How to use it
 

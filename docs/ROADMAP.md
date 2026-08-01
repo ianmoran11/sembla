@@ -93,6 +93,12 @@ The next useful formal target is a complete executable, pathwise Lean semantics 
 
 This does not require immediate verification of Rust or CUDA. A Lean semantic oracle plus phase-level differential testing and plan certificates would already make transformations substantially safer.
 
+The approved implementation sequence is documented in the
+[Lean IR formalization PRD track](prds-lean-ir-formalization/README.md). It
+establishes a proof-complete pathwise V1 foundation before beginning
+composition preservation; Rust/runtime refinement is explicitly outside that
+track.
+
 ### 6. Stabilise compatibility before a 1.0 guarantee
 
 Before claiming a stable public contract, define:
