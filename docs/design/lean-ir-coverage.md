@@ -93,9 +93,11 @@ equal.
 Inserted coercions erase transparently through `Expr.erase_intToReal`; raw Real
 literals use `ScientificLiteral` and therefore retain `IR.Scientific` coefficient
 and exponent exactly. All other non-coercion constructors have named structural
-erasure equations in `Syntax.lean`. Output fields/builders and snapshot values
-remain assigned to PRD 0012, and transition-name/table assembly, checking,
-evaluation, claim compatibility and winner selection remain later work.
+erasure equations in `Syntax.lean`. The exhaustive classifier retains PRD 0012
+as the primary observation meaning owner for output fields/builders and snapshot
+values; approved PRD 0006 separately owns their static checked declarations.
+Transition-name/table assembly, checking, evaluation, actual-claimant
+compatibility and winner selection remain later work.
 
 ## PRD 0005 declaration-checking discharge
 
@@ -115,10 +117,31 @@ exact `DeclarationProjection` erasure. Evidence is executable in
 | Transition headers | `resolveTransitionTarget`, `checkedTransition_target_name` | successful resolved target and unresolved-target category/path |
 | Checker correspondence and fidelity | `firstDeclarationError_none_iff`, `checkDeclarations_sound`, `checkDeclarations_complete`, `checkDeclarations_failure_iff`, `checkDeclarations_erases_exact` | positive checker existence, exact projection equality and every stable category/path family |
 
-Output names and schemas are shallow declaration obligations here; output
-builders and output meaning remain PRD 0012. View/grouped-view and summary names
-are shallow catalogs here; their targets, expressions, reductions and meaning
-remain PRDs 0013/0017. Wires and whole-model term checking remain deferred.
+Output names and schemas are shallow declaration obligations here. The
+exhaustive raw inventory retains output meaning under PRD 0012 and
+view/grouped-view/summary meaning under PRDs 0013/0017; approved PRD 0006 owns
+the intervening static checked declarations without changing those primary
+meaning-owner classifiers. Wires and whole-model term checking remain deferred.
+
+## Approved PRD 0006 static-checking boundary
+
+The exhaustive `Raw.lean` classifiers below record each raw item's primary
+meaning/invariant owner and remain unchanged. The following orthogonal discharge
+records the model-local static obligations approved for PRD 0006 so static
+checking is not confused with later denotation:
+
+| Static family | PRD 0006 checked obligation | Later meaning owner |
+| --- | --- | --- |
+| Expressions/aggregates | Bidirectional elaboration, owner resolution, canonical coercions and exact erasure; no nested input/relational aggregate inside an input-aggregate filter or sum value | PRDs 0010–0012 |
+| Transitions/claims | Guard/hazard/effect typing, duplicate claim rejection, syntactic Ref-write RHS coverage and retained individual ordering domains | PRDs 0014–0016; actual-claimant compatibility PRD 0015 |
+| Output fields/builders | Builder table resolution, ordered field/schema correspondence, Boolean filters and count/sum result sorts | Values/traversal/materialization PRD 0012 |
+| Ordinary/grouped views | Table/key resolution, reducer/value and filter typing, V1 key/band shape and exact source order | Denotation/grouping PRDs 0013/0018 |
+| Summaries | Box and ordinary-view target resolution plus exact reducer retention | Fold/error behavior PRDs 0013/0017 |
+| Wires | No static discharge in PRD 0006; preserve structurally exactly and in source order | `WiresWellFormed` and plan structure PRD 0019 |
+
+PRD 0006 acceptance replaces each pending entry here with checked definitions,
+theorems and constructor/category/path fixture links. It must not edit the
+accepted raw classifier metadata merely to express this orthogonal layer.
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match

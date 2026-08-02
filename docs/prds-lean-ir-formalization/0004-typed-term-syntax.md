@@ -14,9 +14,13 @@ the concrete `ModelSchema`, owner-indexed table schemas, finite identifiers and
 `ScalarSort`/`ScalarValue` families that this PRD must use rather than replacing
 with parallel contexts.
 
-This PRD owns syntax-level input and aggregate signatures only. PRD 0012 owns
-input-snapshot values and traversal, output fields/builders and output
-materialization.
+This PRD owns syntax-level input and aggregate signatures only. A
+post-acceptance ownership clarification assigns static resolved checked
+output-field/builder declarations to PRD 0006, because PRD 0009 must prove its
+observation builders are accepted by that checker. PRD 0012 continues to own
+input-snapshot values and traversal, output values and materialization. This
+clarification does not change the accepted PRD 0004 implementation or move any
+evaluation behavior earlier.
 
 ## Goal
 
@@ -113,7 +117,8 @@ Boolean/reference claim keys.
 - Evaluation, supplied-state validation or semantic errors.
 - Input-snapshot values, row traversal or wire delivery.
 - `IR.OutputField`/`IR.OutputBuilder` checked declarations or output
-  materialization; PRD 0012 owns them.
+  materialization; PRD 0006 owns their static checked declarations and PRD 0012
+  owns their traversal, values and materialization.
 - Views or summaries as executable observations.
 - Claim-set compatibility, contest winner algorithms or effect commit semantics.
 
@@ -136,7 +141,8 @@ Run at least:
 
 1. Every syntax/meaning item assigned owner PRD 0004 in
    `docs/design/lean-ir-coverage.md` has typed syntax, exact erasure and linked
-   fixture/theorem evidence; output fields/builders remain assigned to PRD 0012.
+   fixture/theorem evidence; output fields/builders remain outside this PRD and
+   are split between PRD 0006 static checking and PRD 0012 evaluation.
 2. Expressions, aggregates, transition-term fields, effects and claims use the
    accepted PRD 0003 schema/identifier domains with the indices required above.
 3. Every owned raw constructor erases exactly; raw scientific encodings and

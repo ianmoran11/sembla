@@ -91,6 +91,12 @@ The following decisions are frozen for this track:
 - Prove structural plan/export-data correctness only through Lean-produced data;
   byte encoders, hash primitives, and downstream implementation refinement are
   excluded.
+- PRD 0006 owns static resolved checked declarations for outputs, ordinary views,
+  grouped views and summaries. PRDs 0012–0013 retain their values, traversal,
+  materialization, fold behavior and executable denotation.
+- PRD 0006 preserves raw wires exactly without validating them. PRD 0019 owns
+  endpoint, direction, schema and fan-in structural validity; executable delivery
+  remains outside the foundational checker.
 
 These choices reconcile the raw deep embedding described in
 [`DESIGN.md` §4.5](../../DESIGN.md#45-meaning-the-lean-layer), the CTMC/tau-leap
@@ -116,13 +122,13 @@ not claim the future Lean semantics already exists.
 | Evaluation errors | Evaluate subterms left-to-right and return the first explicit error. Checked names/types are total; dynamic division by zero and invalid supplied state/reference data are errors. | The order and mathematical error behavior are a new Lean contract. The current Rust evaluator is syntax-tree ordered but intentionally uses binary64 division behavior in [`eval.rs`](../../crates/sembla-runtime/src/eval.rs); no refinement theorem is claimed. |
 | Priors | Defaults must match parameter type. Integer parameters have no prior. Current prior metadata is checked structurally for family, exactly two exact arguments, and ordered Uniform bounds; it has no sampling denotation in this pathwise execution track. | Raw parameter/prior metadata is in [`Sembla.IR`](../../frontend/Sembla/IR.lean). Declaration checking and builder preservation belong to PRDs 0005 and 0007. |
 | Empty reductions | `count = 0`, numeric `sum = 0`, and grouping an empty input yields no groups. Empty `min`, `max`, `last` and `argmaxTick` produce `emptyReduction` semantic errors. | Raw observation forms are in [`Sembla.IR`](../../frontend/Sembla/IR.lean). Aggregate, observation, summary, and trace behavior belongs to PRDs 0012, 0013, and 0017. |
-| Hazards | Guards are evaluated before hazards. Zero hazard does not fire; negative dynamic hazard is an explicit error; positive hazard uses mathematical race time `-log(u)/h` for `0 < u < 1`; firing requires strict `raceTime < dt`. | Hazard-rate and frozen-rate semantics are normative in [`DESIGN.md` §4.3](../../DESIGN.md#43-time-and-stochastics-hazard-rates-and-racing-clocks) and [`DECISIONS.md` §§C2–C5](../../DECISIONS.md#c2-hazard-rates-not-per-tick-probabilities). PRD 0014 owns the Lean definition. |
+| Hazards | Guards are evaluated before hazards. Static checking requires a Real hazard but does not inspect its sign. Zero hazard does not fire; negative dynamic hazard, including a negative literal, is an explicit error; positive hazard uses mathematical race time `-log(u)/h` for `0 < u < 1`; firing requires strict `raceTime < dt`. | Hazard-rate and frozen-rate semantics are normative in [`DESIGN.md` §4.3](../../DESIGN.md#43-time-and-stochastics-hazard-rates-and-racing-clocks) and [`DECISIONS.md` §§C2–C5](../../DECISIONS.md#c2-hazard-rates-not-per-tick-probabilities). PRD 0006 checks only the Real sort; PRD 0014 owns sign-dependent behavior. |
 | Draw identity | Coordinates are semantic identities `(tick, transition identity, row identity, draw index)`, not mutable stream positions or dense runtime ordinals. | Coordinate-addressed randomness is required by [`DESIGN.md` §4.2](../../DESIGN.md#42-state-transitions-and-aggregates) and the accepted Philox identity decision in [`DECISIONS.md` §J4](../../DECISIONS.md#j4-rng-strategy-doc-open-question-2-resolved). PRD 0014 owns the abstract oracle. |
-| Contests | Lower race/key value wins; stable transition/row identity breaks ties. Claim-ordering domains must agree for a resource. Each resource chooses one winner independently; a candidate fires iff it wins every claim. Crossed multi-resource contests may defer all candidates. Losers commit no effects. | Resource conflict semantics are fixed by [`DESIGN.md` §5.1](../../DESIGN.md#51-resource-conflicts) and represented in the current IR/runtime boundary. PRD 0015 owns the pathwise winner relation. |
-| Writes | Effects read the pre-tick snapshot. Accepted writes commit simultaneously. A conflicting accepted write set is an explicit semantic error rather than list-order resolution. | Uniform read-old/write-new is normative in [`DECISIONS.md` §C5](../../DECISIONS.md#c5-no-within-tick-cascades-uniform-one-tick-delay); the current staging order is visible in [`executor.rs`](../../crates/sembla-runtime/src/executor.rs). PRD 0016 owns the Lean tick. |
+| Contests | Lower race/key value wins; stable transition/row identity breaks ties. Static checking validates each claim and retains its Real/Int/enum ordering domain but does not require all possible claims to agree. PRD 0015 checks domain agreement only among actual claimants for one evaluated resource. Each resource chooses one winner independently; a candidate fires iff it wins every claim. Crossed multi-resource contests may defer all candidates. Losers commit no effects. | Resource conflict semantics are fixed by [`DESIGN.md` §5.1](../../DESIGN.md#51-resource-conflicts). PRD 0006 owns individual claim typing; PRD 0015 owns actual-resource compatibility and the pathwise winner relation. |
+| Writes | Effects read the pre-tick snapshot. Raw checking requires every Ref-destination effect to have a claim whose resource expression is structurally equal to that effect's raw RHS; duplicate claim resources within one transition are rejected. Accepted writes commit simultaneously. A conflicting accepted write set is an explicit semantic error rather than list-order resolution. | The static Ref-write coverage rule matches [`DESIGN.md` §5.1](../../DESIGN.md#51-resource-conflicts) and the current V1 validator. Uniform read-old/write-new is normative in [`DECISIONS.md` §C5](../../DECISIONS.md#c5-no-within-tick-cascades-uniform-one-tick-delay); PRD 0016 owns commit behavior. |
 | Execution inputs | A finite run receives a tick-indexed provider `Nat → InputSnapshot`; non-composed callers may supply a constant provider. Each atomic tick consumes exactly its indexed snapshot. | This is the external semantic input boundary. It must not be confused with composition delivery, whose ordinary wires materialize the next tick's input under [`DESIGN.md` §4.4](../../DESIGN.md#44-composition-an-operad-with-tables-on-the-wires). |
-| Observations | Outputs/views/grouped views are evaluated from the successfully committed state and are sinks: they do not mutate state or consult draws. If post-commit observation fails, the trace retains that committed state and all prior events, records the observation-phase error, emits no value for the failed observation, and terminates. Summaries fold completed observation values; an invalid empty summary retains the initial/last committed state under the same rule. | [`DESIGN.md` §4.6](../../DESIGN.md#46-observation-a-sink-never-a-feedback-path) fixes prefix noninterference: the transition/draw kernel and every common completed prefix are unchanged, while an explicit post-commit observation error may terminate trace production without rollback. The current executor also observes only after commit in [`executor.rs`](../../crates/sembla-runtime/src/executor.rs). |
-| Raw checking | Raw-to-checked elaboration does not canonicalize. Erasing a successful checked model returns the original semantic raw structure exactly. Plan normalization is owned by PRDs 0019–0020. | The raw source is [`Sembla.IR`](../../frontend/Sembla/IR.lean). PRD 0005 proves exact declaration-projection erasure; whole-model exact erasure remains PRD 0006, while plan validity and identity normalization remain separate in PRDs 0019–0020. |
+| Observations | PRD 0006 statically resolves and types output/view/grouped-view/summary declarations; PRDs 0012–0013 own their values and meaning. Outputs/views/grouped views are evaluated from the successfully committed state and are sinks: they do not mutate state or consult draws. If post-commit observation fails, the trace retains that committed state and all prior events, records the observation-phase error, emits no value for the failed observation, and terminates. Summaries fold completed observation values; an invalid empty summary retains the initial/last committed state under the same rule. | [`DESIGN.md` §4.6](../../DESIGN.md#46-observation-a-sink-never-a-feedback-path) fixes prefix noninterference. PRD 0006 owns only static checked declarations; PRDs 0012–0013 and 0017 own evaluation and error behavior. |
+| Raw checking | Raw-to-checked elaboration does not canonicalize. Erasing a successful checked model returns the original semantic raw structure exactly. PRD 0006 excludes wire validity and preserves the raw wire list unchanged; PRD 0019 owns structural wire validation. Plan normalization is owned by PRDs 0019–0020. | The raw source is [`Sembla.IR`](../../frontend/Sembla/IR.lean). PRD 0005 proves exact declaration-projection erasure; PRD 0006 owns reconstructive whole-model exact erasure for its checked fragment; PRDs 0019–0020 own wire/plan validity and identity normalization. |
 | Composition handoff | Outputs materialize from post-commit state, wires deliver at the next tick, one output may fan out, each input has at most one source, an unwired input is an empty table, and feedback is allowed only through the one-tick delay. Later source/flat preservation uses the existing full pathwise observation fields and states boundary refactoring modulo an explicit identity bijection where literal identities change. | Uniform delay is normative in [`DESIGN.md` §4.4](../../DESIGN.md#44-composition-an-operad-with-tables-on-the-wires), and the full observation quotient is fixed by [`DECISIONS.md` §J13](../../DECISIONS.md#j13-observation-quotient-and-proof-obligations-2026-07). PRD 0021 records only the future handoff. |
 
 ## Accepted declaration-checking boundary
@@ -155,6 +161,25 @@ and whole-model term checking. `checkDeclarations_sound`,
 `checkDeclarations_erases_exact` connect the checker to the independent
 judgment and projection. Exact comparisons use `ℚ`/integer arithmetic only;
 there is no `Float` normalization boundary.
+
+## Approved term/model-checking boundary
+
+PRD 0006 is approved to add the next static layer on top of that declaration
+context. It owns bidirectional term elaboration, checked transitions and static
+resolved declarations for outputs, ordinary views, grouped views and summaries.
+It must reconstruct those payloads during whole-model erasure rather than return
+the retained raw source. Evaluation, observation values and folds remain PRDs
+0010–0017.
+
+The model checker validates each claim independently and retains its ordering
+domain. It rejects duplicate resources within one transition and requires a Ref
+write's raw RHS to be structurally matched by a claim resource. Compatibility
+between actual claimants is dynamic PRD 0015 work. A negative Real hazard is
+statically well typed and remains PRD 0014's explicit dynamic error.
+
+Wires are outside `ModelWellFormed`: PRD 0006 copies the raw wire list exactly and
+PRD 0019 later establishes endpoint, direction, schema and fan-in validity. This
+is structural deferral, not composition behavior.
 
 ## Exact module map for PRDs 0002–0021
 

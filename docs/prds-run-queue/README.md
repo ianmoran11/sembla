@@ -1,8 +1,17 @@
 # Run queue
 
-**Pending:** `0001-declaration-and-reference-checking.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-term-and-model-checking.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-01 — typed term syntax
+## Last cleared 2026-08-02 — declaration and reference checking
+
+`0001-declaration-and-reference-checking` was approved and returned as
+[`prds-lean-ir-formalization/0005`](../prds-lean-ir-formalization/0005-declaration-and-reference-checking.md)
+in implementation commit `8f22eb1`. It established exact declaration checking,
+source-derived owner-indexed contexts, independent structural judgments,
+structured failures, lookup fidelity, exact projection erasure and complete
+positive/negative fixture families.
+
+## Earlier cleared 2026-08-01 — typed term syntax
 
 `0001-typed-term-syntax` was approved and returned as
 [`prds-lean-ir-formalization/0004`](../prds-lean-ir-formalization/0004-typed-term-syntax.md)
@@ -67,7 +76,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved declaration-and-reference-checking PRD.
+Running it now executes only the approved term-and-model-checking PRD.
 
 ## How to use it
 

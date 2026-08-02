@@ -1,6 +1,6 @@
 # Lean IR foundational formalization PRDs
 
-Status: **approved; PRDs 0001–0004 accepted; PRD 0005 enqueued**. This track makes Sembla's current V1 Lean frontend and IR reason-able through proof-complete, pathwise tau-leap semantics. It ends at the Lean-produced structural plan/export-data boundary.
+Status: **approved; PRDs 0001–0005 accepted; PRD 0006 enqueued**. This track makes Sembla's current V1 Lean frontend and IR reason-able through proof-complete, pathwise tau-leap semantics. It ends at the Lean-produced structural plan/export-data boundary.
 
 This README is binding on every numbered PRD.
 
@@ -34,6 +34,12 @@ The claim does **not** include ideal CTMC/probability-law semantics, Lean macro 
 - Represent dynamically invalid operations as explicit semantic errors.
 - Land proof-complete increments; later theorem families remain future work rather than opaque propositions in the trusted base.
 - Prove structural plan/export-data correctness but not byte-level encoding or downstream implementation refinement.
+- PRD 0006 owns static resolved checked declarations for outputs, ordinary views,
+  grouped views and summaries. PRDs 0012–0013 retain their values, traversal,
+  materialization, fold behavior and executable denotation.
+- PRD 0006 preserves raw wires exactly without validating them. PRD 0019 owns
+  endpoint, direction, schema and fan-in structural validity; executable delivery
+  remains outside this foundational checker.
 
 Changing these decisions requires an explicit README/decision amendment before an affected PRD is enqueued.
 
@@ -51,13 +57,13 @@ PRD 0001 must copy this table into the maintained semantic charter and reconcile
 | Evaluation errors | Evaluate subterms left-to-right and return the first explicit error. Checked names/types are total; dynamic division by zero and invalid supplied state/reference data are errors. |
 | Priors | Defaults must match parameter type. Integer parameters have no prior. Current prior metadata is checked structurally for family, exactly two exact arguments, and ordered Uniform bounds; it has no sampling denotation in this pathwise execution track. |
 | Empty reductions | `count = 0`, numeric `sum = 0`, and grouping an empty input yields no groups. Empty `min`, `max`, `last` and `argmaxTick` produce `emptyReduction` semantic errors. |
-| Hazards | Guards are evaluated before hazards. Zero hazard does not fire; negative dynamic hazard is an explicit error; positive hazard uses mathematical race time `-log(u)/h` for `0 < u < 1`; firing requires strict `raceTime < dt`. |
+| Hazards | Guards are evaluated before hazards. Static checking requires a Real hazard but does not inspect its sign. Zero hazard does not fire; negative dynamic hazard, including a negative literal, is an explicit error; positive hazard uses mathematical race time `-log(u)/h` for `0 < u < 1`; firing requires strict `raceTime < dt`. |
 | Draw identity | Coordinates are semantic identities `(tick, transition identity, row identity, draw index)`, not mutable stream positions or dense runtime ordinals. |
-| Contests | Lower race/key value wins; stable transition/row identity breaks ties. Claim-ordering domains must agree for a resource. Each resource chooses one winner independently; a candidate fires iff it wins every claim. Crossed multi-resource contests may defer all candidates. Losers commit no effects. |
-| Writes | Effects read the pre-tick snapshot. Accepted writes commit simultaneously. A conflicting accepted write set is an explicit semantic error rather than list-order resolution. |
+| Contests | Lower race/key value wins; stable transition/row identity breaks ties. Static checking validates each claim and retains its Real/Int/enum ordering domain but does not require all possible claims to agree. PRD 0015 checks domain agreement only among actual claimants for one evaluated resource. Each resource chooses one winner independently; a candidate fires iff it wins every claim. Crossed multi-resource contests may defer all candidates. Losers commit no effects. |
+| Writes | Effects read the pre-tick snapshot. Raw checking requires every Ref-destination effect to have a claim whose resource expression is structurally equal to that effect's raw RHS; duplicate claim resources within one transition are rejected. Accepted writes commit simultaneously. A conflicting accepted write set is an explicit semantic error rather than list-order resolution. |
 | Execution inputs | A finite run receives a tick-indexed provider `Nat → InputSnapshot`; non-composed callers may supply a constant provider. Each atomic tick consumes exactly its indexed snapshot. |
-| Observations | Outputs/views/grouped views are evaluated from the successfully committed state and are sinks: they do not mutate state or consult draws. If post-commit observation fails, the trace retains that committed state and all prior events, records the observation-phase error, emits no value for the failed observation, and terminates. Summaries fold completed observation values; an invalid empty summary retains the initial/last committed state under the same rule. |
-| Raw checking | Raw-to-checked elaboration does not canonicalize. Erasing a successful checked model returns the original semantic raw structure exactly. Plan normalization is owned by PRDs 0019–0020. |
+| Observations | PRD 0006 statically resolves and types output/view/grouped-view/summary declarations; PRDs 0012–0013 own their values and meaning. Outputs/views/grouped views are evaluated from the successfully committed state and are sinks: they do not mutate state or consult draws. If post-commit observation fails, the trace retains that committed state and all prior events, records the observation-phase error, emits no value for the failed observation, and terminates. Summaries fold completed observation values; an invalid empty summary retains the initial/last committed state under the same rule. |
+| Raw checking | Raw-to-checked elaboration does not canonicalize. Erasing a successful checked model returns the original semantic raw structure exactly. PRD 0006 excludes wire validity and preserves the raw wire list unchanged; PRD 0019 owns structural wire validation. Plan normalization is owned by PRDs 0019–0020. |
 | Composition handoff | Outputs materialize from post-commit state, wires deliver at the next tick, one output may fan out, each input has at most one source, an unwired input is an empty table, and feedback is allowed only through the one-tick delay. Later source/flat preservation uses the existing full pathwise observation fields and states boundary refactoring modulo an explicit identity bijection where literal identities change. |
 
 A conflict between this table and an accepted maintained decision is a stop condition for PRD 0001, not permission to guess.
@@ -98,8 +104,8 @@ All PRDs are serial and require every numerically earlier PRD to be accepted.
 | [0002](0002-raw-ir-and-plan-coverage.md) | raw IR/plan constructor and field coverage — accepted in `837360e` |
 | [0003](0003-scalar-schema-and-state-domains.md) | scalar values, schemas and finite state domains — accepted in `38a1ef1` |
 | [0004](0004-typed-term-syntax.md) | typed expressions, aggregates, effects and claims — accepted in `503957b` |
-| [0005](../prds-run-queue/0001-declaration-and-reference-checking.md) | declaration/reference checking — enqueued |
-| [0006](0006-term-and-model-checking.md) | term/model checking, soundness, completeness and exact erasure |
+| [0005](0005-declaration-and-reference-checking.md) | declaration/reference checking — accepted in `8f22eb1` |
+| [0006](../prds-run-queue/0001-term-and-model-checking.md) | term/model checking, soundness, completeness and exact erasure — enqueued |
 | [0007](0007-core-frontend-builders.md) | parameter/table/model pure builders |
 | [0008](0008-transition-frontend-builders.md) | transition/effect/contest pure builders |
 | [0009](0009-observation-builders-and-macro-delegation.md) | observation builders and macro delegation |
