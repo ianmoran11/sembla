@@ -122,8 +122,39 @@ not claim the future Lean semantics already exists.
 | Writes | Effects read the pre-tick snapshot. Accepted writes commit simultaneously. A conflicting accepted write set is an explicit semantic error rather than list-order resolution. | Uniform read-old/write-new is normative in [`DECISIONS.md` §C5](../../DECISIONS.md#c5-no-within-tick-cascades-uniform-one-tick-delay); the current staging order is visible in [`executor.rs`](../../crates/sembla-runtime/src/executor.rs). PRD 0016 owns the Lean tick. |
 | Execution inputs | A finite run receives a tick-indexed provider `Nat → InputSnapshot`; non-composed callers may supply a constant provider. Each atomic tick consumes exactly its indexed snapshot. | This is the external semantic input boundary. It must not be confused with composition delivery, whose ordinary wires materialize the next tick's input under [`DESIGN.md` §4.4](../../DESIGN.md#44-composition-an-operad-with-tables-on-the-wires). |
 | Observations | Outputs/views/grouped views are evaluated from the successfully committed state and are sinks: they do not mutate state or consult draws. If post-commit observation fails, the trace retains that committed state and all prior events, records the observation-phase error, emits no value for the failed observation, and terminates. Summaries fold completed observation values; an invalid empty summary retains the initial/last committed state under the same rule. | [`DESIGN.md` §4.6](../../DESIGN.md#46-observation-a-sink-never-a-feedback-path) fixes prefix noninterference: the transition/draw kernel and every common completed prefix are unchanged, while an explicit post-commit observation error may terminate trace production without rollback. The current executor also observes only after commit in [`executor.rs`](../../crates/sembla-runtime/src/executor.rs). |
-| Raw checking | Raw-to-checked elaboration does not canonicalize. Erasing a successful checked model returns the original semantic raw structure exactly. Plan normalization is owned by PRDs 0019–0020. | The raw source is [`Sembla.IR`](../../frontend/Sembla/IR.lean). Exact erasure is proved in PRD 0006; plan validity and identity normalization remain separate in PRDs 0019–0020. |
+| Raw checking | Raw-to-checked elaboration does not canonicalize. Erasing a successful checked model returns the original semantic raw structure exactly. Plan normalization is owned by PRDs 0019–0020. | The raw source is [`Sembla.IR`](../../frontend/Sembla/IR.lean). PRD 0005 proves exact declaration-projection erasure; whole-model exact erasure remains PRD 0006, while plan validity and identity normalization remain separate in PRDs 0019–0020. |
 | Composition handoff | Outputs materialize from post-commit state, wires deliver at the next tick, one output may fan out, each input has at most one source, an unwired input is an empty table, and feedback is allowed only through the one-tick delay. Later source/flat preservation uses the existing full pathwise observation fields and states boundary refactoring modulo an explicit identity bijection where literal identities change. | Uniform delay is normative in [`DESIGN.md` §4.4](../../DESIGN.md#44-composition-an-operad-with-tables-on-the-wires), and the full observation quotient is fixed by [`DECISIONS.md` §J13](../../DECISIONS.md#j13-observation-quotient-and-proof-obligations-2026-07). PRD 0021 records only the future handoff. |
+
+## Accepted declaration-checking boundary
+
+[`Sembla.Semantics.CheckDeclarations`](../../frontend/Sembla/Semantics/CheckDeclarations.lean)
+implements PRD 0005 as an exact, terminating `Except` checker. Its independent
+`DeclarationsWellFormed` judgment fixes the following static boundary:
+
+- `dt` is positive by an executable coefficient-sign test proved equivalent to
+  positive real denotation;
+- parameters, boxes and summaries have independent global namespaces;
+- tables, transitions, inputs and outputs have independent box-local
+  namespaces, inputs/outputs may share a spelling, and ordinary/grouped views
+  share one namespace;
+- table, input and output attributes are unique, enum domains are nonempty and
+  duplicate-free, and table references resolve against the complete two-phase
+  box catalog;
+- defaults match parameter types, integer priors are absent, every current prior
+  family has exactly two exact arguments, and only Uniform adds strict exact
+  lower/upper ordering; and
+- transition table targets resolve, while expressions, builders, view/summary
+  targets, wires and all behavioral meaning remain deferred.
+
+`DeclarationContext` derives `ModelSchema`, box-owned port schemas and resolved
+transition targets from the exact accepted source. `DeclarationProjection`
+retains declaration spellings, scientific encodings, order, sizes, priors,
+enums and deferred shallow payloads exactly, but deliberately excludes wires
+and whole-model term checking. `checkDeclarations_sound`,
+`checkDeclarations_complete`, `checkDeclarations_failure_iff` and
+`checkDeclarations_erases_exact` connect the checker to the independent
+judgment and projection. Exact comparisons use `ℚ`/integer arithmetic only;
+there is no `Float` normalization boundary.
 
 ## Exact module map for PRDs 0002–0021
 

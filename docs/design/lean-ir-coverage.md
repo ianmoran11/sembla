@@ -1,10 +1,11 @@
 # Lean IR coverage
 
-Status: **PRD 0002 raw inventory plus PRD 0003 checked scalar/schema/state
-and PRD 0004 intrinsically typed term domains**. This document distinguishes
-serialization declarations from their accepted checked representations. It does
-not claim raw-declaration checking, supplied-state validation, evaluation,
-output materialization, or behavioral semantics.
+Status: **PRD 0002 raw inventory, PRD 0003 checked scalar/schema/state,
+PRD 0004 intrinsically typed term domains, and PRD 0005 declaration checking**.
+This document distinguishes serialization declarations from their accepted
+checked representations. It does not claim whole-model term checking,
+supplied-state validation, evaluation, output materialization, or behavioral
+semantics.
 
 ## Exact boundary and exclusions
 
@@ -60,9 +61,9 @@ derived from that list rather than a second map.
 
 `SchemaUniverse` establishes every ordered unique box/table header before
 `ModelSchema.tableSchemas` resolves attrs. This is the constructor boundary for
-forward and mutual table references. PRD 0005 remains responsible for checking
-raw declaration lists, proving uniqueness inputs, resolving raw names and
-choosing structured diagnostic precedence. `SuppliedValue`, `SuppliedRow`,
+forward and mutual table references. PRD 0005 now checks those raw declaration
+lists, proves the uniqueness inputs, resolves raw names and provides structured
+diagnostic paths. `SuppliedValue`, `SuppliedRow`,
 `SuppliedTable` and `SuppliedState` deliberately admit wrong row counts, column
 layouts, scalar types, enum ordinals and reference ordinals; PRD 0011 remains
 responsible for their validation, state lookup, `invalidState` and
@@ -95,6 +96,29 @@ and exponent exactly. All other non-coercion constructors have named structural
 erasure equations in `Syntax.lean`. Output fields/builders and snapshot values
 remain assigned to PRD 0012, and transition-name/table assembly, checking,
 evaluation, claim compatibility and winner selection remain later work.
+
+## PRD 0005 declaration-checking discharge
+
+[`Sembla.Semantics.CheckDeclarations`][declaration-checker] defines the
+checker-independent `DeclarationsWellFormed` judgment, exact rational scientific
+comparisons, structured `CheckErrorCategory`/`CheckPathSegment` diagnostics,
+`DeclarationContext`, box-owned port schemas, transition target resolution and
+exact `DeclarationProjection` erasure. Evidence is executable in
+[`Sembla.Semantics.CheckDeclarationsTests`][declaration-fixtures].
+
+| Owned invariant / family | Checked evidence | Fixture evidence |
+| --- | --- | --- |
+| Exact positive `Model.dt` and strict Uniform ordering | `scientificPositive_iff_denote_pos`, `scientificLt_iff_denote_lt`; no `Float` path | positive exact decimals; zero/negative `dt`; equal/reversed Uniform bounds |
+| Parameter names/defaults/priors | independent `ParameterWellFormed`; `checkedParameterLookup_name`; `modelSchema_eraseParameters_exact` | real/int priorless parameters; all prior families; duplicate names, mismatched defaults, integer prior and arity failures |
+| Global and box-local namespaces | `DeclarationsWellFormed`, `BoxDeclarationsWellFormed`; separate input/output catalogs and one combined view namespace | duplicate parameter/box/summary/table/transition/input/output/view cases and accepted same-named input/output ports |
+| Table/input/output schemas | phased `DeclarationContext.modelSchema`; `BoxPortSchema.instantiate`; owner-indexed lookup wrappers | zero-sized tables, zero-table boxes with ports, fully empty accepted boxes, forward/mutual refs, duplicate attrs, empty/duplicate enums and unresolved refs in all three schema owners |
+| Transition headers | `resolveTransitionTarget`, `checkedTransition_target_name` | successful resolved target and unresolved-target category/path |
+| Checker correspondence and fidelity | `firstDeclarationError_none_iff`, `checkDeclarations_sound`, `checkDeclarations_complete`, `checkDeclarations_failure_iff`, `checkDeclarations_erases_exact` | positive checker existence, exact projection equality and every stable category/path family |
+
+Output names and schemas are shallow declaration obligations here; output
+builders and output meaning remain PRD 0012. View/grouped-view and summary names
+are shallow catalogs here; their targets, expressions, reductions and meaning
+remain PRDs 0013/0017. Wires and whole-model term checking remain deferred.
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match
@@ -133,14 +157,14 @@ constructor arity changes fail compilation. Every function is exercised by
 | `Transition` | `name` (T/SP/0005 → 0006,0008,0014); `table` (T/CR/0005 → 0006,0008,0014); `guard` (S/SP/0004 → 0006,0008,0014); `hazard` (S/CR/0004 → 0006,0008,0014); `effects` (S/SP/0004 → 0006,0008,0016); `contests` (S/SP/0015 → 0006,0008) | `classifyTransitionFields`; `transitionFixture` |
 | `PortDecl` | `name` (T/SP/0005 → 0009,0012); `schema` (S/SP/0005 → 0009,0012) | `classifyPortDeclFields`; `inputPortFixture` |
 | `OutputField` | `name` (T/SP/0012 → 0005,0006,0009); `op` (O/SP/0012 → 0005,0006,0009); `filter` (O/CR/0012 → 0005,0006,0009) | `classifyOutputFieldFields`; `outputFields` |
-| `OutputDecl` | `name` (T/SP/0012 → 0005,0006,0009); `schema` (S/SP/0012 → 0005,0006,0009); `builder` (O/SP/0012 → 0005,0006,0009) | `classifyOutputDeclFields`; `outputFixture` |
-| `ViewDecl` | `name` (T/SP/0013 → 0005,0006,0009); `table` (T/CR/0013 → 0005,0006,0009); `filter`, `value` (O/CR/0013 → 0005,0006,0009); `reduce` (O/SP/0013 → 0005,0006,0009) | `classifyViewDeclFields`; `viewFixtures` |
+| `OutputDecl` | `name` (T/SP/0005 → 0006,0009,0012); `schema` (S/SP/0005 → 0006,0009,0012); `builder` (O/SP/0012 → 0005,0006,0009) | `classifyOutputDeclFields`; shallow name/schema evidence in `CheckDeclarationsTests`; deferred builder in `outputFixture` |
+| `ViewDecl` | `name` (T/SP/0005 → 0006,0009,0013); `table` (T/CR/0013 → 0005,0006,0009); `filter`, `value` (O/CR/0013 → 0005,0006,0009); `reduce` (O/SP/0013 → 0005,0006,0009) | `classifyViewDeclFields`; shallow catalog evidence in `CheckDeclarationsTests`; deferred meaning in `viewFixtures` |
 | `GroupKey` | `attr` (T/CR/0013 → 0005,0006,0009,0018); `bandWidth` (O/CR/0013 → 0005,0006,0009,0018) | `classifyGroupKeyFields`; `groupKeys` |
-| `GroupedViewDecl` | `name` (T/SP/0013 → 0005,0006,0009,0018); `table` (T/CR/0013 → 0005,0006,0009,0018); `filter` (O/CR/0013 → 0005,0006,0009,0018); `keys` (O/SP/0013 → 0005,0006,0009,0018) | `classifyGroupedViewDeclFields`; `groupedViewFixture` |
+| `GroupedViewDecl` | `name` (T/SP/0005 → 0006,0009,0013,0018); `table` (T/CR/0013 → 0005,0006,0009,0018); `filter` (O/CR/0013 → 0005,0006,0009,0018); `keys` (O/SP/0013 → 0005,0006,0009,0018) | `classifyGroupedViewDeclFields`; shared shallow view-namespace evidence in `CheckDeclarationsTests`; deferred meaning in `groupedViewFixture` |
 | `Box` | `name` (T/SP/0005 → 0007,0019); `tables` (S/SP/0005 → 0003,0006,0007); `transitions` (S/SP/0006 → 0008,0014,0015,0016); `inputs` (S/SP/0012 → 0005,0006,0009); `outputs` (O/SP/0012 → 0005,0006,0009); `views` (O/SP/0013 → 0005,0006,0009); `groupedViews` (O/SP/0013 → 0005,0006,0009,0018) | `classifyBoxFields`; `boxFixture` |
 | `WireEndpoint` | `box`, `port` (T/RO/0019 → 0020) | `classifyWireEndpointFields`; `modelWire` |
 | `Wire` | `source`, `target` (T/RO/0019 → 0020) | `classifyWireFields`; `modelWire` |
-| `SummaryDecl` | `name` (T/SP/0013 → 0005,0006,0009); `box`, `view` (T/CR/0013 → 0005,0006); `reduce` (O/SP/0013 → 0017) | `classifySummaryDeclFields`; `summaryFixtures` |
+| `SummaryDecl` | `name` (T/SP/0005 → 0006,0009,0013); `box`, `view` (T/CR/0013 → 0005,0006); `reduce` (O/SP/0013 → 0017) | `classifySummaryDeclFields`; shallow name-catalog evidence in `CheckDeclarationsTests`; deferred meaning in `summaryFixtures` |
 | `Model` | `name` (T/SP/0005 → 0007,0019); `dt` (S/CR/0005 → 0010,0016); `params` (S/SP/0005 → 0003,0007); `boxes` (S/SP/0006 → 0019); `wires` (T/RO/0019 → 0020); `summaries` (O/SP/0013 → 0017) | `classifyModelFields`; `rawModelFixture` |
 
 ## Composition-source inventory
@@ -236,3 +260,5 @@ change.
 [checked-fixtures]: ../../frontend/Sembla/Semantics/TypesTests.lean
 [typed-syntax]: ../../frontend/Sembla/Semantics/Syntax.lean
 [typed-syntax-fixtures]: ../../frontend/Sembla/Semantics/SyntaxTests.lean
+[declaration-checker]: ../../frontend/Sembla/Semantics/CheckDeclarations.lean
+[declaration-fixtures]: ../../frontend/Sembla/Semantics/CheckDeclarationsTests.lean
