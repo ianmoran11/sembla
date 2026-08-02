@@ -1,8 +1,17 @@
 # Run queue
 
-**Pending:** `0001-typed-term-syntax.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-declaration-and-reference-checking.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-01 — scalar, schema and finite-state domains
+## Last cleared 2026-08-01 — typed term syntax
+
+`0001-typed-term-syntax` was approved and returned as
+[`prds-lean-ir-formalization/0004`](../prds-lean-ir-formalization/0004-typed-term-syntax.md)
+in implementation commit `503957b`. It established owner-indexed typed syntax,
+exact structural erasure, full-strength ownership and non-substitution theorem
+families, and positive/negative fixtures for expressions, aggregates, effects
+and claims.
+
+## Earlier cleared 2026-08-01 — scalar, schema and finite-state domains
 
 `0001-scalar-schema-and-state-domains` was approved and returned as
 [`prds-lean-ir-formalization/0003`](../prds-lean-ir-formalization/0003-scalar-schema-and-state-domains.md)
@@ -58,7 +67,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved typed-term-syntax PRD.
+Running it now executes only the approved declaration-and-reference-checking PRD.
 
 ## How to use it
 
