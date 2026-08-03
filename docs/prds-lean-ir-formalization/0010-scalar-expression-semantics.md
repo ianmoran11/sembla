@@ -8,7 +8,7 @@ Binding contract: [track README](../prds-lean-ir-formalization/README.md).
 
 ## Context
 
-Checked syntax exists and the actual frontend constructs it through proved pure functions. The first meaning layer interprets scalar/local expressions while aggregates and inputs remain typed context operations owned by PRD 0012.
+The actual frontend constructs exact raw IR through the proved PRD 0007–0009 pure builders, and their final assembly theorem establishes successful `checkModel` elaboration with exact checked erasure. This semantics layer consumes the resulting checked terms; it does not treat frontend-builder success or raw syntax as semantic input. The first meaning layer interprets scalar/local expressions while aggregates and inputs remain typed context operations owned by PRD 0012.
 
 ## Goal
 
@@ -16,7 +16,7 @@ Define deterministic type-preserving evaluation for literals, parameters, self a
 
 ## Requirements
 
-1. Define `SemanticError` categories and typed evaluation outcomes.
+1. Define `SemanticError` categories and typed evaluation outcomes. Semantic evaluation errors are distinct from frontend builder, declaration-checker and model-checker diagnostics.
 2. Define an evaluation context for parameters, current row attributes and abstract typed aggregate/input services.
 3. Interpret exact scientific literals in `ℝ` and explicit numeric coercions.
 4. Evaluate subexpressions left-to-right; division by zero returns the frozen error.

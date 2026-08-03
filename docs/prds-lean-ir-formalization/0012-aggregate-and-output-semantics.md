@@ -12,14 +12,14 @@ The scalar evaluator delegates aggregate/input operations to a typed interface. 
 
 ## Goal
 
-Complete relational/input aggregate evaluation and output builders with deterministic, type-preserving definitions.
+Complete relational/input aggregate evaluation and the deterministic, type-preserving materialization of checked output declarations. Frontend construction of raw output builders remains closed in PRD 0009.
 
 ## Requirements
 
 1. Define typed input snapshots as finite tables supplied by the semantic environment; do not define wire delivery.
 2. Define filters, count, numeric sum, current foreign-key/self-key joins and input aggregates.
 3. Use source row order operationally but prove count/sum results invariant under named row permutations when expression meaning is permutation-stable.
-4. Define output field/builder materialization from an explicitly supplied state boundary. The later handoff fixes that composition supplies post-commit state.
+4. Define the denotation and materialization of checked output declarations corresponding to raw `IR.OutputBuilder` values, from an explicitly supplied state boundary. Do not add or reopen frontend builder construction. The later handoff fixes that composition supplies post-commit state.
 5. Propagate left-to-right semantic errors and define empty count/sum as zero.
 6. Prove determinism, type preservation, scope correctness, permutation laws and output-schema preservation.
 7. Add empty, filtered, joined, input-snapshot, error and output fixtures.

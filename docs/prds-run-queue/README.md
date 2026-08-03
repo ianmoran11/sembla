@@ -1,8 +1,17 @@
 # Run queue
 
-**Pending:** `0001-core-frontend-builders.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-transition-frontend-builders.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-03 — term and model checking
+## Last cleared 2026-08-03 — core frontend builders
+
+`0001-core-frontend-builders` was approved and returned as
+[`prds-lean-ir-formalization/0007`](../prds-lean-ir-formalization/0007-core-frontend-builders.md)
+in implementation commit `16d7d93`. It established pure source-order-preserving
+prior, parameter, attribute, table, box-shell and model-shell builders; stable
+structured failures; complete soundness/completeness/failure and checker-erasure
+theorem families; and canonical frontend parity without changing macro syntax.
+
+## Earlier cleared 2026-08-03 — term and model checking
 
 `0001-term-and-model-checking` was approved and returned as
 [`prds-lean-ir-formalization/0006`](../prds-lean-ir-formalization/0006-term-and-model-checking.md)
@@ -85,7 +94,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved core-frontend-builders PRD.
+Running it now executes only the approved transition-frontend-builders PRD.
 
 ## How to use it
 

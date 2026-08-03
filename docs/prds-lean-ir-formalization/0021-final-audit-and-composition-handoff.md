@@ -16,7 +16,7 @@ Demonstrate complete foundational Lean-side coverage, audit proof/trust claims, 
 
 ## Requirements
 
-1. Complete `docs/design/lean-ir-coverage.md`. Every non-composition field/constructor must link to both raw classifications, checked representation/rejection, checker theorem, semantics/structural erasure, fixtures and proof owner. Composition-source-only fields/constructors must instead link to both raw classifications, fixtures, their explicit future-composition owner and the exact deferred obligation in the composition handoff charter; they must not claim a current-track checked representation, checker theorem or semantics that this track deliberately excludes.
+1. Complete `docs/design/lean-ir-coverage.md`. Every non-composition field/constructor must link to both raw classifications, checked representation/rejection, checker theorem, semantics/structural erasure, fixtures and proof owner. Builder-owned forms must additionally link to the PRD 0007–0009 pure-builder soundness/completeness/failure evidence, source-order/attachment evidence and final-assembly `checkModel`/exact-erasure theorem. Record executable evidence that current model-local macros delegate to that final assembly boundary, and classify parsing, token-to-path mapping and positioned diagnostic rendering explicitly as trusted/tested rather than proved. Composition-source-only fields/constructors must instead link to both raw classifications, fixtures, their explicit future-composition owner and the exact deferred obligation in the composition handoff charter; they must not claim a current-track checked representation, checker theorem or semantics that this track deliberately excludes.
 2. Add aggregate compile-time coverage guards so neither a new inductive constructor nor a new structure field can bypass classification/tests.
 3. Run the automated theorem/axiom inventory and audit for hidden opaque propositions, forbidden declarations and undocumented classical assumptions.
 4. Add `docs/design/lean-composition-formalization-scope.md` documenting, without Lean declarations:
@@ -59,7 +59,7 @@ Exercise coverage guards with a temporary inductive constructor and a temporary 
 
 ## Acceptance criteria
 
-1. No current V1 field/constructor lacks an owner and evidence. Every non-composition item has a current-track invariant/meaning; every composition-source-only item has an explicit deferred invariant/meaning in the future-composition handoff and makes no false current-track proof claim.
+1. No current V1 field/constructor lacks an owner and evidence. Every non-composition item has a current-track invariant/meaning; every builder-owned item additionally has pure-construction, final-assembly and macro-delegation evidence with the trusted diagnostic boundary stated exactly; every composition-source-only item has an explicit deferred invariant/meaning in the future-composition handoff and makes no false current-track proof claim.
 2. The theorem inventory satisfies the exact proof policy with no omission.
 3. The composition charter is precise enough to draft fine-grained follow-on PRDs but adds no composition semantics.
 4. Independent review reports no blocker or overclaim.
