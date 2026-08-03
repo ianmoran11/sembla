@@ -1,8 +1,17 @@
 # Run queue
 
-**Pending:** `0001-term-and-model-checking.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-core-frontend-builders.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-02 — declaration and reference checking
+## Last cleared 2026-08-03 — term and model checking
+
+`0001-term-and-model-checking` was approved and returned as
+[`prds-lean-ir-formalization/0006`](../prds-lean-ir-formalization/0006-term-and-model-checking.md)
+in implementation commit `1ec3210`. It established canonical term and model
+checking, independent syntax-directed judgments, structured failures, exact
+reconstructive erasure, checker soundness/completeness/failure correspondence,
+structural canonicality/equivalence and a non-vacuous checked round trip.
+
+## Earlier cleared 2026-08-02 — declaration and reference checking
 
 `0001-declaration-and-reference-checking` was approved and returned as
 [`prds-lean-ir-formalization/0005`](../prds-lean-ir-formalization/0005-declaration-and-reference-checking.md)
@@ -76,7 +85,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved term-and-model-checking PRD.
+Running it now executes only the approved core-frontend-builders PRD.
 
 ## How to use it
 

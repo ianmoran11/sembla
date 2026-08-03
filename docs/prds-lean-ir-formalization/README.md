@@ -1,6 +1,6 @@
 # Lean IR foundational formalization PRDs
 
-Status: **approved; PRDs 0001–0005 accepted; PRD 0006 enqueued**. This track makes Sembla's current V1 Lean frontend and IR reason-able through proof-complete, pathwise tau-leap semantics. It ends at the Lean-produced structural plan/export-data boundary.
+Status: **approved; PRDs 0001–0006 accepted; PRD 0007 enqueued**. This track makes Sembla's current V1 Lean frontend and IR reason-able through proof-complete, pathwise tau-leap semantics. It ends at the Lean-produced structural plan/export-data boundary.
 
 This README is binding on every numbered PRD.
 
@@ -40,6 +40,10 @@ The claim does **not** include ideal CTMC/probability-law semantics, Lean macro 
 - PRD 0006 preserves raw wires exactly without validating them. PRD 0019 owns
   endpoint, direction, schema and fan-in structural validity; executable delivery
   remains outside this foundational checker.
+- PRD 0007's pure core builders cover every PRD 0005-valid form in their owned
+  prior/parameter/attribute/table/model-shell fragment, including all three prior
+  families. Existing macros retain their current narrower syntax until PRD 0009
+  delegates to the builders; pure API coverage does not itself add syntax.
 
 Changing these decisions requires an explicit README/decision amendment before an affected PRD is enqueued.
 
@@ -105,8 +109,8 @@ All PRDs are serial and require every numerically earlier PRD to be accepted.
 | [0003](0003-scalar-schema-and-state-domains.md) | scalar values, schemas and finite state domains — accepted in `38a1ef1` |
 | [0004](0004-typed-term-syntax.md) | typed expressions, aggregates, effects and claims — accepted in `503957b` |
 | [0005](0005-declaration-and-reference-checking.md) | declaration/reference checking — accepted in `8f22eb1` |
-| [0006](../prds-run-queue/0001-term-and-model-checking.md) | term/model checking, soundness, completeness and exact erasure — enqueued |
-| [0007](0007-core-frontend-builders.md) | parameter/table/model pure builders |
+| [0006](0006-term-and-model-checking.md) | term/model checking, soundness, completeness and exact erasure — accepted in `1ec3210` |
+| [0007](../prds-run-queue/0001-core-frontend-builders.md) | parameter/table/model pure builders — enqueued |
 | [0008](0008-transition-frontend-builders.md) | transition/effect/contest pure builders |
 | [0009](0009-observation-builders-and-macro-delegation.md) | observation builders and macro delegation |
 | [0010](0010-scalar-expression-semantics.md) | scalar expression semantics |
