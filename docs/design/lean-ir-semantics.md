@@ -1,6 +1,6 @@
 # Lean IR semantics charter
 
-Status: **architecture and proof policy frozen; semantics not yet implemented**.
+Status: **architecture and proof policy frozen; declaration and executable static term/model checking implemented; term- and whole-model checker correspondence proved**.
 
 This charter is the maintained design entry point for the
 [Lean IR foundational-formalization track](../prds-lean-ir-formalization/README.md).
@@ -19,9 +19,14 @@ explicit draw oracle.
 
 It does not claim ideal CTMC/probability-law semantics, verified Lean macros,
 byte-level JSON or hash-primitive proofs, Rust refinement, CPU/CUDA refinement,
-binary64 refinement, or concrete Philox refinement. In particular, this PRD
-adds only module umbrellas and an audit command: there is not yet a raw-to-
-checked checker, evaluator, tick meaning, or trace meaning.
+binary64 refinement, or concrete Philox refinement. The repository now contains the declaration checker and executable model-local
+raw-to-checked elaborator. Its independent term judgments and structural erasers
+are present; synthesis and expected checking now have soundness, exact erasure,
+declarative completeness and canonical synthesis-sort uniqueness. Whole-model
+soundness, exact erasure, completeness, failure characterization,
+successful-result canonicality, erasure validity, and structural checked round
+trip are also proved. There is not yet an evaluator, tick meaning, or trace
+meaning.
 
 The architecture is:
 
@@ -164,12 +169,19 @@ there is no `Float` normalization boundary.
 
 ## Approved term/model-checking boundary
 
-PRD 0006 is approved to add the next static layer on top of that declaration
-context. It owns bidirectional term elaboration, checked transitions and static
-resolved declarations for outputs, ordinary views, grouped views and summaries.
-It must reconstruct those payloads during whole-model erasure rather than return
-the retained raw source. Evaluation, observation values and folds remain PRDs
-0010–0017.
+PRD 0006's executable layer now adds bidirectional term elaboration, checked
+transitions and static resolved declarations for outputs, ordinary views,
+grouped views and summaries on top of the declaration context. Whole-model
+erasure reconstructs those payloads rather than returning the retained raw
+source. Fuel-parametric expression-checker soundness, public synthesis/checking
+soundness, successful-result exact erasure, declarative completeness,
+canonical synthesis-sort uniqueness and transition-payload correspondence are
+present. `checkModel_elaborates`, `checkModel_sound`, `checkModel_complete`,
+`checkModel_failure_iff`, `checkModel_canonical`, and
+`checkModel_checked_round_trip` close the whole-model bridge. The round trip
+rechecks reconstructive erasure and proves structural `Checked.Model.Equivalent`,
+not merely raw erasure equality. Evaluation, observation values and folds remain
+PRDs 0010–0017.
 
 The model checker validates each claim independently and retains its ordering
 domain. It rejects duplicate resources within one transition and requires a Ref

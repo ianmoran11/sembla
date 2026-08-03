@@ -156,6 +156,32 @@ private def networkOutputSchema : BoxPortSchema positiveContext.modelSchema.cata
 #guard eraseDeclarations positiveContext == projectDeclarations positiveModel
 
 example :
+    (networkInputSchema.instantiate networkA).eraseAttributes =
+      networkInputSchema.source :=
+  networkInputSchema.instantiate_erases_exact networkA
+
+example :
+    (positiveContext.inputPortSchemas networkBox).map BoxPortSchema.name =
+      (positiveContext.inputs networkBox).map IR.PortDecl.name :=
+  positiveContext.inputPortSchemas_names networkBox
+
+example :
+    (positiveContext.outputPortSchemas networkBox).map BoxPortSchema.source =
+      (positiveContext.outputs networkBox).map IR.OutputDecl.schema :=
+  positiveContext.outputPortSchemas_sources networkBox
+
+example :
+    positiveContext.modelSchema.catalog.boxes.entries.map BoxHeader.name =
+      positiveModel.boxes.map IR.Box.name :=
+  positiveContext.catalogBoxes_names
+
+example :
+    (positiveContext.modelSchema.schemaFor ⟨networkBox, networkA⟩).eraseAttributes =
+      (sourceTable positiveContext.source positiveContext.wellFormed
+        ⟨networkBox, networkA⟩).attrs :=
+  positiveContext.modelSchema_schemaFor_erases_exact ⟨networkBox, networkA⟩
+
+example :
     positiveContext.modelSchema.catalog.tableName
       ⟨networkBox, positiveContext.resolveTransitionTarget networkBox networkTransition⟩ =
       (positiveContext.transitionAt networkBox networkTransition).table :=

@@ -139,9 +139,116 @@ checking is not confused with later denotation:
 | Summaries | Box and ordinary-view target resolution plus exact reducer retention | Fold/error behavior PRDs 0013/0017 |
 | Wires | No static discharge in PRD 0006; preserve structurally exactly and in source order | `WiresWellFormed` and plan structure PRD 0019 |
 
-PRD 0006 acceptance replaces each pending entry here with checked definitions,
-theorems and constructor/category/path fixture links. It must not edit the
-accepted raw classifier metadata merely to express this orthogonal layer.
+Executable evidence now lives in
+[`CheckModelTests.lean`](../../frontend/Sembla/Semantics/CheckModelTests.lean):
+
+| Checked family | Executable evidence |
+| --- | --- |
+| Declaration bridge | exact input/output name and schema correspondence; catalog/table reconstruction fixtures |
+| Expressions and aggregates | the 22 raw expression constructors (bare enum by expected checking), count/sum, filtered/unfiltered input aggregation, mixed arithmetic and mixed numeric equality, enum anchoring and relational joins |
+| Transition payloads | Boolean guard, negative Real hazard, multiple exact assignments, Ref-write claim coverage, and heterogeneous race-time/Real/Int/enum ordering domains |
+| Observation declarations | filtered count, Int-sum and Real-sum output fields in exact schema order; all seven ordinary-view reducer/result-sort shapes; Enum/Ref/banded-Int grouped keys; one-key and four-key boundaries; every summary reducer |
+| Declaration composition | same-spelled input/output port `flow`, forward table references, and a genuinely empty zero-table box |
+| Deferred wires and erasure | `malformedWire`, `positiveRoundTrip`, `positiveEraseRecheck`, and the theorem-backed `checkModel_checked_round_trip` example preserve the wire, prove exact erasure, and certify structural checked equivalence |
+| Model correspondence | compiled `#check` evidence for `checkModel_elaborates`, `checkModel_sound`, `ModelElaborates.checkModel_exists`, `checkModel_complete`, `checkModel_failure_iff`, `checkModel_canonical`, `checkModel_equivalent_of_elaborates`, and `checkModel_checked_round_trip` |
+| Structured term failures | focused checker-path guards cover unknown names/variants, enum inference, numeric/Boolean/Real/reference/orderable boundaries, incompatible equality/joins and both nested-input aggregate positions; model-rooted guards cover guard/hazard/effect/claim policies, duplicate claims and uncovered Ref writes |
+| Structured observation failures | model-rooted guards cover output missing/extra/duplicate/reordered/name/filter/count/sum sort policies; count-with-value and sum/min/max-without-value view shapes plus table/filter failures; grouped zero/five/unresolved/Real/band/filter policies; and unresolved/grouped-only summary targets |
+| Declaration wrapper | a nonpositive-`dt` declaration failure is retained under `ModelCheckError.declaration` |
+
+The owned constructor and diagnostic evidence is traced literally below.
+`expressionCorpus[n]` uses the zero-based source order in
+`CheckModelTests.lean`; every diagnostic row is a single-defect guard.
+
+| Required positive item | Literal executable evidence |
+| --- | --- |
+| Aggregate operators and filters | `outputDecl.builder.fields[0]` (`count`, filtered), fields `[1]`/`[2]` (Int/Real `sum`, unfiltered/filtered), plus the filtered input-sum `#guard` |
+| Effects | `transition.effects[0..2]` cover multiple exact `setAttr` assignments, Int arithmetic, mixed Real arithmetic, and the claimed Ref write |
+| Claim ordering | `transition.contests[0]` is `raceTime`; `[1]`, `[2]`, `[3]` are heterogeneous Enum, Real, and Int keys |
+| Mixed numeric and enum anchoring | `expressionCorpus[5..14]`, the mixed numeric equality `#guard`, and `checkingOk (.enum "open")` |
+| Input aggregates and joins | `expressionCorpus[19]`, the filtered input-sum `#guard`, and `expressionCorpus[20]` |
+| Output shapes and order | `outputDecl.schema` and `outputDecl.builder` provide count, Int sum, Real sum, filters, and exact three-field order |
+| Ordinary-view shapes | `allViews[0..6]` cover count, Int/Real sum, Int/Real min, Int/Real max, and permitted filter/value combinations |
+| Grouped-view boundaries and order | `grouped` covers Enum/Ref/banded-Int ordered keys; `groupedOne` and `groupedFour` cover one/four-key boundaries |
+| Summary reducers | `summaries[0..4]` cover sum, min, max, last, and argmax-tick against ordinary `vCount` |
+| Declaration composition | `inputPort` and `outputDecl` share `flow`; `box.tables` has the forward `Region` reference; `emptyBox` is zero-table |
+| Exact encodings and source order | `positiveModel.dt`, parameter `gain.default`, and negative `transition.hazard` retain non-normalized scientific encodings; `positiveRoundTrip` checks whole-model structural erasure |
+| Deferred wire and checked round trip | `malformedWire`, `positiveRoundTrip`, `positiveEraseRecheck`, and the theorem-backed `Equivalent` example |
+
+| Raw expression constructor | Executable evidence |
+| --- | --- |
+| `real` | `expressionCorpus[0]` |
+| `int` | `expressionCorpus[1]` |
+| `bool` | `expressionCorpus[2]` |
+| `enum` | `checkingOk (.enum "open")` |
+| `param` | `expressionCorpus[3]` |
+| `selfAttr` | `expressionCorpus[4]` |
+| `add` | `expressionCorpus[5]` |
+| `sub` | `expressionCorpus[6]` |
+| `mul` | `expressionCorpus[7]` |
+| `div` | `expressionCorpus[8]` |
+| `eq` | `expressionCorpus[9]` and the mixed Int/Real equality guard |
+| `ne` | `expressionCorpus[10]` |
+| `lt` | `expressionCorpus[11]` |
+| `le` | `expressionCorpus[12]` |
+| `gt` | `expressionCorpus[13]` |
+| `ge` | `expressionCorpus[14]` |
+| `and` | `expressionCorpus[15]` |
+| `or` | `expressionCorpus[16]` |
+| `not` | `expressionCorpus[17]` |
+| `enumIs` | `expressionCorpus[18]` |
+| `input` | `expressionCorpus[19]` plus filtered input-sum guard |
+| `agg` | `expressionCorpus[20]` |
+
+| Diagnostic category | Executable evidence | Exact asserted path |
+| --- | --- | --- |
+| `cannotInferEnumOwner` | bare enum and two bare enums | `[]` |
+| `unknownParameter` | missing parameter | `[]` |
+| `unknownAttribute` | missing self attribute, nested binary/unary operands and effect destination | `[]`; `lhs`; `rhs`; `operand`; `model/box[0]/transition[0]/effects/effect[0]/destination` |
+| `unknownEnumVariant` | missing anchored variant | `[]` |
+| `unknownInput` | missing input | `inputPort` |
+| `unknownTable` | missing relational table | `tableTarget` |
+| `unknownJoinAttribute` | missing foreign/self join attributes | `joinForeignAttribute`; `joinSelfAttribute` |
+| `nestedInputAggregate` | nested sum value / filter | `aggregate/aggregateValue`; `aggregate/aggregateFilter` |
+| `expectedBool` | input filter, guard, output/view/grouped filters | each corresponding aggregate/model filter path |
+| `expectedReal` | hazard and exact Real assignment | `model/box[0]/transition[0]/hazard`; `.../effect[0]/value` |
+| `expectedNumeric` | Boolean arithmetic | `[]` |
+| `expectedReference` | non-reference claim | `model/box[0]/transition[0]/contests/claim[0]/resource` |
+| `expectedOrderable` | Boolean and Ref claim keys | `model/box[0]/transition[0]/contests/claim[0]/orderingKey` |
+| `sortMismatch` | enum test on Int | `model/box[0]/transition[0]/guard` |
+| `incompatibleEquality` | Boolean/Int equality | `[]` |
+| `incompatibleJoinTargets` | mismatched relational references | `[]` |
+| `duplicateResourceClaim` | repeated resource | `model/box[0]/transition[0]/contests/claim[1]/resource` |
+| `unclaimedRefWrite` | uncovered Ref write | `model/box[0]/transition[0]/effects/effect[0]/value` |
+| `unresolvedOutputTable` | `badOutputTable` | `model/box[0]/output[0]/outputBuilder/tableTarget` |
+| `duplicateOutputField` | `badOutputDuplicate` | `model/box[0]/output[0]/outputFields/outputField[1]/fieldName` |
+| `outputFieldCountMismatch` | missing/extra fields | `model/box[0]/output[0]/outputFields/outputSchema` |
+| `outputFieldNameMismatch` | reordered/wrong name | `model/box[0]/output[0]/outputFields/outputField[0]/fieldName` |
+| `outputFieldSortMismatch` | bad count, Int sum and Real sum destinations | corresponding `outputField[n]/fieldOperation` |
+| `unresolvedViewTable` | `badViewTable` | `model/box[0]/view[0]/viewTable` |
+| `invalidViewReducerShape` | count-with-value, sum/min/max-without-value and nonnumeric value corpus | `model/box[0]/view[0]/viewReducer`; `model/box[0]/view[0]/viewValue` |
+| `invalidGroupedKeyCount` | zero/five keys | `model/box[0]/groupedView[0]/groupedKeys` |
+| `unresolvedGroupedKey` | missing key | `.../groupedKeys/groupedKey[0]/groupedAttribute` |
+| `invalidGroupedKeySort` | Real key | `.../groupedKeys/groupedKey[0]/groupedAttribute` |
+| `missingGroupedBand` | Int without band | `.../groupedKeys/groupedKey[0]/groupedBand` |
+| `unexpectedGroupedBand` | enum with band | `.../groupedKeys/groupedKey[0]/groupedBand` |
+| `nonpositiveGroupedBand` | zero band | `.../groupedKeys/groupedKey[0]/groupedBand` |
+| `aggregateInGroupedFilter` | input aggregate filter | `model/box[0]/groupedView[0]/viewFilter` |
+| `unresolvedSummaryBox` | `badSummaryBox` | `model/summary[0]/summaryBox` |
+| `unresolvedSummaryView` | missing and grouped-only view targets | `model/summary[0]/summaryView` |
+
+`positiveEraseRecheck` executes the erase/recheck path. Its adjacent theorem-backed
+example applies `checkModel_canonical` and `checkModel_checked_round_trip` to an
+actual successful first checker result and produces a second result structurally
+`Equivalent` to the first.
+
+The independent syntax-directed term and model judgments and component erasure
+lemmas are present in `CheckTerms.lean` and `CheckModel.lean`. Simultaneous
+fuel-parametric term correspondence, exact erasure, declarative completeness,
+canonical synthesis-sort uniqueness, structural raw-expression equality,
+transition correspondence, whole-model soundness/completeness/failure,
+successful-result canonicality, and structural checked round trip are proved.
+Executable fixtures remain regression evidence rather than substitutes for
+these theorems. Accepted raw classifier metadata remains unchanged.
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match

@@ -12,7 +12,9 @@ PRD 0005 provides an exact `DeclarationContext`, accepted `ModelSchema`,
 box-owned port schemas, resolved transition table targets and the original raw
 source. PRD 0004 provides owner-indexed typed expressions, aggregates, effects,
 claims and exact syntax erasers. This increment must connect those accepted APIs
-without editing or replacing them.
+without changing their representations or accepted checking decisions. A narrow
+additive compatibility bridge in PRD 0005's module is permitted only to expose
+source-order and erasure theorems already established by its private builders.
 
 This PRD owns the remaining **model-local static** raw-to-checked boundary:
 terms, transitions and resolved checked declarations for outputs, ordinary
@@ -48,6 +50,14 @@ strengthening this one.
 
 ## Required checked structures and checker architecture
 
+0. Before constructing checked terms, expose additive public coherence theorems
+   from `CheckDeclarations.lean` proving: input and output header/schema length,
+   ordinal, name and raw-schema correspondence; full
+   `BoxPortSchema.instantiate` attribute erasure; source-order correspondence
+   between catalog box identities and `DeclarationContext.source.boxes`; and
+   exact `ModelSchema.eraseTables` correspondence with each selected source box.
+   These theorems must derive from the existing builders and may not change
+   declaration validity, diagnostics, structures, schemas or lookup behavior.
 1. Define a `TermContext` from the accepted `DeclarationContext`, box identity,
    current table target and the box's source-ordered input-port schemas,
    instantiated at that current table as PRD 0004 `InputSignature`s. Use PRD
@@ -278,6 +288,8 @@ Maintain a constructor/category/path fixture table in
 
 ## Allowed files
 
+- `frontend/Sembla/Semantics/CheckDeclarations.lean`
+- `frontend/Sembla/Semantics/CheckDeclarationsTests.lean`
 - `frontend/Sembla/Semantics/CheckTerms.lean`
 - `frontend/Sembla/Semantics/CheckModel.lean`
 - `frontend/Sembla/Semantics/CheckModelTests.lean`
@@ -288,8 +300,12 @@ Maintain a constructor/category/path fixture table in
 
 ## Non-goals
 
-- Editing accepted `Types.lean`, `Syntax.lean` or `CheckDeclarations.lean` APIs.
-  If one is insufficient, stop and amend this PRD rather than working around it.
+- Editing accepted `Types.lean` or `Syntax.lean` APIs, or changing any accepted
+  `CheckDeclarations.lean` representation, checker decision, diagnostic or
+  lookup behavior. Only the additive coherence theorems explicitly required
+  above are permitted; if they are insufficient, stop and amend this PRD again
+  rather than introducing replacement schemas, secondary name maps, duplicate
+  checks or impossible-mismatch errors.
 - Evaluation, supplied-state validation, draw semantics, candidate generation,
   contest winners, effect commit, observation values, summary folds or frontend
   macro refactoring.
@@ -307,7 +323,7 @@ equivalence definitions are explicit review targets, not implementation details.
 Run at least:
 
 ```bash
-cd frontend && lake build Sembla.Semantics.CheckModelTests
+cd frontend && lake build Sembla.Semantics.CheckDeclarationsTests Sembla.Semantics.CheckModelTests
 bash frontend/scripts/check-proofs.sh
 python3 scripts/check-prd-allowlist.py <this PRD at its current path>
 bash scripts/check.sh

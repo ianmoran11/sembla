@@ -594,6 +594,14 @@ private theorem catalogTableNames (raw : IR.Model)
   simp [SchemaUniverse.boxHeader, buildCatalog, buildBoxHeaders, sourceBox,
     sourceBoxIndex, buildBoxHeader, buildTableHeader]
 
+private theorem catalogTableSizes (raw : IR.Model)
+    (wellFormed : DeclarationsWellFormed raw)
+    (box : BoxId (buildCatalog raw wellFormed)) :
+    ((buildCatalog raw wellFormed).boxHeader box).tables.entries.map TableHeader.sizeHint =
+      (sourceBox raw wellFormed box).tables.map IR.Table.sizeHint := by
+  simp [SchemaUniverse.boxHeader, buildCatalog, buildBoxHeaders, sourceBox,
+    sourceBoxIndex, buildBoxHeader, buildTableHeader]
+
 private theorem buildBoxHeader_tables_length (box : IR.Box)
     (wellFormed : BoxDeclarationsWellFormed box) :
     (buildBoxHeader box wellFormed).tables.entries.length = box.tables.length := by
@@ -693,6 +701,52 @@ def instantiate {catalog : SchemaUniverse} {box : BoxId catalog}
     ((schema.instantiate current).attributes.entries.map CheckedAttribute.name) =
       schema.source.map IR.Attr.name := by
   simp [instantiate, checkedAttributeFromRaw]
+
+private theorem attrShapeFromRaw_erases_wellFormed {catalog : SchemaUniverse}
+    {box : BoxId catalog} (owner : TableTarget catalog) (tableNames : List String)
+    (names : (catalog.boxHeader box).tables.entries.map TableHeader.name = tableNames)
+    (sameBox : owner.box = box) (ty : IR.AttrType)
+    (wellFormed : AttributeTypeWellFormed tableNames ty) :
+    (attrShapeFromRaw catalog owner ty).erase = ty := by
+  subst box
+  cases ty with
+  | real => rfl
+  | int => rfl
+  | enum variants =>
+      simp only [AttributeTypeWellFormed, attributeTypeWellFormedBool,
+        Bool.and_eq_true, Bool.not_eq_true, List.isEmpty_iff] at wellFormed
+      have nonempty : variants ≠ [] := by
+        intro empty
+        subst variants
+        simp at wellFormed
+      have unique : variants.Nodup := by simpa using wellFormed.2
+      exact resolvedEnum_erases_exact catalog owner variants nonempty unique
+  | ref table =>
+      simp only [AttributeTypeWellFormed, attributeTypeWellFormedBool,
+        decide_eq_true_eq] at wellFormed
+      have member : table ∈
+          (catalog.boxHeader owner.box).tables.entries.map TableHeader.name := by
+        rw [names]
+        exact wellFormed
+      obtain ⟨target, found⟩ := catalog.lookupTable_complete owner.box member
+      exact resolvedReference_erases_name catalog owner table target found
+
+/-- Instantiation preserves every raw attribute, including exact enum order and
+raw reference spelling. -/
+@[simp] theorem instantiate_erases_exact {catalog : SchemaUniverse}
+    {box : BoxId catalog} (schema : BoxPortSchema catalog box)
+    (current : TableId catalog box) :
+    (schema.instantiate current).eraseAttributes = schema.source := by
+  simp only [TableSchema.eraseAttributes, instantiate, List.map_map]
+  conv_rhs => rw [← List.map_id schema.source]
+  apply List.map_congr_left
+  intro attr member
+  simp only [Function.comp_apply, CheckedAttribute.erase, checkedAttributeFromRaw,
+    id_eq]
+  congr 1
+  exact attrShapeFromRaw_erases_wellFormed ⟨box, current⟩ schema.tableNames
+    schema.tableNamesMatch rfl attr.ty
+    ((List.forall_iff_forall_mem.mp schema.sourceWellFormed.attributeTypes) attr member)
 
 end BoxPortSchema
 
@@ -811,6 +865,164 @@ def outputPortSchemas (ctx : DeclarationContext)
     (box : BoxId ctx.modelSchema.catalog) :
     List (BoxPortSchema ctx.modelSchema.catalog box) :=
   buildOutputPortSchemas ctx.source ctx.wellFormed box
+
+/-- Input headers and checked port schemas are the same source-ordered list. -/
+@[simp] theorem inputPortSchemas_length (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.inputPortSchemas box).length = (ctx.inputs box).length := by
+  simp [inputPortSchemas, buildInputPortSchemas, inputs]
+
+@[simp] theorem inputPortSchemas_names (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.inputPortSchemas box).map BoxPortSchema.name =
+      (ctx.inputs box).map IR.PortDecl.name := by
+  simp [inputPortSchemas, buildInputPortSchemas, inputs]
+
+@[simp] theorem inputPortSchemas_sources (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.inputPortSchemas box).map BoxPortSchema.source =
+      (ctx.inputs box).map IR.PortDecl.schema := by
+  simp [inputPortSchemas, buildInputPortSchemas, inputs]
+
+ theorem inputPortSchemas_uniqueNames (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    ((ctx.inputPortSchemas box).map BoxPortSchema.name).Nodup := by
+  rw [ctx.inputPortSchemas_names box]
+  exact (sourceBoxWellFormed ctx.source ctx.wellFormed box).uniqueInputs
+
+/-- Output headers and checked port schemas are aligned by source ordinal. -/
+@[simp] theorem outputPortSchemas_length (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.outputPortSchemas box).length = (ctx.outputs box).length := by
+  simp [outputPortSchemas, buildOutputPortSchemas, outputs]
+
+@[simp] theorem outputPortSchemas_names (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.outputPortSchemas box).map BoxPortSchema.name =
+      (ctx.outputs box).map IR.OutputDecl.name := by
+  simp [outputPortSchemas, buildOutputPortSchemas, outputs]
+
+@[simp] theorem outputPortSchemas_sources (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.outputPortSchemas box).map BoxPortSchema.source =
+      (ctx.outputs box).map IR.OutputDecl.schema := by
+  simp [outputPortSchemas, buildOutputPortSchemas, outputs]
+
+/-- Catalog box identities retain exact source count and order. -/
+@[simp] theorem catalogBoxes_length (ctx : DeclarationContext) :
+    ctx.modelSchema.catalog.boxes.entries.length = ctx.source.boxes.length := by
+  simp [modelSchema, buildModelSchema, buildCatalog, buildBoxHeaders_length]
+
+@[simp] theorem catalogBoxes_names (ctx : DeclarationContext) :
+    ctx.modelSchema.catalog.boxes.entries.map BoxHeader.name =
+      ctx.source.boxes.map IR.Box.name := by
+  simp [modelSchema, buildModelSchema, buildCatalog, buildBoxHeaders,
+    buildBoxHeader]
+
+/-- Catalog table identities retain exact source count, names and sizes. -/
+@[simp] theorem catalogTables_length (ctx : DeclarationContext)
+    (box : BoxId ctx.modelSchema.catalog) :
+    (ctx.modelSchema.catalog.boxHeader box).tables.entries.length =
+      (sourceBox ctx.source ctx.wellFormed box).tables.length := by
+  exact catalogTableLength ctx.source ctx.wellFormed box
+
+@[simp] theorem catalogTable_name_exact (ctx : DeclarationContext)
+    (target : TableTarget ctx.modelSchema.catalog) :
+    ctx.modelSchema.catalog.tableName target =
+      (sourceTable ctx.source ctx.wellFormed target).name := by
+  have point := congrArg (fun names : List String => names.get? target.table.ordinal.val)
+    (catalogTableNames ctx.source ctx.wellFormed target.box)
+  change (((ctx.modelSchema.catalog.boxHeader target.box).tables.entries.map
+      TableHeader.name).get? target.table.ordinal.val) =
+    (((sourceBox ctx.source ctx.wellFormed target.box).tables.map
+      IR.Table.name).get? target.table.ordinal.val) at point
+  have leftSome :
+      (((ctx.modelSchema.catalog.boxHeader target.box).tables.entries.map
+        TableHeader.name).get? target.table.ordinal.val) =
+        some ((ctx.modelSchema.catalog.boxHeader target.box).tables.entries.get
+          target.table.ordinal).name := by
+    apply List.get?_eq_some.mpr
+    refine ⟨by simpa only [List.length_map] using target.table.ordinal.isLt, ?_⟩
+    simp
+  have sourceBound : target.table.ordinal.val <
+      (sourceBox ctx.source ctx.wellFormed target.box).tables.length :=
+    lt_of_lt_of_eq target.table.ordinal.isLt (ctx.catalogTables_length target.box)
+  have rightSome :
+      (((sourceBox ctx.source ctx.wellFormed target.box).tables.map
+        IR.Table.name).get? target.table.ordinal.val) =
+        some (sourceTable ctx.source ctx.wellFormed target).name := by
+    apply List.get?_eq_some.mpr
+    refine ⟨by simpa only [List.length_map] using sourceBound, ?_⟩
+    simp [sourceTable]
+  rw [leftSome, rightSome] at point
+  exact Option.some.inj point
+
+@[simp] theorem catalogTable_size_exact (ctx : DeclarationContext)
+    (target : TableTarget ctx.modelSchema.catalog) :
+    ctx.modelSchema.catalog.tableSize target =
+      (sourceTable ctx.source ctx.wellFormed target).sizeHint := by
+  have point := congrArg (fun sizes : List Nat => sizes.get? target.table.ordinal.val)
+    (catalogTableSizes ctx.source ctx.wellFormed target.box)
+  change (((ctx.modelSchema.catalog.boxHeader target.box).tables.entries.map
+      TableHeader.sizeHint).get? target.table.ordinal.val) =
+    (((sourceBox ctx.source ctx.wellFormed target.box).tables.map
+      IR.Table.sizeHint).get? target.table.ordinal.val) at point
+  have leftSome :
+      (((ctx.modelSchema.catalog.boxHeader target.box).tables.entries.map
+        TableHeader.sizeHint).get? target.table.ordinal.val) =
+        some ((ctx.modelSchema.catalog.boxHeader target.box).tables.entries.get
+          target.table.ordinal).sizeHint := by
+    apply List.get?_eq_some.mpr
+    refine ⟨by simpa only [List.length_map] using target.table.ordinal.isLt, ?_⟩
+    simp
+  have sourceBound : target.table.ordinal.val <
+      (sourceBox ctx.source ctx.wellFormed target.box).tables.length :=
+    lt_of_lt_of_eq target.table.ordinal.isLt (ctx.catalogTables_length target.box)
+  have rightSome :
+      (((sourceBox ctx.source ctx.wellFormed target.box).tables.map
+        IR.Table.sizeHint).get? target.table.ordinal.val) =
+        some (sourceTable ctx.source ctx.wellFormed target).sizeHint := by
+    apply List.get?_eq_some.mpr
+    refine ⟨by simpa only [List.length_map] using sourceBound, ?_⟩
+    simp [sourceTable]
+  rw [leftSome, rightSome] at point
+  exact Option.some.inj point
+
+/-- Resolved table schemas erase every attribute exactly. -/
+@[simp] theorem modelSchema_schemaFor_erases_exact (ctx : DeclarationContext)
+    (target : TableTarget ctx.modelSchema.catalog) :
+    (ctx.modelSchema.schemaFor target).eraseAttributes =
+      (sourceTable ctx.source ctx.wellFormed target).attrs := by
+  let rawTable := sourceTable ctx.source ctx.wellFormed target
+  have boxWellFormed := sourceBoxWellFormed ctx.source ctx.wellFormed target.box
+  have tableMember : rawTable ∈
+      (sourceBox ctx.source ctx.wellFormed target.box).tables := by
+    exact List.get_mem _ _ _
+  have tableWellFormed :=
+    (List.forall_iff_forall_mem.mp boxWellFormed.tableSchemas) rawTable tableMember
+  simp only [ModelSchema.schemaFor, modelSchema, buildModelSchema, buildTableSchema,
+    TableSchema.eraseAttributes, List.map_map]
+  conv_rhs => rw [← List.map_id rawTable.attrs]
+  apply List.map_congr_left
+  intro attr member
+  simp only [Function.comp_apply, CheckedAttribute.erase, checkedAttributeFromRaw,
+    id_eq]
+  congr 1
+  exact BoxPortSchema.attrShapeFromRaw_erases_wellFormed target
+    ((sourceBox ctx.source ctx.wellFormed target.box).tables.map IR.Table.name)
+    (catalogTableNames ctx.source ctx.wellFormed target.box) rfl attr.ty
+    ((List.forall_iff_forall_mem.mp tableWellFormed.attributeTypes) attr member)
+
+/-- A resolved checked table reconstructs its complete raw table. -/
+@[simp] theorem modelSchema_eraseTable_exact (ctx : DeclarationContext)
+    (target : TableTarget ctx.modelSchema.catalog) :
+    ctx.modelSchema.eraseTable target = sourceTable ctx.source ctx.wellFormed target := by
+  cases sourceEq : sourceTable ctx.source ctx.wellFormed target with
+  | mk name size attrs =>
+      simp only [ModelSchema.eraseTable, IR.Table.mk.injEq]
+      exact ⟨by simpa [sourceEq] using ctx.catalogTable_name_exact target,
+        by simpa [sourceEq] using ctx.catalogTable_size_exact target,
+        by simpa [sourceEq] using ctx.modelSchema_schemaFor_erases_exact target⟩
 
 /-- Ordinary and grouped view payloads remain shallow and source ordered. -/
 def views (ctx : DeclarationContext)
