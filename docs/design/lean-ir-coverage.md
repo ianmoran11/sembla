@@ -1,7 +1,8 @@
 # Lean IR coverage
 
 Status: **PRD 0002 raw inventory, PRD 0003 checked scalar/schema/state,
-PRD 0004 intrinsically typed term domains, and PRD 0005 declaration checking**.
+PRD 0004 intrinsically typed term domains, PRD 0005 declaration checking,
+PRD 0006 whole-model checking, and PRD 0007 pure core builders**.
 This document distinguishes serialization declarations from their accepted
 checked representations. It does not claim whole-model term checking,
 supplied-state validation, evaluation, output materialization, or behavioral
@@ -249,6 +250,49 @@ transition correspondence, whole-model soundness/completeness/failure,
 successful-result canonicality, and structural checked round trip are proved.
 Executable fixtures remain regression evidence rather than substitutes for
 these theorems. Accepted raw classifier metadata remains unchanged.
+
+## PRD 0007 pure core-builder discharge
+
+[`Sembla.Frontend.Builders.Core`](../../frontend/Sembla/Frontend/Builders/Core.lean)
+defines syntax-independent `CoreBuilderError`, `CoreBoxShell` and
+`CoreModelShell` APIs. Builders decide the existing PRD 0005 predicates
+without normalization, sorting, deduplication or incremental reference
+resolution. The public soundness/completeness/failure theorem families are
+`buildPrior_*`, `buildParameter_*`, `buildAttribute_*`, `buildTable_*`,
+`buildBoxShell_*` and `buildModelShell_*`.
+`buildModelShell_declaration_acceptance` and
+`buildModelShell_model_acceptance_and_erasure` connect successful shells to the
+PRD 0005/0006 checkers and exact checked erasure. Executable evidence is in
+[`CoreTests.lean`](../../frontend/Sembla/Frontend/Builders/CoreTests.lean), with
+actual command-frontend parity guarded in [`Sembla.lean`](../../frontend/Sembla.lean).
+
+| Owned positive form | Literal executable evidence |
+| --- | --- |
+| Uniform, Normal and LogNormal priors with two exact arguments | `buildPrior` guards for `uniformPrior`, `normalPrior` and `logNormalPrior` |
+| Priorless and prior-bearing Real parameters; priorless Int parameter | direct `buildParameter` guards for `plain-real`, `uniform`, `normal`, `log-normal` and `plain-int` |
+| Exact non-normalized defaults, prior arguments and positive `dt` | `sci 1200 (-3)`, `sci 100 (-2)`, `sci (-2231435513142097) (-16)` and `positiveRaw.dt = sci 250 (-3)` guards |
+| Real, Int, ordered Enum and table-reference attributes | four direct `buildAttribute` guards and exact `.ok tableA`/`.ok tableB` `buildTable` guards |
+| Source-ordered tables, exact sizes, empty/zero-sized tables | exact `.ok tableA`/`.ok tableB` `buildTable` guards plus `emptyTableBox` and `Zero` shell fixtures |
+| Complete-catalog forward, backward, self and mutual references | `tableA` references later `B` and self `A`; `tableB` references earlier `A` and self `B`; both use catalog `["A", "B"]` |
+| Multiple parameters, tables and boxes; zero-table box; empty model | `positiveShell`, `positiveBox`, `zeroTableBox` and `emptyShell` `build*Shell` guards |
+| Declaration-only shell shape and exact source order | `positiveRaw` parameter/box/table/attribute order and all later-owned-list emptiness guards |
+| Representative current canonical frontend declarations | `canonicalSirCoreParity` compares `buildModelShell` output exactly with an independent declaration-only projection of actual `Sembla.Models.sir`; adjacent guards freeze emitted parameters `["beta", "gamma"]` and table catalog `[["person", "employer"]]` |
+| Declaration/model checker acceptance and exact erasure | `checkDeclarations positiveRaw`, `checkModel positiveRaw`, `positiveCheckedErasesExactly`, and theorem-backed nonempty `bridgeBuilt` examples |
+
+| Builder rejection category | Single-defect executable evidence | Exact asserted path |
+| --- | --- | --- |
+| `nonpositiveDt` | zero and negative `withDt` guards | `modelMetadata/dt` |
+| `duplicateParameterName` | `duplicateParameterShell` | `parameter[1]/name` |
+| `duplicateBoxName` | `duplicateBoxShell` | `box[1]/name` |
+| `duplicateTableName` | `duplicateTableBox` | `table[1]/name` |
+| `duplicateAttributeName` | duplicate `same` attributes passed to `buildTable` | `table[0]/attribute[1]/name` |
+| `parameterDefaultTypeMismatch` | both Real/Int and Int/Real `buildParameter` guards | `parameter[0]/defaultValue` |
+| `integerPrior` | `int-prior` | `parameter[0]/prior` |
+| `invalidPriorArity` | one-argument Normal and three-argument LogNormal | `prior` |
+| `unorderedUniformBounds` | equal and reversed Uniform guards | `prior/priorArgument[1]` |
+| `emptyEnum` | empty Enum passed to `buildTable` | `table[0]/attribute[0]/enumVariant[0]` |
+| `duplicateEnumVariant` | `first, second, first` Enum | `table[0]/attribute[0]/enumVariant[2]` |
+| `unresolvedTableReference` | direct missing Ref and nested `badNestedShell` | `table[0]/attribute[0]/tableReference`; `box[1]/table[0]/attribute[0]/tableReference` |
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match
