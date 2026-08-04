@@ -2,7 +2,8 @@
 
 Status: **PRD 0002 raw inventory, PRD 0003 checked scalar/schema/state,
 PRD 0004 intrinsically typed term domains, PRD 0005 declaration checking,
-PRD 0006 whole-model checking, and PRD 0007 pure core builders**.
+PRD 0006 whole-model checking, PRD 0007 pure core builders, and PRD 0008
+pure transition builders**.
 This document distinguishes serialization declarations from their accepted
 checked representations. It does not claim whole-model term checking,
 supplied-state validation, evaluation, output materialization, or behavioral
@@ -293,6 +294,78 @@ actual command-frontend parity guarded in [`Sembla.lean`](../../frontend/Sembla.
 | `emptyEnum` | empty Enum passed to `buildTable` | `table[0]/attribute[0]/enumVariant[0]` |
 | `duplicateEnumVariant` | `first, second, first` Enum | `table[0]/attribute[0]/enumVariant[2]` |
 | `unresolvedTableReference` | direct missing Ref and nested `badNestedShell` | `table[0]/attribute[0]/tableReference`; `box[1]/table[0]/attribute[0]/tableReference` |
+
+## PRD 0008 pure transition-builder discharge
+
+[`Sembla.Frontend.Builders.Transition`](../../frontend/Sembla/Frontend/Builders/Transition.lean)
+consumes the accepted core shells and PRD 0005/0006 contexts/checkers directly.
+`TransitionRaw` retains every raw argument exactly. `buildSynthExpr`,
+`buildExpectedExpr`, `buildEffect`, `buildClaim` and `buildTransition` are
+context-parametric checker adapters, so the same API works with the input-bearing
+context required by PRD 0009. `TransitionOverlaySpec.transitions` is indexed by
+`Fin core.boxes.length`; there is exactly one ordered list per existing core box
+and no truncating `zip` or parallel name catalog.
+
+The named theorem families are `TransitionRaw.*_exact`, the intrinsically typed
+`TransitionTyped.{effect,raceClaim,keyClaim}_erase_exact` constructors,
+`buildSynthExpr_sound`, `buildExpectedExpr_sound`, `buildTransition_sound`,
+`buildTransition_complete`, `buildTransition_failure_iff`,
+`buildSurfaceTransition_{unsupported_iff,failure_iff}`,
+`TransitionOverlaySpec.rawBoxes_get`, the `toRaw_*` core/slice preservation
+family, and `buildTransitionOverlay_{sound,complete,failure_iff}` plus
+`buildTransitionOverlay_model_acceptance_and_erasure`. Exact nested core,
+declaration, term and model failures are retained; only
+`unsupportedSurfaceKeyOrdering` is frontend-owned.
+
+Executable evidence is in
+[`TransitionTests.lean`](../../frontend/Sembla/Frontend/Builders/TransitionTests.lean).
+Actual command-frontend parity is guarded in
+[`Sembla.lean`](../../frontend/Sembla.lean) by an independent `TransitionRaw`
+construction compared against `Sembla.ContestTests.contestTwin`, including both
+claims in its multiple-claim contest.
+
+| Owned positive form | Literal executable evidence |
+| --- | --- |
+| Exact raw expression constructors | `expressionCorpus[0..20]` covers every synthesizable constructor; `checkingOk (TransitionRaw.enum "open")` covers the expected-sort-only bare Enum constructor |
+| Aggregate constructors | `TransitionRaw.count`, `TransitionRaw.sum`, filtered/unfiltered `TransitionRaw.aggregate`, input aggregation and `TransitionRaw.relatedAggregate` guards |
+| Exact scientific values and coercion | `sci 170 (-2)`, mixed Int/Real arithmetic/equality guards, and the retained negative hazard `sci (-250) (-2)` |
+| Effects | `TransitionTyped.effect_erase_exact`, direct `buildEffect`, and `positiveTransition.effects[0..2]` preserve multiple ordered Int, Real and Ref assignments |
+| Race and raw key claims | `TransitionTyped.raceClaim_erase_exact`/`keyClaim_erase_exact` and direct `buildClaim` guards cover race time and Real, Int and owner-indexed Enum keys; `positiveTransition.contests[0..3]` freezes exact heterogeneous order |
+| Ref-write coverage | `positiveTransition` writes `region := region` and has the matching exact resource claim |
+| Empty/nonempty payloads | `emptyTransition` and `positiveTransition` exercise empty and multiple effects/claims |
+| Context-parametric inputs | `contextRaw`, `Γ`, input-count and filtered input-sum guards prove the term API works with an authoritative input-bearing `DeclarationContext`/`TermContext` |
+| Source-ordinal attachment | `overlaySpec` has two core boxes and exact transition counts `[2, 0]`; `rawBoxes_get`, box-name/table guards and full transition-list equality prove no drop or reassignment |
+| Transition-only slice | `overlayRaw.boxes.all` and wire/summary guards establish empty inputs, outputs, ordinary/grouped views, wires and summaries |
+| Checker acceptance and erasure | `buildTransitionOverlay overlaySpec`, `checkDeclarations overlayRaw`, `checkModel overlayRaw`, `overlayCheckedErasesExactly`, and the theorem-backed soundness example |
+| Surface boundary | `buildSurfaceTransition_unsupported_iff` and `buildSurfaceTransition_failure_iff` characterize the frontend-only restriction versus checker failure; `surfaceRace` succeeds, `surfaceKeyRejected` identifies exact `box[4]/transition[7]/claim[1]/orderingKey`, and `surfaceTermErrorDelegated` retains exact checker category/path without weakening raw key checking |
+| Current frontend parity | `expectedContestTransition` independently spells the current command transition with `TransitionRaw`; `canonicalContestTransitionParity` compares its accepted overlay and exact checked erasure with actual `ContestTests.contestTwin`; the adjacent length guard freezes both claims |
+
+| Builder/checker rejection category | Single-defect executable evidence | Exact asserted path |
+| --- | --- | --- |
+| `cannotInferEnumOwner` | unanchored `.enum "open"` synthesis | `[]` |
+| `unknownParameter` | missing parameter | `[]` |
+| `unknownAttribute` | missing self attribute and missing effect destination | `[]`; `destination` |
+| `unknownEnumVariant` | missing expected Enum variant | `[]` |
+| `unknownInput` | missing input port | `inputPort` |
+| `unknownTable` | missing relational aggregate table | `tableTarget` |
+| `unknownJoinAttribute` | missing foreign and self join attributes | `joinForeignAttribute`; `joinSelfAttribute` |
+| `nestedInputAggregate` | nested aggregate in input sum value/filter | `aggregate/aggregateValue`; `aggregate/aggregateFilter` |
+| `expectedBool` | Int checked as Bool | `[]` |
+| `expectedReal` | Int checked as Real and assigned to Real | `[]`; `value` |
+| `expectedNumeric` | Boolean arithmetic | `[]` |
+| `expectedReference` | integer claim resource | `resource` |
+| `expectedOrderable` | Boolean and Ref ordering keys | `orderingKey` |
+| `sortMismatch` | `enumIs` against an Int attribute | `[]` |
+| `incompatibleEquality` | Boolean/Int equality | `[]` |
+| `incompatibleJoinTargets` | foreign/self references with different targets | `[]` |
+| `duplicateResourceClaim` | `duplicateClaimTransition` | `contests/claim[1]/resource` |
+| `unclaimedRefWrite` | `unclaimedWriteTransition` | `effects/effect[0]/value` |
+| PRD 0005 duplicate transition | `duplicateTransitionSpec` | `boxes/box[0]/transitions/transition[1]/name` |
+| PRD 0005 unresolved target | `unresolvedTargetSpec` | `boxes/box[0]/transitions/transition[0]/tableTarget` |
+| Exact nested `ModelCheckError` | `modelTermErrorPreserved` | `model/box[0]/transition[0]/guard` |
+| Nested core failure | `badCoreSpec` | exact `nonpositiveDt` at `modelMetadata/dt` |
+| Surface-only key restriction | `surfaceKeyRejected`, backed by `buildSurfaceTransition_unsupported_iff` | `box[4]/transition[7]/claim[1]/orderingKey` |
+| Race-only surface checker delegation | `surfaceTermErrorDelegated`, backed by `buildSurfaceTransition_failure_iff` | `guard` |
 
 All classifier links below refer to exhaustive functions in
 [`Sembla.Semantics.Raw`][raw-classifiers]. Inductive functions pattern-match

@@ -7,6 +7,7 @@ import Sembla.Semantics.CheckDeclarationsTests
 import Sembla.Semantics.CheckModelTests
 import Sembla.Frontend.Builders
 import Sembla.Frontend.Builders.CoreTests
+import Sembla.Frontend.Builders.TransitionTests
 import Sembla.Json
 import Sembla.Hash
 import Sembla.HashTests
@@ -76,5 +77,27 @@ private def canonicalSirCoreParity : Bool :=
 #guard (coreShellOf Sembla.Models.sir).parameterNames == ["beta", "gamma"]
 #guard (coreShellOf Sembla.Models.sir).boxes.map CoreBoxShell.tableNames ==
   [["person", "employer"]]
+
+/-- Independent pure-builder spelling of the current multiple-claim contest. -/
+private def expectedContestTransition : IR.Transition :=
+  TransitionRaw.transition "exit" "slot"
+    (TransitionRaw.enumIs "occupancy" "present")
+    (TransitionRaw.real 1.0)
+    [TransitionRaw.setAttribute "occupancy" (TransitionRaw.enum "vacant")]
+    [ TransitionRaw.raceClaim (TransitionRaw.selfAttribute "slot_resource")
+    , TransitionRaw.raceClaim (TransitionRaw.selfAttribute "backup_resource") ]
+
+private def contestTransitionSpec : TransitionOverlaySpec :=
+  TransitionOverlaySpec.mk (coreShellOf Sembla.ContestTests.contestTwin) fun ordinal =>
+    if ordinal.val = 0 then [expectedContestTransition] else []
+
+private def canonicalContestTransitionParity : Bool :=
+  contestTransitionSpec.toRaw == Sembla.ContestTests.contestTwin &&
+    match buildTransitionOverlay contestTransitionSpec with
+    | .ok checked => checked.erase == Sembla.ContestTests.contestTwin
+    | .error _ => false
+
+#guard canonicalContestTransitionParity
+#guard expectedContestTransition.contests.length == 2
 
 end Sembla.Frontend.Builders.CanonicalParityTests
