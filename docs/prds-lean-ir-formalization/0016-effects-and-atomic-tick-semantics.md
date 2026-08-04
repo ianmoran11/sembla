@@ -16,13 +16,30 @@ Define accepted write sets, explicit conflicts, simultaneous state commit and on
 
 ## Requirements
 
-1. Evaluate every accepted candidate's effects against the pre-tick state.
-2. Represent writes by resolved destination row/attribute and typed value.
-3. Detect two accepted writes to the same destination as `conflictingWrites`; do not choose by list order.
-4. Commit conflict-free writes simultaneously and preserve every unaffected location.
-5. Define one atomic tick from checked model, state, parameters, abstract input snapshot and draw oracle to next state/events or explicit error.
-6. Prove write typing, conflict freedom on successful commit, frame laws, simultaneous-commit characterization, no read-after-write cascade, state well-formedness preservation and fixed-oracle tick determinism.
-7. Add no-fire, uncontested, contested loser, multiple-effect, disjoint-write and conflicting-write fixtures.
+1. Evaluate every accepted candidate's source-ordered effects against the same
+   retained pre-tick state/input context. Preserve effect source order and
+   source-ordinal provenance for evaluation/errors/events; it must never resolve
+   a write conflict.
+2. Prove the static-to-dynamic Ref-write bridge: the checked effect RHS and its
+   structurally matched claim resource evaluate to the same typed reference in
+   that context, an accepted Ref write's candidate won that evaluated resource,
+   and deferred/losing candidates emit no writes.
+3. Represent writes by resolved destination row/attribute and typed value.
+4. Detect two accepted writes to the same destination as the local
+   `conflictingWrites` error; detection is invariant under write-list
+   permutation and must not choose by list order.
+5. Commit conflict-free writes simultaneously and preserve every unaffected
+   location.
+6. Define one atomic tick from checked model, state, parameters, abstract input
+   snapshot and draw oracle to next state/events or an explicit wrapper sum that
+   preserves the exact candidate, contest, effect and commit errors.
+7. Prove write typing, claim/writer authorization, losing-candidate suppression,
+   conflict freedom on successful commit, frame laws, simultaneous-commit
+   characterization, no read-after-write cascade, state well-formedness
+   preservation and fixed-oracle tick determinism.
+8. Add no-fire, uncontested, accepted claimed-Ref write, losing claimed-Ref
+   write, multiple-effect, disjoint-write, and two accepted writes to one Ref
+   destination/conflicting-write fixtures.
 
 ## Allowed files
 
@@ -45,6 +62,7 @@ State frame and atomicity extensionally over finite state. Permutation fixtures 
 ## Acceptance criteria
 
 1. Every effect field has pathwise meaning and fixtures.
-2. Typing, frame, atomicity, no-cascade, preservation and determinism theorems pass the audit.
+2. Typing, claim/write authorization, loser suppression, frame, atomicity,
+   no-cascade, preservation and determinism theorems pass the audit.
 3. Conflicts are explicit and never resolved incidentally.
 4. Build, proof hygiene and full checks pass.

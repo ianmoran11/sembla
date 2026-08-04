@@ -16,13 +16,28 @@ Define deterministic type-preserving evaluation for literals, parameters, self a
 
 ## Requirements
 
-1. Define `SemanticError` categories and typed evaluation outcomes. Semantic evaluation errors are distinct from frontend builder, declaration-checker and model-checker diagnostics.
-2. Define an evaluation context for parameters, current row attributes and abstract typed aggregate/input services.
-3. Interpret exact scientific literals in `ℝ` and explicit numeric coercions.
-4. Evaluate subexpressions left-to-right; division by zero returns the frozen error.
-5. Cover literals, parameters, self attributes, arithmetic, comparisons, Boolean operations and enum tests; delegate aggregate/input nodes to the typed context interface.
-6. Prove determinism, result-type preservation, outcome totality and context extensionality.
-7. Add fixtures for every constructor and error branch.
+1. Define a closed scalar `EvalError` and typed evaluation outcomes. Do not name
+   it as an extensible track-wide `SemanticError`: later accepted phases own
+   closed local errors, and combining APIs preserve exact child errors through
+   explicit wrapper sums. Semantic evaluation errors remain distinct from
+   frontend builder, declaration-checker and model-checker diagnostics.
+2. Define an evaluation context indexed by the checked term's actual `RowScope`.
+   It must provide typed parameter access, the scope-appropriate typed current-row
+   identity/projection for either table or input scope, and abstract typed
+   aggregate/input services; it may not assume every term is evaluated in an
+   owning-table row.
+3. Interpret exact scientific literals in `ℝ` and explicit `Int → Real`
+   coercions.
+4. Evaluate subexpressions left-to-right; division by zero returns the frozen
+   scalar error.
+5. Cover every owned constructor explicitly, including literals, parameters,
+   `self`, arithmetic, comparisons, Boolean operations, enum literals/tests,
+   `intToReal`, `input` and `agg`; the latter two delegate to the typed context
+   interface.
+6. Prove determinism, result-type preservation, outcome totality, scope safety
+   and context extensionality.
+7. Add fixtures for every constructor and error branch, with distinct table- and
+   input-scope contexts.
 
 ## Allowed files
 
@@ -43,7 +58,9 @@ Do not inherit Lean's total `x / 0` behavior; the evaluator must implement the e
 
 ## Acceptance criteria
 
-1. Every owned expression constructor has semantics and fixtures.
-2. Determinism, type preservation, total outcome and extensionality pass the audit.
+1. Every owned expression constructor, including `enum`, `intToReal`, `input`
+   and `agg`, has semantics and fixtures.
+2. Determinism, type preservation, total outcome, scope safety and extensionality
+   pass the audit.
 3. Error order is pinned by tests and definitions.
 4. Build, proof hygiene and full checks pass.

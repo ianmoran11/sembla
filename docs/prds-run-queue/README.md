@@ -1,8 +1,18 @@
 # Run queue
 
-**Pending:** `0001-transition-frontend-builders.md` from the approved Lean IR foundational formalization track.
+**Pending:** `0001-observation-builders-and-macro-delegation.md` from the approved Lean IR foundational formalization track.
 
-## Last cleared 2026-08-03 — core frontend builders
+## Last cleared 2026-08-04 — transition frontend builders
+
+`0001-transition-frontend-builders` was approved and returned as
+[`prds-lean-ir-formalization/0008`](../prds-lean-ir-formalization/0008-transition-frontend-builders.md)
+in implementation commit `462ef2c`. It established complete pure raw and typed
+transition/effect/contest builders, context-parametric checker adapters, a
+race-only current-surface boundary, source-ordinal transition overlays over the
+accepted core shells, exact error/failure and erasure theorem families, and
+independent canonical contest-transition parity.
+
+## Earlier cleared 2026-08-03 — core frontend builders
 
 `0001-core-frontend-builders` was approved and returned as
 [`prds-lean-ir-formalization/0007`](../prds-lean-ir-formalization/0007-core-frontend-builders.md)
@@ -94,7 +104,7 @@ names, so one command runs them in the right order:
 /piprd run docs/prds-run-queue
 ```
 
-Running it now executes only the approved transition-frontend-builders PRD.
+Running it now executes only the approved observation-builders-and-macro-delegation PRD.
 
 ## How to use it
 
