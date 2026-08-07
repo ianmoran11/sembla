@@ -1,0 +1,328 @@
+{
+  "base_draw_generator": {
+    "algorithm": "python_random_normalvariate",
+    "materialized_values_authoritative": true,
+    "seed": 6006
+  },
+  "base_draws": [
+    {
+      "free_values": {
+        "interstate_base": 5.324527889132847e-05,
+        "k": 6.3736932190458005e-06,
+        "peak_months": 150.0226850676448,
+        "pull_act": 1.1892114857211793,
+        "pull_nt": 0.9085371346955524,
+        "pull_qld": 1.1559883169671437,
+        "pull_sa": 0.8064823210812221,
+        "pull_tas": 0.7862944385811607,
+        "pull_vic": 1.1103788283545837,
+        "pull_wa": 0.6504588099922289,
+        "push_act": 1.1484815348117774,
+        "push_nt": 0.8370831165085516,
+        "push_qld": 1.0743547668791509,
+        "push_sa": 0.8281197872026226,
+        "push_tas": 1.0359750541564827,
+        "push_vic": 1.559339774557826,
+        "push_wa": 1.1427033602171344
+      },
+      "index": 0,
+      "latent_z": {
+        "interstate_base": -1.2605220892936,
+        "k": -0.9008120164192422,
+        "peak_months": -3.5012700600171085,
+        "pull_act": 0.6931618818188638,
+        "pull_nt": -0.38367806899030316,
+        "pull_qld": 0.5798226550772353,
+        "pull_sa": -0.8602932088047365,
+        "pull_tas": -0.9616958116263542,
+        "pull_vic": 0.41880497562031754,
+        "pull_wa": -1.7203092142761116,
+        "push_act": 0.5537626614460082,
+        "push_nt": -0.7113276421810624,
+        "push_qld": 0.2868810580830971,
+        "push_sa": -0.7543898581043263,
+        "push_tas": 0.14137225819141364,
+        "push_vic": 1.7770500409627417,
+        "push_wa": 0.5335872950421271
+      }
+    },
+    {
+      "free_values": {
+        "interstate_base": 8.779762647239235e-05,
+        "k": 1.2319690014945492e-05,
+        "peak_months": 394.23932825756407,
+        "pull_act": 1.415488007487534,
+        "pull_nt": 0.7499884446118292,
+        "pull_qld": 1.2287258866174828,
+        "pull_sa": 1.3667143557387509,
+        "pull_tas": 0.8966248444485894,
+        "pull_vic": 0.9138006772086249,
+        "pull_wa": 1.444291190976791,
+        "push_act": 1.6203770180225674,
+        "push_nt": 0.9337126686031888,
+        "push_qld": 0.8212236035081227,
+        "push_sa": 0.8981866651843249,
+        "push_tas": 1.005198080271093,
+        "push_vic": 0.8389307576110328,
+        "push_wa": 0.9440686382158623
+      },
+      "index": 1,
+      "latent_z": {
+        "interstate_base": -0.2602714381129557,
+        "k": 0.4172274073404542,
+        "peak_months": 0.3634165022454241,
+        "pull_act": 1.389897413015353,
+        "pull_nt": -1.1507899190188018,
+        "pull_qld": 0.8239110718689423,
+        "pull_sa": 1.2496383155053756,
+        "pull_tas": -0.43647095208409936,
+        "pull_vic": -0.36057123505041067,
+        "pull_wa": 1.4704747037677532,
+        "push_act": 1.9306353973677963,
+        "push_nt": -0.27434609364496343,
+        "push_qld": -0.787839406187647,
+        "push_sa": -0.4295094583714966,
+        "push_tas": 0.020738467550074635,
+        "push_vic": -0.7025084223429182,
+        "push_wa": -0.23022562202179214
+      }
+    },
+    {
+      "free_values": {
+        "interstate_base": 0.0001410404511886842,
+        "k": 3.4437616890581446e-05,
+        "peak_months": 549.211410823432,
+        "pull_act": 1.190045259648837,
+        "pull_nt": 0.6666575174103342,
+        "pull_qld": 0.8430826955893553,
+        "pull_sa": 1.3726453302479926,
+        "pull_tas": 0.5430501339123424,
+        "pull_vic": 1.5360814063029717,
+        "pull_wa": 0.9231478202449707,
+        "push_act": 0.7106079687384521,
+        "push_nt": 0.7871983656608441,
+        "push_qld": 1.153071242452585,
+        "push_sa": 1.5302705528932565,
+        "push_tas": 1.0679108829810813,
+        "push_vic": 0.5375476372282528,
+        "push_wa": 1.4136515015497408
+      },
+      "index": 2,
+      "latent_z": {
+        "interstate_base": 0.687753102217264,
+        "k": 2.4731287763903675,
+        "peak_months": 1.6895176776034184,
+        "pull_act": 0.6959653588741599,
+        "pull_nt": -1.6219153283473455,
+        "pull_qld": -0.6827609160277225,
+        "pull_sa": 1.2669591041758868,
+        "pull_tas": -2.4422145426523887,
+        "pull_vic": 1.7169385288650099,
+        "pull_wa": -0.31986362143009966,
+        "push_act": -1.3665375254380248,
+        "push_nt": -0.9571000375538757,
+        "push_qld": 0.5697161125949869,
+        "push_sa": 1.7017782069111738,
+        "push_tas": 0.2628171766193645,
+        "push_vic": -2.4829515820243784,
+        "push_wa": 1.3847042970452608
+      }
+    }
+  ],
+  "correlation_metric": "sample-space covariance participation rank and mean absolute centered draw cosine",
+  "effect_metric": "RMS central difference per prior standard deviation over 3 bases and all components",
+  "expected_run_count": 108,
+  "format": "sembla.target-sensitivity-predeclaration/v1",
+  "free_parameter_order": [
+    "interstate_base",
+    "k",
+    "peak_months",
+    "pull_act",
+    "pull_nt",
+    "pull_qld",
+    "pull_sa",
+    "pull_tas",
+    "pull_vic",
+    "pull_wa",
+    "push_act",
+    "push_nt",
+    "push_qld",
+    "push_sa",
+    "push_tas",
+    "push_vic",
+    "push_wa"
+  ],
+  "free_parameters": {
+    "interstate_base": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "interstate_base"
+      },
+      "location": -9.210340371976184,
+      "spread": 0.5
+    },
+    "k": {
+      "identification": {
+        "evidence": "simulated_stock_age_structure",
+        "group": "k"
+      },
+      "location": -11.512925464970229,
+      "spread": 0.5
+    },
+    "peak_months": {
+      "identification": {
+        "evidence": "simulated_stock_age_structure",
+        "group": "peak"
+      },
+      "location": 5.886104031450156,
+      "spread": 0.25
+    },
+    "pull_act": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "pull_nt": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "pull_qld": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "pull_sa": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "pull_tas": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "pull_vic": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "pull_wa": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_act": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_nt": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_qld": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_sa": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_tas": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_vic": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    },
+    "push_wa": {
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "location": 0.0,
+      "spread": 0.25
+    }
+  },
+  "full_dimension": 1096,
+  "inputs": {
+    "model_raw_sha256": "6f307418a367d44d6cde56c18c57d6873981a7187bc17fa94ca3c5f9110ed904",
+    "params_raw_sha256": "cd4f4ffe295711cbdfb55701cf66ed4e2897caff07192fada7410624d1220e35",
+    "plan_raw_sha256": "6f05d870681f35950deab4c74a8a9e816b43625a744f9e8cf2d5aa96a2ef18fe",
+    "state_raw_sha256": "1d3f85db8fd93c66118df15622c70eac4fd6dfc1adcc72c9142b5949146eff5f",
+    "targets_domain_sha256": "e465e65aa90a2d2ae48acbb68b54c371ab8a62395cb6a612133d457850561da0"
+  },
+  "noise_metric": "RMS component sample standard deviation over 6 independent prior-median seeds",
+  "noise_point": "prior_medians",
+  "noise_seeds": [
+    9101,
+    9102,
+    9103,
+    9104,
+    9105,
+    9106
+  ],
+  "normalisation": "(observed-target)/max(abs(target),1)",
+  "paired_seeds": [
+    8001,
+    8002,
+    8003
+  ],
+  "perturbation_prior_sd": 0.5,
+  "purpose": "diagnostic prior-predictive sensitivity only; no fitting or inference",
+  "recommendation_rule": "recommend reduced only if every free parameter passes both gates; otherwise recommend full",
+  "reduced_dimension": 165,
+  "run_year": 2010,
+  "scale": "hundredth",
+  "sensitivity_gate": {
+    "minimum_effect_to_noise": 1.0,
+    "minimum_retained_effect_ratio": 0.1
+  },
+  "ticks": 12
+}

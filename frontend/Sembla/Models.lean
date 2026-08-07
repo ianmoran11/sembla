@@ -1,6 +1,7 @@
 import Sembla.Json
 import Sembla.DSL
 import Sembla.Models.DemographicSlots
+import Sembla.Models.AustralianPopulation
 
 namespace Sembla.Models
 open Sembla.IR Sembla.DSL
@@ -18,8 +19,8 @@ sembla_model sir
       employer : Employer
     system Employer (rows := 50_000)
 
-    infect on Person : health: S →[β · freq (health = I) over employer] I
-    recover on Person : health: I →[γ] R
+    infect on Person : health: S → [β · freq (health = I) over employer] I
+    recover on Person : health: I → [γ] R
 
     view S := count Person where health = S
     view I := count Person where health = I
@@ -61,11 +62,11 @@ sembla_model sirPolicy
     input restriction_modifier where
       modifier_offset : ℝ
 
-    infect on Person : health: S →[
+    infect on Person : health: S → [
       β · freq (health = I) over employer ·
         (1.0 + inputSum restriction_modifier field modifier_offset)
     ] I
-    recover on Person : health: I →[γ] R
+    recover on Person : health: I → [γ] R
 
     output infection_count from Person where
       infected : Int := count where health = I
@@ -113,8 +114,8 @@ sembla_model reversibleCtmc
     system Particle (rows := 100_000) where
       phase : {A, B}
 
-    move_ab on Particle : phase: A →[rate_ab] B
-    move_ba on Particle : phase: B →[rate_ba] A
+    move_ab on Particle : phase: A → [rate_ab] B
+    move_ba on Particle : phase: B → [rate_ba] A
 
 /- Bateman-chain hazards with a stable sink; stages advance on separate ticks. -/
 sembla_model radioactiveDecayChain
@@ -127,8 +128,8 @@ sembla_model radioactiveDecayChain
     system Atom (rows := 100_000) where
       nuclide : {Parent, Daughter, Stable}
 
-    parent_decay on Atom : nuclide: Parent →[«λ_parent»] Daughter
-    daughter_decay on Atom : nuclide: Daughter →[lambda_daughter] Stable
+    parent_decay on Atom : nuclide: Parent → [«λ_parent»] Daughter
+    daughter_decay on Atom : nuclide: Daughter → [lambda_daughter] Stable
 
 /- Frequency-dependent SIS hazards, frozen per tick, with exogenous importation. -/
 sembla_model sisImportation
@@ -144,10 +145,10 @@ sembla_model sisImportation
       community : Community
     system Community (rows := 1_000)
 
-    infect on Person : health: S →[
+    infect on Person : health: S → [
       import_rate + β · freq (health = I) over community
     ] I
-    recover on Person : health: I →[γ] S
+    recover on Person : health: I → [γ] S
 
 /- Markovian SEIRS hazards under fixed-dt tau-leaping, with importation and waning. -/
 sembla_model seirsWaning
@@ -165,12 +166,12 @@ sembla_model seirsWaning
       community : Community
     system Community (rows := 1_000)
 
-    expose on Person : health: S →[
+    expose on Person : health: S → [
       import_rate + β · freq (health = I) over community
     ] E
-    progress on Person : health: E →[σ] I
-    recover on Person : health: I →[γ] R
-    wane on Person : health: R →[omega] S
+    progress on Person : health: E → [σ] I
+    recover on Person : health: I → [γ] R
+    wane on Person : health: R → [omega] S
 
 /- Mean-field noisy voter hazards with per-tick snapshot mutation and imitation. -/
 sembla_model noisyVoter
@@ -185,10 +186,10 @@ sembla_model noisyVoter
       community : Community
     system Community (rows := 1_000)
 
-    adopt_b on Agent : opinion: A →[
+    adopt_b on Agent : opinion: A → [
       mutation_rate + imitation_rate · freq (opinion = B) over community
     ] B
-    adopt_a on Agent : opinion: B →[
+    adopt_a on Agent : opinion: B → [
       mutation_rate + imitation_rate · freq (opinion = A) over community
     ] A
 

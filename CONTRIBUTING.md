@@ -35,10 +35,16 @@ contract before submitting a repository-wide change:
 ./scripts/check-rust.sh       # formatting, Clippy, Rust tests, dependency policy
 ./scripts/check.sh            # documentation + strict Rust + Lean + parity
 python3 scripts/check-markdown-links.py
+./scripts/check-abs-data.sh    # ABS extracts, readers, reconciliation (offline)
 python3 scripts/check-cargo-metadata.py
 ./scripts/check-determinism.sh
 bash frontend/scripts/check-parity.sh
 ```
+
+`./scripts/check-abs-data.sh` runs the ABS pipeline's reader and extract
+tests, verifies the pinned cache without touching the network, reconciles
+the committed extracts, and confirms they regenerate byte-identically. It
+uses only the Python standard library and needs no virtual environment.
 
 The directly runnable Markdown checker uses only the Python standard library.
 It checks relative targets in tracked Markdown, excludes managed `.piprd`

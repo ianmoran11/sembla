@@ -1,0 +1,22 @@
+{
+  "format": "sembla.australian-population-fidelity/v1",
+  "held_out_seed": 2001,
+  "pilot_seeds": [
+    1001,
+    1002,
+    1003,
+    1004,
+    1005,
+    1006,
+    1007,
+    1008,
+    1009,
+    1010
+  ],
+  "run_year": 2010,
+  "scale": "hundredth",
+  "scale_factor": 100,
+  "status": "predeclared",
+  "ticks": 12,
+  "tolerance_rule": "ceil(3 * sample_standard_deviation)"
+}

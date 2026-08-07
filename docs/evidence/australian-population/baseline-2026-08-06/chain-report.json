@@ -1,0 +1,2282 @@
+{
+  "backend": "cpu",
+  "enabled_features": [
+    "grouped-observations"
+  ],
+  "end_boundary": "2025-06-30",
+  "end_run_year": 2024,
+  "execution_contract": {
+    "bytes": 948,
+    "path": "data/abs/targets/execution.json",
+    "raw_sha256": "779a74bca8bf89d2965c09c72dea8c434645f15c1667c3e3078db80f4d55ed9a"
+  },
+  "format": "sembla.australian-population-chain/v1",
+  "initial_state": "fixtures/state/australian_population_2010_hundredth.state",
+  "link_count": 15,
+  "links": [
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.002457002457002457,
+          "fired_on_slot_resource": 407,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 8
+        },
+        "minimum_vacant_birth_slots": 47053,
+        "minimum_vacant_overseas_slots": 77700,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2607,
+          "path": "2010.grouped.births_cells.csv",
+          "raw_sha256": "8ad9a4de4e18ce5598f7a16f68750d1c0dcf483bd19b8bae617d711a23162870",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2279,
+          "path": "2010.grouped.deaths_cells.csv",
+          "raw_sha256": "6798313bb942a013ee029217efae7c81e7c9aa7daf326e3dfd73c1e75e9d1c04",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 13582,
+          "path": "2010.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "3a7b6f3754051d8da384e5fb0ce1911f42fcb4f48c7800fc59f3cb1ded81f70e",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 22421,
+          "path": "2010.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "8f0f902bfc78cc036b542221521ed500c4a39feb535c81209ae3e5457a2885cf",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 4845,
+          "path": "2010.grouped.interstate_flows.csv",
+          "raw_sha256": "9461c102d6773d5ff21f5d5da5233d2f9cb62dd641b43fe5cde3e2e5b9cfaeb7",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2630,
+          "path": "2010.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "766f6fa63465c938071790f7846f1fd11ca9c8168c97d50b6ca4d20eedc8b45c",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2483,
+          "path": "2010.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "2e4a9eef48516eb2ff4e5483109f2b60f5dade76abd4a9c893f97705344b965f",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 70816,
+          "path": "2010.grouped.population_cells.csv",
+          "raw_sha256": "819d396290ec076c26a625bdb934ce1c8594b8d00fdfbff59448a77fca7c390f",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 339318,
+          "path": "2010.grouped.population_single_year_cells.csv",
+          "raw_sha256": "fd76ef6ec289d8fea95e2900600fd9e4ff9b1f3f1f9b6257a80152d315daa3a3",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6467,
+          "path": "2010.grouped.vacancy_cells.csv",
+          "raw_sha256": "19feadb146511562ad8e4c7b3e60735f3d1ef953d03303321f8b47a47b8b945f",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "fixtures/state/australian_population_2010_hundredth.state",
+        "raw_sha256": "1d3f85db8fd93c66118df15622c70eac4fd6dfc1adcc72c9142b5949146eff5f",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "c7db0d7324aecd9a50a3d297e604f71da8677058c20ae9b42f8fd7524a136df4",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2010-2011",
+      "manifest": {
+        "bytes": 19543,
+        "path": "2010.csv.manifest.json",
+        "raw_sha256": "6064d6fddf9ec5e559c421fbdbbf0f96f525cbfadf1b76722c3e3bf780b50a4e"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2011.state",
+        "raw_sha256": "738ea93ec68b616f08fc0989a3b5a8064dc8010a5a3fe550496bf313f5414738",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "8e703fb79c232b435e083a5a4df59d87c38e3a46117d55cfd0f07073ce04d670",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17890,
+        "path": "data/abs/params/2010.json",
+        "raw_sha256": "cd4f4ffe295711cbdfb55701cf66ed4e2897caff07192fada7410624d1220e35"
+      },
+      "results": {
+        "bytes": 37886,
+        "path": "2010.csv",
+        "raw_sha256": "e73c9c2b1f84841bcfb5859f60f42f121cff43eb822d533f934a5404c68f7b49"
+      },
+      "run_year": 2010,
+      "score": {
+        "bytes": 1095644,
+        "path": "2010.score.json",
+        "raw_sha256": "e4d3640e1639c42c7dea9805d5917a55c6e338696263ba2bcf69994dacd3ca3a"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "cd4f4ffe295711cbdfb55701cf66ed4e2897caff07192fada7410624d1220e35",
+          "replica_index": 0,
+          "run_year": 2010,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 2594735361883248024,
+        "sha256": "24025a106b3215983788014c5761bb4dc4c88fdc1210dc2ccb79063d29c8c1e4"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2010.csv.summaries.csv",
+        "raw_sha256": "cab0420b2c3fb732c1fe142c0c4a3f76828f741f9c41c003669147529486452f"
+      },
+      "targets": {
+        "bytes": 4180580,
+        "domain_sha256": "e465e65aa90a2d2ae48acbb68b54c371ab8a62395cb6a612133d457850561da0",
+        "path": "data/abs/targets/2010.json",
+        "raw_sha256": "dfaa004668182e761d2a97e2b4ba44dea76a5e1c468f89613385d7a29a655d39"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 0,
+          "deferred_to_fired_ratio": 0.0,
+          "fired_on_slot_resource": 391,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 0
+        },
+        "minimum_vacant_birth_slots": 44052,
+        "minimum_vacant_overseas_slots": 72868,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2670,
+          "path": "2011.grouped.births_cells.csv",
+          "raw_sha256": "e79dd3e9c782ffcc2c3e76f89dcc5fd1177673f4cc7a76d1cfbe7be6b9dafd26",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2410,
+          "path": "2011.grouped.deaths_cells.csv",
+          "raw_sha256": "8ad19e9d3f52c7ec78235ff7c16e6f70ac27f6174d7c3c530a91a8c5bab2bc37",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 13870,
+          "path": "2011.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "0e14e7092ecc06ddff19f6218ed1a925c879c39a794c995bbbd73ebd98befc99",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 22301,
+          "path": "2011.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "eb635cfaf0b85feaa7ee8afbc7af10c77ed53c6855f1265f0248d80d2375f082",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 4870,
+          "path": "2011.grouped.interstate_flows.csv",
+          "raw_sha256": "2758f129786e5de5b18e9b13ea2360a77303bb7153d995ff1b8141921416966a",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2662,
+          "path": "2011.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "c1dc058aabcc3b589b33ae92f7a8c063b3017f804a02e710484eec30351674b5",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2642,
+          "path": "2011.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "ef7c537e7dde1b6675e741c0a33b9d57e7b51d22dfc48e01ed52b2aef6451405",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 70991,
+          "path": "2011.grouped.population_cells.csv",
+          "raw_sha256": "45f63a01142d4c468668002963f45cc85a49ec50ffad3dcda42e751e44d91be9",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 340923,
+          "path": "2011.grouped.population_single_year_cells.csv",
+          "raw_sha256": "d0bc7b937964420f8a78000e283fde1cf57adfbcca5ec00a516a53951807998a",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6697,
+          "path": "2011.grouped.vacancy_cells.csv",
+          "raw_sha256": "cc7ef92ffdee4c085f1826f89c9aa97efc12cc42a820baf797f6f19f7c05707d",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2011.state",
+        "raw_sha256": "738ea93ec68b616f08fc0989a3b5a8064dc8010a5a3fe550496bf313f5414738",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "8e703fb79c232b435e083a5a4df59d87c38e3a46117d55cfd0f07073ce04d670",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2011-2012",
+      "manifest": {
+        "bytes": 19451,
+        "path": "2011.csv.manifest.json",
+        "raw_sha256": "d2af01a583b37b82a9ddffb3d0359801002b33bf00ba2e688509e2585946d45b"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2012.state",
+        "raw_sha256": "b6bac49c1368f6c5fe9c0dc4c830494de54b4e36f8f510a38ed300e723be52b8",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "1178e6f3540f572e63e3b0b0ad648935ef9beba8fd89b474d9f18a51fe34a5e9",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17822,
+        "path": "data/abs/params/2011.json",
+        "raw_sha256": "04487d83bfd16503d0354b15b61edeaee83ec685bc20504c4572ba5f1dcafeb1"
+      },
+      "results": {
+        "bytes": 37848,
+        "path": "2011.csv",
+        "raw_sha256": "68c541c0cd8379564f93ed79f8902742a361fde4b95b1b2f7ddbf082b9b0d575"
+      },
+      "run_year": 2011,
+      "score": {
+        "bytes": 1096422,
+        "path": "2011.score.json",
+        "raw_sha256": "604de4436a9557d950c768ce5e37c14a82f7b2cb93272b3a7bfa53aacccbb12b"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "04487d83bfd16503d0354b15b61edeaee83ec685bc20504c4572ba5f1dcafeb1",
+          "replica_index": 0,
+          "run_year": 2011,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 8352363302603609403,
+        "sha256": "73e98e2bc6b2553b855f38731beb5161f7fe5e1b96eaae13be23681929d8805d"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2011.csv.summaries.csv",
+        "raw_sha256": "8e5922469dcd68b65cd27807617e24f6e725b48aa98c08ab08de8e59ed057325"
+      },
+      "targets": {
+        "bytes": 4180596,
+        "domain_sha256": "fc54e6bb463d468acd4b51ea44d964ee89172214dce175acce8815fbeb8f19a4",
+        "path": "data/abs/targets/2011.json",
+        "raw_sha256": "355c516bbe401e131788d9013246dfbcad84da3c47d4abe04de7b1e5ad2a15ad"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.002232142857142857,
+          "fired_on_slot_resource": 448,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 7
+        },
+        "minimum_vacant_birth_slots": 41028,
+        "minimum_vacant_overseas_slots": 68025,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2678,
+          "path": "2012.grouped.births_cells.csv",
+          "raw_sha256": "c5f2c9b265d5d3a068923d779a269ba3edfaf956b86eb93f761c830607a00554",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2261,
+          "path": "2012.grouped.deaths_cells.csv",
+          "raw_sha256": "d1626a9857a80d20da04a86f58beff4444efbb784ccab0040bff1a6c15e12fe0",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 13790,
+          "path": "2012.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "c518c83a3bc2c080bcad7cb7fd9d865c6e442948f8180068d67f89e06f04a501",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 25513,
+          "path": "2012.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "34b3e72252f672989448bea3587d57d48f241c79c37c5e28a657b442a5082164",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 4964,
+          "path": "2012.grouped.interstate_flows.csv",
+          "raw_sha256": "2697a9ecdf844c02074614b4dc901e04344091fba549c8ca9f3b62f731597301",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2615,
+          "path": "2012.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "657a24a51b47e4dce14a461f3279d7d0f6c5e8a47605f3d2e2b91d1a363d9995",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2514,
+          "path": "2012.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "dffdd9928600f1b2bdb74d7873f05b9981d94083fe72feecef0c3cc59b3e2b2e",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 71538,
+          "path": "2012.grouped.population_cells.csv",
+          "raw_sha256": "8698447f3055dbecd655981a04ff65247f538261a109c851b5378a8efa5ca7a5",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 342025,
+          "path": "2012.grouped.population_single_year_cells.csv",
+          "raw_sha256": "e6ed26b679b1610ad82002963727fb1a3603b3b9288c56f23ebc84e920aeaae8",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6730,
+          "path": "2012.grouped.vacancy_cells.csv",
+          "raw_sha256": "036404456878539af78f6b4b0032bdbf1f347af3ff0aa0b3dc5de334d91887a9",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2012.state",
+        "raw_sha256": "b6bac49c1368f6c5fe9c0dc4c830494de54b4e36f8f510a38ed300e723be52b8",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "1178e6f3540f572e63e3b0b0ad648935ef9beba8fd89b474d9f18a51fe34a5e9",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2012-2013",
+      "manifest": {
+        "bytes": 19381,
+        "path": "2012.csv.manifest.json",
+        "raw_sha256": "b5df7e49da6aef6acdd901c98d64096165dac72c85dc32486bc49a58cc755215"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2013.state",
+        "raw_sha256": "d03d0271758d905704c903e5ae4c11d2a4fc394e25939f13af9c8335aca0fae9",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "6ba34890f9e77c281773d0408a256ac36e23827f681fc4f5f04436ca09ce1454",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17759,
+        "path": "data/abs/params/2012.json",
+        "raw_sha256": "5e80c369bd6496a1426fa6ee384e7316737ff58b5a4211e9ca85cf99cd0bb617"
+      },
+      "results": {
+        "bytes": 37783,
+        "path": "2012.csv",
+        "raw_sha256": "83601555e033c2e6811de11511b1e08fb4ddedda06602f6fc9100c4436028766"
+      },
+      "run_year": 2012,
+      "score": {
+        "bytes": 1098086,
+        "path": "2012.score.json",
+        "raw_sha256": "6e603520ff2b6409db024441ace03a6a7d8824a0c12c1064cef58178f5ed8204"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "5e80c369bd6496a1426fa6ee384e7316737ff58b5a4211e9ca85cf99cd0bb617",
+          "replica_index": 0,
+          "run_year": 2012,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 15209722509838124537,
+        "sha256": "d313ca09c32a05f9d0e8c4ece327c69185d8e056df9295df37f8cb5ad8147882"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2012.csv.summaries.csv",
+        "raw_sha256": "a8e56c1c0c1bfe569965c8460618cd1caef84bec3d310822e0b7f1fba66ab55c"
+      },
+      "targets": {
+        "bytes": 4180590,
+        "domain_sha256": "7ca3a3cbe53a6d57331a09fba7cb439d88fd935d5b949cb4e8d98be35066888e",
+        "path": "data/abs/targets/2012.json",
+        "raw_sha256": "26e4e982fcdcc7272b0e8282ac9a5a36393421a372f1067c15e7d18ba79d2daa"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.0021691973969631237,
+          "fired_on_slot_resource": 461,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 0
+        },
+        "minimum_vacant_birth_slots": 37864,
+        "minimum_vacant_overseas_slots": 63405,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2669,
+          "path": "2013.grouped.births_cells.csv",
+          "raw_sha256": "4743a895e345859dc0785678efa7e059f2d37b8efb4e0ff043ae9059e0a9b820",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2385,
+          "path": "2013.grouped.deaths_cells.csv",
+          "raw_sha256": "1530a900d6ffc6ccb44ee05cbd596f3071e53339723911d9c2fde7f8e0510b81",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 14177,
+          "path": "2013.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "fc611e08814e52343a621e9e95a2acc21d7bf29c0b3a721e49fc0623089665ec",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 24619,
+          "path": "2013.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "23a22e1b847d31f7951b7eb5961313797f5648a6fcec2171518b0d6fcaee7f30",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5059,
+          "path": "2013.grouped.interstate_flows.csv",
+          "raw_sha256": "480ccb4168b5605d4133d125e907eeaa0fb681929269e7a3db811e5f81bd3ea4",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2719,
+          "path": "2013.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "aa1209fb21707d3b3f9186615bb43e19ae5e044dfe49573d9bc9078b31cb80f4",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2549,
+          "path": "2013.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "09cfeb53545cd565a2c48dd6fde9e8e478fdca4189f475e2d512950fbc5c1a5f",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 71981,
+          "path": "2013.grouped.population_cells.csv",
+          "raw_sha256": "b4fc4127008ab3e9e651e9515e85a9921ec80ac836fc0f17cfb7affcd55cd530",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 343729,
+          "path": "2013.grouped.population_single_year_cells.csv",
+          "raw_sha256": "e6c783311ca383501c846fae879debbadf5d86872bf793650601af0dcfbaa169",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6730,
+          "path": "2013.grouped.vacancy_cells.csv",
+          "raw_sha256": "8d7d8f7f43f0f20e0872b711aa9f17bee8e4b391d7395601123de47a1cf2d1c6",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2013.state",
+        "raw_sha256": "d03d0271758d905704c903e5ae4c11d2a4fc394e25939f13af9c8335aca0fae9",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "6ba34890f9e77c281773d0408a256ac36e23827f681fc4f5f04436ca09ce1454",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2013-2014",
+      "manifest": {
+        "bytes": 19448,
+        "path": "2013.csv.manifest.json",
+        "raw_sha256": "2c833afea07361556a48082ba9fccc852385e8bf0b186a69b7a2c949d0bd60fd"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2014.state",
+        "raw_sha256": "aa9fc29ca927a0d845e636a4340210d2c1f96543e5fddd890a4dfb118bb1e2e6",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "feba5b04056ddccca5b458572a874c49ec23e4427fdb331c70164d7aab3ccba1",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17821,
+        "path": "data/abs/params/2013.json",
+        "raw_sha256": "cfd70467b999f2ba766a23273f35d5236901690179e4faac7bcbd0b8c1e6fd4e"
+      },
+      "results": {
+        "bytes": 37860,
+        "path": "2013.csv",
+        "raw_sha256": "14de404f81304e07bf00a219cd6d8fd3c37e0d511714f66aa5bda8f4c94b6c1a"
+      },
+      "run_year": 2013,
+      "score": {
+        "bytes": 1098344,
+        "path": "2013.score.json",
+        "raw_sha256": "205305a53a3a916f948423a1c09ebe98633d37ee031efcb81b9eeeba6bb4e192"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "cfd70467b999f2ba766a23273f35d5236901690179e4faac7bcbd0b8c1e6fd4e",
+          "replica_index": 0,
+          "run_year": 2013,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 5005260250600429197,
+        "sha256": "457641adcd6bd68d9a398d6e4aa41436a5b37e364fd94aabc9cc88454b0d2da3"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2013.csv.summaries.csv",
+        "raw_sha256": "4c92cc25353cd581681ba205e3af50d4c029d3398e3de48252dc189a7c256485"
+      },
+      "targets": {
+        "bytes": 4180627,
+        "domain_sha256": "8be5078b1e01598a47db70666c5395a9484ef2aa05738338eec4398afb54762f",
+        "path": "data/abs/targets/2013.json",
+        "raw_sha256": "df586347859d101b4d42003732361b2a62260d7eb355fb891c055d22f56a655a"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.0022522522522522522,
+          "fired_on_slot_resource": 444,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 3
+        },
+        "minimum_vacant_birth_slots": 34916,
+        "minimum_vacant_overseas_slots": 58896,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2635,
+          "path": "2014.grouped.births_cells.csv",
+          "raw_sha256": "120817a6801e2b4d78e7ef650a09fa7f32a7d30f56efe3d7302af0c26321b2c7",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2401,
+          "path": "2014.grouped.deaths_cells.csv",
+          "raw_sha256": "3e3678ebd104d7e5f0b31f972bf8361ccc3283a0a2550971c43d046fa3f6ca0e",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 14444,
+          "path": "2014.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "53b01036ae4dc4ae0b906d09af351d24e201778b7a45b1f127bbb307bcdb052e",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 24689,
+          "path": "2014.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "1d6aeed41906eaaed72c9a41e787b8ce7cbcd712922c154d3026031b999c1d37",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5099,
+          "path": "2014.grouped.interstate_flows.csv",
+          "raw_sha256": "823719b0739e909f5ab3c3c71b86c8ca72d04f74ae54e3ed922d3dda555d47bc",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2716,
+          "path": "2014.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "5f39ffc8cf072ecfc8d9caf86714d5c7f43ed1541f3412ea1d93131966ed27f2",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2598,
+          "path": "2014.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "c4747dccd0af45e3504effe50bec26fc447c6b8ae8e3d0ebf9686ddabfd3f59f",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 72262,
+          "path": "2014.grouped.population_cells.csv",
+          "raw_sha256": "182928485ce506f6be172dd2892a356c79ff3566d89fea33333dcd451ded632a",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 343841,
+          "path": "2014.grouped.population_single_year_cells.csv",
+          "raw_sha256": "fa8d1fa5c8f7c4845b01d6c4a2698870a76bb4dd1c4b90f852944242593764fe",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6731,
+          "path": "2014.grouped.vacancy_cells.csv",
+          "raw_sha256": "f63621fc0d06bbe5f1f32764a3e5eb772dee17ea0a04c46d611becf910544a2d",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2014.state",
+        "raw_sha256": "aa9fc29ca927a0d845e636a4340210d2c1f96543e5fddd890a4dfb118bb1e2e6",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "feba5b04056ddccca5b458572a874c49ec23e4427fdb331c70164d7aab3ccba1",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2014-2015",
+      "manifest": {
+        "bytes": 19575,
+        "path": "2014.csv.manifest.json",
+        "raw_sha256": "cd48861cbf2c3a062f362e9df14badc0d67b9fe7dfb70086c9096dd9efedac87"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2015.state",
+        "raw_sha256": "b9de0a393904b7277776cfffba57b8c8194c80bd992eb27e0be9317121599a3c",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "e309efc4f1a070af189949e295a4c47c1e755deb4ac56f72dc3ccf2b7b60e940",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17948,
+        "path": "data/abs/params/2014.json",
+        "raw_sha256": "642d673c01f3f548e0be6471d2bca6e9b7481e227e2564a0a524dbe2c5d17939"
+      },
+      "results": {
+        "bytes": 37992,
+        "path": "2014.csv",
+        "raw_sha256": "46b5fe017228afc19cafb43e4a933c7429af9d2a624671093ab3349a6ab3328f"
+      },
+      "run_year": 2014,
+      "score": {
+        "bytes": 1098397,
+        "path": "2014.score.json",
+        "raw_sha256": "2254455bd194a1a26a5db8153b02a2499d8060c0ee831a83a32cb2828a477a10"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "642d673c01f3f548e0be6471d2bca6e9b7481e227e2564a0a524dbe2c5d17939",
+          "replica_index": 0,
+          "run_year": 2014,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 4828353909448632933,
+        "sha256": "4301c24c868dea651d6cd808dd5083c5df880e3461d6f51e55d90a5fbdc4acd5"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2014.csv.summaries.csv",
+        "raw_sha256": "ba6891b2a58f1b27b2e635ed6dd60dcb2d5440e730bd2e5f6107a6476775dac0"
+      },
+      "targets": {
+        "bytes": 4180688,
+        "domain_sha256": "5f869ca69b6ada63da0ee276b6205e619e4899c96381c1cc7b7feacdc15e7340",
+        "path": "data/abs/targets/2014.json",
+        "raw_sha256": "20a145dead99b431a519a0cc1911d917a434dd42c1fbc3c25335b9bb0f8f3519"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 2,
+          "deferred_to_fired_ratio": 0.004132231404958678,
+          "fired_on_slot_resource": 484,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 0
+        },
+        "minimum_vacant_birth_slots": 31833,
+        "minimum_vacant_overseas_slots": 54081,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2647,
+          "path": "2015.grouped.births_cells.csv",
+          "raw_sha256": "82d55bfbf6f2d75596e6fd98dd6ed09aaea8fa4e59e9ce16f7b03563ddc95790",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2305,
+          "path": "2015.grouped.deaths_cells.csv",
+          "raw_sha256": "eb35b2cfd45fc509682b1b29a97eda718ff637bade0fdb6c49e4b7dc07cd2c64",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 14247,
+          "path": "2015.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "2d1fe8d6df2babf3fee752cae19ff79d0dad47e799b8d3f6b8974d331c1cec9b",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 25939,
+          "path": "2015.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "97ca312ca9582a5a037489efbd035c040fba1e60d73f088ba0671cc7e87bf5b5",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5325,
+          "path": "2015.grouped.interstate_flows.csv",
+          "raw_sha256": "cb33f31a873ef118f72caa40d1d61cec838c66f9a4da35eb97df94084239a0b4",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2736,
+          "path": "2015.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "8e3c46d0f7ca97383b80c11a049b76417b231d5206a087f3153527e3128b0256",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2554,
+          "path": "2015.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "99daffa213729af29d7fa9d8a8095b7fa6417481a3be42406b351ed0c99f86a7",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 72750,
+          "path": "2015.grouped.population_cells.csv",
+          "raw_sha256": "77dd6df7eef043e6a91d4a289b2467742e585ce51c7e7126ef41d1d1db7baea5",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 344814,
+          "path": "2015.grouped.population_single_year_cells.csv",
+          "raw_sha256": "5c2e4064628c18fa57f03a79eba7a5f5aff44fc8b8b7bafaf1f01be9d849c01c",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6721,
+          "path": "2015.grouped.vacancy_cells.csv",
+          "raw_sha256": "669b529ee3af7973b79296969cc5a6a908b97afa9b2cd8e4fb089aca85162306",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2015.state",
+        "raw_sha256": "b9de0a393904b7277776cfffba57b8c8194c80bd992eb27e0be9317121599a3c",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "e309efc4f1a070af189949e295a4c47c1e755deb4ac56f72dc3ccf2b7b60e940",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2015-2016",
+      "manifest": {
+        "bytes": 19473,
+        "path": "2015.csv.manifest.json",
+        "raw_sha256": "a20de87e97d78dc36c3ae9d026fd428602d01f763f4ae33576ee30fc964d3910"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2016.state",
+        "raw_sha256": "64fe5e0cf6724c501518264ab091580f72743aae7525148450801e32a3b196c0",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "5b5aa3e0ed50b0e4c51d2f94a86eab782a44dabda14e7013bd41c64a11c6cbce",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17834,
+        "path": "data/abs/params/2015.json",
+        "raw_sha256": "727990a6f3f08ccc2e4149bef592cc2e99a04dc01ee6e97599cadf3a5c6d6470"
+      },
+      "results": {
+        "bytes": 37899,
+        "path": "2015.csv",
+        "raw_sha256": "4d50a7a60b75d5375bc2628742c54f787f24ee7ceac9c342a231656cf058c3be"
+      },
+      "run_year": 2015,
+      "score": {
+        "bytes": 1099427,
+        "path": "2015.score.json",
+        "raw_sha256": "65003a9b8363baf2899ed0103551662a9789fbd408787d65a8eb0bb87ebc657d"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "727990a6f3f08ccc2e4149bef592cc2e99a04dc01ee6e97599cadf3a5c6d6470",
+          "replica_index": 0,
+          "run_year": 2015,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 16602397731015379114,
+        "sha256": "e66790c5e8ec48aa6d38aab27fe1506ff73fd18e280294c7fe1e7c499671b180"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2015.csv.summaries.csv",
+        "raw_sha256": "f53966fb22c7647a23eebbd56ad6ba2866eefe72b284953ceefcfa7b00d41af4"
+      },
+      "targets": {
+        "bytes": 4180740,
+        "domain_sha256": "570f1a3c64e8ac8da8f26cc3b0b1ccc7ed628124c060c681187aeef8d3e0ba4e",
+        "path": "data/abs/targets/2015.json",
+        "raw_sha256": "19032b1bdb4e05a8daa4acffd1dd99a88a6685b4114dbc502300f3c898ccc4ba"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 2,
+          "deferred_to_fired_ratio": 0.004705882352941176,
+          "fired_on_slot_resource": 425,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 4
+        },
+        "minimum_vacant_birth_slots": 28679,
+        "minimum_vacant_overseas_slots": 48664,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2626,
+          "path": "2016.grouped.births_cells.csv",
+          "raw_sha256": "c25bfb6d20096feadddfc9636ec944927020d31f3c17ed69a557e0586494db4e",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2348,
+          "path": "2016.grouped.deaths_cells.csv",
+          "raw_sha256": "4435e48f45106e230f6ebb5cab8595323a7f242ec9cb67b7fc77ba03fc48acf7",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 14046,
+          "path": "2016.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "135ae1479dd983fdb379aa01312ce0f86a05990edc234b6e78298142c9b7aaef",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 25617,
+          "path": "2016.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "31bb4b68593610c2bc9b33c2a70bef35b06271bef948a98a0526c506c777507d",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5167,
+          "path": "2016.grouped.interstate_flows.csv",
+          "raw_sha256": "57c11ca7a86b60299976d8793acd73d6c060952dc81e6afbf69c62d1a314c044",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2702,
+          "path": "2016.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "3c98617e451d2f3c29a148bcd68513f3c7e01f55675a1f34b5e3f4f6a1b3dea7",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2667,
+          "path": "2016.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "3f1deedb9e1500f2627913da70f5b2889e8ac38dfadfb292f48f300652f43973",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 72714,
+          "path": "2016.grouped.population_cells.csv",
+          "raw_sha256": "cfc435ae7d8f5c34a2ef15d7a44e974efdb53b3b17404013aed9d73e777ad1d8",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 345234,
+          "path": "2016.grouped.population_single_year_cells.csv",
+          "raw_sha256": "1a910c01de033adec731f1a59c30dee84c2a848219c3df741d7bac4f090f2a18",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6703,
+          "path": "2016.grouped.vacancy_cells.csv",
+          "raw_sha256": "cbe2765c446b6f847a24502c87d865c3b7da8f743c510336f00ae702ebfd577c",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2016.state",
+        "raw_sha256": "64fe5e0cf6724c501518264ab091580f72743aae7525148450801e32a3b196c0",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "5b5aa3e0ed50b0e4c51d2f94a86eab782a44dabda14e7013bd41c64a11c6cbce",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2016-2017",
+      "manifest": {
+        "bytes": 19485,
+        "path": "2016.csv.manifest.json",
+        "raw_sha256": "023db3c63c90e57ffe239caabd51c70abc612828b955d69e33f0c01885c11a28"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2017.state",
+        "raw_sha256": "21a95a82a537b27cb84c48c75b55f551c53a14f2557046f49dc62ea90b4cb1f9",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "8d8e847949f35b250a6236011b582723847ac2f882380285f2f7dd5455a1d12b",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17848,
+        "path": "data/abs/params/2016.json",
+        "raw_sha256": "e4e0080b808634884311d3bae7496cb157acc3e3b6419c7f01e8c373cf68ac78"
+      },
+      "results": {
+        "bytes": 37903,
+        "path": "2016.csv",
+        "raw_sha256": "183018b2dd856e4ce8d0bb09e335944321d0c9763d3e934c2f182c5209feb077"
+      },
+      "run_year": 2016,
+      "score": {
+        "bytes": 1100070,
+        "path": "2016.score.json",
+        "raw_sha256": "04f9dd39a2d0dc559c15b397d8fdaff96b98c680d54ac7c4b6700199251f9891"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "e4e0080b808634884311d3bae7496cb157acc3e3b6419c7f01e8c373cf68ac78",
+          "replica_index": 0,
+          "run_year": 2016,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 13801901352471521119,
+        "sha256": "bf8a34278b0c675f1500f7ed12b825ca43ca80cef2a68d9125cf3ca561d9dd12"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2016.csv.summaries.csv",
+        "raw_sha256": "8becb16904b70931d5227e625216eebdf2a56aa6ebf25107b1003ff0986de719"
+      },
+      "targets": {
+        "bytes": 4180833,
+        "domain_sha256": "00053306251b7479d90ca2581e8c6da580611b8b947fba7a0e82c4997317a67f",
+        "path": "data/abs/targets/2016.json",
+        "raw_sha256": "2cb4515b1beac1d91a232690ac1b3af3c7aa19112de9b5b4a0afe6c6eb24b0e7"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.002028397565922921,
+          "fired_on_slot_resource": 493,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 4
+        },
+        "minimum_vacant_birth_slots": 25650,
+        "minimum_vacant_overseas_slots": 43278,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2594,
+          "path": "2017.grouped.births_cells.csv",
+          "raw_sha256": "01e18bcca306857b6cc42e22885c9593ba74673e2dfd7e2a18af02c3d1a5bf34",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2496,
+          "path": "2017.grouped.deaths_cells.csv",
+          "raw_sha256": "8879853abecb0cc2dd1ab688a0f7981a8a10c03a6d402789b77d0f7deff7fe5c",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 15320,
+          "path": "2017.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "2b3e6cdad714d3a3b55722fe74dc3f5fb20cffee55d841072b24474670336bab",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 25904,
+          "path": "2017.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "91ac80dd9f834638d7c393d4614f9a64bbfda069c523bc7867adef0717c62cc9",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5214,
+          "path": "2017.grouped.interstate_flows.csv",
+          "raw_sha256": "5c58db94ab6d956b7633575d7c5c91b9f6bd6d0037d01f68b9a11598015b4456",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2717,
+          "path": "2017.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "0a3782337918b0a9152177056340f34d54657cedb89af6d1061ecf2eda72b75d",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2618,
+          "path": "2017.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "b9201fce627a5216297e612040beb2c532653bb2018d408033201941e5b55809",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 73070,
+          "path": "2017.grouped.population_cells.csv",
+          "raw_sha256": "4d386123a345587d600cd6648315d5155493e10124fca773f00cdb161708bc08",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 345332,
+          "path": "2017.grouped.population_single_year_cells.csv",
+          "raw_sha256": "3a040076e57f5cbbecbfb5383bcc5e6234721c01e0d5d3c24e238afce74bdce1",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6710,
+          "path": "2017.grouped.vacancy_cells.csv",
+          "raw_sha256": "55ecfd6cb432a00e6d58bcb83c6a8e022699667913db9b37d8dcb06c82fb5016",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2017.state",
+        "raw_sha256": "21a95a82a537b27cb84c48c75b55f551c53a14f2557046f49dc62ea90b4cb1f9",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "8d8e847949f35b250a6236011b582723847ac2f882380285f2f7dd5455a1d12b",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2017-2018",
+      "manifest": {
+        "bytes": 19721,
+        "path": "2017.csv.manifest.json",
+        "raw_sha256": "f85e415293578ec0215820da8bbba997d7a162e4d76d6815085fa2444736e338"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2018.state",
+        "raw_sha256": "dab0b364459f43e08976587061bc3b26977c7ff0ca4470ceeacf2e3f93dc69b7",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "b897e11b961ca734653923246b9e366745b399bf94df37f5c552137adef0c163",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 18102,
+        "path": "data/abs/params/2017.json",
+        "raw_sha256": "db7d3d8a83e7cbcefcbc287009386c1524fb6c1144c179e90e316d23f005def2"
+      },
+      "results": {
+        "bytes": 38144,
+        "path": "2017.csv",
+        "raw_sha256": "05c2165a2c62900d46914ee05b52a84ac117b94d9443716b00a21bb8ab57f3b6"
+      },
+      "run_year": 2017,
+      "score": {
+        "bytes": 1099143,
+        "path": "2017.score.json",
+        "raw_sha256": "d8a6ea87ac382c3f7139f064cadf1021c6133b40a33c334d7f2bded80a9ba569"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "db7d3d8a83e7cbcefcbc287009386c1524fb6c1144c179e90e316d23f005def2",
+          "replica_index": 0,
+          "run_year": 2017,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 15004560332953366199,
+        "sha256": "d03ae820109a2eb792dbe7c41436d3bf7d02fa8f4e4af59cd488563d9eb7634a"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2017.csv.summaries.csv",
+        "raw_sha256": "71e76cd57744003496ccb91e5f2c70f3a6a09af45966585dbd1332e75e8b69c5"
+      },
+      "targets": {
+        "bytes": 4180855,
+        "domain_sha256": "10f9fa416d4d1706053e398c348634d5c7decd6c98749c8fde5b96bd420a05ad",
+        "path": "data/abs/targets/2017.json",
+        "raw_sha256": "69d5a58554e09bd4a0f2addfc5215130adc7b95e36a80ac1ecf9b7e123a1dcd5"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.0022271714922048997,
+          "fired_on_slot_resource": 449,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 5
+        },
+        "minimum_vacant_birth_slots": 22558,
+        "minimum_vacant_overseas_slots": 37716,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2597,
+          "path": "2018.grouped.births_cells.csv",
+          "raw_sha256": "1af52aaf18daf5b296aae69e44a24dfb1145951e04ebbf20471f7286de00d760",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2376,
+          "path": "2018.grouped.deaths_cells.csv",
+          "raw_sha256": "0f64c01867d0d3e39c74f08edaad4357a57d909be286c1540b3de8951e069a84",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 13893,
+          "path": "2018.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "dcca743804d552906fe0fb688c07459c0e729027956998ba3c375ba769eb931f",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 26504,
+          "path": "2018.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "44b9b0a69983c42ca8557d5f8c0484242b35aa086600db9d71f4abd83f690507",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5047,
+          "path": "2018.grouped.interstate_flows.csv",
+          "raw_sha256": "7af6a8c56e03f5a0bcdb44c124d28bbd72950eb4cc31f95af98e4a7b9b62b167",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2699,
+          "path": "2018.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "9866c430b4d63a655df2acb025d77dad8cb622d5f09960c0dc3d5f220da3e6f3",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2648,
+          "path": "2018.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "60f53f4d2dc214c7d45533fbc0449df43c53d77803d0844a8dcc58cc869e3635",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 73316,
+          "path": "2018.grouped.population_cells.csv",
+          "raw_sha256": "7149a9f3adaff1524857a77f0dbb1d1008512e7aba9f22d6f8afeaf3aa6603c2",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 346466,
+          "path": "2018.grouped.population_single_year_cells.csv",
+          "raw_sha256": "11407fb36fc103ee1aa2bd285c841d976c1465a22ed12a504c8780787f67540b",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6713,
+          "path": "2018.grouped.vacancy_cells.csv",
+          "raw_sha256": "d670d65c716639df675de4981d0438ebcef8c69d6fb1682784d45398239c2d01",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2018.state",
+        "raw_sha256": "dab0b364459f43e08976587061bc3b26977c7ff0ca4470ceeacf2e3f93dc69b7",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "b897e11b961ca734653923246b9e366745b399bf94df37f5c552137adef0c163",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2018-2019",
+      "manifest": {
+        "bytes": 19486,
+        "path": "2018.csv.manifest.json",
+        "raw_sha256": "b3ff5add43959bf5b80fb157458e249679d3c3f6f4ff4a195a2ba8e2df80ebf2"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2019.state",
+        "raw_sha256": "4f75c50548ac49fadd28dd994bf9032ff23da82ea798c37e17ca8e80421d71c5",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "8d6f17bb45b4ec145d044e73685dfe7e513bee6c66a2d9b6ebd4e782de1849f6",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17859,
+        "path": "data/abs/params/2018.json",
+        "raw_sha256": "1475a71395d6673c1734073872633c097c3462124b90c8d995af697390d9ec7b"
+      },
+      "results": {
+        "bytes": 37919,
+        "path": "2018.csv",
+        "raw_sha256": "cd0fc79f53663e8d5b36ee886f783ac3b5d15f45daaf266e99db82f017ff6ef1"
+      },
+      "run_year": 2018,
+      "score": {
+        "bytes": 1100341,
+        "path": "2018.score.json",
+        "raw_sha256": "be209f0aff223b247d8367f616b95e2f155cb5e8844b32f27d4224d5c1a4840f"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "1475a71395d6673c1734073872633c097c3462124b90c8d995af697390d9ec7b",
+          "replica_index": 0,
+          "run_year": 2018,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 12563740119011773329,
+        "sha256": "ae5b5f129c054b9153903c33cc5d33b97e952551dfe2f1516b54eb85544b038f"
+      },
+      "summaries": {
+        "bytes": 302,
+        "path": "2018.csv.summaries.csv",
+        "raw_sha256": "541ca875fc35f5931ea436bbcc175fb00e00a6d24bd6d7025f7e323169fa2323"
+      },
+      "targets": {
+        "bytes": 4180999,
+        "domain_sha256": "15f3d497fbf373f21640324b45ca820d0cee39d5ad4bf8946a15dbddae2bd0a2",
+        "path": "data/abs/targets/2018.json",
+        "raw_sha256": "1e0f22077a0450d49aea68e44465d2888a611fa91384602b66ba864c85e28d2d"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.00196078431372549,
+          "fired_on_slot_resource": 510,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 10
+        },
+        "minimum_vacant_birth_slots": 19485,
+        "minimum_vacant_overseas_slots": 32645,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2571,
+          "path": "2019.grouped.births_cells.csv",
+          "raw_sha256": "2ee324aba80534b1b56edbf2143cfba3d242d6a9bb7d2a9ca16931270bdff3eb",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2404,
+          "path": "2019.grouped.deaths_cells.csv",
+          "raw_sha256": "1e037f3b2cd99510309ce53ec9c3fd57c1291d83c500d3891d51d3e5e35d978a",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 14840,
+          "path": "2019.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "22adae9678aecfc39f8a546470a84ba3af0d053e13a85ee193254768b34c89e0",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 27528,
+          "path": "2019.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "a4e1815314288bafc848b6e69fd48638a956ab12cca1424c6a63a7c8fc6552fb",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5177,
+          "path": "2019.grouped.interstate_flows.csv",
+          "raw_sha256": "efe0b24f2bd4e35a84bbf9ba1d748bbaa7a4af1bb7ef2c3573344b43af821e4d",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2690,
+          "path": "2019.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "7eb07a4a1e9234ea65698901839ad082a6dec8242ae5110fa488f7c5f0e0116e",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2622,
+          "path": "2019.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "96e0ea66fb05de7b66fe2eeca9b75a477f225122dfe09aa89b90259b7c747d4d",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 73516,
+          "path": "2019.grouped.population_cells.csv",
+          "raw_sha256": "56c514f700a438327f69ee01708705b3d09185cc5a8ba6e3483bbe181116dd5a",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 348565,
+          "path": "2019.grouped.population_single_year_cells.csv",
+          "raw_sha256": "e82fe0d67c7ee28922530d2f479e8efdd71048fdcb28de1a0d93e9ccbb288249",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6710,
+          "path": "2019.grouped.vacancy_cells.csv",
+          "raw_sha256": "cc616b03f2534c691b2b6ab9b82bef3baec7b8b292a124356f27f1448cb2e8ab",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2019.state",
+        "raw_sha256": "4f75c50548ac49fadd28dd994bf9032ff23da82ea798c37e17ca8e80421d71c5",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "8d6f17bb45b4ec145d044e73685dfe7e513bee6c66a2d9b6ebd4e782de1849f6",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2019-2020",
+      "manifest": {
+        "bytes": 19450,
+        "path": "2019.csv.manifest.json",
+        "raw_sha256": "aec7aa941751743eec47f256dde2ee7252e176e411fb2f4427a5055888c01184"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2020.state",
+        "raw_sha256": "da12460bd5338341efffc1fd26a63fab265fdd290cef386477fac6118978aef2",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "f8fbac9caa25b9ae3b8dd0cbbd1c2eff60534624be10dd87c13a2a560d56b5af",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17825,
+        "path": "data/abs/params/2019.json",
+        "raw_sha256": "5c314dc3d9357b04e6f24a0cac89c459b8767ccb44326daf23120a81afbc2789"
+      },
+      "results": {
+        "bytes": 37887,
+        "path": "2019.csv",
+        "raw_sha256": "8b68bff53f3557b6a3b1683e8e69fa925fb4c85cfba5ade1fdf4c528c232160f"
+      },
+      "run_year": 2019,
+      "score": {
+        "bytes": 1097777,
+        "path": "2019.score.json",
+        "raw_sha256": "053dfad48fde3e361bb0bb7c222380883610ba061bc9315690316d04ac3b9dc7"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "5c314dc3d9357b04e6f24a0cac89c459b8767ccb44326daf23120a81afbc2789",
+          "replica_index": 0,
+          "run_year": 2019,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 5486956300487288290,
+        "sha256": "4c2595af24a2e5e2f8375c6063e7c5d64004110ac358a108a8e411a5e25498c2"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2019.csv.summaries.csv",
+        "raw_sha256": "0d635edb9aed1d51f31070bae0ee9be1b8509aad5b7ef012871bdbd164697a41"
+      },
+      "targets": {
+        "bytes": 4180878,
+        "domain_sha256": "a19a13d02a80c7c91eae04853573f72039f7d12ee30960af25e96f6d8a93d8e8",
+        "path": "data/abs/targets/2019.json",
+        "raw_sha256": "d163e96e18ca8555ffd1651250c44824850564fb3e9725d3a2125b55c6014a25"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 3,
+          "deferred_to_fired_ratio": 0.006521739130434782,
+          "fired_on_slot_resource": 460,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 6
+        },
+        "minimum_vacant_birth_slots": 16472,
+        "minimum_vacant_overseas_slots": 31152,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2690,
+          "path": "2020.grouped.births_cells.csv",
+          "raw_sha256": "4fee461f306a33637ddee45a32ff74f58c8224047befd7ae6c73eea747d1c736",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2363,
+          "path": "2020.grouped.deaths_cells.csv",
+          "raw_sha256": "cce43ed76692a3470844246d0d954c8971c24e13abd5d0eaf39c15361f650672",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 14288,
+          "path": "2020.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "87309fcd367f2cd9c0cb4358b1a6c0fd4e22f772168b3478efd8b118ef5cf6f0",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 27069,
+          "path": "2020.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "3c987f39f8775042ddd2497678d46b4697f6f077bb778ab80a75e715e67aa463",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5395,
+          "path": "2020.grouped.interstate_flows.csv",
+          "raw_sha256": "a3a7cbf48d16c7b7ab196fca0a04e6f47577ce46ba10f48f685a1e7bcaa357cf",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2272,
+          "path": "2020.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "b4de558bc540b38b5c6b12e71f5700f050b9b09e7bb266440fc600230b868657",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2578,
+          "path": "2020.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "5b825a86b8f778bf1774e433d28a8b73060dc45f0ca37984c541cffb6fb00f8b",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 73809,
+          "path": "2020.grouped.population_cells.csv",
+          "raw_sha256": "01230937688096a52fa7994a6bfde451c5a52a6656f2a4ae1e6e621c745811cc",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 349613,
+          "path": "2020.grouped.population_single_year_cells.csv",
+          "raw_sha256": "7106804c9909a9b6d7a175c015abd40c01252b262cb1c390e05dcead8d39dbc8",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6716,
+          "path": "2020.grouped.vacancy_cells.csv",
+          "raw_sha256": "954c2df8ecefc9bd28f9c1ab48be41d24d69625119bd71b5ddcaa2438d09cd96",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2020.state",
+        "raw_sha256": "da12460bd5338341efffc1fd26a63fab265fdd290cef386477fac6118978aef2",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "f8fbac9caa25b9ae3b8dd0cbbd1c2eff60534624be10dd87c13a2a560d56b5af",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2020-2021",
+      "manifest": {
+        "bytes": 19358,
+        "path": "2020.csv.manifest.json",
+        "raw_sha256": "c656fb17a2d5f55a812e1464639a70a609008ea202f9bc1c7d0fc0c76e7359ad"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2021.state",
+        "raw_sha256": "13af0951ae9b8c596b07bc89eae1a3d2de2b7c98d259f4c201642e07129e2cf9",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "22a0df46064812288a885f3793fb6d55253c31bb0badb68b77909b12727b4b7f",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17712,
+        "path": "data/abs/params/2020.json",
+        "raw_sha256": "4cda48a654ceb0271695aaffd158a2fa52b63eb1c2fc67ec478c6fc0e3680055"
+      },
+      "results": {
+        "bytes": 37725,
+        "path": "2020.csv",
+        "raw_sha256": "ba11e7d043fb983338e932854f98bbcff12635314acd3e0f57c08af517ff7460"
+      },
+      "run_year": 2020,
+      "score": {
+        "bytes": 1100702,
+        "path": "2020.score.json",
+        "raw_sha256": "20ca266188e8f7e986e8f8da00a008b2388f5e6aaa2352b98ad50d283f65823c"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "4cda48a654ceb0271695aaffd158a2fa52b63eb1c2fc67ec478c6fc0e3680055",
+          "replica_index": 0,
+          "run_year": 2020,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 9167061509704109937,
+        "sha256": "7f37f1dfb811cf714b36ba639850e9380c03fdf0df7db45e05496c812c0f162c"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2020.csv.summaries.csv",
+        "raw_sha256": "806a382d571318c06046ac68b9d36c93b0adfa564f7ca7bae7510903aefb4e55"
+      },
+      "targets": {
+        "bytes": 4180909,
+        "domain_sha256": "32148aa5ed5b920cbaada8d241225a72511ce00acc9f90ab10fda9306f7c0039",
+        "path": "data/abs/targets/2020.json",
+        "raw_sha256": "f5c0d173f22a024a8e1fad308902b285e325e9c06d86ae78e4bb4f15abea8d3c"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 2,
+          "deferred_to_fired_ratio": 0.004597701149425287,
+          "fired_on_slot_resource": 435,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 8
+        },
+        "minimum_vacant_birth_slots": 13337,
+        "minimum_vacant_overseas_slots": 26914,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2663,
+          "path": "2021.grouped.births_cells.csv",
+          "raw_sha256": "057f6ac69f913cf5e7a19911707ced657698aac46c3a5a12f4e8c144f3efc0db",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2483,
+          "path": "2021.grouped.deaths_cells.csv",
+          "raw_sha256": "b2bb2528d22234b3a94938fde0e465a37ccd3c71f8d2b83a859fc8847bf1b1bd",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 15298,
+          "path": "2021.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "cb3b54753769445c613bebed70d6b01cbd8e2d58679f1015ad0fd24c536a0d20",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 27214,
+          "path": "2021.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "83296b3abd155613d1f5e5f3bac2e582281f7c0fe3a7c70e18229d9cf95bac99",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5328,
+          "path": "2021.grouped.interstate_flows.csv",
+          "raw_sha256": "8ab5490ea9cd78f83183ee5f583d2715100fe9ef0ee9cec0454a08f7a9015e64",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2665,
+          "path": "2021.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "69daecd115e351618d07963fca69c597ba1711c8c24de5927ff3d003f35b8629",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2439,
+          "path": "2021.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "10fb6139e5afa248c3de9b548d436baf0c4f349109e4547fdc07581cbe5b88bf",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 73958,
+          "path": "2021.grouped.population_cells.csv",
+          "raw_sha256": "bd803b863e7ac0d17374e20964c4d06f0620b6044924b867cf102445c66bd7cb",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 350169,
+          "path": "2021.grouped.population_single_year_cells.csv",
+          "raw_sha256": "550348a9ea645b4bc640b5334d4222286eaf6baa930b1f2a3f5995fb203dcc59",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6707,
+          "path": "2021.grouped.vacancy_cells.csv",
+          "raw_sha256": "23f3f52645704687bd1bb86502755b11add12f2f51fafab94ceb8cd13d592504",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2021.state",
+        "raw_sha256": "13af0951ae9b8c596b07bc89eae1a3d2de2b7c98d259f4c201642e07129e2cf9",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "22a0df46064812288a885f3793fb6d55253c31bb0badb68b77909b12727b4b7f",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2021-2022",
+      "manifest": {
+        "bytes": 19721,
+        "path": "2021.csv.manifest.json",
+        "raw_sha256": "68091753b55456d847ffaeadb2168cf3dedb0eace06007e5d1183553d806fd4b"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2022.state",
+        "raw_sha256": "78526b0be337e79571a97c273c5a2d685784e7ca7fe3734cab42cdaf40f26cfc",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "4e616a45856043f193b02a28c791df4826486e05e3e9ea71d89f29398b3a4dcb",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 18084,
+        "path": "data/abs/params/2021.json",
+        "raw_sha256": "06f17cb8caad4b724dbce3c711f9af7afdefe81c376edf9a03b21500441dc48d"
+      },
+      "results": {
+        "bytes": 38142,
+        "path": "2021.csv",
+        "raw_sha256": "af0f93b7725c1605c8f9912a87a07b9a920ab29640791d0dd8159d60cb97c99b"
+      },
+      "run_year": 2021,
+      "score": {
+        "bytes": 1099775,
+        "path": "2021.score.json",
+        "raw_sha256": "fd190a59795648f0f2d97f085d29508f97be54da088d17addca8ff036172e57d"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "06f17cb8caad4b724dbce3c711f9af7afdefe81c376edf9a03b21500441dc48d",
+          "replica_index": 0,
+          "run_year": 2021,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 7343407494289076337,
+        "sha256": "65e90635820ab071bf3db5f47af3673add7d42e8531f98a5269ec804ff3f7450"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2021.csv.summaries.csv",
+        "raw_sha256": "709c99b2db1190e290c9105ae4f56f9b575fd191ff7e3fd369dd918e0a0cac3c"
+      },
+      "targets": {
+        "bytes": 4180936,
+        "domain_sha256": "ed1010c15cc3e705a016f5b14bbfa4c74051c5adc57e29449cebb6626237e844",
+        "path": "data/abs/targets/2021.json",
+        "raw_sha256": "21a55f656c3c0bef2a6f255120827883d66752adbe83f6f84d5f6edea6c3f588"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.002183406113537118,
+          "fired_on_slot_resource": 458,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 6
+        },
+        "minimum_vacant_birth_slots": 10397,
+        "minimum_vacant_overseas_slots": 19554,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2604,
+          "path": "2022.grouped.births_cells.csv",
+          "raw_sha256": "0acc0bcc8e16842dfd9a75cf18f0f52d81117f62a21253e01677b6007e6505d0",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2488,
+          "path": "2022.grouped.deaths_cells.csv",
+          "raw_sha256": "d28d5408447302a9fcabf5d9c093c7a0e7b1bedd849b1e13b475d03ab5178dff",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 15838,
+          "path": "2022.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "e42871950f579eed13ae843c790d5403b2a5a573d46a945bead3a21710dd9b10",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 27025,
+          "path": "2022.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "bd7e1f5b193c1db12008bf47b9b1aa40b0fb6b2c85aa5404f2d133b1e4cf3c1e",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5328,
+          "path": "2022.grouped.interstate_flows.csv",
+          "raw_sha256": "1759ec6dede44d6d9898b376e8f964c06b8b85171b356380cd39e41202e33d72",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2798,
+          "path": "2022.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "143db7df73262a665661bb8c2da0446d04d4796dbf10ee3d312c3c07a4b37499",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2509,
+          "path": "2022.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "72795909dc922af0831b32c86adee3a00302c03b89307da79420c5dc15db6fe4",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 73987,
+          "path": "2022.grouped.population_cells.csv",
+          "raw_sha256": "1228ac7eb7df7426e45005bfe1d3e840f3ca2bafb621d7c2b27ef8b5446c243d",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 350562,
+          "path": "2022.grouped.population_single_year_cells.csv",
+          "raw_sha256": "673e7f49d41a11c0297a211bb8515c9b9768221112f233c83f43445dae5b111d",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6704,
+          "path": "2022.grouped.vacancy_cells.csv",
+          "raw_sha256": "923ddf45885411f958911034a5825df593cc5167815f1f3a2c2944ab7cacda93",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2022.state",
+        "raw_sha256": "78526b0be337e79571a97c273c5a2d685784e7ca7fe3734cab42cdaf40f26cfc",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "4e616a45856043f193b02a28c791df4826486e05e3e9ea71d89f29398b3a4dcb",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2022-2023",
+      "manifest": {
+        "bytes": 19373,
+        "path": "2022.csv.manifest.json",
+        "raw_sha256": "06a7ca29ae93da7ef2ff61029adbc6a8c39eceb694bb74b6a227a55cd0c69ce3"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2023.state",
+        "raw_sha256": "4d2d1be8afb68c2642b19119bf23f7efd7906334ff321f38fd29b77acebcef00",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "ac877c9e71ee948ab2ebb3ec4c8b985c879e23bcda8db6ab0aacfc1ef038a6fe",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17728,
+        "path": "data/abs/params/2022.json",
+        "raw_sha256": "5133ebdef4e82387b9df1f0721f099ac5bb407217d233d87b3d519d173c28a3e"
+      },
+      "results": {
+        "bytes": 37809,
+        "path": "2022.csv",
+        "raw_sha256": "8ef3cfe08e83a73f014f5d0b8f37afa5065a5d29d456d814c09becc7d87a95fa"
+      },
+      "run_year": 2022,
+      "score": {
+        "bytes": 1101432,
+        "path": "2022.score.json",
+        "raw_sha256": "1e7159dd1cdaa32ba1118954fe57ef4bb4f271ef2b14f0e75051bab2e8f5810e"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "5133ebdef4e82387b9df1f0721f099ac5bb407217d233d87b3d519d173c28a3e",
+          "replica_index": 0,
+          "run_year": 2022,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 18175818157145943191,
+        "sha256": "fc3d7a5076c76c973b797e96e84ed69759dd4c43e941d96c46972e815eb12d99"
+      },
+      "summaries": {
+        "bytes": 302,
+        "path": "2022.csv.summaries.csv",
+        "raw_sha256": "4e05f1d5cf176bb954f5d2fa1b9248f65d3a5e0ca75698d0e9d15ac04ab8fb7f"
+      },
+      "targets": {
+        "bytes": 4180908,
+        "domain_sha256": "c758c046505155f8bbbd89606854b951583f64f7d17d76e52fc1bd35016f9378",
+        "path": "data/abs/targets/2022.json",
+        "raw_sha256": "44cec0b426a53f1d61cfbbbdf20b32f6b1059b329a907b7998c0d7ee99cfeffb"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 2,
+          "deferred_to_fired_ratio": 0.004048582995951417,
+          "fired_on_slot_resource": 494,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 6
+        },
+        "minimum_vacant_birth_slots": 7470,
+        "minimum_vacant_overseas_slots": 13005,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2588,
+          "path": "2023.grouped.births_cells.csv",
+          "raw_sha256": "2144ba2521495503e84aa7e61a3a48bc44e6b1724ef3d3649c7e07feb84ca91f",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2518,
+          "path": "2023.grouped.deaths_cells.csv",
+          "raw_sha256": "92dbe28ca4284afb5ca73a1a80f6d221ae13d141bb90630a3eb2e2f9f4983b2d",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 15463,
+          "path": "2023.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "7650a434cceb473292c30ee7f5ea32d1d1f1d17b27ec44a4a1a6bcd393f74a6c",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 29145,
+          "path": "2023.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "4184d755a2c555f61ff9208ab9341bb735ef7bbdd5fdaf491dfda307da6fd5c7",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5508,
+          "path": "2023.grouped.interstate_flows.csv",
+          "raw_sha256": "676054286fe2572560b461b08d5cbb99eeceb6558a077c43bb233ca262d7db5d",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2721,
+          "path": "2023.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "3845b72c14aa87c259227e68a8831055b73966f024c3c9b4b0bb33b69d7d8a87",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2525,
+          "path": "2023.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "d6321196dfabb291a8f57dfa82050f76bf299b33e741ab2cecefd3a9c6bd4263",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 74134,
+          "path": "2023.grouped.population_cells.csv",
+          "raw_sha256": "89554f9db8e7ea7c0f32485319a7fa78645f34207d0c2a79af6af23f58785e00",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 351429,
+          "path": "2023.grouped.population_single_year_cells.csv",
+          "raw_sha256": "f7824dfefda11c3cdf86cd46acf68d34f113556b17ed705d354397fd7427a5e1",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6699,
+          "path": "2023.grouped.vacancy_cells.csv",
+          "raw_sha256": "9839e0e80ac3e506ea1ff94718a4c06b7aad76fdfe649758e9a4a0b7e37b8235",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2023.state",
+        "raw_sha256": "4d2d1be8afb68c2642b19119bf23f7efd7906334ff321f38fd29b77acebcef00",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "ac877c9e71ee948ab2ebb3ec4c8b985c879e23bcda8db6ab0aacfc1ef038a6fe",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2023-2024",
+      "manifest": {
+        "bytes": 19433,
+        "path": "2023.csv.manifest.json",
+        "raw_sha256": "ce41d14e098b0d2eb8f4f0cd1bab98d55e8063c11be8092b633e852b15d7151e"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2024.state",
+        "raw_sha256": "b00163b6db8780a3484896d65c096a2c6776275315f4e74b5c8596d078b13f63",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "fe44b95718fd6ad07a05cd77c1e815434919aca9f46b4f548693a5167482d5f6",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17810,
+        "path": "data/abs/params/2023.json",
+        "raw_sha256": "d1d80ce3602fa21f0f0754708e54bb385d0c83e71b9fc241cc35403a63b81cbe"
+      },
+      "results": {
+        "bytes": 37860,
+        "path": "2023.csv",
+        "raw_sha256": "4bebcac827feb971e27ff75ca063d9b6b3f00833e06084ceb1818bf5a524eec6"
+      },
+      "run_year": 2023,
+      "score": {
+        "bytes": 1101989,
+        "path": "2023.score.json",
+        "raw_sha256": "6d7a4afd8b35c2b77713af3f0bade79d1ce46448661d947edd957f0394d3c1ee"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "d1d80ce3602fa21f0f0754708e54bb385d0c83e71b9fc241cc35403a63b81cbe",
+          "replica_index": 0,
+          "run_year": 2023,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 5870671788489679948,
+        "sha256": "5178d0e331d5a44c00eb407fbe5e6fbc838f8891fb750f8b257c9269d260f36a"
+      },
+      "summaries": {
+        "bytes": 301,
+        "path": "2023.csv.summaries.csv",
+        "raw_sha256": "08c021bc038a73c4e7b2c43741fa2f6d9f442a7ea8e45d6d32eb1a20a36fdb1b"
+      },
+      "targets": {
+        "bytes": 4180903,
+        "domain_sha256": "375cb5145d57591336ae077305262c6287f60fa51c9ca0870fd32d484a9db123",
+        "path": "data/abs/targets/2023.json",
+        "raw_sha256": "41b00f7ea47c29501f9cda1378885c9e097ffab1949d706ab2923514ba18f878"
+      }
+    },
+    {
+      "capacity": {
+        "maximum_saturation": {
+          "deferred": 1,
+          "deferred_to_fired_ratio": 0.0020242914979757085,
+          "fired_on_slot_resource": 494,
+          "strictly_exceeds_ten_percent": false,
+          "tick": 3
+        },
+        "minimum_vacant_birth_slots": 4606,
+        "minimum_vacant_overseas_slots": 7425,
+        "valid_calibration_evidence": true,
+        "zero_vacancy_margin": false
+      },
+      "grouped_outputs": [
+        {
+          "bytes": 2686,
+          "path": "2024.grouped.births_cells.csv",
+          "raw_sha256": "3f64f2e488c9f1c5daeedf23c6009c248413dabb61f44be26819521254031302",
+          "view": "births_cells"
+        },
+        {
+          "bytes": 2465,
+          "path": "2024.grouped.deaths_cells.csv",
+          "raw_sha256": "0879fd50eb409b6ee5ec2ee9187ab6960506453834c9fade75ab1938bb81729a",
+          "view": "deaths_cells"
+        },
+        {
+          "bytes": 16106,
+          "path": "2024.grouped.deaths_state_age_cells.csv",
+          "raw_sha256": "dc410bf19a1c687edb53245bb41ec7784bc8999acf3c5bdedb1895e9b262fdf8",
+          "view": "deaths_state_age_cells"
+        },
+        {
+          "bytes": 28280,
+          "path": "2024.grouped.interstate_age_sex_flows.csv",
+          "raw_sha256": "624464ec133ebeabc1962d3cb8a35403b26508a7f6076e843cae074bddd3dc05",
+          "view": "interstate_age_sex_flows"
+        },
+        {
+          "bytes": 5502,
+          "path": "2024.grouped.interstate_flows.csv",
+          "raw_sha256": "2490a2a10b493c10ec361cb001d504d2c6d2eb1aa7e0203ddc6863ba54ccaafc",
+          "view": "interstate_flows"
+        },
+        {
+          "bytes": 2644,
+          "path": "2024.grouped.overseas_arrival_cells.csv",
+          "raw_sha256": "559c85e3f8d5a412defbd4fe71decae0afcb5247369a29339508b035a9e0cf1f",
+          "view": "overseas_arrival_cells"
+        },
+        {
+          "bytes": 2603,
+          "path": "2024.grouped.overseas_departure_cells.csv",
+          "raw_sha256": "ca082be1490ad39e9f422c9539f4600421ba631376078e5507488586bda9f8c0",
+          "view": "overseas_departure_cells"
+        },
+        {
+          "bytes": 74386,
+          "path": "2024.grouped.population_cells.csv",
+          "raw_sha256": "d5bc346db5bc491354b2bb341640f7a1942f15fdf8050e1739106aeba69bdeff",
+          "view": "population_cells"
+        },
+        {
+          "bytes": 351773,
+          "path": "2024.grouped.population_single_year_cells.csv",
+          "raw_sha256": "aabc63f3aaea11c9f823e823885f7327933b9c458e9cd4f83ce52d18456f538b",
+          "view": "population_single_year_cells"
+        },
+        {
+          "bytes": 6677,
+          "path": "2024.grouped.vacancy_cells.csv",
+          "raw_sha256": "b5f052dd7bf9d8b256f391dab51a570c55e4310b7c92554bcf93e41f5641a17a",
+          "view": "vacancy_cells"
+        }
+      ],
+      "input_state": {
+        "bytes": 16918851,
+        "path": "2024.state",
+        "raw_sha256": "b00163b6db8780a3484896d65c096a2c6776275315f4e74b5c8596d078b13f63",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "fe44b95718fd6ad07a05cd77c1e815434919aca9f46b4f548693a5167482d5f6",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "link": "2024-2025",
+      "manifest": {
+        "bytes": 19521,
+        "path": "2024.csv.manifest.json",
+        "raw_sha256": "734a3f5834e5b090e40354fb29e4261ba95ca349490c59dd7712c20fd4006b01"
+      },
+      "output_state": {
+        "bytes": 16918851,
+        "path": "2025.state",
+        "raw_sha256": "21f8a2013475ad2322548c314cd5a489368104eae25a64eb384ffe08db223b0f",
+        "state_artifact": {
+          "format": "sembla.state/v1",
+          "hash": {
+            "algorithm": "sha256",
+            "digest": "95241e9b4a0f961a8daf739d5cb4a98b17d0420db9f4d160e9c932240fcc9b63",
+            "domain": "sembla.state-artifact/v1"
+          }
+        }
+      },
+      "parameters": {
+        "bytes": 17894,
+        "path": "data/abs/params/2024.json",
+        "raw_sha256": "9a12798af299e08ab8705fab6cedc46da716c25e10aa403b0be3682e56873f3c"
+      },
+      "results": {
+        "bytes": 37927,
+        "path": "2024.csv",
+        "raw_sha256": "52843d84fc6383d91659fa8786223e852e593fa38e7f002a6dd29da6f14d92e7"
+      },
+      "run_year": 2024,
+      "score": {
+        "bytes": 1100840,
+        "path": "2024.score.json",
+        "raw_sha256": "a80b2d07040dff274d5dd814ae001af4f217a683cd49b56781cc48ee3b360b08"
+      },
+      "seed": {
+        "coordinate": {
+          "format": "sembla.australian-population-seed-coordinate/v1",
+          "model_identity": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+          "params_raw_sha256": "9a12798af299e08ab8705fab6cedc46da716c25e10aa403b0be3682e56873f3c",
+          "replica_index": 0,
+          "run_year": 2024,
+          "scale": "hundredth"
+        },
+        "domain": "sembla.australian-population-seed/v1",
+        "seed": 12262038376949043548,
+        "sha256": "aa2b82efd041515c265a1092a82c719e694c74c37d281c28d6c43da010c749cd"
+      },
+      "summaries": {
+        "bytes": 300,
+        "path": "2024.csv.summaries.csv",
+        "raw_sha256": "8f65b6576e453bc9d9490524370f7299689a922de8aa06020451a2df83a1e79b"
+      },
+      "targets": {
+        "bytes": 4180892,
+        "domain_sha256": "8104633e3bf9781deb84b1c6e38d3ed406327d577c2115976ce0a0c51bd63274",
+        "path": "data/abs/targets/2024.json",
+        "raw_sha256": "0b762d340300afc3763cbfc176b0b4851c796c4de1bbf6dcfdacf5c3e27d6634"
+      }
+    }
+  ],
+  "model": {
+    "bytes": 534979,
+    "ir_sha256": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e",
+    "path": "fixtures/australian-population/australian_population.hundredth.json",
+    "raw_sha256": "6f307418a367d44d6cde56c18c57d6873981a7187bc17fa94ca3c5f9110ed904"
+  },
+  "parameter_directory": "data/abs/params",
+  "plan": {
+    "bytes": 585429,
+    "path": "fixtures/australian-population/australian_population.hundredth.plan.json",
+    "raw_sha256": "6f05d870681f35950deab4c74a8a9e816b43625a744f9e8cf2d5aa96a2ef18fe",
+    "semantic_hash": {
+      "algorithm": "sha256",
+      "digest": "0e24d88398abaaaae7842d21aacf8c7dd9ae5f882c0f6d39c97d03c7aa74e5bf",
+      "domain": "sembla.plan-core/v1"
+    }
+  },
+  "replica_index": 0,
+  "scale": "hundredth",
+  "seed_domain": "sembla.australian-population-seed/v1",
+  "sembla": {
+    "path": "target/release/sembla",
+    "raw_sha256": "48dc4fa8db73d62e11f1e54f7817ac97299aa639994fe2b7972bba9b4570bbd0",
+    "version": "sembla 0.3.0"
+  },
+  "start_boundary": "2010-06-30",
+  "start_run_year": 2010,
+  "status": "uncalibrated_baseline",
+  "target_directory": "data/abs/targets"
+}

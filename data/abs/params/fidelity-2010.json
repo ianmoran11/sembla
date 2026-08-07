@@ -1,0 +1,381 @@
+{
+  "format": "sembla.australian-population-fidelity/v1",
+  "held_out": {
+    "births": {
+      "pass": true,
+      "published": 303299,
+      "signed_error": 1701,
+      "simulated": 305000
+    },
+    "births_by_state": {
+      "act": {
+        "published": 5152,
+        "signed_error": -152,
+        "simulated": 5000
+      },
+      "nsw": {
+        "published": 101266,
+        "signed_error": -3366,
+        "simulated": 97900
+      },
+      "nt": {
+        "published": 3899,
+        "signed_error": 801,
+        "simulated": 4700
+      },
+      "qld": {
+        "published": 64523,
+        "signed_error": 177,
+        "simulated": 64700
+      },
+      "sa": {
+        "published": 20078,
+        "signed_error": -578,
+        "simulated": 19500
+      },
+      "tas": {
+        "published": 6385,
+        "signed_error": 115,
+        "simulated": 6500
+      },
+      "vic": {
+        "published": 70572,
+        "signed_error": 1128,
+        "simulated": 71700
+      },
+      "wa": {
+        "published": 31424,
+        "signed_error": 3576,
+        "simulated": 35000
+      }
+    },
+    "deaths": {
+      "pass": true,
+      "published": 143451,
+      "signed_error": 3049,
+      "simulated": 146500
+    },
+    "deaths_by_age_band": {
+      "0-4": {
+        "published": 1455,
+        "signed_error": 345,
+        "simulated": 1800
+      },
+      "10-14": {
+        "published": 136,
+        "signed_error": -136,
+        "simulated": 0
+      },
+      "100+": {
+        "published": 1269,
+        "signed_error": 31,
+        "simulated": 1300
+      },
+      "15-19": {
+        "published": 524,
+        "signed_error": -24,
+        "simulated": 500
+      },
+      "20-24": {
+        "published": 733,
+        "signed_error": -133,
+        "simulated": 600
+      },
+      "25-29": {
+        "published": 837,
+        "signed_error": -237,
+        "simulated": 600
+      },
+      "30-34": {
+        "published": 1009,
+        "signed_error": 91,
+        "simulated": 1100
+      },
+      "35-39": {
+        "published": 1452,
+        "signed_error": -452,
+        "simulated": 1000
+      },
+      "40-44": {
+        "published": 1942,
+        "signed_error": 358,
+        "simulated": 2300
+      },
+      "45-49": {
+        "published": 2957,
+        "signed_error": -57,
+        "simulated": 2900
+      },
+      "5-9": {
+        "published": 143,
+        "signed_error": 57,
+        "simulated": 200
+      },
+      "50-54": {
+        "published": 4078,
+        "signed_error": 722,
+        "simulated": 4800
+      },
+      "55-59": {
+        "published": 5460,
+        "signed_error": 1340,
+        "simulated": 6800
+      },
+      "60-64": {
+        "published": 7580,
+        "signed_error": -180,
+        "simulated": 7400
+      },
+      "65-69": {
+        "published": 9356,
+        "signed_error": -556,
+        "simulated": 8800
+      },
+      "70-74": {
+        "published": 12376,
+        "signed_error": 1124,
+        "simulated": 13500
+      },
+      "75-79": {
+        "published": 16369,
+        "signed_error": -2069,
+        "simulated": 14300
+      },
+      "80-84": {
+        "published": 24274,
+        "signed_error": 726,
+        "simulated": 25000
+      },
+      "85-89": {
+        "published": 26786,
+        "signed_error": 2514,
+        "simulated": 29300
+      },
+      "90-94": {
+        "published": 17603,
+        "signed_error": 97,
+        "simulated": 17700
+      },
+      "95-99": {
+        "published": 7103,
+        "signed_error": -503,
+        "simulated": 6600
+      }
+    },
+    "deaths_by_state": {
+      "act": {
+        "published": 1677,
+        "signed_error": 1023,
+        "simulated": 2700
+      },
+      "nsw": {
+        "published": 47942,
+        "signed_error": -3842,
+        "simulated": 44100
+      },
+      "nt": {
+        "published": 977,
+        "signed_error": 123,
+        "simulated": 1100
+      },
+      "qld": {
+        "published": 27287,
+        "signed_error": 3013,
+        "simulated": 30300
+      },
+      "sa": {
+        "published": 12956,
+        "signed_error": 844,
+        "simulated": 13800
+      },
+      "tas": {
+        "published": 4269,
+        "signed_error": 1331,
+        "simulated": 5600
+      },
+      "vic": {
+        "published": 35623,
+        "signed_error": -1223,
+        "simulated": 34400
+      },
+      "wa": {
+        "published": 12720,
+        "signed_error": 1780,
+        "simulated": 14500
+      }
+    },
+    "overseas_arrivals_by_state": {
+      "act": {
+        "published": 7270,
+        "signed_error": 730,
+        "simulated": 8000
+      },
+      "nsw": {
+        "published": 141980,
+        "signed_error": -2780,
+        "simulated": 139200
+      },
+      "nt": {
+        "published": 4810,
+        "signed_error": -310,
+        "simulated": 4500
+      },
+      "qld": {
+        "published": 84250,
+        "signed_error": 950,
+        "simulated": 85200
+      },
+      "sa": {
+        "published": 20160,
+        "signed_error": 2240,
+        "simulated": 22400
+      },
+      "tas": {
+        "published": 3470,
+        "signed_error": 830,
+        "simulated": 4300
+      },
+      "vic": {
+        "published": 104900,
+        "signed_error": 1500,
+        "simulated": 106400
+      },
+      "wa": {
+        "published": 64930,
+        "signed_error": -30,
+        "simulated": 64900
+      }
+    },
+    "overseas_departures_by_state": {
+      "act": {
+        "published": 5540,
+        "signed_error": 60,
+        "simulated": 5600
+      },
+      "nsw": {
+        "published": 90300,
+        "signed_error": 300,
+        "simulated": 90600
+      },
+      "nt": {
+        "published": 3710,
+        "signed_error": 890,
+        "simulated": 4600
+      },
+      "qld": {
+        "published": 49620,
+        "signed_error": -420,
+        "simulated": 49200
+      },
+      "sa": {
+        "published": 10990,
+        "signed_error": -1390,
+        "simulated": 9600
+      },
+      "tas": {
+        "published": 2480,
+        "signed_error": 420,
+        "simulated": 2900
+      },
+      "vic": {
+        "published": 60270,
+        "signed_error": -2570,
+        "simulated": 57700
+      },
+      "wa": {
+        "published": 28500,
+        "signed_error": 1900,
+        "simulated": 30400
+      }
+    }
+  },
+  "held_out_seed": 2001,
+  "pilot_results": [
+    {
+      "births": 291900,
+      "deaths": 143700,
+      "seed": 1001
+    },
+    {
+      "births": 306400,
+      "deaths": 144000,
+      "seed": 1002
+    },
+    {
+      "births": 309300,
+      "deaths": 146800,
+      "seed": 1003
+    },
+    {
+      "births": 297700,
+      "deaths": 150800,
+      "seed": 1004
+    },
+    {
+      "births": 307800,
+      "deaths": 141700,
+      "seed": 1005
+    },
+    {
+      "births": 299800,
+      "deaths": 143000,
+      "seed": 1006
+    },
+    {
+      "births": 303000,
+      "deaths": 144600,
+      "seed": 1007
+    },
+    {
+      "births": 309700,
+      "deaths": 145800,
+      "seed": 1008
+    },
+    {
+      "births": 300600,
+      "deaths": 147400,
+      "seed": 1009
+    },
+    {
+      "births": 307000,
+      "deaths": 146900,
+      "seed": 1010
+    }
+  ],
+  "pilot_seeds": [
+    1001,
+    1002,
+    1003,
+    1004,
+    1005,
+    1006,
+    1007,
+    1008,
+    1009,
+    1010
+  ],
+  "predeclaration_path": "fidelity-2010-predeclaration.json",
+  "predeclaration_sha256": "87f442ea1b97b90f718e0bf4205497aad03c2d24de0aa7470a09e160f391e18b",
+  "run_year": 2010,
+  "scale": "hundredth",
+  "scale_factor": 100,
+  "statistics": {
+    "births": {
+      "mean": 303320.0,
+      "sample_standard_deviation": 5787.496100310661,
+      "tolerance": 17363
+    },
+    "deaths": {
+      "mean": 145470.0,
+      "sample_standard_deviation": 2633.5653906190873,
+      "tolerance": 7901
+    }
+  },
+  "status": "measured",
+  "targets": {
+    "births": 303299,
+    "deaths": 143451
+  },
+  "ticks": 12,
+  "tolerance_rule": "ceil(3 * sample_standard_deviation)"
+}

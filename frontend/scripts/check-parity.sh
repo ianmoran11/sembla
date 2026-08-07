@@ -284,3 +284,20 @@ cmp "$repo_root/fixtures/demographic/demographic_slots.json" "$tmp/demographic_s
 cmp "$repo_root/fixtures/demographic/demographic_slots.plan.json" "$tmp/demographic_slots.plan.json"
 "$sembla" validate "$tmp/demographic_slots.plan.json"
 echo "Lean demographic model and direct-stable plan are byte-identical to canonical fixtures"
+
+# Australian population: generated movement/mortality lists, canonical model,
+# and feature-bearing plan remain byte-identical to the committed 1:100 schema.
+(
+  cd "$frontend_root"
+  lake exe sembla-export australian_population "$tmp/australian_population.json"
+  lake exe sembla-export --plan australian_population \
+    "$tmp/australian_population.plan.json"
+)
+cmp "$repo_root/fixtures/australian-population/australian_population.hundredth.json" \
+  "$tmp/australian_population.json"
+cmp "$repo_root/fixtures/australian-population/australian_population.hundredth.plan.json" \
+  "$tmp/australian_population.plan.json"
+"$sembla" validate "$tmp/australian_population.plan.json"
+"$sembla" validate \
+  "$repo_root/fixtures/state/australian_population_2010_hundredth.state.model.json"
+echo "Lean Australian population model/plan are byte-identical and the plan/state companion are Rust-validated"

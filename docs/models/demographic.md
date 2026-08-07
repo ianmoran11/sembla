@@ -177,3 +177,5 @@ justify silently adding cross-row or mother-linked semantics here.
 
 The manual scale measurements and the §K2 `Expr::Tick` recommendation are in
 [the demographic benchmark report](../performance/demographic-benchmark.md).
+For the individual-agent design that preserves identity and closes interstate
+flows exactly, see [Australian population](australian-population.md).

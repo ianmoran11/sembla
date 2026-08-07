@@ -2078,3 +2078,402 @@ direct measurement that avoids this second-copy cost.
 Hyperstack reconciliation showed zero VMs/orphans, performance-counter access
 was restored to admin-only, and the destroy watchdog was disarmed only after
 zero resources were confirmed.
+
+## N. Australian population model (accepted 2026-08-05)
+
+### N1. Geography is the eight states and territories, with genuine movement
+
+**Decision.** Spatial location is `area`, an enum over the eight states and
+territories, written by move transitions so a person persists across a move
+with age and `generation` intact. Sub-state geography is neither modelled nor
+carried as an attribute.
+
+**Alternatives.** The aggregate internal migration of §K10 — vacating one slot
+and activating a different pre-classified slot — is rejected for this model.
+Finer geography is rejected on cost: ordered origin-destination pairs grow as
+the square of the area count, giving 56 at state level, 1,190 at GCCSA, 11,342
+at SA4 and 6.1 million at SA2, while guards are evaluated per transition per
+row. A finer static label carried alongside state-level movement is also
+rejected because it would drift silently against its own published series.
+
+**Reason.** The brief requires agents that move, which the aggregate design
+cannot express: its arrival is a different agent with a pre-classified age.
+State level is the finest geography at which an origin-destination transition
+set remains affordable, and it is the level at which ABS publishes interstate
+migration by age and sex. One §K10 caveat is superseded for this model: because
+a move relocates a person rather than activating a new one, national
+internal-migration balance holds exactly rather than in expectation, and the
+model asserts that as an invariant. §K10's fertility caveat is unaffected and
+still applies.
+
+### N2. Movement is one transition per ordered pair, resolved by racing clocks
+
+**Decision.** Each ordered origin-destination pair is its own transition, and
+every move, death and emigration declares `contest slot_resource by race_time`.
+The §5.1 argmin over sampled firing times with its lexicographic tie-break then
+admits exactly one event per person per tick and selects the destination with
+probability proportional to its hazard.
+
+**Alternatives.** A categorical-draw expression is not introduced and remains
+deferred under §K9's trigger. Assigning a Ref destination is impossible rather
+than rejected: the expression language has no row literal, so the only
+Ref-valued expression is `SelfAttr` reading an existing column.
+
+**Reason.** Competing exponential clocks are already correct competing-risks
+multinomial choice, so the destination distribution is obtained from existing
+semantics rather than new ones. Routing every exit through one contested
+resource also makes moving, dying and emigrating compete as they must, and
+keeps deferred losers visible through the existing saturation diagnostics.
+
+### N3. Two foreclosures are accepted, not deferred
+
+**Decision.** Making `area` an enum permanently forecloses two capabilities,
+and both are recorded as consequences rather than as deferrals with triggers.
+First, no hazard may reference the population of its own state, because
+`freq (pred) over <ref>` and `Agg { on: AggJoin }` join only on declared Ref
+keys. Second, the expression language offers Add, Sub, Mul and Div only, so no
+transcendental function is available to any hazard.
+
+**Alternatives.** Retaining `area` as a Ref to preserve frequency-keyed
+aggregates is rejected, because it forbids movement and movement is the point.
+Carrying both an enum and a parallel Ref is rejected because the Ref could
+never be updated on a move and would go stale.
+
+**Reason.** Reversing either foreclosure means abandoning individual movement,
+so a trigger would be dishonest. The scientific cost is stated instead: rates
+are exogenous, there is no crowding or agglomeration feedback, and fertility
+remains an aggregate birth-slot activation rather than a rate applied to
+resident women of childbearing age. §K10's fertility caveat carries over
+unchanged; its internal-migration residual caveat is superseded by N1. The restriction is on the IR expression language only; offline
+arithmetic that computes a parameter default is unaffected.
+
+### N4. `prev_area` is the frozen origin marker
+
+**Decision.** A nine-variant enum `prev_area`, holding `none_` plus the eight
+states, is written on every move and cleared with `event`. Origin-destination
+flows are observed as `count PersonSlot by prev_area, area where event =
+interstate_move`.
+
+**Alternatives.** Encoding the origin into the `event` enum, giving variants
+such as `moved_from_nsw`, is rejected.
+
+**Reason.** The rejected encoding saves one column but overloads `event` and
+makes every flow view harder to read, for a saving that is immaterial beside
+the columns the model already carries.
+
+### N5. Migration is gravity times a rational age profile
+
+**Decision.** The move hazard is `interstate_base` times `push_o` times
+`pull_d` times an age profile `1 / (1 + k (a - peak)(a - peak))` in
+`age_months`, with both `push_nsw` and `pull_nsw` fixed at one. That leaves
+fifteen identifiable spatial parameters — base, seven pushes and seven pulls —
+plus `peak` and `k`: seventeen parameters for all fifty-six cells. The spatial
+parameters are estimated offline from the published origin-destination cells;
+`peak` and `k` are not identified by those all-age cells and are fitted by
+simulation-based inference against simulated stock age structure and published
+state-age-sex interstate-flow compositions.
+
+**Alternatives.** Fixing only `push_nsw` is rejected because multiplying
+`interstate_base` by a constant and dividing every pull by that constant leaves
+all hazards unchanged. A mean-zero log-pull constraint is equivalent but would
+require a transformed parameter representation; fixing `pull_nsw` is explicit
+in the model. A free origin-destination matrix, whether 56 parameters per year
+or 56 per age band, is rejected as uncalibratable. A Gompertz or exponential
+age profile is unavailable under N3. Fixing `peak` and `k` from external
+age-detailed migration margins offline is rejected because age is not observed
+jointly with O-D and the profile remains coupled to simulated stock exposure.
+NPE combines both sources. Raw age-sex counts are retained, but fitting uses
+within-state compositions so the incompatible 2020 O-D and margin totals do not
+force an impossible count match.
+
+**Reason.** The fifty-six observed O-D cells support a fifteen-parameter
+separable gravity fit with forty-one residual degrees of freedom, so the
+assumption can be tested rather than merely made. The rational age form is the
+closest shape reachable with the available operators; its inability to
+represent asymmetry is documented rather than hidden. The full-window age-sex
+flow compositions strengthen the stock-age signal without pretending age is
+jointly observed with destination. Identification can still be weak because
+migration changes state age composition slowly and is confounded with fertility
+and mortality. That weakness is measured — a `peak` or `k` whose posterior
+matches its prior is reported as unidentified, never as fitted.
+
+### N6. Fertility and mortality come from ABS and are fixed during inference
+
+**Decision.** Mortality is five-year age bands by state and sex, with annual
+hazards derived from the ABS age-specific death rates published for every
+registration year 2010–2024. Three-year ABS life-table `qx` snapshots are an
+independent validation source, not the annual model input. Fertility and entry
+rates are per state with ABS-derived values. All are declared parameters, so
+they remain symbolic in the IR, but none varies in a sweep. The fixed and free
+split is recorded in one place and read from there by the calibration harness.
+
+**Alternatives.** Treating an overlapping three-year life-table `qx` snapshot as
+an annual rate is rejected: it needs an arbitrary carry or interpolation rule,
+the early files are legacy BIFF `.xls`, and the latest published period ends in
+2024. Estimating mortality by simulation-based inference is also rejected.
+Inlining any rate as a literal is rejected.
+
+**Reason.** Annual age-specific death rates are published directly for the full
+run window and already match the model's five-year bands. Using them avoids
+manufacturing annual observations from period life tables while retaining those
+tables as an external validation of mortality level and shape. Inferring a
+published rate would spend a large budget to recover a number that can simply be
+read. Keeping rates symbolic preserves §4.2's rule that parameter values never
+enter the IR.
+
+### N7. Monthly ticks in chained annual runs, calibrating 2010 to 2025
+
+**Decision.** The tick is one month, each run covers one year from 1 July to
+30 June with its own seed, parameters and manifest, and consecutive runs are
+chained by a hashed state artifact. The window is the fifteen run years 2010 to
+2024, carrying stocks from 30 June 2010 through 30 June 2025.
+
+**Alternatives.** Annual ticks are rejected. A single continuous run across
+fifteen years is rejected. Ending the window at 30 June 2024 was the initially
+recorded decision and is superseded.
+
+**Reason.** N2 admits at most one event per person per tick, so an annual tick
+would forbid a person both moving and dying within a year and would bias every
+flow downward; a monthly tick makes that bias negligible. Chaining follows §K4
+and keeps each year an independent calibration window with its own parameters,
+which is what absorbs the 2020-21 border closure. The window ends at 30 June
+2025 because that is the last 30 June for which state-level estimated resident
+population by single year of age and sex is published. The 30 June 2024 limit
+that first set this window applies to sub-state data, which N1 puts out of
+scope, so it does not bind here. Later years remain projection.
+
+### N8. Calibrate at one in a hundred, validate at one in one
+
+**Decision.** Calibration runs at a one-in-a-hundred scale of roughly four
+hundred thousand slots; confirmation runs at full scale of roughly thirty-five
+to forty million slots.
+
+**Alternatives.** Calibrating at full scale is rejected on budget. Validating
+only at reduced scale is rejected as unproven.
+
+**Reason.** Per-capita hazards are scale-invariant, so a reduced pool supports
+the thousands of simulations inference needs, while a small number of full
+runs test that invariance in practice. Reduced scale leaves single-year cells
+in the Northern Territory and the Australian Capital Territory frequently at
+zero or one, which is a reportable limitation and never something to smooth.
+A single global largest-remainder pass does not preserve state and age margins
+on the 2010 ERP cube. Reduced-scale initial states therefore apportion both
+margin sets to the national target and use deterministic minimum-cost bipartite
+rounding to satisfy them exactly while favouring the largest cell remainders.
+
+### N9. The person schema is age, sex and state
+
+**Decision.** A person carries occupancy, event, sex, age in months, event age,
+generation, entry stream, entry age, area and previous area only.
+
+**Alternatives.** Household, income, labour force, education, visa and country
+of birth attributes are rejected for this model.
+
+**Reason.** Age by sex by state is exactly the joint that estimated resident
+population publishes, so every calibration target is a published cell. Richer
+structure requires synthesis or reweighting whose uncertainty is materially
+greater and which belongs in its own track.
+
+### N10. The ABS pipeline is quarantined and standard library only
+
+**Decision.** Acquisition, normalisation, state construction, target
+construction and scoring live under `data/abs/`, never import a Sembla crate,
+library, model parser or runtime API, and take no third-party dependency at
+all. Raw downloads are cached and pinned by SHA-256, normalised extracts are
+committed, and re-downloading requires an explicit flag.
+
+**Alternatives.** A second hash-locked requirements contract alongside
+`calibration/npe` is rejected. A separate repository is rejected. Generating
+population inside the runtime is rejected.
+
+**Reason.** §G5's quarantine applies to data as much as to inference, and
+DESIGN §10.5 places population generation outside the runtime boundary. The
+standard library is sufficient for these formats, so a dependency graph would
+add supply-chain surface without adding capability. Committed extracts keep
+every downstream build offline and byte-reproducible.
+
+### N11. Per-year forward walk, with flow targets mandatory
+
+**Decision.** Given the state at 30 June of year t, parameters for year t are
+fitted against that year's flows and the following year's stocks, the final
+state is exported, and the walk advances. Published births, deaths, overseas
+and interstate flow series are mandatory calibration targets.
+
+**Alternatives.** A joint posterior over the whole 2010 to 2025 path is
+rejected. Calibrating against stocks alone is rejected.
+
+**Reason.** A joint fit is intractable at this parameter count and simulation
+cost, whereas a forward walk matches the chained-run architecture exactly. The
+consequence is recorded rather than glossed: this is a filtering-style
+procedure, errors compound across years, and rolling-origin validation is
+mandatory. Separately, annual stocks identify only the net effect of the four
+components, so in-migration and out-migration are not separable without the
+flow series.
+
+### N12. Calibration targets are a versioned artifact
+
+**Decision.** Targets are `sembla.targets/v1`, canonical JSON hashed by
+SHA-256 over exact file bytes, naming each target by model observation, period
+and source series with its ABS vintage, and marking each as fitted or held out.
+
+**Alternatives.** Assembling targets inside the calibration harness is
+rejected, as is any target set that does not distinguish fitted from held out.
+
+**Reason.** Targets are data and must be versioned and hashed like data.
+Recording the split inside the artifact is what prevents a fitted cell from
+later being quoted as validation evidence.
+
+### N13. Reporting discipline and the non-claims
+
+**Decision.** Fit to fitted controls is reported as reconstruction and always
+separately from held-out evidence. Reports carry signed and absolute cell
+error, MAE, RMSE and maximum error, error by population size, per-state
+residual detail, and uncertainty across replicates. Residuals between published
+components and estimated resident population are reported, never forced away.
+
+**Alternatives.** Correlation as a headline measure is rejected. Adjusting
+parameters in response to held-out results is rejected.
+
+**Reason.** Large states can carry a high correlation while the smallest
+jurisdictions are poor, so correlation alone conceals the errors that matter.
+Estimated resident population is itself modelled, confidentialised, constrained
+and revised, so agreement with it is not agreement with truth. A model matching
+state by age by sex controls is not thereby realistic on any omitted
+relationship and carries no sub-state validity whatsoever.
+
+### N14. Entrant slots are single-use and exited rows retire
+
+**Decision.** `entry_stream` has `birth_slot`, `overseas_slot` and
+`retired_slot`. Every initially present row starts retired. Death and emigration
+write `retired_slot` before vacating a row, so that row can never activate
+again. Birth and overseas rows are pre-classified once and retire after exit.
+
+PRD 0004 therefore exports the schema before PRD 0003 builds states, then
+finishes its invariants against the committed one-in-a-hundred artifact. Paired
+models for the other scales may change only the `person_slot` and
+`slot_resource` row counts and must pass Rust validation.
+
+**Alternatives.** Reusing every exited row under one of the two entrant streams
+is rejected because mutable area and inherited sex or entry age corrupt the
+fixed ABS entrant composition. Adding a full immutable entry-area column is
+rejected because it adds memory and still leaves dynamic mixture assumptions.
+
+**Reason.** The pool arithmetic reserves one row for every future entry, so
+single-use slots make the arithmetic and the state lifecycle agree. The extra
+enum variant costs no additional column memory, requires no syntax or IR change,
+and keeps calibration responsible for entrant rates rather than entrant mix.
+
+### N15. Entry streams carry ten percent headroom
+
+**Decision.** The initial pool reserves every observed 2010–2024 birth and
+NOM arrival plus 10% headroom independently for each stream, rounded up before
+scale reduction. Reports show the requirement, headroom and total separately.
+
+**Alternatives.** Five percent is the smallest whole percentage exceeding ten
+Poisson standard deviations at one-in-a-hundred scale, but is rejected in favour
+of a more conservative first full-chain margin. An unrecorded magic slot count
+is rejected.
+
+**Reason.** Ten percent adds 1,201,566 full-scale rows while keeping the pool
+inside the accepted 35–40 million range. It protects the first calibration from
+moderate model misspecification as well as simulation noise. PRD 0008 still
+fails on a zero or near-zero vacancy margin; headroom is capacity, not evidence
+that saturation cannot occur.
+
+### N16. Mortality retains all state-age-sex rates
+
+**Decision.** Mortality uses 336 disjoint transitions and fixed parameters:
+eight states by 21 five-year age bands by two sexes. Each guard includes area,
+age band and sex, and each annual parameter maps to the corresponding published
+ABS rate without averaging states together.
+
+**Alternatives.** Forty-two national age-sex transitions are rejected because
+they cannot represent the selected state-specific evidence. A mutable per-row
+rate column is rejected because interstate movement and ageing would make it
+stale. Exposure-weighted state aggregation is rejected because §N6 explicitly
+selects direct published rates.
+
+**Reason.** The expression language has no conditional lookup, so disjoint
+transitions are the only no-IR way to preserve every ABS cell. They add no
+column or state-artifact bytes and leave the free migration dimension at 17,
+but increase transition evaluation cost; PRD 0010 must measure that cost rather
+than conceal it.
+
+### N17. State companions omit only feature-gated grouped views
+
+**Decision.** Each `.state.model.json` companion has the canonical tables,
+parameters, transitions, scalar views and summaries, with scale-specific row
+counts, but an empty `grouped_views` list. The adjacent executable plan is the
+scientific run artifact and retains every grouped observation.
+
+**Alternatives.** Keeping a feature-bearing raw companion is rejected because
+the existing public `sembla validate` command has no feature-enable option and
+rejects it. Changing CLI feature semantics inside this model work is rejected
+as a platform change. Treating the failed raw validation as acceptable is
+rejected because it leaves the documented conformance command false.
+
+**Reason.** State bytes depend only on table schema. The validation-safe
+companion lets existing generic tooling validate and load every scale without a
+new flag, while the plan remains the single feature-bearing execution boundary.
+Tests compare parsed models after restoring grouped views, preventing dynamics
+or parameter drift between the two representations.
+
+### N18. Entry hazards close exactly and published zero mortality stays zero
+
+**Decision.** For start-of-year vacant entry slots `V` and published entries
+`E`, the monthly birth or overseas-arrival hazard is
+`-log1p(-E / V) / 12`. The projected path subtracts published rather than
+simulated entries, and rates are derived from full-scale capacities before use
+at any simulation scale. Published mortality rates rounded to `0.0` remain
+exact zero hazards. Because a LogNormal cannot be centred at zero, those fixed
+zero defaults alone use a centred Normal prior with spread `0.05 / 12000`, half
+the ABS one-decimal rate precision in monthly-hazard units.
+
+**Alternatives.** Treating `E / (12 × average vacancies)` directly as a
+continuous-time hazard is rejected because the runtime applies exponential
+racing and that quotient is a monthly firing probability. Flooring published
+zero mortality to a positive value merely to retain a LogNormal prior is also
+rejected because it would violate the direct-rate mapping.
+
+**Reason.** The selected entry hazard leaves exactly `V - E` expected vacancies
+after twelve monthly opportunities, while retaining the PRD's expected-vacancy
+exposure interpretation after probability-to-hazard conversion. Exact zeros
+preserve the published evidence; their priors are descriptive metadata because
+all direct rates are fixed and excluded from the inference vector.
+
+### N19. Targets are annual ledgers; the measured reduction is rejected
+
+**Decision.** `sembla.targets/v1` uses fifteen hundredth-scale run-year ledgers,
+2010--2024. Ledger `y` maps year-`y` flows and 30 June `y+1` stocks to exact
+model observations, covering terminal 2025 ERP without manufacturing 2025
+flows. Each ledger keeps one complete evidence list with mixed fitted and
+held-out roles and two explicit fitted projections: 1,096-cell `full` and
+165-component `reduced`. Single-year stocks are always held out; a named 2010
+variant additionally holds out NT without leaking it through aggregates.
+Target hashes are SHA-256 over `b"sembla.targets/v1\\0"` plus exact canonical
+bytes. Counts are compared after exact 1:100 scale-up, while composition values
+retain integer numerators and denominators.
+
+Three grouped observations are additive sinks only: single-year population,
+death event age, and interstate origin-destination-sex-event-age. Published
+`not_stated` deaths and incompatible all-age interstate margins remain
+reporting diagnostics, never synthetic age cells or duplicate fitted controls.
+
+The predeclared 108-run diagnostic prior-predictive experiment found that only
+`interstate_base` passed the reduced vector's effect-to-noise gate; the other
+sixteen free migration parameters failed. The selected recommendation is
+therefore `full`. This is not a claim that `full` is strongly identified: its
+own measured effects were below the same noise level at one-in-a-hundred scale,
+so PRD 0008 must add replication or larger-scale confirmation and report weak
+identification honestly.
+
+**Alternatives.** Sixteen boundary-year files are rejected because edge files
+would lack scoreable flows. Separate duplicated full/reduced ledgers are
+rejected because projection order can be recorded over one immutable evidence
+list. Scaling ABS targets down, adjusting O-D cells to published margins, or
+selecting `reduced` despite a failed gate are rejected.
+
+**Reason.** Run-year ledgers align with the chained simulation boundary and keep
+every source discrepancy visible. One complete ledger prevents reduction from
+silently deleting evidence, while measured projection failure resolves the
+NPE-width question by evidence rather than convenience.

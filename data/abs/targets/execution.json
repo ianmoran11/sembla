@@ -1,0 +1,26 @@
+{
+  "format": "sembla.targets-execution/v1",
+  "model": {
+    "ir_hash": {
+      "algorithm": "sha256",
+      "digest": "3d249dbc8c39249b234daa6d3af7a44bae77acf154a830b1b81180afbcd0f62e"
+    },
+    "name": "australian_population",
+    "raw_sha256": "6f307418a367d44d6cde56c18c57d6873981a7187bc17fa94ca3c5f9110ed904"
+  },
+  "plan": {
+    "enabled_features": [
+      "grouped-observations"
+    ],
+    "identity_scheme": "sembla.identity/stable-v1",
+    "origin": "direct_stable",
+    "raw_sha256": "6f05d870681f35950deab4c74a8a9e816b43625a744f9e8cf2d5aa96a2ef18fe",
+    "schema": "sembla.executable-plan/v1",
+    "semantic_hash": {
+      "algorithm": "sha256",
+      "digest": "0e24d88398abaaaae7842d21aacf8c7dd9ae5f882c0f6d39c97d03c7aa74e5bf",
+      "domain": "sembla.plan-core/v1"
+    }
+  },
+  "provenance": "Observed from the public run manifest for the exact model/plan bytes; cross-checked by crates/sembla-cli/tests/australian_population.rs"
+}

@@ -1,0 +1,43 @@
+{
+  "capacity": {
+    "maximum_deferred_to_fired_ratio": 0.006521739130434782,
+    "maximum_ratio_run_year": 2020,
+    "minimum_vacant_birth_slots": 4606,
+    "minimum_vacant_overseas_slots": 7425
+  },
+  "chain_report_raw_sha256": "29fe3755a14f909c7437d01fb2e667d6525473533f4ffb917c348a4ab0075c24",
+  "final_boundary_year": 2025,
+  "final_eight_state_erp": {
+    "relative_error": 0.006320797994407594,
+    "signed_error": 174492.0,
+    "simulated": 27780500.0,
+    "target": 27606008.0
+  },
+  "format": "sembla.australian-population-baseline-evidence/v1",
+  "maximum_absolute_national_relative_drift": {
+    "boundary_year": 2024,
+    "relative_error": 0.006734600030578216,
+    "run_year": 2023
+  },
+  "middle_year_reproduction_raw_sha256": "02013f37a59de890ffa4866c384f56d6aab6191451b001fb6a49dc96f4e497ec",
+  "reproduction_raw_sha256": "495745dd702f97921212476a76fa4059b36d13538f6469b5cf0a6558098aaf75",
+  "residual_report_count": 15,
+  "run_years": [
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ],
+  "status": "uncalibrated_baseline"
+}

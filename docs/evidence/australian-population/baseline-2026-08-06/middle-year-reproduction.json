@@ -1,0 +1,83 @@
+{
+  "byte_identical": true,
+  "file_count": 15,
+  "files": [
+    {
+      "bytes": 38144,
+      "path": "2017.csv",
+      "raw_sha256": "05c2165a2c62900d46914ee05b52a84ac117b94d9443716b00a21bb8ab57f3b6"
+    },
+    {
+      "bytes": 19721,
+      "path": "2017.csv.manifest.json",
+      "raw_sha256": "f85e415293578ec0215820da8bbba997d7a162e4d76d6815085fa2444736e338"
+    },
+    {
+      "bytes": 301,
+      "path": "2017.csv.summaries.csv",
+      "raw_sha256": "71e76cd57744003496ccb91e5f2c70f3a6a09af45966585dbd1332e75e8b69c5"
+    },
+    {
+      "bytes": 2594,
+      "path": "2017.grouped.births_cells.csv",
+      "raw_sha256": "01e18bcca306857b6cc42e22885c9593ba74673e2dfd7e2a18af02c3d1a5bf34"
+    },
+    {
+      "bytes": 2496,
+      "path": "2017.grouped.deaths_cells.csv",
+      "raw_sha256": "8879853abecb0cc2dd1ab688a0f7981a8a10c03a6d402789b77d0f7deff7fe5c"
+    },
+    {
+      "bytes": 15320,
+      "path": "2017.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "2b3e6cdad714d3a3b55722fe74dc3f5fb20cffee55d841072b24474670336bab"
+    },
+    {
+      "bytes": 25904,
+      "path": "2017.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "91ac80dd9f834638d7c393d4614f9a64bbfda069c523bc7867adef0717c62cc9"
+    },
+    {
+      "bytes": 5214,
+      "path": "2017.grouped.interstate_flows.csv",
+      "raw_sha256": "5c58db94ab6d956b7633575d7c5c91b9f6bd6d0037d01f68b9a11598015b4456"
+    },
+    {
+      "bytes": 2717,
+      "path": "2017.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "0a3782337918b0a9152177056340f34d54657cedb89af6d1061ecf2eda72b75d"
+    },
+    {
+      "bytes": 2618,
+      "path": "2017.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "b9201fce627a5216297e612040beb2c532653bb2018d408033201941e5b55809"
+    },
+    {
+      "bytes": 73070,
+      "path": "2017.grouped.population_cells.csv",
+      "raw_sha256": "4d386123a345587d600cd6648315d5155493e10124fca773f00cdb161708bc08"
+    },
+    {
+      "bytes": 345332,
+      "path": "2017.grouped.population_single_year_cells.csv",
+      "raw_sha256": "3a040076e57f5cbbecbfb5383bcc5e6234721c01e0d5d3c24e238afce74bdce1"
+    },
+    {
+      "bytes": 6710,
+      "path": "2017.grouped.vacancy_cells.csv",
+      "raw_sha256": "55ecfd6cb432a00e6d58bcb83c6a8e022699667913db9b37d8dcb06c82fb5016"
+    },
+    {
+      "bytes": 1099143,
+      "path": "2017.score.json",
+      "raw_sha256": "d8a6ea87ac382c3f7139f064cadf1021c6133b40a33c334d7f2bded80a9ba569"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2018.state",
+      "raw_sha256": "dab0b364459f43e08976587061bc3b26977c7ff0ca4470ceeacf2e3f93dc69b7"
+    }
+  ],
+  "format": "sembla.australian-population-middle-year-reproduction/v1",
+  "run_year": 2017
+}

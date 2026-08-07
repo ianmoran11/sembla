@@ -1,0 +1,1137 @@
+{
+  "byte_identical": true,
+  "file_count": 226,
+  "files": [
+    {
+      "bytes": 37886,
+      "path": "2010.csv",
+      "raw_sha256": "e73c9c2b1f84841bcfb5859f60f42f121cff43eb822d533f934a5404c68f7b49"
+    },
+    {
+      "bytes": 19543,
+      "path": "2010.csv.manifest.json",
+      "raw_sha256": "6064d6fddf9ec5e559c421fbdbbf0f96f525cbfadf1b76722c3e3bf780b50a4e"
+    },
+    {
+      "bytes": 301,
+      "path": "2010.csv.summaries.csv",
+      "raw_sha256": "cab0420b2c3fb732c1fe142c0c4a3f76828f741f9c41c003669147529486452f"
+    },
+    {
+      "bytes": 2607,
+      "path": "2010.grouped.births_cells.csv",
+      "raw_sha256": "8ad9a4de4e18ce5598f7a16f68750d1c0dcf483bd19b8bae617d711a23162870"
+    },
+    {
+      "bytes": 2279,
+      "path": "2010.grouped.deaths_cells.csv",
+      "raw_sha256": "6798313bb942a013ee029217efae7c81e7c9aa7daf326e3dfd73c1e75e9d1c04"
+    },
+    {
+      "bytes": 13582,
+      "path": "2010.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "3a7b6f3754051d8da384e5fb0ce1911f42fcb4f48c7800fc59f3cb1ded81f70e"
+    },
+    {
+      "bytes": 22421,
+      "path": "2010.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "8f0f902bfc78cc036b542221521ed500c4a39feb535c81209ae3e5457a2885cf"
+    },
+    {
+      "bytes": 4845,
+      "path": "2010.grouped.interstate_flows.csv",
+      "raw_sha256": "9461c102d6773d5ff21f5d5da5233d2f9cb62dd641b43fe5cde3e2e5b9cfaeb7"
+    },
+    {
+      "bytes": 2630,
+      "path": "2010.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "766f6fa63465c938071790f7846f1fd11ca9c8168c97d50b6ca4d20eedc8b45c"
+    },
+    {
+      "bytes": 2483,
+      "path": "2010.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "2e4a9eef48516eb2ff4e5483109f2b60f5dade76abd4a9c893f97705344b965f"
+    },
+    {
+      "bytes": 70816,
+      "path": "2010.grouped.population_cells.csv",
+      "raw_sha256": "819d396290ec076c26a625bdb934ce1c8594b8d00fdfbff59448a77fca7c390f"
+    },
+    {
+      "bytes": 339318,
+      "path": "2010.grouped.population_single_year_cells.csv",
+      "raw_sha256": "fd76ef6ec289d8fea95e2900600fd9e4ff9b1f3f1f9b6257a80152d315daa3a3"
+    },
+    {
+      "bytes": 6467,
+      "path": "2010.grouped.vacancy_cells.csv",
+      "raw_sha256": "19feadb146511562ad8e4c7b3e60735f3d1ef953d03303321f8b47a47b8b945f"
+    },
+    {
+      "bytes": 1095644,
+      "path": "2010.score.json",
+      "raw_sha256": "e4d3640e1639c42c7dea9805d5917a55c6e338696263ba2bcf69994dacd3ca3a"
+    },
+    {
+      "bytes": 37848,
+      "path": "2011.csv",
+      "raw_sha256": "68c541c0cd8379564f93ed79f8902742a361fde4b95b1b2f7ddbf082b9b0d575"
+    },
+    {
+      "bytes": 19451,
+      "path": "2011.csv.manifest.json",
+      "raw_sha256": "d2af01a583b37b82a9ddffb3d0359801002b33bf00ba2e688509e2585946d45b"
+    },
+    {
+      "bytes": 301,
+      "path": "2011.csv.summaries.csv",
+      "raw_sha256": "8e5922469dcd68b65cd27807617e24f6e725b48aa98c08ab08de8e59ed057325"
+    },
+    {
+      "bytes": 2670,
+      "path": "2011.grouped.births_cells.csv",
+      "raw_sha256": "e79dd3e9c782ffcc2c3e76f89dcc5fd1177673f4cc7a76d1cfbe7be6b9dafd26"
+    },
+    {
+      "bytes": 2410,
+      "path": "2011.grouped.deaths_cells.csv",
+      "raw_sha256": "8ad19e9d3f52c7ec78235ff7c16e6f70ac27f6174d7c3c530a91a8c5bab2bc37"
+    },
+    {
+      "bytes": 13870,
+      "path": "2011.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "0e14e7092ecc06ddff19f6218ed1a925c879c39a794c995bbbd73ebd98befc99"
+    },
+    {
+      "bytes": 22301,
+      "path": "2011.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "eb635cfaf0b85feaa7ee8afbc7af10c77ed53c6855f1265f0248d80d2375f082"
+    },
+    {
+      "bytes": 4870,
+      "path": "2011.grouped.interstate_flows.csv",
+      "raw_sha256": "2758f129786e5de5b18e9b13ea2360a77303bb7153d995ff1b8141921416966a"
+    },
+    {
+      "bytes": 2662,
+      "path": "2011.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "c1dc058aabcc3b589b33ae92f7a8c063b3017f804a02e710484eec30351674b5"
+    },
+    {
+      "bytes": 2642,
+      "path": "2011.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "ef7c537e7dde1b6675e741c0a33b9d57e7b51d22dfc48e01ed52b2aef6451405"
+    },
+    {
+      "bytes": 70991,
+      "path": "2011.grouped.population_cells.csv",
+      "raw_sha256": "45f63a01142d4c468668002963f45cc85a49ec50ffad3dcda42e751e44d91be9"
+    },
+    {
+      "bytes": 340923,
+      "path": "2011.grouped.population_single_year_cells.csv",
+      "raw_sha256": "d0bc7b937964420f8a78000e283fde1cf57adfbcca5ec00a516a53951807998a"
+    },
+    {
+      "bytes": 6697,
+      "path": "2011.grouped.vacancy_cells.csv",
+      "raw_sha256": "cc7ef92ffdee4c085f1826f89c9aa97efc12cc42a820baf797f6f19f7c05707d"
+    },
+    {
+      "bytes": 1096422,
+      "path": "2011.score.json",
+      "raw_sha256": "604de4436a9557d950c768ce5e37c14a82f7b2cb93272b3a7bfa53aacccbb12b"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2011.state",
+      "raw_sha256": "738ea93ec68b616f08fc0989a3b5a8064dc8010a5a3fe550496bf313f5414738"
+    },
+    {
+      "bytes": 37783,
+      "path": "2012.csv",
+      "raw_sha256": "83601555e033c2e6811de11511b1e08fb4ddedda06602f6fc9100c4436028766"
+    },
+    {
+      "bytes": 19381,
+      "path": "2012.csv.manifest.json",
+      "raw_sha256": "b5df7e49da6aef6acdd901c98d64096165dac72c85dc32486bc49a58cc755215"
+    },
+    {
+      "bytes": 301,
+      "path": "2012.csv.summaries.csv",
+      "raw_sha256": "a8e56c1c0c1bfe569965c8460618cd1caef84bec3d310822e0b7f1fba66ab55c"
+    },
+    {
+      "bytes": 2678,
+      "path": "2012.grouped.births_cells.csv",
+      "raw_sha256": "c5f2c9b265d5d3a068923d779a269ba3edfaf956b86eb93f761c830607a00554"
+    },
+    {
+      "bytes": 2261,
+      "path": "2012.grouped.deaths_cells.csv",
+      "raw_sha256": "d1626a9857a80d20da04a86f58beff4444efbb784ccab0040bff1a6c15e12fe0"
+    },
+    {
+      "bytes": 13790,
+      "path": "2012.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "c518c83a3bc2c080bcad7cb7fd9d865c6e442948f8180068d67f89e06f04a501"
+    },
+    {
+      "bytes": 25513,
+      "path": "2012.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "34b3e72252f672989448bea3587d57d48f241c79c37c5e28a657b442a5082164"
+    },
+    {
+      "bytes": 4964,
+      "path": "2012.grouped.interstate_flows.csv",
+      "raw_sha256": "2697a9ecdf844c02074614b4dc901e04344091fba549c8ca9f3b62f731597301"
+    },
+    {
+      "bytes": 2615,
+      "path": "2012.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "657a24a51b47e4dce14a461f3279d7d0f6c5e8a47605f3d2e2b91d1a363d9995"
+    },
+    {
+      "bytes": 2514,
+      "path": "2012.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "dffdd9928600f1b2bdb74d7873f05b9981d94083fe72feecef0c3cc59b3e2b2e"
+    },
+    {
+      "bytes": 71538,
+      "path": "2012.grouped.population_cells.csv",
+      "raw_sha256": "8698447f3055dbecd655981a04ff65247f538261a109c851b5378a8efa5ca7a5"
+    },
+    {
+      "bytes": 342025,
+      "path": "2012.grouped.population_single_year_cells.csv",
+      "raw_sha256": "e6ed26b679b1610ad82002963727fb1a3603b3b9288c56f23ebc84e920aeaae8"
+    },
+    {
+      "bytes": 6730,
+      "path": "2012.grouped.vacancy_cells.csv",
+      "raw_sha256": "036404456878539af78f6b4b0032bdbf1f347af3ff0aa0b3dc5de334d91887a9"
+    },
+    {
+      "bytes": 1098086,
+      "path": "2012.score.json",
+      "raw_sha256": "6e603520ff2b6409db024441ace03a6a7d8824a0c12c1064cef58178f5ed8204"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2012.state",
+      "raw_sha256": "b6bac49c1368f6c5fe9c0dc4c830494de54b4e36f8f510a38ed300e723be52b8"
+    },
+    {
+      "bytes": 37860,
+      "path": "2013.csv",
+      "raw_sha256": "14de404f81304e07bf00a219cd6d8fd3c37e0d511714f66aa5bda8f4c94b6c1a"
+    },
+    {
+      "bytes": 19448,
+      "path": "2013.csv.manifest.json",
+      "raw_sha256": "2c833afea07361556a48082ba9fccc852385e8bf0b186a69b7a2c949d0bd60fd"
+    },
+    {
+      "bytes": 301,
+      "path": "2013.csv.summaries.csv",
+      "raw_sha256": "4c92cc25353cd581681ba205e3af50d4c029d3398e3de48252dc189a7c256485"
+    },
+    {
+      "bytes": 2669,
+      "path": "2013.grouped.births_cells.csv",
+      "raw_sha256": "4743a895e345859dc0785678efa7e059f2d37b8efb4e0ff043ae9059e0a9b820"
+    },
+    {
+      "bytes": 2385,
+      "path": "2013.grouped.deaths_cells.csv",
+      "raw_sha256": "1530a900d6ffc6ccb44ee05cbd596f3071e53339723911d9c2fde7f8e0510b81"
+    },
+    {
+      "bytes": 14177,
+      "path": "2013.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "fc611e08814e52343a621e9e95a2acc21d7bf29c0b3a721e49fc0623089665ec"
+    },
+    {
+      "bytes": 24619,
+      "path": "2013.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "23a22e1b847d31f7951b7eb5961313797f5648a6fcec2171518b0d6fcaee7f30"
+    },
+    {
+      "bytes": 5059,
+      "path": "2013.grouped.interstate_flows.csv",
+      "raw_sha256": "480ccb4168b5605d4133d125e907eeaa0fb681929269e7a3db811e5f81bd3ea4"
+    },
+    {
+      "bytes": 2719,
+      "path": "2013.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "aa1209fb21707d3b3f9186615bb43e19ae5e044dfe49573d9bc9078b31cb80f4"
+    },
+    {
+      "bytes": 2549,
+      "path": "2013.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "09cfeb53545cd565a2c48dd6fde9e8e478fdca4189f475e2d512950fbc5c1a5f"
+    },
+    {
+      "bytes": 71981,
+      "path": "2013.grouped.population_cells.csv",
+      "raw_sha256": "b4fc4127008ab3e9e651e9515e85a9921ec80ac836fc0f17cfb7affcd55cd530"
+    },
+    {
+      "bytes": 343729,
+      "path": "2013.grouped.population_single_year_cells.csv",
+      "raw_sha256": "e6c783311ca383501c846fae879debbadf5d86872bf793650601af0dcfbaa169"
+    },
+    {
+      "bytes": 6730,
+      "path": "2013.grouped.vacancy_cells.csv",
+      "raw_sha256": "8d7d8f7f43f0f20e0872b711aa9f17bee8e4b391d7395601123de47a1cf2d1c6"
+    },
+    {
+      "bytes": 1098344,
+      "path": "2013.score.json",
+      "raw_sha256": "205305a53a3a916f948423a1c09ebe98633d37ee031efcb81b9eeeba6bb4e192"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2013.state",
+      "raw_sha256": "d03d0271758d905704c903e5ae4c11d2a4fc394e25939f13af9c8335aca0fae9"
+    },
+    {
+      "bytes": 37992,
+      "path": "2014.csv",
+      "raw_sha256": "46b5fe017228afc19cafb43e4a933c7429af9d2a624671093ab3349a6ab3328f"
+    },
+    {
+      "bytes": 19575,
+      "path": "2014.csv.manifest.json",
+      "raw_sha256": "cd48861cbf2c3a062f362e9df14badc0d67b9fe7dfb70086c9096dd9efedac87"
+    },
+    {
+      "bytes": 301,
+      "path": "2014.csv.summaries.csv",
+      "raw_sha256": "ba6891b2a58f1b27b2e635ed6dd60dcb2d5440e730bd2e5f6107a6476775dac0"
+    },
+    {
+      "bytes": 2635,
+      "path": "2014.grouped.births_cells.csv",
+      "raw_sha256": "120817a6801e2b4d78e7ef650a09fa7f32a7d30f56efe3d7302af0c26321b2c7"
+    },
+    {
+      "bytes": 2401,
+      "path": "2014.grouped.deaths_cells.csv",
+      "raw_sha256": "3e3678ebd104d7e5f0b31f972bf8361ccc3283a0a2550971c43d046fa3f6ca0e"
+    },
+    {
+      "bytes": 14444,
+      "path": "2014.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "53b01036ae4dc4ae0b906d09af351d24e201778b7a45b1f127bbb307bcdb052e"
+    },
+    {
+      "bytes": 24689,
+      "path": "2014.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "1d6aeed41906eaaed72c9a41e787b8ce7cbcd712922c154d3026031b999c1d37"
+    },
+    {
+      "bytes": 5099,
+      "path": "2014.grouped.interstate_flows.csv",
+      "raw_sha256": "823719b0739e909f5ab3c3c71b86c8ca72d04f74ae54e3ed922d3dda555d47bc"
+    },
+    {
+      "bytes": 2716,
+      "path": "2014.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "5f39ffc8cf072ecfc8d9caf86714d5c7f43ed1541f3412ea1d93131966ed27f2"
+    },
+    {
+      "bytes": 2598,
+      "path": "2014.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "c4747dccd0af45e3504effe50bec26fc447c6b8ae8e3d0ebf9686ddabfd3f59f"
+    },
+    {
+      "bytes": 72262,
+      "path": "2014.grouped.population_cells.csv",
+      "raw_sha256": "182928485ce506f6be172dd2892a356c79ff3566d89fea33333dcd451ded632a"
+    },
+    {
+      "bytes": 343841,
+      "path": "2014.grouped.population_single_year_cells.csv",
+      "raw_sha256": "fa8d1fa5c8f7c4845b01d6c4a2698870a76bb4dd1c4b90f852944242593764fe"
+    },
+    {
+      "bytes": 6731,
+      "path": "2014.grouped.vacancy_cells.csv",
+      "raw_sha256": "f63621fc0d06bbe5f1f32764a3e5eb772dee17ea0a04c46d611becf910544a2d"
+    },
+    {
+      "bytes": 1098397,
+      "path": "2014.score.json",
+      "raw_sha256": "2254455bd194a1a26a5db8153b02a2499d8060c0ee831a83a32cb2828a477a10"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2014.state",
+      "raw_sha256": "aa9fc29ca927a0d845e636a4340210d2c1f96543e5fddd890a4dfb118bb1e2e6"
+    },
+    {
+      "bytes": 37899,
+      "path": "2015.csv",
+      "raw_sha256": "4d50a7a60b75d5375bc2628742c54f787f24ee7ceac9c342a231656cf058c3be"
+    },
+    {
+      "bytes": 19473,
+      "path": "2015.csv.manifest.json",
+      "raw_sha256": "a20de87e97d78dc36c3ae9d026fd428602d01f763f4ae33576ee30fc964d3910"
+    },
+    {
+      "bytes": 301,
+      "path": "2015.csv.summaries.csv",
+      "raw_sha256": "f53966fb22c7647a23eebbd56ad6ba2866eefe72b284953ceefcfa7b00d41af4"
+    },
+    {
+      "bytes": 2647,
+      "path": "2015.grouped.births_cells.csv",
+      "raw_sha256": "82d55bfbf6f2d75596e6fd98dd6ed09aaea8fa4e59e9ce16f7b03563ddc95790"
+    },
+    {
+      "bytes": 2305,
+      "path": "2015.grouped.deaths_cells.csv",
+      "raw_sha256": "eb35b2cfd45fc509682b1b29a97eda718ff637bade0fdb6c49e4b7dc07cd2c64"
+    },
+    {
+      "bytes": 14247,
+      "path": "2015.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "2d1fe8d6df2babf3fee752cae19ff79d0dad47e799b8d3f6b8974d331c1cec9b"
+    },
+    {
+      "bytes": 25939,
+      "path": "2015.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "97ca312ca9582a5a037489efbd035c040fba1e60d73f088ba0671cc7e87bf5b5"
+    },
+    {
+      "bytes": 5325,
+      "path": "2015.grouped.interstate_flows.csv",
+      "raw_sha256": "cb33f31a873ef118f72caa40d1d61cec838c66f9a4da35eb97df94084239a0b4"
+    },
+    {
+      "bytes": 2736,
+      "path": "2015.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "8e3c46d0f7ca97383b80c11a049b76417b231d5206a087f3153527e3128b0256"
+    },
+    {
+      "bytes": 2554,
+      "path": "2015.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "99daffa213729af29d7fa9d8a8095b7fa6417481a3be42406b351ed0c99f86a7"
+    },
+    {
+      "bytes": 72750,
+      "path": "2015.grouped.population_cells.csv",
+      "raw_sha256": "77dd6df7eef043e6a91d4a289b2467742e585ce51c7e7126ef41d1d1db7baea5"
+    },
+    {
+      "bytes": 344814,
+      "path": "2015.grouped.population_single_year_cells.csv",
+      "raw_sha256": "5c2e4064628c18fa57f03a79eba7a5f5aff44fc8b8b7bafaf1f01be9d849c01c"
+    },
+    {
+      "bytes": 6721,
+      "path": "2015.grouped.vacancy_cells.csv",
+      "raw_sha256": "669b529ee3af7973b79296969cc5a6a908b97afa9b2cd8e4fb089aca85162306"
+    },
+    {
+      "bytes": 1099427,
+      "path": "2015.score.json",
+      "raw_sha256": "65003a9b8363baf2899ed0103551662a9789fbd408787d65a8eb0bb87ebc657d"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2015.state",
+      "raw_sha256": "b9de0a393904b7277776cfffba57b8c8194c80bd992eb27e0be9317121599a3c"
+    },
+    {
+      "bytes": 37903,
+      "path": "2016.csv",
+      "raw_sha256": "183018b2dd856e4ce8d0bb09e335944321d0c9763d3e934c2f182c5209feb077"
+    },
+    {
+      "bytes": 19485,
+      "path": "2016.csv.manifest.json",
+      "raw_sha256": "023db3c63c90e57ffe239caabd51c70abc612828b955d69e33f0c01885c11a28"
+    },
+    {
+      "bytes": 301,
+      "path": "2016.csv.summaries.csv",
+      "raw_sha256": "8becb16904b70931d5227e625216eebdf2a56aa6ebf25107b1003ff0986de719"
+    },
+    {
+      "bytes": 2626,
+      "path": "2016.grouped.births_cells.csv",
+      "raw_sha256": "c25bfb6d20096feadddfc9636ec944927020d31f3c17ed69a557e0586494db4e"
+    },
+    {
+      "bytes": 2348,
+      "path": "2016.grouped.deaths_cells.csv",
+      "raw_sha256": "4435e48f45106e230f6ebb5cab8595323a7f242ec9cb67b7fc77ba03fc48acf7"
+    },
+    {
+      "bytes": 14046,
+      "path": "2016.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "135ae1479dd983fdb379aa01312ce0f86a05990edc234b6e78298142c9b7aaef"
+    },
+    {
+      "bytes": 25617,
+      "path": "2016.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "31bb4b68593610c2bc9b33c2a70bef35b06271bef948a98a0526c506c777507d"
+    },
+    {
+      "bytes": 5167,
+      "path": "2016.grouped.interstate_flows.csv",
+      "raw_sha256": "57c11ca7a86b60299976d8793acd73d6c060952dc81e6afbf69c62d1a314c044"
+    },
+    {
+      "bytes": 2702,
+      "path": "2016.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "3c98617e451d2f3c29a148bcd68513f3c7e01f55675a1f34b5e3f4f6a1b3dea7"
+    },
+    {
+      "bytes": 2667,
+      "path": "2016.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "3f1deedb9e1500f2627913da70f5b2889e8ac38dfadfb292f48f300652f43973"
+    },
+    {
+      "bytes": 72714,
+      "path": "2016.grouped.population_cells.csv",
+      "raw_sha256": "cfc435ae7d8f5c34a2ef15d7a44e974efdb53b3b17404013aed9d73e777ad1d8"
+    },
+    {
+      "bytes": 345234,
+      "path": "2016.grouped.population_single_year_cells.csv",
+      "raw_sha256": "1a910c01de033adec731f1a59c30dee84c2a848219c3df741d7bac4f090f2a18"
+    },
+    {
+      "bytes": 6703,
+      "path": "2016.grouped.vacancy_cells.csv",
+      "raw_sha256": "cbe2765c446b6f847a24502c87d865c3b7da8f743c510336f00ae702ebfd577c"
+    },
+    {
+      "bytes": 1100070,
+      "path": "2016.score.json",
+      "raw_sha256": "04f9dd39a2d0dc559c15b397d8fdaff96b98c680d54ac7c4b6700199251f9891"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2016.state",
+      "raw_sha256": "64fe5e0cf6724c501518264ab091580f72743aae7525148450801e32a3b196c0"
+    },
+    {
+      "bytes": 38144,
+      "path": "2017.csv",
+      "raw_sha256": "05c2165a2c62900d46914ee05b52a84ac117b94d9443716b00a21bb8ab57f3b6"
+    },
+    {
+      "bytes": 19721,
+      "path": "2017.csv.manifest.json",
+      "raw_sha256": "f85e415293578ec0215820da8bbba997d7a162e4d76d6815085fa2444736e338"
+    },
+    {
+      "bytes": 301,
+      "path": "2017.csv.summaries.csv",
+      "raw_sha256": "71e76cd57744003496ccb91e5f2c70f3a6a09af45966585dbd1332e75e8b69c5"
+    },
+    {
+      "bytes": 2594,
+      "path": "2017.grouped.births_cells.csv",
+      "raw_sha256": "01e18bcca306857b6cc42e22885c9593ba74673e2dfd7e2a18af02c3d1a5bf34"
+    },
+    {
+      "bytes": 2496,
+      "path": "2017.grouped.deaths_cells.csv",
+      "raw_sha256": "8879853abecb0cc2dd1ab688a0f7981a8a10c03a6d402789b77d0f7deff7fe5c"
+    },
+    {
+      "bytes": 15320,
+      "path": "2017.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "2b3e6cdad714d3a3b55722fe74dc3f5fb20cffee55d841072b24474670336bab"
+    },
+    {
+      "bytes": 25904,
+      "path": "2017.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "91ac80dd9f834638d7c393d4614f9a64bbfda069c523bc7867adef0717c62cc9"
+    },
+    {
+      "bytes": 5214,
+      "path": "2017.grouped.interstate_flows.csv",
+      "raw_sha256": "5c58db94ab6d956b7633575d7c5c91b9f6bd6d0037d01f68b9a11598015b4456"
+    },
+    {
+      "bytes": 2717,
+      "path": "2017.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "0a3782337918b0a9152177056340f34d54657cedb89af6d1061ecf2eda72b75d"
+    },
+    {
+      "bytes": 2618,
+      "path": "2017.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "b9201fce627a5216297e612040beb2c532653bb2018d408033201941e5b55809"
+    },
+    {
+      "bytes": 73070,
+      "path": "2017.grouped.population_cells.csv",
+      "raw_sha256": "4d386123a345587d600cd6648315d5155493e10124fca773f00cdb161708bc08"
+    },
+    {
+      "bytes": 345332,
+      "path": "2017.grouped.population_single_year_cells.csv",
+      "raw_sha256": "3a040076e57f5cbbecbfb5383bcc5e6234721c01e0d5d3c24e238afce74bdce1"
+    },
+    {
+      "bytes": 6710,
+      "path": "2017.grouped.vacancy_cells.csv",
+      "raw_sha256": "55ecfd6cb432a00e6d58bcb83c6a8e022699667913db9b37d8dcb06c82fb5016"
+    },
+    {
+      "bytes": 1099143,
+      "path": "2017.score.json",
+      "raw_sha256": "d8a6ea87ac382c3f7139f064cadf1021c6133b40a33c334d7f2bded80a9ba569"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2017.state",
+      "raw_sha256": "21a95a82a537b27cb84c48c75b55f551c53a14f2557046f49dc62ea90b4cb1f9"
+    },
+    {
+      "bytes": 37919,
+      "path": "2018.csv",
+      "raw_sha256": "cd0fc79f53663e8d5b36ee886f783ac3b5d15f45daaf266e99db82f017ff6ef1"
+    },
+    {
+      "bytes": 19486,
+      "path": "2018.csv.manifest.json",
+      "raw_sha256": "b3ff5add43959bf5b80fb157458e249679d3c3f6f4ff4a195a2ba8e2df80ebf2"
+    },
+    {
+      "bytes": 302,
+      "path": "2018.csv.summaries.csv",
+      "raw_sha256": "541ca875fc35f5931ea436bbcc175fb00e00a6d24bd6d7025f7e323169fa2323"
+    },
+    {
+      "bytes": 2597,
+      "path": "2018.grouped.births_cells.csv",
+      "raw_sha256": "1af52aaf18daf5b296aae69e44a24dfb1145951e04ebbf20471f7286de00d760"
+    },
+    {
+      "bytes": 2376,
+      "path": "2018.grouped.deaths_cells.csv",
+      "raw_sha256": "0f64c01867d0d3e39c74f08edaad4357a57d909be286c1540b3de8951e069a84"
+    },
+    {
+      "bytes": 13893,
+      "path": "2018.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "dcca743804d552906fe0fb688c07459c0e729027956998ba3c375ba769eb931f"
+    },
+    {
+      "bytes": 26504,
+      "path": "2018.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "44b9b0a69983c42ca8557d5f8c0484242b35aa086600db9d71f4abd83f690507"
+    },
+    {
+      "bytes": 5047,
+      "path": "2018.grouped.interstate_flows.csv",
+      "raw_sha256": "7af6a8c56e03f5a0bcdb44c124d28bbd72950eb4cc31f95af98e4a7b9b62b167"
+    },
+    {
+      "bytes": 2699,
+      "path": "2018.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "9866c430b4d63a655df2acb025d77dad8cb622d5f09960c0dc3d5f220da3e6f3"
+    },
+    {
+      "bytes": 2648,
+      "path": "2018.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "60f53f4d2dc214c7d45533fbc0449df43c53d77803d0844a8dcc58cc869e3635"
+    },
+    {
+      "bytes": 73316,
+      "path": "2018.grouped.population_cells.csv",
+      "raw_sha256": "7149a9f3adaff1524857a77f0dbb1d1008512e7aba9f22d6f8afeaf3aa6603c2"
+    },
+    {
+      "bytes": 346466,
+      "path": "2018.grouped.population_single_year_cells.csv",
+      "raw_sha256": "11407fb36fc103ee1aa2bd285c841d976c1465a22ed12a504c8780787f67540b"
+    },
+    {
+      "bytes": 6713,
+      "path": "2018.grouped.vacancy_cells.csv",
+      "raw_sha256": "d670d65c716639df675de4981d0438ebcef8c69d6fb1682784d45398239c2d01"
+    },
+    {
+      "bytes": 1100341,
+      "path": "2018.score.json",
+      "raw_sha256": "be209f0aff223b247d8367f616b95e2f155cb5e8844b32f27d4224d5c1a4840f"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2018.state",
+      "raw_sha256": "dab0b364459f43e08976587061bc3b26977c7ff0ca4470ceeacf2e3f93dc69b7"
+    },
+    {
+      "bytes": 37887,
+      "path": "2019.csv",
+      "raw_sha256": "8b68bff53f3557b6a3b1683e8e69fa925fb4c85cfba5ade1fdf4c528c232160f"
+    },
+    {
+      "bytes": 19450,
+      "path": "2019.csv.manifest.json",
+      "raw_sha256": "aec7aa941751743eec47f256dde2ee7252e176e411fb2f4427a5055888c01184"
+    },
+    {
+      "bytes": 301,
+      "path": "2019.csv.summaries.csv",
+      "raw_sha256": "0d635edb9aed1d51f31070bae0ee9be1b8509aad5b7ef012871bdbd164697a41"
+    },
+    {
+      "bytes": 2571,
+      "path": "2019.grouped.births_cells.csv",
+      "raw_sha256": "2ee324aba80534b1b56edbf2143cfba3d242d6a9bb7d2a9ca16931270bdff3eb"
+    },
+    {
+      "bytes": 2404,
+      "path": "2019.grouped.deaths_cells.csv",
+      "raw_sha256": "1e037f3b2cd99510309ce53ec9c3fd57c1291d83c500d3891d51d3e5e35d978a"
+    },
+    {
+      "bytes": 14840,
+      "path": "2019.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "22adae9678aecfc39f8a546470a84ba3af0d053e13a85ee193254768b34c89e0"
+    },
+    {
+      "bytes": 27528,
+      "path": "2019.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "a4e1815314288bafc848b6e69fd48638a956ab12cca1424c6a63a7c8fc6552fb"
+    },
+    {
+      "bytes": 5177,
+      "path": "2019.grouped.interstate_flows.csv",
+      "raw_sha256": "efe0b24f2bd4e35a84bbf9ba1d748bbaa7a4af1bb7ef2c3573344b43af821e4d"
+    },
+    {
+      "bytes": 2690,
+      "path": "2019.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "7eb07a4a1e9234ea65698901839ad082a6dec8242ae5110fa488f7c5f0e0116e"
+    },
+    {
+      "bytes": 2622,
+      "path": "2019.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "96e0ea66fb05de7b66fe2eeca9b75a477f225122dfe09aa89b90259b7c747d4d"
+    },
+    {
+      "bytes": 73516,
+      "path": "2019.grouped.population_cells.csv",
+      "raw_sha256": "56c514f700a438327f69ee01708705b3d09185cc5a8ba6e3483bbe181116dd5a"
+    },
+    {
+      "bytes": 348565,
+      "path": "2019.grouped.population_single_year_cells.csv",
+      "raw_sha256": "e82fe0d67c7ee28922530d2f479e8efdd71048fdcb28de1a0d93e9ccbb288249"
+    },
+    {
+      "bytes": 6710,
+      "path": "2019.grouped.vacancy_cells.csv",
+      "raw_sha256": "cc616b03f2534c691b2b6ab9b82bef3baec7b8b292a124356f27f1448cb2e8ab"
+    },
+    {
+      "bytes": 1097777,
+      "path": "2019.score.json",
+      "raw_sha256": "053dfad48fde3e361bb0bb7c222380883610ba061bc9315690316d04ac3b9dc7"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2019.state",
+      "raw_sha256": "4f75c50548ac49fadd28dd994bf9032ff23da82ea798c37e17ca8e80421d71c5"
+    },
+    {
+      "bytes": 37725,
+      "path": "2020.csv",
+      "raw_sha256": "ba11e7d043fb983338e932854f98bbcff12635314acd3e0f57c08af517ff7460"
+    },
+    {
+      "bytes": 19358,
+      "path": "2020.csv.manifest.json",
+      "raw_sha256": "c656fb17a2d5f55a812e1464639a70a609008ea202f9bc1c7d0fc0c76e7359ad"
+    },
+    {
+      "bytes": 301,
+      "path": "2020.csv.summaries.csv",
+      "raw_sha256": "806a382d571318c06046ac68b9d36c93b0adfa564f7ca7bae7510903aefb4e55"
+    },
+    {
+      "bytes": 2690,
+      "path": "2020.grouped.births_cells.csv",
+      "raw_sha256": "4fee461f306a33637ddee45a32ff74f58c8224047befd7ae6c73eea747d1c736"
+    },
+    {
+      "bytes": 2363,
+      "path": "2020.grouped.deaths_cells.csv",
+      "raw_sha256": "cce43ed76692a3470844246d0d954c8971c24e13abd5d0eaf39c15361f650672"
+    },
+    {
+      "bytes": 14288,
+      "path": "2020.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "87309fcd367f2cd9c0cb4358b1a6c0fd4e22f772168b3478efd8b118ef5cf6f0"
+    },
+    {
+      "bytes": 27069,
+      "path": "2020.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "3c987f39f8775042ddd2497678d46b4697f6f077bb778ab80a75e715e67aa463"
+    },
+    {
+      "bytes": 5395,
+      "path": "2020.grouped.interstate_flows.csv",
+      "raw_sha256": "a3a7cbf48d16c7b7ab196fca0a04e6f47577ce46ba10f48f685a1e7bcaa357cf"
+    },
+    {
+      "bytes": 2272,
+      "path": "2020.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "b4de558bc540b38b5c6b12e71f5700f050b9b09e7bb266440fc600230b868657"
+    },
+    {
+      "bytes": 2578,
+      "path": "2020.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "5b825a86b8f778bf1774e433d28a8b73060dc45f0ca37984c541cffb6fb00f8b"
+    },
+    {
+      "bytes": 73809,
+      "path": "2020.grouped.population_cells.csv",
+      "raw_sha256": "01230937688096a52fa7994a6bfde451c5a52a6656f2a4ae1e6e621c745811cc"
+    },
+    {
+      "bytes": 349613,
+      "path": "2020.grouped.population_single_year_cells.csv",
+      "raw_sha256": "7106804c9909a9b6d7a175c015abd40c01252b262cb1c390e05dcead8d39dbc8"
+    },
+    {
+      "bytes": 6716,
+      "path": "2020.grouped.vacancy_cells.csv",
+      "raw_sha256": "954c2df8ecefc9bd28f9c1ab48be41d24d69625119bd71b5ddcaa2438d09cd96"
+    },
+    {
+      "bytes": 1100702,
+      "path": "2020.score.json",
+      "raw_sha256": "20ca266188e8f7e986e8f8da00a008b2388f5e6aaa2352b98ad50d283f65823c"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2020.state",
+      "raw_sha256": "da12460bd5338341efffc1fd26a63fab265fdd290cef386477fac6118978aef2"
+    },
+    {
+      "bytes": 38142,
+      "path": "2021.csv",
+      "raw_sha256": "af0f93b7725c1605c8f9912a87a07b9a920ab29640791d0dd8159d60cb97c99b"
+    },
+    {
+      "bytes": 19721,
+      "path": "2021.csv.manifest.json",
+      "raw_sha256": "68091753b55456d847ffaeadb2168cf3dedb0eace06007e5d1183553d806fd4b"
+    },
+    {
+      "bytes": 301,
+      "path": "2021.csv.summaries.csv",
+      "raw_sha256": "709c99b2db1190e290c9105ae4f56f9b575fd191ff7e3fd369dd918e0a0cac3c"
+    },
+    {
+      "bytes": 2663,
+      "path": "2021.grouped.births_cells.csv",
+      "raw_sha256": "057f6ac69f913cf5e7a19911707ced657698aac46c3a5a12f4e8c144f3efc0db"
+    },
+    {
+      "bytes": 2483,
+      "path": "2021.grouped.deaths_cells.csv",
+      "raw_sha256": "b2bb2528d22234b3a94938fde0e465a37ccd3c71f8d2b83a859fc8847bf1b1bd"
+    },
+    {
+      "bytes": 15298,
+      "path": "2021.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "cb3b54753769445c613bebed70d6b01cbd8e2d58679f1015ad0fd24c536a0d20"
+    },
+    {
+      "bytes": 27214,
+      "path": "2021.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "83296b3abd155613d1f5e5f3bac2e582281f7c0fe3a7c70e18229d9cf95bac99"
+    },
+    {
+      "bytes": 5328,
+      "path": "2021.grouped.interstate_flows.csv",
+      "raw_sha256": "8ab5490ea9cd78f83183ee5f583d2715100fe9ef0ee9cec0454a08f7a9015e64"
+    },
+    {
+      "bytes": 2665,
+      "path": "2021.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "69daecd115e351618d07963fca69c597ba1711c8c24de5927ff3d003f35b8629"
+    },
+    {
+      "bytes": 2439,
+      "path": "2021.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "10fb6139e5afa248c3de9b548d436baf0c4f349109e4547fdc07581cbe5b88bf"
+    },
+    {
+      "bytes": 73958,
+      "path": "2021.grouped.population_cells.csv",
+      "raw_sha256": "bd803b863e7ac0d17374e20964c4d06f0620b6044924b867cf102445c66bd7cb"
+    },
+    {
+      "bytes": 350169,
+      "path": "2021.grouped.population_single_year_cells.csv",
+      "raw_sha256": "550348a9ea645b4bc640b5334d4222286eaf6baa930b1f2a3f5995fb203dcc59"
+    },
+    {
+      "bytes": 6707,
+      "path": "2021.grouped.vacancy_cells.csv",
+      "raw_sha256": "23f3f52645704687bd1bb86502755b11add12f2f51fafab94ceb8cd13d592504"
+    },
+    {
+      "bytes": 1099775,
+      "path": "2021.score.json",
+      "raw_sha256": "fd190a59795648f0f2d97f085d29508f97be54da088d17addca8ff036172e57d"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2021.state",
+      "raw_sha256": "13af0951ae9b8c596b07bc89eae1a3d2de2b7c98d259f4c201642e07129e2cf9"
+    },
+    {
+      "bytes": 37809,
+      "path": "2022.csv",
+      "raw_sha256": "8ef3cfe08e83a73f014f5d0b8f37afa5065a5d29d456d814c09becc7d87a95fa"
+    },
+    {
+      "bytes": 19373,
+      "path": "2022.csv.manifest.json",
+      "raw_sha256": "06a7ca29ae93da7ef2ff61029adbc6a8c39eceb694bb74b6a227a55cd0c69ce3"
+    },
+    {
+      "bytes": 302,
+      "path": "2022.csv.summaries.csv",
+      "raw_sha256": "4e05f1d5cf176bb954f5d2fa1b9248f65d3a5e0ca75698d0e9d15ac04ab8fb7f"
+    },
+    {
+      "bytes": 2604,
+      "path": "2022.grouped.births_cells.csv",
+      "raw_sha256": "0acc0bcc8e16842dfd9a75cf18f0f52d81117f62a21253e01677b6007e6505d0"
+    },
+    {
+      "bytes": 2488,
+      "path": "2022.grouped.deaths_cells.csv",
+      "raw_sha256": "d28d5408447302a9fcabf5d9c093c7a0e7b1bedd849b1e13b475d03ab5178dff"
+    },
+    {
+      "bytes": 15838,
+      "path": "2022.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "e42871950f579eed13ae843c790d5403b2a5a573d46a945bead3a21710dd9b10"
+    },
+    {
+      "bytes": 27025,
+      "path": "2022.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "bd7e1f5b193c1db12008bf47b9b1aa40b0fb6b2c85aa5404f2d133b1e4cf3c1e"
+    },
+    {
+      "bytes": 5328,
+      "path": "2022.grouped.interstate_flows.csv",
+      "raw_sha256": "1759ec6dede44d6d9898b376e8f964c06b8b85171b356380cd39e41202e33d72"
+    },
+    {
+      "bytes": 2798,
+      "path": "2022.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "143db7df73262a665661bb8c2da0446d04d4796dbf10ee3d312c3c07a4b37499"
+    },
+    {
+      "bytes": 2509,
+      "path": "2022.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "72795909dc922af0831b32c86adee3a00302c03b89307da79420c5dc15db6fe4"
+    },
+    {
+      "bytes": 73987,
+      "path": "2022.grouped.population_cells.csv",
+      "raw_sha256": "1228ac7eb7df7426e45005bfe1d3e840f3ca2bafb621d7c2b27ef8b5446c243d"
+    },
+    {
+      "bytes": 350562,
+      "path": "2022.grouped.population_single_year_cells.csv",
+      "raw_sha256": "673e7f49d41a11c0297a211bb8515c9b9768221112f233c83f43445dae5b111d"
+    },
+    {
+      "bytes": 6704,
+      "path": "2022.grouped.vacancy_cells.csv",
+      "raw_sha256": "923ddf45885411f958911034a5825df593cc5167815f1f3a2c2944ab7cacda93"
+    },
+    {
+      "bytes": 1101432,
+      "path": "2022.score.json",
+      "raw_sha256": "1e7159dd1cdaa32ba1118954fe57ef4bb4f271ef2b14f0e75051bab2e8f5810e"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2022.state",
+      "raw_sha256": "78526b0be337e79571a97c273c5a2d685784e7ca7fe3734cab42cdaf40f26cfc"
+    },
+    {
+      "bytes": 37860,
+      "path": "2023.csv",
+      "raw_sha256": "4bebcac827feb971e27ff75ca063d9b6b3f00833e06084ceb1818bf5a524eec6"
+    },
+    {
+      "bytes": 19433,
+      "path": "2023.csv.manifest.json",
+      "raw_sha256": "ce41d14e098b0d2eb8f4f0cd1bab98d55e8063c11be8092b633e852b15d7151e"
+    },
+    {
+      "bytes": 301,
+      "path": "2023.csv.summaries.csv",
+      "raw_sha256": "08c021bc038a73c4e7b2c43741fa2f6d9f442a7ea8e45d6d32eb1a20a36fdb1b"
+    },
+    {
+      "bytes": 2588,
+      "path": "2023.grouped.births_cells.csv",
+      "raw_sha256": "2144ba2521495503e84aa7e61a3a48bc44e6b1724ef3d3649c7e07feb84ca91f"
+    },
+    {
+      "bytes": 2518,
+      "path": "2023.grouped.deaths_cells.csv",
+      "raw_sha256": "92dbe28ca4284afb5ca73a1a80f6d221ae13d141bb90630a3eb2e2f9f4983b2d"
+    },
+    {
+      "bytes": 15463,
+      "path": "2023.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "7650a434cceb473292c30ee7f5ea32d1d1f1d17b27ec44a4a1a6bcd393f74a6c"
+    },
+    {
+      "bytes": 29145,
+      "path": "2023.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "4184d755a2c555f61ff9208ab9341bb735ef7bbdd5fdaf491dfda307da6fd5c7"
+    },
+    {
+      "bytes": 5508,
+      "path": "2023.grouped.interstate_flows.csv",
+      "raw_sha256": "676054286fe2572560b461b08d5cbb99eeceb6558a077c43bb233ca262d7db5d"
+    },
+    {
+      "bytes": 2721,
+      "path": "2023.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "3845b72c14aa87c259227e68a8831055b73966f024c3c9b4b0bb33b69d7d8a87"
+    },
+    {
+      "bytes": 2525,
+      "path": "2023.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "d6321196dfabb291a8f57dfa82050f76bf299b33e741ab2cecefd3a9c6bd4263"
+    },
+    {
+      "bytes": 74134,
+      "path": "2023.grouped.population_cells.csv",
+      "raw_sha256": "89554f9db8e7ea7c0f32485319a7fa78645f34207d0c2a79af6af23f58785e00"
+    },
+    {
+      "bytes": 351429,
+      "path": "2023.grouped.population_single_year_cells.csv",
+      "raw_sha256": "f7824dfefda11c3cdf86cd46acf68d34f113556b17ed705d354397fd7427a5e1"
+    },
+    {
+      "bytes": 6699,
+      "path": "2023.grouped.vacancy_cells.csv",
+      "raw_sha256": "9839e0e80ac3e506ea1ff94718a4c06b7aad76fdfe649758e9a4a0b7e37b8235"
+    },
+    {
+      "bytes": 1101989,
+      "path": "2023.score.json",
+      "raw_sha256": "6d7a4afd8b35c2b77713af3f0bade79d1ce46448661d947edd957f0394d3c1ee"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2023.state",
+      "raw_sha256": "4d2d1be8afb68c2642b19119bf23f7efd7906334ff321f38fd29b77acebcef00"
+    },
+    {
+      "bytes": 37927,
+      "path": "2024.csv",
+      "raw_sha256": "52843d84fc6383d91659fa8786223e852e593fa38e7f002a6dd29da6f14d92e7"
+    },
+    {
+      "bytes": 19521,
+      "path": "2024.csv.manifest.json",
+      "raw_sha256": "734a3f5834e5b090e40354fb29e4261ba95ca349490c59dd7712c20fd4006b01"
+    },
+    {
+      "bytes": 300,
+      "path": "2024.csv.summaries.csv",
+      "raw_sha256": "8f65b6576e453bc9d9490524370f7299689a922de8aa06020451a2df83a1e79b"
+    },
+    {
+      "bytes": 2686,
+      "path": "2024.grouped.births_cells.csv",
+      "raw_sha256": "3f64f2e488c9f1c5daeedf23c6009c248413dabb61f44be26819521254031302"
+    },
+    {
+      "bytes": 2465,
+      "path": "2024.grouped.deaths_cells.csv",
+      "raw_sha256": "0879fd50eb409b6ee5ec2ee9187ab6960506453834c9fade75ab1938bb81729a"
+    },
+    {
+      "bytes": 16106,
+      "path": "2024.grouped.deaths_state_age_cells.csv",
+      "raw_sha256": "dc410bf19a1c687edb53245bb41ec7784bc8999acf3c5bdedb1895e9b262fdf8"
+    },
+    {
+      "bytes": 28280,
+      "path": "2024.grouped.interstate_age_sex_flows.csv",
+      "raw_sha256": "624464ec133ebeabc1962d3cb8a35403b26508a7f6076e843cae074bddd3dc05"
+    },
+    {
+      "bytes": 5502,
+      "path": "2024.grouped.interstate_flows.csv",
+      "raw_sha256": "2490a2a10b493c10ec361cb001d504d2c6d2eb1aa7e0203ddc6863ba54ccaafc"
+    },
+    {
+      "bytes": 2644,
+      "path": "2024.grouped.overseas_arrival_cells.csv",
+      "raw_sha256": "559c85e3f8d5a412defbd4fe71decae0afcb5247369a29339508b035a9e0cf1f"
+    },
+    {
+      "bytes": 2603,
+      "path": "2024.grouped.overseas_departure_cells.csv",
+      "raw_sha256": "ca082be1490ad39e9f422c9539f4600421ba631376078e5507488586bda9f8c0"
+    },
+    {
+      "bytes": 74386,
+      "path": "2024.grouped.population_cells.csv",
+      "raw_sha256": "d5bc346db5bc491354b2bb341640f7a1942f15fdf8050e1739106aeba69bdeff"
+    },
+    {
+      "bytes": 351773,
+      "path": "2024.grouped.population_single_year_cells.csv",
+      "raw_sha256": "aabc63f3aaea11c9f823e823885f7327933b9c458e9cd4f83ce52d18456f538b"
+    },
+    {
+      "bytes": 6677,
+      "path": "2024.grouped.vacancy_cells.csv",
+      "raw_sha256": "b5f052dd7bf9d8b256f391dab51a570c55e4310b7c92554bcf93e41f5641a17a"
+    },
+    {
+      "bytes": 1100840,
+      "path": "2024.score.json",
+      "raw_sha256": "a80b2d07040dff274d5dd814ae001af4f217a683cd49b56781cc48ee3b360b08"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2024.state",
+      "raw_sha256": "b00163b6db8780a3484896d65c096a2c6776275315f4e74b5c8596d078b13f63"
+    },
+    {
+      "bytes": 16918851,
+      "path": "2025.state",
+      "raw_sha256": "21f8a2013475ad2322548c314cd5a489368104eae25a64eb384ffe08db223b0f"
+    },
+    {
+      "bytes": 85726,
+      "path": "chain-report.json",
+      "raw_sha256": "29fe3755a14f909c7437d01fb2e667d6525473533f4ffb917c348a4ab0075c24"
+    }
+  ],
+  "format": "sembla.australian-population-chain-reproduction/v1"
+}

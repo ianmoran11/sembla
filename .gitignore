@@ -18,3 +18,10 @@
 *.swp
 *.swo
 *~
+
+# ABS raw downloads: pinned by SHA-256 in data/abs/sources.json and
+# re-acquired with `python3 data/abs/fetch.py --download`.
+data/abs/cache/
+data/abs/generated/
+data/abs/**/__pycache__/
+data/abs/**/*.pyc

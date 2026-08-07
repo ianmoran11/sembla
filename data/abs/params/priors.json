@@ -1,0 +1,5701 @@
+{
+  "classification_counts": {
+    "fixed": 360,
+    "fixed_normalization": 0,
+    "free": 17
+  },
+  "format": "sembla.abs-priors/v1",
+  "free_parameters": [
+    "interstate_base",
+    "k",
+    "peak_months",
+    "pull_act",
+    "pull_nt",
+    "pull_qld",
+    "pull_sa",
+    "pull_tas",
+    "pull_vic",
+    "pull_wa",
+    "push_act",
+    "push_nt",
+    "push_qld",
+    "push_sa",
+    "push_tas",
+    "push_vic",
+    "push_wa"
+  ],
+  "parameter_count": 377,
+  "parameters": {
+    "birth_rate_act": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.311125932699634,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_nsw": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.219814545546841,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_nt": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.240420510892615,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_qld": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.215353454773702,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_sa": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.227333518381529,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_tas": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.17105596577564,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_vic": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.3326892877589875,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "birth_rate_wa": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "births_state.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.317125160578194,
+        "spread": 0.5
+      },
+      "role": "fertility",
+      "source": "births_state.csv"
+    },
+    "emigration_act": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.663909743002529,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_nsw": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.855838184546345,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_nt": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.610988398578278,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_qld": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.970950092428312,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_sa": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.482611879274145,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_tas": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.808795471584624,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_vic": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.991477879055351,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "emigration_wa": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.871678586632722,
+        "spread": 0.5
+      },
+      "role": "emigration",
+      "source": "overseas_margins.csv"
+    },
+    "interstate_base": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "interstate_base"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.210340371976184,
+        "spread": 0.5
+      },
+      "precalibration_value": 0.0001
+    },
+    "k": {
+      "classification": "free",
+      "identification": {
+        "evidence": "simulated_stock_age_structure",
+        "group": "k"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.512925464970229,
+        "spread": 0.5
+      },
+      "precalibration_value": 1e-05
+    },
+    "mortality_act_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.297351748965813,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.506557897319982,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -2.4849066497880004,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.862033677707966,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.862033677707966,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.987196820661973,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.922658299524402,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.261259817279036,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.750808042597743,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.934046906070621,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.911057387845922,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.600902459542082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.3645136814778525,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.013115794639964,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.858965114812705,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.422247463200436,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.235661507620025,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.789885173709613,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.711310741076993,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.298317366548036,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.896191159705387,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.505324851018376,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.260399146552183,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.877219083233454,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.742983713107137,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_act_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.4604167413221263,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.297351748965813,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.3651065615178015,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.5776362752979547,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.392661928770137,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.498022444427964,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.987196820661973,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.130297664302647,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.559752805835034,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.65072458404076,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.139898960274769,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.261259817279036,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.706262975199909,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.783224016336037,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.300797867091744,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.313220387090301,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.8200496985630314,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.812445099177812,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.32460899363652,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.2442085681984825,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.773668602120368,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.572754212249797,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.1864778847925015,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.9313621132017476,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.616905442206512,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.28369073395302,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.0652713147363935,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.766840995583648,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nsw_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.649658740960655,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.056189692148925,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.65072458404076,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.3198478359658323,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.297351748965813,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.437150483742702,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.392661928770137,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.750808042597743,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.517193191416238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.056189692148925,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.399410155759854,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.559752805835034,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.139898960274769,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.399410155759854,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.888584531993863,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.866605625275088,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.461140517166924,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.888584531993863,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.229338903109599,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.418580902748127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.739419964162923,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.060518033534548,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.437751649736401,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.2791466195597625,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.881116489939116,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.869246914383733,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.615313826668593,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.490689259195492,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.933674252960127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.675056313452258,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.328801873436584,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.213128098212068,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.323128993426396,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.1780538303479458,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_nt_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.871201010907891,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.297351748965813,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.987196820661973,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.3270179834879037,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.2245167047582863,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.130297664302647,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.056189692148925,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.297351748965813,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.862033677707966,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.987196820661973,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.437150483742702,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.604204568405867,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.111728083308073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.229511118964457,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.724955108212061,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.783224016336037,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.338538195074591,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.325799169297161,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.739419964162923,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.711640400055846,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.283600969909143,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.248509650097873,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.73424168214091,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.53615163327225,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.132802928070463,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.84406209427044,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.576420772702106,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.232457864351735,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.029025096101458,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.7964646647938736,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_qld_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.555806499889574,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.297351748965813,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.1296446911402582,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.9703585824411096,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.987196820661973,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.130297664302647,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.862033677707966,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.750808042597743,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.36304251158898,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.476371196895983,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.111728083308073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.229511118964457,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.652195753929633,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.803426723653557,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.276406413967585,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.418580902748127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.767993336606978,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.753604599154879,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.306175291947683,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.202185578423634,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.784450377723656,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.504931615911036,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.14702791900181,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.879607031689852,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.545330185632074,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.210316738474521,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.9895341978697556,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.733876820044672,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_sa_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.6544780273966038,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.210340371976184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.3377532091056206,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.708742083210188,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.498022444427964,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.498022444427964,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.699514748210191,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.392661928770137,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.750808042597743,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.987196820661973,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.229511118964457,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.294049640102028,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.111728083308073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.957577403480815,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.706262975199909,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.803426723653557,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.151952239494179,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.05085612262281,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.691300715818724,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.577253209347428,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.257167712840988,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.988136757015307,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.647874842717905,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.381698975487088,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.0206856299497575,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.758904285930133,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.496315781076009,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.075032251189728,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.9633162998156966,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.664186841523565,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_tas_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.652547524866546,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.498022444427964,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.3246994106894303,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.207482641038758,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "mean",
+        "family": "normal",
+        "location": 0.0,
+        "reason": "published_zero_at_abs_one_decimal_precision",
+        "spread": 4.166666666666667e-06
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.903487552536127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.392661928770137,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.056189692148925,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.130297664302647,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.604204568405867,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.750808042597743,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.261259817279036,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.294049640102028,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.783224016336037,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.866605625275088,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.3645136814778525,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.490554402373217,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.924562397298518,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.835434617402511,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.3292710067423315,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.261525018209944,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.789885173709613,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.588224134021929,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.174625894205487,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.867617787261331,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.59769817114939,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.235332255523078,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.059943135504768,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.6992665470004233,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_vic_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.545356477361761,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_00_04_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_00_04_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.210340371976184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_05_09_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_05_09_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_100_plus_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.3602953903417294,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_100_plus_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.0155949026502427,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_10_14_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_10_14_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.695247021764184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_15_19_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -11.002099841204238,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_15_19_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.085809109330082,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_20_24_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.596634733096073,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_20_24_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_25_29_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_25_29_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.498022444427964,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_30_34_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -10.308952660644293,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_30_34_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.210340371976184,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_35_39_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.74933687270887,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_35_39_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.130297664302647,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_40_44_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.615805480084347,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_40_44_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.804875263868018,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_45_49_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -9.056189692148925,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_45_49_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.604204568405867,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_50_54_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.699514748210191,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_50_54_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.168886497148021,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_55_59_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -8.229511118964457,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_55_59_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.803426723653557,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_60_64_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.957577403480815,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_60_64_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.418580902748127,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_65_69_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -7.4757393165880766,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_65_69_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.851059935305591,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_70_74_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.8277125713086,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_70_74_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.3292710067423315,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_75_79_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -6.406979991069647,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_75_79_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.784450377723656,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_80_84_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.657376101842045,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_80_84_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.170217363920721,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_85_89_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.950010672279821,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_85_89_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.581290912198148,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_90_94_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.336416123421829,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_90_94_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -4.053682580503211,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_95_99_female": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.686548838775654,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "mortality_wa_95_99_male": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "mortality_rates_state_age_sex.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -3.713513735072297,
+        "spread": 0.5
+      },
+      "role": "mortality",
+      "source": "mortality_rates_state_age_sex.csv"
+    },
+    "overseas_arrival_act": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.5270885257413545,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_nsw": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.442309157749786,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_nt": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.421278751124245,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_qld": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.287514441629423,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_sa": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.458458029045641,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_tas": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.590604711078398,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_vic": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.545400701033658,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "overseas_arrival_wa": {
+      "classification": "fixed",
+      "identification": {
+        "evidence": "overseas_margins.csv",
+        "group": "abs_direct"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": -5.131881325403855,
+        "spread": 0.5
+      },
+      "role": "overseas_arrival",
+      "source": "overseas_margins.csv"
+    },
+    "peak_months": {
+      "classification": "free",
+      "identification": {
+        "evidence": "simulated_stock_age_structure",
+        "group": "peak"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 5.886104031450156,
+        "spread": 0.25
+      },
+      "precalibration_value": 360.0
+    },
+    "pull_act": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "pull_nt": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "pull_qld": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "pull_sa": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "pull_tas": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "pull_vic": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "pull_wa": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "pull_d"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_act": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_nt": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_qld": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_sa": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_tas": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_vic": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    },
+    "push_wa": {
+      "classification": "free",
+      "identification": {
+        "evidence": "published_interstate_margins",
+        "group": "push_o"
+      },
+      "lean_prior_2010": {
+        "centering": "median",
+        "family": "log_normal",
+        "location": 0.0,
+        "spread": 0.25
+      },
+      "precalibration_value": 1.0
+    }
+  },
+  "provenance_overrides": [
+    {
+      "parameter": "mortality_nt_100_plus_female",
+      "provenance": "national_zero_exposure_fallback",
+      "rate_per_1000": 433.9,
+      "source": "mortality_rates_national_age_sex.csv",
+      "source_cell": {
+        "age_band": "100+",
+        "sex": "female",
+        "year": 2010
+      },
+      "year": 2010
+    },
+    {
+      "parameter": "mortality_nt_100_plus_female",
+      "provenance": "national_zero_exposure_fallback",
+      "rate_per_1000": 450.0,
+      "source": "mortality_rates_national_age_sex.csv",
+      "source_cell": {
+        "age_band": "100+",
+        "sex": "female",
+        "year": 2011
+      },
+      "year": 2011
+    }
+  ]
+}
