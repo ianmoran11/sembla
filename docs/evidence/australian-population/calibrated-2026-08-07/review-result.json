@@ -1,0 +1,1 @@
+{"blocker_count":0,"decision":"approved","high_count":0,"low_count":0,"medium_count":0,"residual_risks":["The immutable raw execution preceded its first Git commit; unchanged scientific outputs are proven by retained raw hashes, chain verification, exact residuals and SHA256SUMS rather than a Git parent diff."]}

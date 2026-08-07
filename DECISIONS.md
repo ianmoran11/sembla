@@ -2507,3 +2507,33 @@ mid-run substitution.
 chosen after seeing a preferred result. Wholesale fallback avoids mixing
 coordinates from an incoherent posterior and preserves the deterministic,
 positive gravity fit as the declared safe estimate.
+
+### N21. The θ̂ point-predictive check strictly dominates the frozen baseline
+
+**Decision.** PRD 0008's point-estimate re-run has a deterministic predictive
+failure gate over fitted targets. Its canonical `metrics.by_role.fitted` MAE
+**and** RMSE must both be strictly lower than the same run year's frozen PRD
+0007 baseline score. Equality fails. There is no percentage tolerance or
+adjustable threshold, and held-out targets never enter this gate. A failure
+aborts the year and PRD rather than silently selecting another estimate.
+
+This gate was made explicit during final independent review, which found that
+scoring θ̂ without a numerical mismatch consequence did not satisfy PRD 0008
+§5. The user selected frozen-baseline dominance from the reviewed alternatives.
+Applying the rule to the already immutable score reports passes all fifteen
+run years, so it changes no parameter, seed, run, state, or scientific result.
+The evidence records every baseline/candidate metric and criterion result.
+
+**Alternatives.** A tunable WAPE or percentage threshold, using held-out cells
+to approve a fitted estimate, treating count-lattice discretisation floors as
+predictive tolerances, and checking only one aggregate metric are rejected.
+Full posterior-draw resimulation is statistically stronger but is a new,
+costly declared experiment rather than a post-run substitution; it remains a
+future option. A gravity-non-inferiority selection rule is also not introduced
+retroactively: the evidence reports that accepted NPE updates worsened O-D WAPE
+relative to gravity-only without rewriting the declared θ̂ decisions.
+
+**Reason.** The baseline was frozen before calibration, both metrics already
+belong to the canonical scorer, strict improvement has no fitted knob, and the
+fitted/held-out boundary remains intact. MAE prevents broad degradation while
+RMSE prevents a few large fitted residuals from being hidden by the mean.

@@ -51,6 +51,9 @@ PLAN = (
 )
 STATE_2010 = ROOT / "fixtures/state/australian_population_2010_hundredth.state"
 TARGETS = HERE / "targets"
+BASELINE_RESIDUALS = (
+    ROOT / "docs/evidence/australian-population/baseline-2026-08-06/residuals"
+)
 FEATURE = "grouped-observations"
 
 STATES = ("nsw", "vic", "qld", "sa", "wa", "tas", "nt", "act")
@@ -430,7 +433,6 @@ def _run_sweep_cpu(
         assignments[start : start + chunk_size]
         for start in range(0, draws, chunk_size)
     ]
-    parameter_digest = hashlib.sha256(theta_file.read_bytes()).hexdigest()
 
     out_dir.mkdir(parents=True)
     commands = []
@@ -736,6 +738,58 @@ def decide_theta_hat(
     }
 
 
+POINT_PREDICTIVE_FORMAT = "sembla.australian-population-point-predictive-gate/v1"
+
+
+def point_predictive_gate(candidate: dict, baseline: dict) -> dict:
+    """Require θ̂ to dominate the frozen PRD 0007 fit without a tuned tolerance.
+
+    This is the deterministic point-predictive check implied by the PRD's θ̂
+    re-run. Both canonical fitted-role aggregate metrics must be *strictly*
+    lower than the same-year baseline. Held-out targets never enter the gate.
+    """
+
+    def fitted_metrics(report: dict, label: str) -> dict[str, float]:
+        try:
+            row = report["metrics"]["by_role"]["fitted"]
+        except (KeyError, TypeError) as error:
+            raise CalibrateError(
+                f"{label} score is missing metrics.by_role.fitted"
+            ) from error
+        values = {}
+        for metric in ("mae", "rmse"):
+            value = row.get(metric)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                raise CalibrateError(
+                    f"{label} fitted {metric} must be a finite number"
+                )
+            values[metric] = float(value)
+        return values
+
+    candidate_metrics = fitted_metrics(candidate, "candidate")
+    baseline_metrics = fitted_metrics(baseline, "baseline")
+    criteria = {
+        metric: candidate_metrics[metric] < baseline_metrics[metric]
+        for metric in ("mae", "rmse")
+    }
+    return {
+        "baseline": baseline_metrics,
+        "candidate": candidate_metrics,
+        "criteria": {
+            "mae_strictly_lower": criteria["mae"],
+            "rmse_strictly_lower": criteria["rmse"],
+        },
+        "format": POINT_PREDICTIVE_FORMAT,
+        "pass": all(criteria.values()),
+        "reference": "prd-0007-baseline",
+        "role": "fitted",
+    }
+
+
 def _run_calibrated_year(
     run_year: int,
     *,
@@ -781,10 +835,22 @@ def _run_calibrated_year(
     )
     chain.require_capacity(capacity, str(run_year))
     report = score.score_run(run_path, TARGETS / f"{run_year}.json", MODEL, mode="evaluation")
+    predictive = point_predictive_gate(
+        report, _load(BASELINE_RESIDUALS / f"{run_year}.json")
+    )
     score_path = run_path.with_suffix(run_path.suffix + ".score.json")
     canonical.write_json(score_path, report)
+    if not predictive["pass"]:
+        candidate = predictive["candidate"]
+        baseline = predictive["baseline"]
+        raise CalibrateError(
+            f"{run_year}: point-predictive gate failed: "
+            f"candidate fitted MAE/RMSE {candidate['mae']}/{candidate['rmse']} "
+            f"must both be below baseline {baseline['mae']}/{baseline['rmse']}"
+        )
     return {
         "capacity": capacity,
+        "point_predictive": predictive,
         "run_raw_sha256": hashlib.sha256(run_path.read_bytes()).hexdigest(),
         "score_raw_sha256": hashlib.sha256(score_path.read_bytes()).hexdigest(),
         "seed": seed,
@@ -993,16 +1059,18 @@ def package_evidence(work: pathlib.Path, out_dir: pathlib.Path) -> dict:
     """Compare the calibrated chain against the PRD 0007 baseline, held-out only."""
     work = pathlib.Path(work)
     out_dir = pathlib.Path(out_dir)
-    baseline_residuals = (
-        ROOT / "docs/evidence/australian-population/baseline-2026-08-06/residuals"
-    )
     years = []
     for run_year in range(2010, 2025):
         done = _load(work / f"year-{run_year}" / "done.json")
         calibrated_score = _load(
             work / "calibrated-chain" / f"{run_year}.csv.score.json"
         )
-        baseline_score = _load(baseline_residuals / f"{run_year}.json")
+        baseline_score = _load(BASELINE_RESIDUALS / f"{run_year}.json")
+        predictive = point_predictive_gate(calibrated_score, baseline_score)
+        if not predictive["pass"]:
+            raise CalibrateError(
+                f"{run_year}: point-predictive gate failed while packaging evidence"
+            )
         years.append(
             {
                 "baseline_held_out": _held_out_family_metrics(baseline_score),
@@ -1010,6 +1078,7 @@ def package_evidence(work: pathlib.Path, out_dir: pathlib.Path) -> dict:
                 "inadmissible_parameters": done["decision"].get(
                     "inadmissible_parameters", []
                 ),
+                "point_predictive": predictive,
                 "posterior_rejected": done["decision"].get(
                     "posterior_rejected", not done["sbc"].get("pass")
                 ),
@@ -1042,6 +1111,9 @@ def package_evidence(work: pathlib.Path, out_dir: pathlib.Path) -> dict:
     payload = {
         "comparison_by_family": comparison,
         "format": COMPARISON_FORMAT,
+        "point_predictive_all_pass": all(
+            year["point_predictive"]["pass"] for year in years
+        ),
         "years": years,
     }
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -7,6 +7,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent.parent
@@ -105,6 +106,45 @@ class TestPairsContract(unittest.TestCase):
                     theta_file=HERE.parent / "params" / "gravity" / "2010.json",
                     identity=calibrate.model_identity(),
                 )
+
+
+class TestSweepExecution(unittest.TestCase):
+    def test_cpu_sweep_uses_the_digest_supplied_by_run_sweep(self):
+        class FakePopen:
+            def __init__(self, command, **_kwargs):
+                out = pathlib.Path(command[command.index("--out") + 1])
+                theta_path = pathlib.Path(command[command.index("--theta-file") + 1])
+                assignments = json.loads(theta_path.read_text(encoding="utf-8"))
+                out.mkdir(parents=True)
+                for draw in range(len(assignments)):
+                    (out / f"draw_{draw}.csv").write_text(
+                        "tick,value\n0,1\n", encoding="utf-8"
+                    )
+                self.returncode = 0
+
+            def communicate(self):
+                return None, ""
+
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory) / "sweep"
+            assignments = [{"p": value} for value in (1, 2, 3)]
+            with mock.patch.object(calibrate.subprocess, "Popen", FakePopen):
+                calibrate._run_sweep_cpu(
+                    out,
+                    workers=2,
+                    purpose="cpu-regression",
+                    run_year=2010,
+                    population=pathlib.Path("population.state"),
+                    sembla=pathlib.Path("sembla"),
+                    assignments=assignments,
+                    parameter_digest="frozen-theta-digest",
+                )
+
+            manifest = json.loads((out / "sweep-manifest.json").read_text())
+            self.assertEqual(manifest["theta_file_sha256"], "frozen-theta-digest")
+            self.assertEqual(manifest["draws"], 3)
+            self.assertEqual(manifest["processes"], 2)
+            self.assertTrue(all((out / f"draw_{draw}.csv").exists() for draw in range(3)))
 
 
 class TestDrawExtraction(unittest.TestCase):
@@ -269,6 +309,53 @@ class TestPointEstimateDecision(unittest.TestCase):
         self.assertEqual(
             decision["theta_hat"]["interstate_base"], medians["interstate_base"]
         )
+
+
+class TestPointPredictiveGate(unittest.TestCase):
+    @staticmethod
+    def _report(mae: float, rmse: float) -> dict:
+        return {
+            "metrics": {
+                "by_role": {
+                    "fitted": {
+                        "mae": mae,
+                        "rmse": rmse,
+                    }
+                }
+            }
+        }
+
+    def test_both_fitted_metrics_must_strictly_improve(self):
+        gate = calibrate.point_predictive_gate(
+            self._report(9.0, 19.0), self._report(10.0, 20.0)
+        )
+        self.assertTrue(gate["pass"])
+        self.assertEqual(gate["role"], "fitted")
+        self.assertEqual(gate["reference"], "prd-0007-baseline")
+        self.assertEqual(
+            gate["criteria"],
+            {"mae_strictly_lower": True, "rmse_strictly_lower": True},
+        )
+
+    def test_equal_or_worse_metric_fails_without_a_tolerance(self):
+        equal_mae = calibrate.point_predictive_gate(
+            self._report(10.0, 19.0), self._report(10.0, 20.0)
+        )
+        worse_rmse = calibrate.point_predictive_gate(
+            self._report(9.0, 21.0), self._report(10.0, 20.0)
+        )
+        self.assertFalse(equal_mae["pass"])
+        self.assertFalse(equal_mae["criteria"]["mae_strictly_lower"])
+        self.assertFalse(worse_rmse["pass"])
+        self.assertFalse(worse_rmse["criteria"]["rmse_strictly_lower"])
+
+    def test_missing_or_non_finite_metrics_are_refused(self):
+        with self.assertRaises(calibrate.CalibrateError):
+            calibrate.point_predictive_gate({}, self._report(10.0, 20.0))
+        with self.assertRaises(calibrate.CalibrateError):
+            calibrate.point_predictive_gate(
+                self._report(float("nan"), 19.0), self._report(10.0, 20.0)
+            )
 
 
 class TestQuarantine(unittest.TestCase):

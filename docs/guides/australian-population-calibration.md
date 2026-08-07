@@ -105,7 +105,7 @@ python3 data/abs/theta.py --run-year <y> --draws <N> \
 # simulate: independent noise is mandatory for NPE (DECISIONS.md §G5)
 sembla sweep fixtures/australian-population/australian_population.hundredth.plan.json \
   --population <y>.state --seed <semantic> --theta-file theta-<y>.json \
-  --ticks 12 --out sweep-<y> --backend cpu --noise independent \
+  --ticks 12 --out sweep-<y> --backend cuda --noise independent \
   --draw-workers 8 --enable grouped-observations
 ```
 
@@ -133,11 +133,14 @@ requires `--backend cuda`), so the CPU path shards the draw file and runs one
 sweep *process* per worker with per-chunk semantic seeds. On CUDA a single
 sweep runs the pool in-process. The CUDA backend is gated before any loop
 runs: `sembla diff-backends … --enable grouped-observations` must report
-`verdict=equal` for this exact model and state (measured 2026-08-07 on an
-H100: 7.9 ticks/s CUDA against 3.6 on the host CPU, equality exact). The
-15-year loop ran on a Hyperstack H100 under
-`spikes/precision/infra-hyperstack/`'s paid-session discipline; CPU fallback
-remains a first-class path (~6x slower wall clock).
+`verdict=equal` for this exact model and state. The retained 2026-08-07 gate,
+using the actual calibrated 2010 θ and semantic seed, measured 7.730 ticks/s
+CUDA against 3.583 on the H100 VM's host CPU with exact equality across scalar,
+summary, grouped, per-tick and final-state outputs. The 15-year loop ran on a
+Hyperstack H100 under `spikes/precision/infra-hyperstack/`'s paid-session
+discipline. CPU fallback remains first-class; the corrected pilot measurements
+put the H100 sweep at about 2.5× the local eight-process CPU sweep, while
+CPU-only NPE training limits the end-to-end gain.
 
 The quarantined `calibration/npe` trainer consumes the pairs and produces a
 posterior per year. The quarantine is byte-untouched: `calibrate.py`'s training
@@ -176,18 +179,42 @@ centres as their fallback. The year is then re-run with θ̂_y to export the
 state for y+1, with `chain.py`'s exact command and semantic seed so the
 calibrated chain is comparable link by link with the baseline.
 
+## Measured 2010–2025 result
+
+The complete evidence is in
+[`calibrated-2026-08-07`](../evidence/australian-population/calibrated-2026-08-07/README.md).
+On held-out single-year stock cells, mean annual WAPE improves from 9.008% to
+7.701% (a 14.5% relative reduction). Terminal national drift improves modestly,
+from +0.632% to +0.577%, while mean absolute terminal state error is 1.75%.
+Fitted O-D WAPE improves from the uncalibrated 72.7% to 29.4%, but is worse than
+the gravity-only 22.4% because accepted NPE posteriors updated the spatial block
+in 2010, 2012 and 2019. That degradation is evidence and was not tuned away.
+
+Only those three yearly posteriors were accepted. Six years failed SBC; another
+six passed SBC but had a non-positive posterior median and therefore failed the
+domain gate. This is strong evidence that the offline gravity fit supplied most
+of the useful correction and that this unconstrained raw-coordinate NPE is not
+reliably identified year by year. A log-space parameterisation is a possible
+future declared experiment, not a result substituted into this run.
+
 ## Diagnostics, and how each can fail
 
-All of these run per year and any of them fails the calibration, not merely
-prints:
+All diagnostics run per year, but their failure consequences differ explicitly:
 
 - **Capacity and saturation** (PRD 0007 §5): every draw's run CSV is checked;
   a saturated or zero-vacancy draw is not calibration evidence and aborts the
   year.
 - **Simulation-based calibration**: rank uniformity over held-out draws, using
-  the quarantined `sbc.py` gate against `posterior.pt`.
-- **Posterior predictive check**: the θ̂_y re-run is scored in evaluation mode;
-  fitted targets must sit within the score report's own tolerances.
+  the quarantined `sbc.py` gate against `posterior.pt`. Failure rejects the
+  posterior wholesale and selects the gravity fallback; it does not disappear
+  from the evidence.
+- **Point-predictive check**: the θ̂_y re-run is scored in evaluation mode.
+  Its fitted-role MAE and RMSE must both be strictly lower than the same-year
+  frozen PRD 0007 baseline; equality fails, held-out cells are excluded, and
+  there is no tunable tolerance. An undefined composition, score-contract
+  failure, or failed dominance criterion aborts the year. All fifteen retained
+  scores pass this gate; DECISIONS §N21 records that it was made explicit during
+  final independent review rather than falsely calling it predeclared.
 - **Prior/posterior contraction** per parameter: the posterior standard
   deviation divided by the draw standard deviation. A parameter whose ratio is
   ≥ 0.9 was not informed by the data and is **named as not identified** —

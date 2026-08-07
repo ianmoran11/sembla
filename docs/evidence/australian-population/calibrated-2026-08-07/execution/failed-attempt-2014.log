@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/ubuntu/sembla/data/abs/calibrate.py", line 1196, in <module>
+    raise SystemExit(main())
+  File "/home/ubuntu/sembla/data/abs/calibrate.py", line 1183, in main
+    report = run_loop(args)
+  File "/home/ubuntu/sembla/data/abs/calibrate.py", line 903, in run_loop
+    run_record = _run_calibrated_year(
+  File "/home/ubuntu/sembla/data/abs/calibrate.py", line 760, in _run_calibrated_year
+    report = score.score_run(run_path, TARGETS / f"{run_year}.json", MODEL, mode="evaluation")
+  File "/home/ubuntu/sembla/data/abs/score.py", line 448, in score_run
+    observed = observe_target(target, store, artifact["scale"]["factor"])
+  File "/home/ubuntu/sembla/data/abs/score.py", line 344, in observe_target
+    raise ValueError(f"observed ratio denominator is zero for {target['id']!r}")
+ValueError: observed ratio denominator is zero for 'flow.interstate_composition.arrivals.nsw.male.00_04'

@@ -1,0 +1,33 @@
+source_commit=1720ab703b412fd58cb882c68aca587632ba2bc5
+source_status_begin
+?? data/abs/._cache
+source_status_end
+hostname=sembla-precision-58595904d02b
+Linux sembla-precision-58595904d02b 6.8.0-90-generic #91~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 15:20:45 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+status: done
+extended_status: done
+boot_status_code: enabled-by-generator
+last_update: Thu, 01 Jan 1970 00:02:13 +0000
+detail: DataSourceOpenStackLocal [net,ver=2]
+errors: []
+recoverable_errors: {}
+Architecture:                         x86_64
+CPU(s):                               28
+Model name:                           AMD EPYC 9554 64-Core Processor
+               total        used        free      shared  buff/cache   available
+Mem:           177Gi       2.2Gi       157Gi       2.0Mi        17Gi       173Gi
+Swap:             0B          0B          0B
+NVIDIA H100 PCIe, GPU-238aef77-a5bc-b913-f6d6-29760f01e653, 570.195.03, 81559 MiB
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+bash: line 1: rustc: command not found
+bash: line 1: cargo: command not found
+Python 3.10.12
+Python 3.12.13
+f6ffcea8df8065ebeb941c37b3d73c636a169e35ea7f0acd71c1c540423cacf4  target/release/sembla
+6f05d870681f35950deab4c74a8a9e816b43625a744f9e8cf2d5aa96a2ef18fe  fixtures/australian-population/australian_population.hundredth.plan.json
+6f307418a367d44d6cde56c18c57d6873981a7187bc17fa94ca3c5f9110ed904  fixtures/australian-population/australian_population.hundredth.json
+1d3f85db8fd93c66118df15622c70eac4fd6dfc1adcc72c9142b5949146eff5f  fixtures/state/australian_population_2010_hundredth.state

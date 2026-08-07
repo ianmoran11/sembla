@@ -1,0 +1,1200 @@
+{
+  "comparison_by_family": {
+    "stock_single_year": {
+      "baseline_mean_wape": 0.09007736884309946,
+      "calibrated_mean_wape": 0.07700627281597017,
+      "improved": true
+    }
+  },
+  "format": "sembla.australian-population-calibration-comparison/v1",
+  "point_predictive_all_pass": true,
+  "years": [
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 22376000.0,
+          "signed_error": 39093.0,
+          "target": 22336907.0,
+          "wape": 0.03648316214953127
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 22378300.0,
+          "signed_error": 41393.0,
+          "target": 22336907.0,
+          "wape": 0.03576112843197136
+        }
+      },
+      "inadmissible_parameters": [],
+      "point_predictive": {
+        "baseline": {
+          "mae": 827.9675106658158,
+          "rmse": 3281.4714300028704
+        },
+        "candidate": {
+          "mae": 611.2024093574867,
+          "rmse": 2600.1770943335346
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": false,
+      "rejection_reason": null,
+      "run_year": 2010,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0007216334633994848,
+        "k": 1.3483904240274569e-05,
+        "peak_months": 320.7526397705078,
+        "pull_act": 0.22548333555459976,
+        "pull_nt": 0.15338173508644104,
+        "pull_qld": 0.8909659087657928,
+        "pull_sa": 0.14642981439828873,
+        "pull_tas": 0.09625986590981483,
+        "pull_vic": 0.5793253481388092,
+        "pull_wa": 0.3237937092781067,
+        "push_act": 1.8960512280464172,
+        "push_nt": 3.9275951849151003,
+        "push_qld": 1.2908012424500868,
+        "push_sa": 0.6089869737625122,
+        "push_tas": 1.186518669128418,
+        "push_vic": 0.6226282715797424,
+        "push_wa": 0.8091329336166382
+      },
+      "unidentified": [
+        "push_nt",
+        "push_qld"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 22782300.0,
+          "signed_error": 51868.0,
+          "target": 22730432.0,
+          "wape": 0.0570642036191833
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 22747900.0,
+          "signed_error": 17468.0,
+          "target": 22730432.0,
+          "wape": 0.054003989013495214
+        }
+      },
+      "inadmissible_parameters": [],
+      "point_predictive": {
+        "baseline": {
+          "mae": 1262.7659998542626,
+          "rmse": 5214.6795276139555
+        },
+        "candidate": {
+          "mae": 920.4649210926956,
+          "rmse": 4078.533345615221
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "sbc_failed",
+      "run_year": 2011,
+      "sbc_pass": false,
+      "theta_hat": {
+        "interstate_base": 0.0007060879418528433,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.16365828461144502,
+        "pull_nt": 0.13534586297640586,
+        "pull_qld": 0.9629785653283308,
+        "pull_sa": 0.1910425482170044,
+        "pull_tas": 0.09260181465000239,
+        "pull_vic": 0.6775296686187564,
+        "pull_wa": 0.34384028640323516,
+        "push_act": 2.5166562434108464,
+        "push_nt": 3.5253426562677332,
+        "push_qld": 1.2109885576813615,
+        "push_sa": 0.8480254598360989,
+        "push_tas": 1.376540662414799,
+        "push_vic": 0.7423295344227916,
+        "push_wa": 0.7217304821664569
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 23169400.0,
+          "signed_error": 44233.0,
+          "target": 23125167.0,
+          "wape": 0.06490145563056907
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 23160100.0,
+          "signed_error": 34933.0,
+          "target": 23125167.0,
+          "wape": 0.05986650820727046
+        }
+      },
+      "inadmissible_parameters": [],
+      "point_predictive": {
+        "baseline": {
+          "mae": 1683.5933595692934,
+          "rmse": 7160.177057017782
+        },
+        "candidate": {
+          "mae": 1454.463371273957,
+          "rmse": 6191.189061482724
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": false,
+      "rejection_reason": null,
+      "run_year": 2012,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 3.33711359417066e-05,
+        "k": 2.519867121009156e-05,
+        "peak_months": 308.5714416503906,
+        "pull_act": 0.11393050104379654,
+        "pull_nt": 0.09507958590984344,
+        "pull_qld": 1.7186843752861023,
+        "pull_sa": 0.11928141117095947,
+        "pull_tas": 0.16889062523841858,
+        "pull_vic": 0.7251889309813307,
+        "pull_wa": 0.5959493517875671,
+        "push_act": 3.0951755046844482,
+        "push_nt": 6.010255336761475,
+        "push_qld": 2.2365920543670654,
+        "push_sa": 0.5724417269229889,
+        "push_tas": 1.1525778770446777,
+        "push_vic": 0.5623601078987122,
+        "push_wa": 0.7572533786296844
+      },
+      "unidentified": [
+        "pull_vic"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 23520500.0,
+          "signed_error": 47710.0,
+          "target": 23472790.0,
+          "wape": 0.06542988711610337
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 23490000.0,
+          "signed_error": 17210.0,
+          "target": 23472790.0,
+          "wape": 0.059199865035217375
+        }
+      },
+      "inadmissible_parameters": [],
+      "point_predictive": {
+        "baseline": {
+          "mae": 2174.3077440501183,
+          "rmse": 9529.313739490706
+        },
+        "candidate": {
+          "mae": 1608.146956526645,
+          "rmse": 7550.058495908012
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "sbc_failed",
+      "run_year": 2013,
+      "sbc_pass": false,
+      "theta_hat": {
+        "interstate_base": 0.0006894718852970822,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.14705198253856716,
+        "pull_nt": 0.11960440081033896,
+        "pull_qld": 0.9060356810600938,
+        "pull_sa": 0.18337749398625122,
+        "pull_tas": 0.08991995767640677,
+        "pull_vic": 0.7020116149658772,
+        "pull_wa": 0.27953879082389366,
+        "push_act": 2.6730352959507315,
+        "push_nt": 3.6715020600057287,
+        "push_qld": 1.2833138207931951,
+        "push_sa": 0.914110812766627,
+        "push_tas": 1.3334149718493375,
+        "push_vic": 0.7571996969157813,
+        "push_wa": 0.8049579962154751
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 23828800.0,
+          "signed_error": 15656.0,
+          "target": 23813144.0,
+          "wape": 0.06019054014875146
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 23817600.0,
+          "signed_error": 4456.0,
+          "target": 23813144.0,
+          "wape": 0.052242240671790334
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 2673.226138349826,
+          "rmse": 11858.347775514549
+        },
+        "candidate": {
+          "mae": 1884.095510210374,
+          "rmse": 9072.50670762002
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "inadmissible_posterior",
+      "run_year": 2014,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0006661695233323796,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.15303754058233415,
+        "pull_nt": 0.11900375050968022,
+        "pull_qld": 0.8876617199525071,
+        "pull_sa": 0.17729146511022625,
+        "pull_tas": 0.09021096792676699,
+        "pull_vic": 0.7138517786391558,
+        "pull_wa": 0.2600976714035735,
+        "push_act": 2.684456547248307,
+        "push_nt": 3.6849019860592302,
+        "push_qld": 1.2466593979647471,
+        "push_sa": 0.9189393350330273,
+        "push_tas": 1.2927242928133293,
+        "push_vic": 0.7493796525240662,
+        "push_wa": 0.8089689217363514
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 24178200.0,
+          "signed_error": -8099.0,
+          "target": 24186299.0,
+          "wape": 0.07394893282349647
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 24167600.0,
+          "signed_error": -18699.0,
+          "target": 24186299.0,
+          "wape": 0.062136129219274104
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 3082.880798679434,
+          "rmse": 13764.853536153518
+        },
+        "candidate": {
+          "mae": 2058.163750087582,
+          "rmse": 9720.00357085284
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "sbc_failed",
+      "run_year": 2015,
+      "sbc_pass": false,
+      "theta_hat": {
+        "interstate_base": 0.0007311304393074585,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.15697518434388133,
+        "pull_nt": 0.11576894168295554,
+        "pull_qld": 0.8927789301306931,
+        "pull_sa": 0.16906654275579786,
+        "pull_tas": 0.09185485396855746,
+        "pull_vic": 0.7457374400720462,
+        "pull_wa": 0.2298894865466338,
+        "push_act": 2.6101575136217807,
+        "push_nt": 3.427729136908783,
+        "push_qld": 1.1757919443143463,
+        "push_sa": 0.9349434771615436,
+        "push_tas": 1.2342327416093317,
+        "push_vic": 0.7126249486853575,
+        "push_wa": 0.816349307567392
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 24616300.0,
+          "signed_error": 28383.0,
+          "target": 24587917.0,
+          "wape": 0.08844730523533165
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 24589800.0,
+          "signed_error": 1883.0,
+          "target": 24587917.0,
+          "wape": 0.07336062668505022
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 3446.6443805038693,
+          "rmse": 15186.400296607902
+        },
+        "candidate": {
+          "mae": 2317.456153012765,
+          "rmse": 10869.113140776797
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "sbc_failed",
+      "run_year": 2016,
+      "sbc_pass": false,
+      "theta_hat": {
+        "interstate_base": 0.0008769750367772395,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.15631763405602886,
+        "pull_nt": 0.10746178254287791,
+        "pull_qld": 0.9087877451399371,
+        "pull_sa": 0.17055778630854107,
+        "pull_tas": 0.0964463987336401,
+        "pull_vic": 0.7092689845976144,
+        "pull_wa": 0.21901064214877153,
+        "push_act": 2.314718475430448,
+        "push_nt": 3.1380065199961136,
+        "push_qld": 1.1605192868449545,
+        "push_sa": 0.8808221855692024,
+        "push_tas": 1.2111302109465547,
+        "push_vic": 0.705592567562942,
+        "push_wa": 0.787015463768393
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25006200.0,
+          "signed_error": 47667.0,
+          "target": 24958533.0,
+          "wape": 0.09738212578439606
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 24993400.0,
+          "signed_error": 34867.0,
+          "target": 24958533.0,
+          "wape": 0.08266202985568102
+        }
+      },
+      "inadmissible_parameters": [],
+      "point_predictive": {
+        "baseline": {
+          "mae": 3838.7413005782128,
+          "rmse": 16877.284644727577
+        },
+        "candidate": {
+          "mae": 2533.585370416783,
+          "rmse": 12272.646850900712
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "sbc_failed",
+      "run_year": 2017,
+      "sbc_pass": false,
+      "theta_hat": {
+        "interstate_base": 0.0009134862360433209,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.1568316127989202,
+        "pull_nt": 0.10430525442183382,
+        "pull_qld": 0.9394065310391483,
+        "pull_sa": 0.17618274950035995,
+        "pull_tas": 0.1024986532359051,
+        "pull_vic": 0.7057346366448055,
+        "pull_wa": 0.22204154952438848,
+        "push_act": 2.32350109554422,
+        "push_nt": 3.0934912163159596,
+        "push_qld": 1.1163659874379335,
+        "push_sa": 0.8394902950082456,
+        "push_tas": 1.1724190406375994,
+        "push_vic": 0.7092955672357493,
+        "push_wa": 0.722312614181302
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25414900.0,
+          "signed_error": 84850.0,
+          "target": 25330050.0,
+          "wape": 0.1023288939421754
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25390600.0,
+          "signed_error": 60550.0,
+          "target": 25330050.0,
+          "wape": 0.08558830322087797
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base",
+        "k"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 4249.76612528384,
+          "rmse": 18750.100523205416
+        },
+        "candidate": {
+          "mae": 2891.085730356782,
+          "rmse": 14163.18244303492
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "inadmissible_posterior",
+      "run_year": 2018,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0009075858636189557,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.16070103085999687,
+        "pull_nt": 0.11002555018803147,
+        "pull_qld": 0.9592433039263377,
+        "pull_sa": 0.18419935657178016,
+        "pull_tas": 0.10235793137353774,
+        "pull_vic": 0.7144557914065655,
+        "pull_wa": 0.24397599571797396,
+        "push_act": 2.3160734144023345,
+        "push_nt": 3.320988076600366,
+        "push_qld": 1.1570062843268978,
+        "push_sa": 0.8377312576018104,
+        "push_tas": 1.224148436221889,
+        "push_vic": 0.7279706797047549,
+        "push_wa": 0.6961691195581201
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25754800.0,
+          "signed_error": 110355.0,
+          "target": 25644445.0,
+          "wape": 0.10318800036421143
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25713100.0,
+          "signed_error": 68655.0,
+          "target": 25644445.0,
+          "wape": 0.08743495911102775
+        }
+      },
+      "inadmissible_parameters": [],
+      "point_predictive": {
+        "baseline": {
+          "mae": 4884.222722709619,
+          "rmse": 21534.11158286719
+        },
+        "candidate": {
+          "mae": 3631.0145474714627,
+          "rmse": 17235.65970587704
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": false,
+      "rejection_reason": null,
+      "run_year": 2019,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.000614862481597811,
+        "k": 1.2298417459533084e-05,
+        "peak_months": 415.9561767578125,
+        "pull_act": 0.2924793064594269,
+        "pull_nt": 0.21158329397439957,
+        "pull_qld": 0.2953720986843109,
+        "pull_sa": 0.20938915759325027,
+        "pull_tas": 0.01943376660346985,
+        "pull_vic": 0.8171202838420868,
+        "pull_wa": 0.4267098158597946,
+        "push_act": 2.6061989068984985,
+        "push_nt": 5.714764833450317,
+        "push_qld": 0.4352123439311981,
+        "push_sa": 0.3817830979824066,
+        "push_tas": 0.6773121058940887,
+        "push_vic": 1.1741688251495361,
+        "push_wa": 0.2106475532054901
+      },
+      "unidentified": []
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25830900.0,
+          "signed_error": 150338.0,
+          "target": 25680562.0,
+          "wape": 0.10958233702206362
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 25757700.0,
+          "signed_error": 77138.0,
+          "target": 25680562.0,
+          "wape": 0.092657707413101
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base",
+        "k"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 5057.73567480357,
+          "rmse": 22453.617251371426
+        },
+        "candidate": {
+          "mae": 3734.224314324375,
+          "rmse": 18234.40892297443
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "inadmissible_posterior",
+      "run_year": 2020,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0008299735431909461,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.16283130775704643,
+        "pull_nt": 0.09786981301039661,
+        "pull_qld": 0.9140123555312601,
+        "pull_sa": 0.1808586664901279,
+        "pull_tas": 0.09007339322922668,
+        "pull_vic": 0.5898289257874506,
+        "pull_wa": 0.22945769311767494,
+        "push_act": 2.394188346440613,
+        "push_nt": 3.0286240040366237,
+        "push_qld": 1.0923596349728604,
+        "push_sa": 0.7820990108890855,
+        "push_tas": 1.2698961605278238,
+        "push_vic": 0.7846957654497572,
+        "push_wa": 0.5616517361598403
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 26183000.0,
+          "signed_error": 169200.0,
+          "target": 26013800.0,
+          "wape": 0.1147431747764648
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 26128500.0,
+          "signed_error": 114700.0,
+          "target": 26013800.0,
+          "wape": 0.09628281911908294
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 5192.654662572766,
+          "rmse": 23092.399159189434
+        },
+        "candidate": {
+          "mae": 3749.516389890208,
+          "rmse": 18435.376520540725
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "inadmissible_posterior",
+      "run_year": 2021,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0007685099465025634,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.17755432568380292,
+        "pull_nt": 0.12291968500979354,
+        "pull_qld": 1.0614733228146531,
+        "pull_sa": 0.2162554125890516,
+        "pull_tas": 0.10881670143051138,
+        "pull_vic": 0.6064981775273129,
+        "pull_wa": 0.2841651114886103,
+        "push_act": 2.3505098231733457,
+        "push_nt": 3.1781268261512965,
+        "push_qld": 1.0646936067120638,
+        "push_sa": 0.7486322266404551,
+        "push_tas": 1.3048783560035881,
+        "push_vic": 0.8486748611014651,
+        "push_wa": 0.5034669292332771
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 26832000.0,
+          "signed_error": 177048.0,
+          "target": 26654952.0,
+          "wape": 0.12124238678051268
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 26788900.0,
+          "signed_error": 133948.0,
+          "target": 26654952.0,
+          "wape": 0.1018930366109832
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 5316.017422221209,
+          "rmse": 23553.250548741107
+        },
+        "candidate": {
+          "mae": 3703.934270938095,
+          "rmse": 17951.55237060365
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "inadmissible_posterior",
+      "run_year": 2022,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0006512449432790204,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.17952658206560174,
+        "pull_nt": 0.12708735790790893,
+        "pull_qld": 1.1439736801161238,
+        "pull_sa": 0.2236555122615914,
+        "pull_tas": 0.10512303730534146,
+        "pull_vic": 0.7405341256212787,
+        "pull_wa": 0.352211961432132,
+        "push_act": 2.4436826093457253,
+        "push_nt": 3.358592964293416,
+        "push_qld": 1.0721354441180524,
+        "push_sa": 0.7880342441859789,
+        "push_tas": 1.5738141321482728,
+        "push_vic": 0.7516964851212172,
+        "push_wa": 0.4990849090145799
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 27372400.0,
+          "signed_error": 183109.0,
+          "target": 27189291.0,
+          "wape": 0.12836704715838307
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 27345800.0,
+          "signed_error": 156509.0,
+          "target": 27189291.0,
+          "wape": 0.10574998075529075
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 5534.42189374739,
+          "rmse": 24780.550834979837
+        },
+        "candidate": {
+          "mae": 3804.3390042996957,
+          "rmse": 18183.544878001274
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "sbc_failed",
+      "run_year": 2023,
+      "sbc_pass": false,
+      "theta_hat": {
+        "interstate_base": 0.0006156604581300021,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.17304260074769873,
+        "pull_nt": 0.12300457668588212,
+        "pull_qld": 1.1521114537689978,
+        "pull_sa": 0.20669338829794506,
+        "pull_tas": 0.10708056457754003,
+        "pull_vic": 0.7468071100675647,
+        "pull_wa": 0.3519472758712245,
+        "push_act": 2.510624929949772,
+        "push_nt": 3.4515150303796993,
+        "push_qld": 1.1421685124031846,
+        "push_sa": 0.8239424610156034,
+        "push_tas": 1.6506969371346405,
+        "push_vic": 0.7663334805496056,
+        "push_wa": 0.5508147944040243
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    },
+    {
+      "baseline_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 27780500.0,
+          "signed_error": 174492.0,
+          "target": 27606008.0,
+          "wape": 0.12786108009531838
+        }
+      },
+      "calibrated_held_out": {
+        "stock_single_year": {
+          "cells": 1616,
+          "observed": 27765300.0,
+          "signed_error": 159292.0,
+          "target": 27606008.0,
+          "wape": 0.10625476888943886
+        }
+      },
+      "inadmissible_parameters": [
+        "interstate_base",
+        "k"
+      ],
+      "point_predictive": {
+        "baseline": {
+          "mae": 5879.421155361244,
+          "rmse": 26447.603612890023
+        },
+        "candidate": {
+          "mae": 3955.3776793960697,
+          "rmse": 19078.401379591145
+        },
+        "criteria": {
+          "mae_strictly_lower": true,
+          "rmse_strictly_lower": true
+        },
+        "format": "sembla.australian-population-point-predictive-gate/v1",
+        "pass": true,
+        "reference": "prd-0007-baseline",
+        "role": "fitted"
+      },
+      "posterior_rejected": true,
+      "rejection_reason": "inadmissible_posterior",
+      "run_year": 2024,
+      "sbc_pass": true,
+      "theta_hat": {
+        "interstate_base": 0.0005864756830275482,
+        "k": 1e-05,
+        "peak_months": 360.0,
+        "pull_act": 0.16865561816210234,
+        "pull_nt": 0.1264779316515822,
+        "pull_qld": 1.0965546211455561,
+        "pull_sa": 0.2042823550551822,
+        "pull_tas": 0.11756596304514699,
+        "pull_vic": 0.7562283339753666,
+        "pull_wa": 0.3402889076902769,
+        "push_act": 2.4854275284401197,
+        "push_nt": 3.3322430014631985,
+        "push_qld": 1.1673892760470996,
+        "push_sa": 0.8643357033826655,
+        "push_tas": 1.5824798815546417,
+        "push_vic": 0.7889862241980494,
+        "push_wa": 0.5826736669701363
+      },
+      "unidentified": [
+        "interstate_base",
+        "k",
+        "peak_months",
+        "pull_act",
+        "pull_nt",
+        "pull_qld",
+        "pull_sa",
+        "pull_tas",
+        "pull_vic",
+        "pull_wa",
+        "push_act",
+        "push_nt",
+        "push_qld",
+        "push_sa",
+        "push_tas",
+        "push_vic",
+        "push_wa"
+      ]
+    }
+  ]
+}
