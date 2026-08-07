@@ -50,6 +50,8 @@ PLAN = (
     ROOT / "fixtures/australian-population/australian_population.hundredth.plan.json"
 )
 STATE_2010 = ROOT / "fixtures/state/australian_population_2010_hundredth.state"
+TARGETS = HERE / "targets"
+FEATURE = "grouped-observations"
 
 STATES = ("nsw", "vic", "qld", "sa", "wa", "tas", "nt", "act")
 SEXES = ("female", "male")
@@ -333,23 +335,94 @@ def run_sweep(
     workers: int = 8,
     purpose: str = "npe-sweep",
     run_year: int = 2010,
+    backend: str = "cpu",
+    population: pathlib.Path = STATE_2010,
     sembla: pathlib.Path = ROOT / "target/release/sembla",
 ) -> None:
-    """Simulate every draw, using one sweep process per worker.
+    """Simulate every draw, CPU or CUDA.
 
-    `sembla sweep` is the prescribed command, but its internal draw-worker pool
-    requires the CUDA backend; on CPU a sweep is serial. The draw file is
-    therefore sharded into one chunk per worker and the chunks run as
-    concurrent sweep *processes* (one worker each), each with its own semantic
-    seed, and the chunk outputs are flattened into the documented
-    `draw_<global>.*` layout. Every chunk's theta file, seed and command are
-    recorded in `sweep-manifest.json`.
+    On CPU the sweep's internal draw-worker pool is unavailable (it requires
+    the CUDA backend), so the draw file is sharded into one chunk per worker
+    and the chunks run as concurrent sweep *processes* whose outputs are
+    flattened into the documented `draw_<global>.*` layout. On CUDA a single
+    sweep runs the pool in-process. Both paths record every command, seed and
+    theta hash in `sweep-manifest.json`.
     """
     out_dir = pathlib.Path(out_dir)
     if out_dir.exists():
         raise CalibrateError(f"sweep output directory already exists: {out_dir}")
     theta_file = pathlib.Path(theta_file)
     assignments = json.loads(theta_file.read_text(encoding="utf-8"))
+    draws = len(assignments)
+    parameter_digest = hashlib.sha256(theta_file.read_bytes()).hexdigest()
+    if backend == "cuda":
+        out_dir.mkdir(parents=True)
+        seed = sweep_seed(run_year, parameter_digest, purpose)
+        inner = out_dir / "draws"
+        command = [
+            str(sembla), "sweep", str(PLAN),
+            "--population", str(population),
+            "--seed", str(seed),
+            "--theta-file", str(theta_file),
+            "--ticks", "12",
+            "--out", str(inner),
+            "--backend", "cuda",
+            "--noise", "independent",
+            "--draw-workers", str(workers),
+            "--export-pairs", str(out_dir / "native-pairs.csv"),
+            "--enable", "grouped-observations",
+        ]
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise CalibrateError(f"cuda sweep failed: {result.stderr[-2000:]}")
+        for path in inner.glob("draw_*.*"):
+            path.rename(out_dir / path.name)
+        inner.rmdir()
+        canonical.write_json(
+            out_dir / "sweep-manifest.json",
+            {
+                "backend": "cuda",
+                "chunks": [
+                    {
+                        "chunk": 0,
+                        "command": command,
+                        "draw_count": draws,
+                        "global_draw_start": 0,
+                        "seed": seed,
+                        "theta_file_sha256": parameter_digest,
+                    }
+                ],
+                "draws": draws,
+                "format": "sembla.australian-population-sweep/v1",
+                "noise_mode": "independent",
+                "processes": 1,
+                "theta_file_sha256": parameter_digest,
+            },
+        )
+        return
+    _run_sweep_cpu(
+        out_dir,
+        workers=workers,
+        purpose=purpose,
+        run_year=run_year,
+        population=population,
+        sembla=sembla,
+        assignments=assignments,
+        parameter_digest=parameter_digest,
+    )
+
+
+def _run_sweep_cpu(
+    out_dir: pathlib.Path,
+    *,
+    workers: int,
+    purpose: str,
+    run_year: int,
+    population: pathlib.Path,
+    sembla: pathlib.Path,
+    assignments: list,
+    parameter_digest: str,
+) -> None:
     draws = len(assignments)
     processes = max(1, min(workers, draws))
     chunk_size = (draws + processes - 1) // processes
@@ -375,7 +448,7 @@ def run_sweep(
         chunk_out = out_dir / f"chunk-{chunk_index}"
         command = [
             str(sembla), "sweep", str(PLAN),
-            "--population", str(STATE_2010),
+            "--population", str(population),
             "--seed", str(chunk_seed),
             "--theta-file", str(chunk_theta),
             "--ticks", "12",
@@ -427,6 +500,7 @@ def run_sweep(
     canonical.write_json(
         out_dir / "sweep-manifest.json",
         {
+            "backend": "cpu",
             "chunks": chunk_records,
             "draws": draws,
             "format": "sembla.australian-population-sweep/v1",
@@ -571,6 +645,287 @@ def contraction_report(
             "sd_ratio": ratio,
         }
     return report
+
+
+# ---------------------------------------------------------------------------
+# The per-year calibrated chain loop
+# ---------------------------------------------------------------------------
+
+CONTRACTION_GATE = 0.9
+LOOP_FORMAT = "sembla.australian-population-npe-loop/v1"
+
+
+def posterior_medians(samples_path: pathlib.Path) -> dict[str, float]:
+    """Median per parameter — robust under skewed multiplicative posteriors."""
+    with pathlib.Path(samples_path).open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    medians = {}
+    for column in rows[0]:
+        values = sorted(float(row[column]) for row in rows)
+        middle = len(values) // 2
+        medians[model_name(column)] = (
+            values[middle]
+            if len(values) % 2
+            else (values[middle - 1] + values[middle]) / 2
+        )
+    return medians
+
+
+def decide_theta_hat(
+    contraction: dict[str, dict[str, float]],
+    medians: dict[str, float],
+    gravity_values: dict[str, float],
+    *,
+    sbc_pass: bool,
+) -> dict:
+    """The predeclared point-estimate rule.
+
+    A failed SBC gate rejects the whole posterior: every parameter keeps its
+    offline gravity value and the year is flagged. Otherwise each parameter
+    that contracts (sd ratio below 0.9) takes its posterior median, and each
+    parameter that does not is named unidentified and keeps its gravity value.
+    `peak_months` and `k` follow the same rule with the gravity file's prior
+    centres as their fallback. Nothing here is tuned per year.
+    """
+    values = {}
+    decisions = {}
+    for name, gravity_value in gravity_values.items():
+        row = contraction[name]
+        identified = bool(sbc_pass) and row["sd_ratio"] < CONTRACTION_GATE
+        values[name] = medians[name] if identified else gravity_value
+        decisions[name] = {
+            "identified": identified,
+            "sd_ratio": row["sd_ratio"],
+            "source": "posterior_median" if identified else "gravity_fit",
+            "value": values[name],
+        }
+    return {
+        "contraction_gate": CONTRACTION_GATE,
+        "decisions": decisions,
+        "sbc_pass": bool(sbc_pass),
+        "theta_hat": values,
+    }
+
+
+def _run_calibrated_year(
+    run_year: int,
+    *,
+    params_path: pathlib.Path,
+    input_state: pathlib.Path,
+    run_path: pathlib.Path,
+    export_state: pathlib.Path,
+    sembla: pathlib.Path,
+) -> dict:
+    """Re-run the year with theta_hat to export the state for the next year.
+
+    Mirrors `chain.py`'s annual command and semantic seed exactly, so the
+    calibrated chain is comparable link by link with the baseline.
+    """
+    import chain
+    import score
+
+    seed = chain.derive_seed(
+        model_identity=model_identity(),
+        scale="hundredth",
+        run_year=run_year,
+        params_sha256=hashlib.sha256(params_path.read_bytes()).hexdigest(),
+        replica_index=0,
+    )
+    command = [
+        str(sembla), "run", str(PLAN),
+        "--population", str(input_state),
+        "--seed", str(seed["seed"]),
+        "--ticks", "12",
+        "--params", str(params_path),
+        "--backend", "cpu",
+        "--out", str(run_path),
+        "--export-state", str(export_state),
+        "--enable", FEATURE,
+    ]
+    process = subprocess.run(command, text=True, capture_output=True)
+    if process.returncode:
+        raise CalibrateError(
+            f"{run_year}: calibrated run failed: {process.stderr[-1500:]}"
+        )
+    capacity = chain.inspect_capacity(
+        run_path, json.loads(MODEL.read_text(encoding="utf-8"))
+    )
+    chain.require_capacity(capacity, str(run_year))
+    report = score.score_run(run_path, TARGETS / f"{run_year}.json", MODEL, mode="evaluation")
+    score_path = run_path.with_suffix(run_path.suffix + ".score.json")
+    canonical.write_json(score_path, report)
+    return {
+        "capacity": capacity,
+        "run_raw_sha256": hashlib.sha256(run_path.read_bytes()).hexdigest(),
+        "score_raw_sha256": hashlib.sha256(score_path.read_bytes()).hexdigest(),
+        "seed": seed,
+        "state_raw_sha256": hashlib.sha256(export_state.read_bytes()).hexdigest(),
+    }
+
+
+def run_loop(args) -> dict:
+    """The per-year NPE forward walk over run years 2010-2024."""
+    work = pathlib.Path(args.work)
+    work.mkdir(parents=True, exist_ok=True)
+    params_out = work / "calibrated-params"
+    params_out.mkdir(exist_ok=True)
+    chain_dir = work / "calibrated-chain"
+    chain_dir.mkdir(exist_ok=True)
+    names = theta.free_parameters()
+    spreads = theta.prior_spreads()
+    identity = model_identity()
+    state = STATE_2010
+    summaries = []
+    for run_year in range(args.start_year, args.end_year + 1):
+        year_dir = work / f"year-{run_year}"
+        done_path = year_dir / "done.json"
+        if done_path.exists():
+            summaries.append(_load(done_path))
+            state = chain_dir / f"{run_year + 1}.state"
+            continue
+        year_dir.mkdir(exist_ok=True)
+        centre_path = GRAVITY / f"{run_year}.json"
+        centre_bytes = centre_path.read_bytes()
+        centre = json.loads(centre_bytes.decode("utf-8"))
+        digest = hashlib.sha256(centre_bytes).hexdigest()
+
+        theta_path = year_dir / "theta.json"
+        if not theta_path.exists():
+            key = theta.draw_key(
+                identity, "hundredth", run_year, digest, args.draws, "npe-loop"
+            )
+            assignments = theta.build_draws(
+                centre, draws=args.draws, key=key, spreads=spreads, names=names
+            )
+            theta_path.write_text(
+                json.dumps(assignments, sort_keys=True, separators=(",", ":"))
+                + "\n",
+                encoding="utf-8",
+                newline="",
+            )
+        sweep_dir = year_dir / "sweep"
+        if not sweep_dir.exists():
+            run_sweep(
+                theta_path,
+                sweep_dir,
+                workers=args.workers,
+                purpose="npe-loop",
+                run_year=run_year,
+                backend=args.backend,
+                population=state,
+                sembla=pathlib.Path(args.sembla),
+            )
+        check_capacity(sweep_dir, args.draws)
+
+        train_pairs = year_dir / "pairs-train.csv"
+        if not train_pairs.exists():
+            assignments = json.loads(theta_path.read_text(encoding="utf-8"))
+            vectors = [
+                x_from_draw(sweep_dir, draw) for draw in range(args.draws)
+            ]
+            write_pairs(
+                train_pairs,
+                theta_assignments=assignments,
+                vectors=vectors,
+                names=names,
+                seed=sweep_seed(run_year, digest, "npe-loop"),
+                theta_file=theta_path,
+                identity=identity,
+            )
+        real_pairs = year_dir / "pairs-observation-real.csv"
+        if not real_pairs.exists():
+            write_pairs(
+                real_pairs,
+                theta_assignments=[{name: centre[name] for name in names}],
+                vectors=[x_real(run_year)],
+                names=names,
+                seed=sweep_seed(run_year, digest, "npe-loop-observation"),
+                theta_file=centre_path,
+                identity=identity,
+            )
+        sbc_draws = min(100, args.draws - 1)
+        train_draws = args.draws - sbc_draws
+        npe_dir = year_dir / "npe"
+        diagnostics_path = npe_dir / "diagnostics.json"
+        if not diagnostics_path.exists():
+            command = [
+                str(NPE_PYTHON), str(HERE / "calibrate.py"), "train",
+                "--pairs", str(train_pairs),
+                "--observation", str(real_pairs),
+                "--output", str(npe_dir),
+                "--train-draws", str(train_draws),
+                "--sbc-draws", str(sbc_draws),
+                "--threads", str(args.threads),
+            ]
+            result = subprocess.run(command, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise CalibrateError(
+                    f"{run_year}: NPE training failed: {result.stderr[-3000:]}"
+                )
+        diagnostics = _load(diagnostics_path)
+        if diagnostics["sbc"]["status"] == "pending":
+            result = subprocess.run(
+                [
+                    str(NPE_PYTHON), str(HERE / "calibrate.py"), "sbc",
+                    "--model", str(npe_dir / "posterior.pt"),
+                    "--diagnostics", str(diagnostics_path),
+                    "--threads", str(args.threads),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise CalibrateError(
+                    f"{run_year}: SBC failed to run: {result.stderr[-2000:]}"
+                )
+            diagnostics = _load(diagnostics_path)
+        sbc_pass = bool(diagnostics["sbc"].get("pass"))
+
+        contraction = contraction_report(train_pairs, npe_dir / "posterior-samples.csv")
+        medians = posterior_medians(npe_dir / "posterior-samples.csv")
+        gravity_values = {name: centre[name] for name in names}
+        decision = decide_theta_hat(
+            contraction, medians, gravity_values, sbc_pass=sbc_pass
+        )
+        calibrated = dict(centre)
+        calibrated.update(decision["theta_hat"])
+        params_path = params_out / f"{run_year}.json"
+        canonical.write_json(params_path, calibrated)
+
+        run_path = chain_dir / f"{run_year}.csv"
+        export_state = chain_dir / f"{run_year + 1}.state"
+        run_record = _run_calibrated_year(
+            run_year,
+            params_path=params_path,
+            input_state=state,
+            run_path=run_path,
+            export_state=export_state,
+            sembla=pathlib.Path(args.sembla),
+        )
+        done = {
+            "calibrated_params_raw_sha256": hashlib.sha256(
+                params_path.read_bytes()
+            ).hexdigest(),
+            "contraction": contraction,
+            "decision": decision,
+            "format": LOOP_FORMAT,
+            "run": run_record,
+            "run_year": run_year,
+            "sbc": diagnostics["sbc"],
+            "unidentified": sorted(
+                name
+                for name, row in decision["decisions"].items()
+                if not row["identified"]
+            ),
+        }
+        canonical.write_json(done_path, done)
+        summaries.append(done)
+        state = export_state
+    return {
+        "format": LOOP_FORMAT,
+        "run_years": [row["run_year"] for row in summaries],
+        "years": summaries,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -785,6 +1140,17 @@ def main(argv: list[str] | None = None) -> int:
     pilot.add_argument("--out", type=pathlib.Path, required=True)
     pilot.add_argument("--force", action="store_true")
 
+    loop = sub.add_parser("run-loop", help="per-year NPE forward walk 2010-2024")
+    loop.add_argument("--start-year", type=int, default=2010)
+    loop.add_argument("--end-year", type=int, default=2024)
+    loop.add_argument("--draws", type=int, default=960)
+    loop.add_argument("--workers", type=int, default=8)
+    loop.add_argument("--threads", type=int, default=8)
+    loop.add_argument("--backend", choices=("cpu", "cuda"), default="cpu")
+    loop.add_argument("--sembla", type=pathlib.Path,
+                      default=ROOT / "target/release/sembla")
+    loop.add_argument("--work", type=pathlib.Path, required=True)
+
     args = parser.parse_args(argv)
     if args.command == "observe":
         vector = x_real(args.run_year)
@@ -806,6 +1172,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "pilot":
         report = run_pilot(args)
         _print_pilot_summary(report)
+        return 0
+    if args.command == "run-loop":
+        report = run_loop(args)
+        years = report["years"]
+        print(f"loop complete: {len(years)} years")
+        for row in years:
+            print(
+                f"  {row['run_year']}: sbc_pass={row['sbc'].get('pass')} "
+                f"unidentified={','.join(row['unidentified']) or 'none'}"
+            )
         return 0
     raise CalibrateError(f"unknown command {args.command}")
 
