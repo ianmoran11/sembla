@@ -935,6 +935,88 @@ def run_loop(args) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Evidence packaging: calibrated chain versus baseline, held-out only
+# ---------------------------------------------------------------------------
+
+COMPARISON_FORMAT = "sembla.australian-population-calibration-comparison/v1"
+
+
+def _held_out_family_metrics(report: dict) -> dict:
+    """Aggregate signed and absolute error over held-out residuals only."""
+    out = {}
+    families = sorted(
+        {row["family"] for row in report["residuals"] if row["role"] == "heldout"}
+    )
+    for family in families:
+        rows = [
+            row
+            for row in report["residuals"]
+            if row["role"] == "heldout" and row["family"] == family
+        ]
+        target = sum(row["target"] for row in rows)
+        observed = sum(row["observed"] for row in rows)
+        absolute = sum(row["absolute_error"] for row in rows)
+        out[family] = {
+            "cells": len(rows),
+            "observed": observed,
+            "signed_error": observed - target,
+            "target": target,
+            "wape": absolute / target if target else None,
+        }
+    return out
+
+
+def package_evidence(work: pathlib.Path, out_dir: pathlib.Path) -> dict:
+    """Compare the calibrated chain against the PRD 0007 baseline, held-out only."""
+    work = pathlib.Path(work)
+    out_dir = pathlib.Path(out_dir)
+    baseline_residuals = (
+        ROOT / "docs/evidence/australian-population/baseline-2026-08-06/residuals"
+    )
+    years = []
+    for run_year in range(2010, 2025):
+        done = _load(work / f"year-{run_year}" / "done.json")
+        calibrated_score = _load(
+            work / "calibrated-chain" / f"{run_year}.csv.score.json"
+        )
+        baseline_score = _load(baseline_residuals / f"{run_year}.json")
+        years.append(
+            {
+                "baseline_held_out": _held_out_family_metrics(baseline_score),
+                "calibrated_held_out": _held_out_family_metrics(calibrated_score),
+                "run_year": run_year,
+                "sbc_pass": done["sbc"].get("pass"),
+                "theta_hat": done["decision"]["theta_hat"],
+                "unidentified": done["unidentified"],
+            }
+        )
+    if len(years) != 15:
+        raise CalibrateError(f"evidence needs 15 years, found {len(years)}")
+    families = sorted(years[0]["baseline_held_out"])
+    comparison = {}
+    for family in families:
+        baseline_wape = sum(
+            year["baseline_held_out"][family]["wape"] or 0 for year in years
+        ) / len(years)
+        calibrated_wape = sum(
+            year["calibrated_held_out"][family]["wape"] or 0 for year in years
+        ) / len(years)
+        comparison[family] = {
+            "baseline_mean_wape": baseline_wape,
+            "calibrated_mean_wape": calibrated_wape,
+            "improved": calibrated_wape < baseline_wape,
+        }
+    payload = {
+        "comparison_by_family": comparison,
+        "format": COMPARISON_FORMAT,
+        "years": years,
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    canonical.write_json(out_dir / "held-out-comparison.json", payload)
+    return payload
+
+
+# ---------------------------------------------------------------------------
 # Pilot
 # ---------------------------------------------------------------------------
 
@@ -1157,6 +1239,10 @@ def main(argv: list[str] | None = None) -> int:
                       default=ROOT / "target/release/sembla")
     loop.add_argument("--work", type=pathlib.Path, required=True)
 
+    package = sub.add_parser("package", help="held-out comparison evidence")
+    package.add_argument("--work", type=pathlib.Path, required=True)
+    package.add_argument("--out", type=pathlib.Path, required=True)
+
     args = parser.parse_args(argv)
     if args.command == "observe":
         vector = x_real(args.run_year)
@@ -1187,6 +1273,15 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"  {row['run_year']}: sbc_pass={row['sbc'].get('pass')} "
                 f"unidentified={','.join(row['unidentified']) or 'none'}"
+            )
+        return 0
+    if args.command == "package":
+        payload = package_evidence(args.work, args.out)
+        for family, row in payload["comparison_by_family"].items():
+            print(
+                f"  {family:34s} baseline {row['baseline_mean_wape'] * 100:7.3f}% "
+                f"calibrated {row['calibrated_mean_wape'] * 100:7.3f}% "
+                f"{'IMPROVED' if row['improved'] else 'not improved'}"
             )
         return 0
     raise CalibrateError(f"unknown command {args.command}")

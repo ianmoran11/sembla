@@ -121,6 +121,24 @@ summary vector and writes contract-shaped pairs artifacts:
   2020-vintage total scale is incompatible;
 - the **normalized stock age-sex composition** at the final tick, same shape.
 
+Grouped CSVs emit band *indices* (`band age_months 60` produces 0, 1, 2, …),
+not attribute values; the extraction maps index `b` to ABS band `min(b, 15)`,
+and a regression test locks the convention after a pilot-era bug collapsed
+every band into 0-4.
+
+### Where the sweeps run
+
+On CPU the sweep's draw-worker pool is unavailable (`--draw-workers > 1`
+requires `--backend cuda`), so the CPU path shards the draw file and runs one
+sweep *process* per worker with per-chunk semantic seeds. On CUDA a single
+sweep runs the pool in-process. The CUDA backend is gated before any loop
+runs: `sembla diff-backends … --enable grouped-observations` must report
+`verdict=equal` for this exact model and state (measured 2026-08-07 on an
+H100: 7.9 ticks/s CUDA against 3.6 on the host CPU, equality exact). The
+15-year loop ran on a Hyperstack H100 under
+`spikes/precision/infra-hyperstack/`'s paid-session discipline; CPU fallback
+remains a first-class path (~6x slower wall clock).
+
 The quarantined `calibration/npe` trainer consumes the pairs and produces a
 posterior per year. The quarantine is byte-untouched: `calibrate.py`'s training
 entry point runs under the calibration venv interpreter and only then imports
@@ -130,11 +148,21 @@ raises on any other name. In-memory injection leaves every quarantined byte
 unchanged and adds no Australian name to it; the injected values (draw standard
 deviations) are informational and never a pass gate.
 
-The point estimate is the **posterior median**, not the mean: posteriors for
-weakly identified multiplicative parameters are skewed, and the median is the
-quantile the contraction diagnostic already reports, so the choice is made for
-robustness and consistency rather than tuned per parameter. The year is then
-re-run with θ̂_y to export the state for y+1.
+The point estimate follows a predeclared gate, never tuned per year:
+
+- if the year's SBC rank-uniformity gate fails, the posterior is rejected
+  wholesale and every parameter keeps its offline gravity value (the year is
+  flagged `sbc_failed`);
+- otherwise each parameter whose posterior contracts (posterior SD ÷ draw SD
+  below 0.9) takes the **posterior median** — chosen over the mean because
+  posteriors for weakly identified multiplicative parameters are skewed — and
+  each parameter that does not contract is named unidentified and keeps its
+  gravity value.
+
+`peak_months` and `k` follow the same rule with the gravity file's prior
+centres as their fallback. The year is then re-run with θ̂_y to export the
+state for y+1, with `chain.py`'s exact command and semantic seed so the
+calibrated chain is comparable link by link with the baseline.
 
 ## Diagnostics, and how each can fail
 
