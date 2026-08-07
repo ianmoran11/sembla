@@ -513,8 +513,10 @@ def _run_sweep_cpu(
 
 def check_capacity(sweep_dir: pathlib.Path, draws: int) -> None:
     """PRD 0007 §5: a saturated draw is not calibration evidence."""
-    for draw in range(draws):
-        result = subprocess.run(
+    from concurrent.futures import ThreadPoolExecutor
+
+    def check(draw: int):
+        return draw, subprocess.run(
             [
                 sys.executable,
                 str(HERE / "chain.py"),
@@ -527,6 +529,10 @@ def check_capacity(sweep_dir: pathlib.Path, draws: int) -> None:
             capture_output=True,
             text=True,
         )
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(check, range(draws)))
+    for draw, result in results:
         if result.returncode != 0:
             raise CalibrateError(f"draw {draw} failed capacity: {result.stderr}")
 
