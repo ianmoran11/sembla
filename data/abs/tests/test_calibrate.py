@@ -214,6 +214,63 @@ class TestContraction(unittest.TestCase):
                 self.assertAlmostEqual(row["contraction"], 0.0, places=9)
 
 
+class TestPointEstimateDecision(unittest.TestCase):
+    def _inputs(self):
+        names = theta.free_parameters()
+        gravity = {name: float(index + 1) for index, name in enumerate(names)}
+        medians = {name: value + 0.5 for name, value in gravity.items()}
+        contraction = {name: {"sd_ratio": 0.1} for name in names}
+        return contraction, medians, gravity
+
+    def test_inadmissible_median_rejects_the_whole_posterior(self):
+        contraction, medians, gravity = self._inputs()
+        medians["interstate_base"] = -0.0003639
+
+        decision = calibrate.decide_theta_hat(
+            contraction, medians, gravity, sbc_pass=True
+        )
+
+        self.assertFalse(decision["admissible"])
+        self.assertTrue(decision["posterior_rejected"])
+        self.assertEqual(decision["rejection_reason"], "inadmissible_posterior")
+        self.assertEqual(decision["inadmissible_parameters"], ["interstate_base"])
+        self.assertEqual(decision["theta_hat"], gravity)
+        self.assertTrue(
+            all(
+                not row["identified"] and row["source"] == "gravity_fit"
+                for row in decision["decisions"].values()
+            )
+        )
+
+    def test_sbc_failure_remains_the_first_rejection_reason(self):
+        contraction, medians, gravity = self._inputs()
+        medians["interstate_base"] = float("nan")
+
+        decision = calibrate.decide_theta_hat(
+            contraction, medians, gravity, sbc_pass=False
+        )
+
+        self.assertEqual(decision["rejection_reason"], "sbc_failed")
+        self.assertEqual(decision["inadmissible_parameters"], ["interstate_base"])
+        self.assertEqual(decision["theta_hat"], gravity)
+
+    def test_admissible_contracted_parameters_use_posterior_medians(self):
+        contraction, medians, gravity = self._inputs()
+        contraction["pull_nt"]["sd_ratio"] = calibrate.CONTRACTION_GATE
+
+        decision = calibrate.decide_theta_hat(
+            contraction, medians, gravity, sbc_pass=True
+        )
+
+        self.assertTrue(decision["admissible"])
+        self.assertFalse(decision["posterior_rejected"])
+        self.assertIsNone(decision["rejection_reason"])
+        self.assertEqual(decision["theta_hat"]["pull_nt"], gravity["pull_nt"])
+        self.assertEqual(
+            decision["theta_hat"]["interstate_base"], medians["interstate_base"]
+        )
+
+
 class TestQuarantine(unittest.TestCase):
     def test_calibration_npe_is_byte_unchanged_by_this_prds_work(self):
         import hashlib

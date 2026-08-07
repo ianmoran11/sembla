@@ -148,16 +148,28 @@ raises on any other name. In-memory injection leaves every quarantined byte
 unchanged and adds no Australian name to it; the injected values (draw standard
 deviations) are informational and never a pass gate.
 
-The point estimate follows a predeclared gate, never tuned per year:
+The point estimate follows three fixed gates, never tuned per year:
 
 - if the year's SBC rank-uniformity gate fails, the posterior is rejected
   wholesale and every parameter keeps its offline gravity value (the year is
   flagged `sbc_failed`);
+- every free parameter is a strictly positive rate, factor, or month count; if
+  any posterior median is non-finite or non-positive, the posterior is outside
+  the mathematical parameter domain and is rejected wholesale, every
+  parameter keeps its offline gravity value, and the year is flagged
+  `inadmissible_posterior`;
 - otherwise each parameter whose posterior contracts (posterior SD ÷ draw SD
   below 0.9) takes the **posterior median** — chosen over the mean because
   posteriors for weakly identified multiplicative parameters are skewed — and
   each parameter that does not contract is named unidentified and keeps its
   gravity value.
+
+The domain gate is an intrinsic parameter invariant rather than a fitted
+threshold. It was made explicit after the first 2014 execution exposed an
+unconstrained-flow posterior with a negative `interstate_base` median despite
+passing SBC; the resulting zero-move run was correctly refused by the scorer.
+The failed attempt is retained as execution provenance, not presented as a
+scientific result.
 
 `peak_months` and `k` follow the same rule with the gravity file's prior
 centres as their fallback. The year is then re-run with θ̂_y to export the

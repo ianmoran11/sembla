@@ -684,20 +684,34 @@ def decide_theta_hat(
     *,
     sbc_pass: bool,
 ) -> dict:
-    """The predeclared point-estimate rule.
+    """The fixed point-estimate rule.
 
-    A failed SBC gate rejects the whole posterior: every parameter keeps its
-    offline gravity value and the year is flagged. Otherwise each parameter
-    that contracts (sd ratio below 0.9) takes its posterior median, and each
-    parameter that does not is named unidentified and keeps its gravity value.
+    Three gates apply uniformly to every year:
+
+    - **SBC.** A failed rank-uniformity gate rejects the whole posterior.
+    - **Admissibility.** Every free parameter is a strictly positive rate,
+      factor or month count. A non-finite or non-positive posterior median for
+      *any* of them means the flow placed mass outside the parameter domain for
+      the real observation; the year's posterior is rejected wholesale,
+      exactly like an SBC failure, and flagged `inadmissible_posterior`.
+    - **Contraction.** Otherwise each parameter whose posterior SD ratio is
+      below 0.9 takes its posterior median; the rest are named unidentified
+      and keep their gravity values.
+
     `peak_months` and `k` follow the same rule with the gravity file's prior
     centres as their fallback. Nothing here is tuned per year.
     """
+    inadmissible = sorted(
+        name
+        for name, median in medians.items()
+        if not math.isfinite(median) or median <= 0.0
+    )
+    posterior_rejected = (not sbc_pass) or bool(inadmissible)
     values = {}
     decisions = {}
     for name, gravity_value in gravity_values.items():
         row = contraction[name]
-        identified = bool(sbc_pass) and row["sd_ratio"] < CONTRACTION_GATE
+        identified = not posterior_rejected and row["sd_ratio"] < CONTRACTION_GATE
         values[name] = medians[name] if identified else gravity_value
         decisions[name] = {
             "identified": identified,
@@ -705,9 +719,18 @@ def decide_theta_hat(
             "source": "posterior_median" if identified else "gravity_fit",
             "value": values[name],
         }
+    rejection = None
+    if not sbc_pass:
+        rejection = "sbc_failed"
+    elif inadmissible:
+        rejection = "inadmissible_posterior"
     return {
+        "admissible": not inadmissible,
         "contraction_gate": CONTRACTION_GATE,
         "decisions": decisions,
+        "inadmissible_parameters": inadmissible,
+        "posterior_rejected": posterior_rejected,
+        "rejection_reason": rejection,
         "sbc_pass": bool(sbc_pass),
         "theta_hat": values,
     }
@@ -984,6 +1007,16 @@ def package_evidence(work: pathlib.Path, out_dir: pathlib.Path) -> dict:
             {
                 "baseline_held_out": _held_out_family_metrics(baseline_score),
                 "calibrated_held_out": _held_out_family_metrics(calibrated_score),
+                "inadmissible_parameters": done["decision"].get(
+                    "inadmissible_parameters", []
+                ),
+                "posterior_rejected": done["decision"].get(
+                    "posterior_rejected", not done["sbc"].get("pass")
+                ),
+                "rejection_reason": done["decision"].get(
+                    "rejection_reason",
+                    "sbc_failed" if not done["sbc"].get("pass") else None,
+                ),
                 "run_year": run_year,
                 "sbc_pass": done["sbc"].get("pass"),
                 "theta_hat": done["decision"]["theta_hat"],

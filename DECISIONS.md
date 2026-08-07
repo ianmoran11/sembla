@@ -2477,3 +2477,33 @@ selecting `reduced` despite a failed gate are rejected.
 every source discrepancy visible. One complete ledger prevents reduction from
 silently deleting evidence, while measured projection failure resolves the
 NPE-width question by evidence rather than convenience.
+
+### N20. A posterior outside the free-parameter domain is rejected wholesale
+
+**Decision.** All seventeen inferred migration parameters are strictly positive
+rates, factors, or month counts. After SBC, every posterior median must therefore
+be finite and greater than zero. If any median violates that intrinsic domain,
+the entire year's posterior is flagged `inadmissible_posterior`, all seventeen
+point estimates retain their offline gravity values, and the offending
+parameter names remain in the evidence. This gate applies uniformly to every
+run year and precedes contraction-based selection; an SBC failure remains the
+primary rejection reason when both conditions occur.
+
+This invariant was made explicit during the first 2014 forward-walk attempt,
+when SBC passed but `interstate_base` had posterior median approximately
+`-0.0003639` and 1,998 of 2,000 posterior samples were negative. The resulting
+zero-move calibrated run made an interstate-composition denominator zero, and
+the scorer correctly refused it. The failed attempt is retained as execution
+provenance and is not calibration evidence.
+
+**Alternatives.** Clipping a median to zero or a small positive floor, changing
+the scorer to manufacture a composition when its denominator is zero, retaining
+other medians conditioned on an inadmissible posterior, and tuning a year-
+specific threshold are rejected. Reparameterizing NPE in log space remains a
+future methodological option requiring a new declared experiment rather than a
+mid-run substitution.
+
+**Reason.** Positivity is part of the parameter definition, not a diagnostic
+chosen after seeing a preferred result. Wholesale fallback avoids mixing
+coordinates from an incoherent posterior and preserves the deterministic,
+positive gravity fit as the declared safe estimate.
