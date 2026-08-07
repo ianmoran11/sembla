@@ -377,7 +377,7 @@ def run_sweep(
             raise CalibrateError(f"cuda sweep failed: {result.stderr[-2000:]}")
         for path in inner.glob("draw_*.*"):
             path.rename(out_dir / path.name)
-        inner.rmdir()
+        # The sweep-level manifests stay behind under draws/ as provenance.
         canonical.write_json(
             out_dir / "sweep-manifest.json",
             {
