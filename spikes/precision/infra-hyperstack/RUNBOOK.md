@@ -7,6 +7,41 @@ money to learn. Read the preflight before spending anything.
 The module README remains authoritative for provisioning, security posture, and
 teardown; this file covers *operating* the benchmark collection specifically.
 
+## One-time Keychain and Tailscale OAuth setup
+
+In the Tailscale admin console:
+
+1. define `tag:sembla-bench` and make its ACL/grant allow only the operator to
+   reach tagged nodes on TCP/22;
+2. create an OAuth client with **only** `auth_keys` scope for that exact tag; and
+3. do not grant `devices:core`, `all`, an administrative tag, or unrelated
+   tailnet access.
+
+Store that client plus the existing Hyperstack API key once:
+
+```bash
+cd spikes/precision/infra-hyperstack
+bash keychain-credentials.sh store
+bash keychain-credentials.sh check
+```
+
+The Keychain services default to `sembla.hyperstack.api-key`,
+`sembla.tailscale.oauth-client-id`, and
+`sembla.tailscale.oauth-client-secret` under the current macOS account. The
+Hyperstack key is loaded only into a credentialed child process, after session
+preparation succeeds. The OAuth credentials remain in Keychain; each paid
+session mints one one-off, ephemeral, pre-authorized, tagged auth key with a
+one-hour expiry. Only the derived `tskey-auth` value enters launchctl, the saved
+plan/state, provider user-data, and the guest. Cloud-init passes it to Tailscale
+through a root-only temporary file rather than process argv. `tskey-client`
+values are rejected by Terraform.
+
+The OAuth client's persistent power is limited but real: if stolen, it can mint
+nodes carrying `tag:sembla-bench` until revoked. The tag ACL is therefore the
+security boundary. The Hyperstack key can create/delete billable resources;
+the reviewed-plan gate, balance alerts, watchdog, and reconciliation remain
+mandatory even though the key is convenient to load.
+
 ## Preflight checklist
 
 Each item below has failed at least once in practice.
@@ -19,11 +54,12 @@ Each item below has failed at least once in practice.
       shell running the collector inherits `SSH_AUTH_SOCK`.
 - [ ] **Check the network path can carry an SSH session.** See "The network
       requirement" below. This is the single most expensive failure mode.
-- [ ] **Set `TF_VAR_tailscale_auth_key`** (ephemeral, pre-authorized, tagged)
-      *before* the plan. This is the single highest-value item on the list: it
-      removes the entire class of failure where your egress IP rotates and locks
-      you out of a billing machine, which cannot be repaired by re-applying. The
-      collector warns at startup if it is about to use the public path instead.
+- [ ] **Prepare the disposable Tailscale key before the plan.** Run
+      `bash keychain-credentials.sh prepare-shell`; it mints and imports
+      `TF_VAR_tailscale_auth_key` without displaying it. Paid creation rejects
+      an empty value or a long-lived `tskey-client` secret. This is the single
+      highest-value network item because it removes the rotating-egress-IP
+      failure class.
 - [ ] **Confirm `ssh_cidr` matches your current egress IP**
       (`curl -s https://api.ipify.org`). A mismatch produces a TCP timeout, not
       a useful error. Fix it **now**, before the apply — afterwards it is
@@ -31,11 +67,11 @@ Each item below has failed at least once in practice.
       in two places; see "enforced in two places" below.
 - [ ] **Delete any leftover `hyperstack-paid.tfplan`.** An already-applied plan
       file is one keystroke from a duplicate VM, and plans are cheap to remake.
-- [ ] **Secrets available**: `HYPERSTACK_API_KEY`,
-      `TF_VAR_console_password_hash`, and — if using the pre-seeded host key —
-      `TF_VAR_ssh_host_private_key`. If pushing evidence to GitHub, also
-      `TF_VAR_evidence_deploy_key` (see "Evidence push"). All must be in the
-      *same* shell as the plan, the apply, and the collector.
+- [ ] **Use the credentialed child shell.** `prepare-shell` loads
+      `HYPERSTACK_API_KEY` from Keychain and imports the disposable Tailscale
+      key, console hash, host key, and optional evidence deploy key from
+      launchctl. Plan, apply, watchdog and collector must remain in that shell.
+      Long-lived OAuth credentials are never imported.
 - [ ] **`umask 077` before `terraform plan`.** The plan file embeds the console
       password hash — and the evidence deploy key, if set — inside user-data;
       `review-paid-plan.py` refuses a `0644` plan, and it is right to.
@@ -90,9 +126,11 @@ defence in depth; it did **not** fix the failing home network.
 
 ## Reaching the VM over Tailscale (recommended)
 
-Set `TF_VAR_tailscale_auth_key` and the guest joins your tailnet as
-`sembla-bench` during bootstrap. The collector then finds it automatically via
-`tailscale status` and connects over WireGuard instead of the public IP.
+`keychain-credentials.sh prepare-shell` asks the scoped OAuth client to mint one
+one-off `TF_VAR_tailscale_auth_key`; the guest consumes it and joins as
+`sembla-bench` during bootstrap. The collector finds it via `tailscale status`
+and connects over WireGuard instead of the public IP. Paid Terraform creation
+requires this derived key.
 
 Why this is the better path:
 
@@ -104,13 +142,17 @@ Why this is the better path:
   enable Tailscale SSH: authentication stays with the pinned host key and your
   keypair. The tailnet is transport only.
 
-Use an **ephemeral, pre-authorized, tagged** auth key so the node removes itself
-from your tailnet when the VM dies. The guest also opens tcp/22 on `tailscale0`
-— without that the tailnet path is established but unusable, because the guest
-firewall drops port 22 from anything but the operator `/32`.
+The minted key is **one-off, ephemeral, pre-authorized, tagged**, and valid for
+at most one hour. The OAuth client must be scoped to the same
+`tag:sembla-bench`; tagged nodes are tag-owned, so the tailnet policy must permit
+the operator to reach that tag on TCP/22. The guest opens tcp/22 on
+`tailscale0`, verifies a 100.x address, and records status before cloning or
+building. Installation/registration failure aborts bootstrap; a requested
+Tailscale path never silently degrades to public SSH.
 
-Override the node name with `TAILSCALE_NODE=<name>`; force the public path with
-`PUBLIC_IP_OVERRIDE=<ip>`.
+Override only the lookup name with `TAILSCALE_NODE=<name>`. A public-IP override
+remains a diagnostic/recovery control, not a supported substitute for preparing
+the paid plan with Tailscale.
 
 ### Retrofitting a VM that is already running
 
@@ -168,19 +210,21 @@ The rule is inserted at position 3 so it precedes the `DROP` at 4. Appending it
 with `-A` puts it after the `DROP` and changes nothing — another way to conclude
 wrongly that the network is at fault.
 
-**Prevention is much cheaper than recovery.** Set `TF_VAR_tailscale_auth_key`
-before the apply and neither wall is in the path: WireGuard is UDP, needs no
-inbound rule, and does not care what your public IP is. The collector now warns
-loudly at startup when it is about to use the public path, so this is visible
-before hours of compute are committed rather than after.
+**Prevention is much cheaper than recovery.** Enter through
+`keychain-credentials.sh prepare-shell` before planning. Paid Terraform creation
+then requires the disposable key, and bootstrap must establish WireGuard before
+expensive work or readiness. Neither SSH wall is in that path, and public-IP
+rotation does not matter.
 
 Note that an *established* session does not survive the rotation either. The
 `ESTABLISHED,RELATED` accept at rule 1 keeps existing flows alive, but a changed
 source IP is by definition a different flow. The remote job is detached and
 keeps running regardless — what you lose is the ability to watch it, collect
 from it, and tear it down.
-- **The plan file is sensitive.** It contains the console password hash. Keep
+- **The plan file is sensitive.** It contains the console password hash,
+  per-VM host/deploy material, and disposable Tailscale auth key. Keep
   `umask 077`; never commit it (the allowlist `.gitignore` already blocks it).
+  It never contains the Hyperstack key or long-lived Tailscale OAuth client.
 - **Never delete host key files in cloud-init.** An explicit `HostKey` directive
   already makes sshd serve only the listed key. Deleting the others risks
   sshd failing per-connection after the banner — unrecoverable remotely.
@@ -351,7 +395,7 @@ usually unreachable on its public IP even once adopted.
 
 | Symptom | Cause | Action |
 |---|---|---|
-| `Missing API token` | secrets not in this shell | re-export; they do not survive a new shell |
+| `Missing API token` | command ran outside the credentialed child shell | use `keychain-credentials.sh exec …`, or enter `keychain-credentials.sh shell`; do not regenerate the key |
 | Plan review: `0o644 exposes sensitive user_data` | forgot `umask 077` | `umask 077`, re-plan |
 | `No global public IPv4 ... within the timeout` | IP not attached yet | collector now polls the provider API; or pass `PUBLIC_IP_OVERRIDE=<ip>` |
 | SSH: `Permission denied (publickey)` | key not in agent | `ssh-add`; verify `ssh-add -l` |
@@ -367,53 +411,56 @@ progress rather than starting a second one. Check state directly with
 
 ## Known-good sequence
 
-Prepare every per-session credential and host identity with one interactive
-command. It prompts securely for the Tailscale key and console password,
-generates the deploy/host keys, verifies `main` protection, registers the write
-deploy key through `gh`, and stores values in `launchctl`. If setup fails after
-its first side effect, it attempts and verifies rollback; any incomplete GitHub,
-launchctl, or host-key cleanup is reported with an actionable warning:
+The one-time Keychain setup is above. For each paid session, first reconcile
+using a one-command Keychain injection, then mint the disposable key and enter a
+child shell carrying all runtime values:
 
 ```bash
 cd spikes/precision/infra-hyperstack
-bash prepare-paid-session.sh
+bash keychain-credentials.sh exec bash reconcile-orphans.sh
+rm -f hyperstack-paid.tfplan               # a consumed plan is a duplicate VM
+ssh-add --apple-use-keychain ~/.ssh/sembla_hyperstack
+bash keychain-credentials.sh prepare-shell
 ```
 
-It refuses to overwrite an existing session. `bash prepare-paid-session.sh
---check` verifies tools, GitHub authentication, and branch protection without
-creating credentials. No secret is written to a tracked source/configuration
-file. The pre-seeded host private key is the deliberate exception: it lives
-mode `0600` in an ignored `.host-key-paid-*` directory until teardown, whose
-path is stored in `SEMBLA_HOST_KEY_DIR`.
+`prepare-shell` runs `prepare-paid-session.sh --tailscale-oauth-keychain`. It
+verifies tools/GitHub protection, generates and registers the deploy/host keys,
+then performs its final remote side effect: minting one uniquely described,
+one-off Tailscale key. It stores only per-session values in launchctl and opens
+a shell with the Hyperstack key in that shell's process environment. OAuth
+credentials never leave Keychain except transiently inside the preparation
+process and are not copied to launchctl.
 
-For a manual plan/apply in the same terminal, import the prepared launchctl
-values into that shell; an automated operator can read them directly from
-launchctl:
+Preparation refuses to overwrite a session. `bash prepare-paid-session.sh
+--check` remains credential-free and creates nothing. A post-mint setup failure
+revokes/verifies the derived key when its ID is known; an ambiguous create is
+never retried and expires within one hour. The existing GitHub/host/launchctl
+rollback remains fail-closed.
+
+Inside the child shell:
 
 ```bash
-bash reconcile-orphans.sh                  # nothing should be billing yet
-rm -f hyperstack-paid.tfplan               # a consumed plan is a duplicate VM
-ssh-add ~/.ssh/sembla_hyperstack           # passphrase prompt
-export HYPERSTACK_API_KEY=...
-export TF_VAR_tailscale_auth_key="$(launchctl getenv TF_VAR_tailscale_auth_key)"
-export TF_VAR_console_password_hash="$(launchctl getenv TF_VAR_console_password_hash)"
-export TF_VAR_evidence_deploy_key="$(launchctl getenv TF_VAR_evidence_deploy_key)"
-export TF_VAR_ssh_host_private_key="$(launchctl getenv TF_VAR_ssh_host_private_key)"
-export SSH_HOST_KEY_FINGERPRINT="$(launchctl getenv SSH_HOST_KEY_FINGERPRINT)"
-export SEMBLA_HOST_KEY_DIR="$(launchctl getenv SEMBLA_HOST_KEY_DIR)"
-export SEMBLA_EVIDENCE_DEPLOY_KEY_ID="$(launchctl getenv SEMBLA_EVIDENCE_DEPLOY_KEY_ID)"
-umask 077
 # confirm ssh_cidr matches: curl -s https://api.ipify.org
 terraform plan -var-file=terraform.tfvars \
   -var=create_instance=true -var=accept_paid_creation=true \
   -out=hyperstack-paid.tfplan
 python3 review-paid-plan.py hyperstack-paid.tfplan     # human approval gate
+# Stop here until the exact GPU/hourly price and saved plan are approved.
 terraform apply hyperstack-paid.tfplan
 bash destroy-deadline.sh arm 7
 bash run-demographic-benchmark.sh 2>&1 | tee ~/bench-driver.log
 # On success, verify the new hyperstack-l4-<UTC>/SHA256SUMS once more before
 # using bench-results.json to update the verdict documents.
 ```
+
+Apply promptly. If the one-hour key expires or must be replaced, delete the
+saved plan and clean/reprepare the session; changing the key changes the
+bootstrap fingerprint and VM identity, so never substitute it beneath an
+already reviewed plan. After verified destroy and provider reconciliation, run
+`bash keychain-credentials.sh cleanup-session`, then exit the child shell. The
+cleanup revokes/verifies disposable Tailscale/GitHub keys, removes the per-VM
+host key and plan, and clears launchctl without deleting long-lived Keychain
+items.
 
 ### Verifying a device-observation session
 
@@ -752,8 +799,9 @@ driver becomes insurance rather than a dependency.
 
 ### One-time setup
 
-Run `bash prepare-paid-session.sh`. It verifies **branch protection on `main`**
-before generating anything, creates the fresh ED25519 deploy key, registers its
+Run `bash keychain-credentials.sh prepare-shell`. It invokes the preparation
+helper, verifies **branch protection on `main`** before generating anything,
+creates the fresh ED25519 deploy key, registers its
 public half through the authenticated GitHub CLI with write access, and stores
 the private half in launchctl for the paid session. GitHub deploy keys cannot be
 scoped to a branch, so protection on trunk remains mandatory even though the

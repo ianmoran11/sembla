@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # Prepare every per-session secret/identity needed by a paid Hyperstack run.
-# Secrets are prompted on /dev/tty, stored in launchctl, and never printed.
+# Values are prompted on /dev/tty or minted from Keychain OAuth, only derived
+# session values enter launchctl, and no secret is printed.
 # Disable inherited/command-line xtrace before any secret can enter the shell.
 { set +x; } 2>/dev/null
 set -Eeuo pipefail
+# This script never calls Hyperstack. Do not propagate a provider key inherited
+# from an existing paid shell into GitHub, Keychain, or local key helpers.
+unset HYPERSTACK_API_KEY
 
 MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-ianmoran11/sembla}"
 CHECK_ONLY=0
+TAILSCALE_OAUTH_KEYCHAIN=0
 SUCCESS=0
 MUTATED=0
 REGISTERED_DEPLOY_KEY_ID=''
@@ -15,18 +20,32 @@ DEPLOY_PUBLIC=''
 HOST_KEY_DIR=''
 RETURNED_HOST_KEY_DIR=''
 WORK=''
+TAILSCALE_AUTH_KEY=''
+TAILSCALE_AUTH_KEY_ID=''
+TAILSCALE_OAUTH_CLIENT_ID=''
+TAILSCALE_OAUTH_CLIENT_SECRET=''
+TAILSCALE_KEY_DESCRIPTION=''
+KEYCHAIN_ACCOUNT="${SEMBLA_KEYCHAIN_ACCOUNT:-${USER:-}}"
+TAILSCALE_CLIENT_ID_SERVICE="${SEMBLA_TAILSCALE_CLIENT_ID_KEYCHAIN_SERVICE:-sembla.tailscale.oauth-client-id}"
+TAILSCALE_CLIENT_SECRET_SERVICE="${SEMBLA_TAILSCALE_CLIENT_SECRET_KEYCHAIN_SERVICE:-sembla.tailscale.oauth-client-secret}"
+TAILSCALE_TAG="${SEMBLA_TAILSCALE_TAG:-tag:sembla-bench}"
+TAILSCALE_AUTH_KEY_HELPER="$MODULE_DIR/tailscale-auth-key.py"
 
 usage() {
   cat <<'EOF'
-Usage: bash prepare-paid-session.sh [--check] [--repo OWNER/REPO]
+Usage: bash prepare-paid-session.sh [--check] [--tailscale-oauth-keychain]
+                                    [--repo OWNER/REPO]
 
 Interactively prepares one fresh paid-run session:
-  1. prompts for a Tailscale ephemeral auth key;
+  1. prompts for a one-off Tailscale auth key, or mints one from a narrowly
+     scoped OAuth client in macOS Keychain with --tailscale-oauth-keychain;
   2. prompts twice for the temporary console password;
   3. generates and registers a write-enabled GitHub deploy key;
   4. generates the pre-seeded SSH host identity; and
-  5. stores all values in launchctl without printing secrets.
+  5. stores only per-session values in launchctl without printing secrets.
 
+The OAuth client must have only the auth_keys scope for tag:sembla-bench.
+Its client ID and secret never enter launchctl, Terraform, or guest user-data.
 --check only verifies local tools and GitHub branch protection.
 EOF
 }
@@ -34,6 +53,7 @@ EOF
 while (( $# )); do
   case "$1" in
     --check) CHECK_ONLY=1; shift ;;
+    --tailscale-oauth-keychain) TAILSCALE_OAUTH_KEYCHAIN=1; shift ;;
     --repo)
       [[ $# -ge 2 ]] || { echo '--repo requires OWNER/REPO' >&2; exit 2; }
       GITHUB_REPOSITORY="$2"; shift 2 ;;
@@ -71,6 +91,31 @@ remove_owned_host_dir() {
   [[ ! -e "$path" ]]
 }
 
+keychain_read_item() {
+  local service="$1" value=''
+  if ! value="$(security find-generic-password \
+      -a "$KEYCHAIN_ACCOUNT" -s "$service" -w 2>/dev/null)"; then
+    echo "Keychain item unavailable: $service" >&2
+    return 1
+  fi
+  [[ -n "$value" ]] || { echo "Keychain item is empty: $service" >&2; return 1; }
+  printf '%s' "$value"
+}
+
+revoke_minted_tailscale_key() {
+  [[ -n "$TAILSCALE_AUTH_KEY_ID" ]] || return 0
+  [[ -n "$TAILSCALE_OAUTH_CLIENT_ID" && -n "$TAILSCALE_OAUTH_CLIENT_SECRET" ]] \
+    || { echo 'ROLLBACK WARNING: OAuth credentials unavailable for Tailscale key revocation.' >&2; return 1; }
+  if ! printf '%s\0%s\0' \
+      "$TAILSCALE_OAUTH_CLIENT_ID" "$TAILSCALE_OAUTH_CLIENT_SECRET" \
+      | python3 "$TAILSCALE_AUTH_KEY_HELPER" delete \
+          --key-id "$TAILSCALE_AUTH_KEY_ID"; then
+    echo "ROLLBACK WARNING: could not revoke Tailscale auth key $TAILSCALE_AUTH_KEY_ID; it is one-off and expires within one hour." >&2
+    return 1
+  fi
+  TAILSCALE_AUTH_KEY_ID=''
+}
+
 cleanup() {
   local rc=$?
   local rollback_failed=0
@@ -78,14 +123,17 @@ cleanup() {
   local remaining=''
   local lookup_rc=0
   set +e
-  unset TAILSCALE_AUTH_KEY TF_VAR_console_password_hash \
-    TF_VAR_evidence_deploy_key TF_VAR_ssh_host_private_key
+  unset TF_VAR_console_password_hash TF_VAR_evidence_deploy_key \
+    TF_VAR_ssh_host_private_key
   if [[ "$SUCCESS" != 1 && "$MUTATED" == 1 ]]; then
-    # Remove local secret state before attempting any network rollback.
+    if ! revoke_minted_tailscale_key; then
+      rollback_failed=1
+    fi
+    # Remove local per-session state before attempting any other rollback.
     for name in TF_VAR_tailscale_auth_key TF_VAR_console_password_hash \
       TF_VAR_evidence_deploy_key TF_VAR_ssh_host_private_key \
       SSH_HOST_KEY_FINGERPRINT SEMBLA_HOST_KEY_DIR \
-      SEMBLA_EVIDENCE_DEPLOY_KEY_ID; do
+      SEMBLA_EVIDENCE_DEPLOY_KEY_ID SEMBLA_TAILSCALE_AUTH_KEY_ID; do
       if ! launchctl unsetenv "$name"; then
         echo "ROLLBACK WARNING: launchctl could not clear $name" >&2
         rollback_failed=1
@@ -144,6 +192,8 @@ cleanup() {
   elif [[ -n "$WORK" ]] && ! rm -rf -- "$WORK"; then
     echo "WARNING: could not remove temporary directory $WORK" >&2
   fi
+  unset TAILSCALE_AUTH_KEY TAILSCALE_OAUTH_CLIENT_ID \
+    TAILSCALE_OAUTH_CLIENT_SECRET
   return "$rc"
 }
 trap cleanup EXIT
@@ -156,6 +206,18 @@ for helper in prepare-console-password.sh prepare-deploy-key.sh prepare-host-key
   [[ -r "$MODULE_DIR/$helper" ]] \
     || { echo "required helper not readable: $MODULE_DIR/$helper" >&2; exit 1; }
 done
+if [[ "$TAILSCALE_OAUTH_KEYCHAIN" == 1 ]]; then
+  for command in security python3; do
+    command -v "$command" >/dev/null 2>&1 \
+      || { echo "required command not found: $command" >&2; exit 1; }
+  done
+  [[ -r "$TAILSCALE_AUTH_KEY_HELPER" ]] \
+    || { echo "required helper not readable: $TAILSCALE_AUTH_KEY_HELPER" >&2; exit 1; }
+  [[ -n "$KEYCHAIN_ACCOUNT" ]] \
+    || { echo 'could not determine Keychain account; set SEMBLA_KEYCHAIN_ACCOUNT' >&2; exit 1; }
+  [[ "$TAILSCALE_TAG" =~ ^tag:[A-Za-z0-9][A-Za-z0-9-]*$ ]] \
+    || { echo 'SEMBLA_TAILSCALE_TAG must look like tag:name' >&2; exit 1; }
+fi
 printf 'capability-check' | openssl passwd -6 -stdin >/dev/null 2>&1 \
   || { echo 'OpenSSL lacks required SHA-512 crypt support' >&2; exit 1; }
 [[ "$GITHUB_REPOSITORY" =~ ^[^/]+/[^/]+$ ]] \
@@ -182,7 +244,7 @@ fi
 for name in TF_VAR_tailscale_auth_key TF_VAR_console_password_hash \
   TF_VAR_evidence_deploy_key TF_VAR_ssh_host_private_key \
   SSH_HOST_KEY_FINGERPRINT SEMBLA_HOST_KEY_DIR \
-  SEMBLA_EVIDENCE_DEPLOY_KEY_ID; do
+  SEMBLA_EVIDENCE_DEPLOY_KEY_ID SEMBLA_TAILSCALE_AUTH_KEY_ID; do
   if ! existing_value="$(launchctl getenv "$name")"; then
     echo "could not inspect existing launchctl value: $name" >&2
     exit 1
@@ -198,15 +260,26 @@ unset existing_value
 [[ -r /dev/tty && -w /dev/tty ]] \
   || { echo 'an interactive terminal (/dev/tty) is required' >&2; exit 1; }
 
-cat >&2 <<'EOF'
-Create a fresh ephemeral, pre-authorized Tailscale auth key, then paste it below.
-The input is hidden and is never printed.
+if [[ "$TAILSCALE_OAUTH_KEYCHAIN" == 1 ]]; then
+  # Readability is proved before the first remote mutation. Long-lived OAuth
+  # credentials remain only in this process and are never stored in launchctl.
+  TAILSCALE_OAUTH_CLIENT_ID="$(keychain_read_item "$TAILSCALE_CLIENT_ID_SERVICE")"
+  TAILSCALE_OAUTH_CLIENT_SECRET="$(keychain_read_item "$TAILSCALE_CLIENT_SECRET_SERVICE")"
+  [[ "$TAILSCALE_OAUTH_CLIENT_ID" == "${TAILSCALE_OAUTH_CLIENT_ID//[[:space:]]/}" ]] \
+    || { echo 'stored Tailscale OAuth client ID contains whitespace' >&2; exit 1; }
+  [[ "$TAILSCALE_OAUTH_CLIENT_SECRET" =~ ^tskey-client-[A-Za-z0-9-]+$ ]] \
+    || { echo 'stored Tailscale OAuth client secret has an unexpected format' >&2; exit 1; }
+else
+  cat >&2 <<'EOF'
+Create a fresh ephemeral, pre-authorized, tagged Tailscale auth key, then paste
+it below. The input is hidden and is never printed.
 EOF
-printf 'Tailscale ephemeral auth key: ' >&2
-IFS= read -r -s TAILSCALE_AUTH_KEY < /dev/tty
-printf '\n' >&2
-[[ -n "$TAILSCALE_AUTH_KEY" ]] \
-  || { echo 'Tailscale auth key was empty' >&2; exit 1; }
+  printf 'Tailscale ephemeral auth key: ' >&2
+  IFS= read -r -s TAILSCALE_AUTH_KEY < /dev/tty
+  printf '\n' >&2
+  [[ "$TAILSCALE_AUTH_KEY" =~ ^tskey-auth-[A-Za-z0-9-]+$ ]] \
+    || { echo 'Tailscale auth key has an unexpected format' >&2; exit 1; }
+fi
 
 WORK="$(mktemp -d)"
 chmod 0700 "$WORK"
@@ -271,6 +344,44 @@ RETURNED_HOST_KEY_DIR="${SEMBLA_HOST_KEY_DIR:-}"
 [[ "$RETURNED_HOST_KEY_DIR" == "$HOST_KEY_DIR" ]] \
   || { echo 'Host-key helper returned an unexpected directory' >&2; exit 1; }
 
+registered_key="$(gh api "repos/$GITHUB_REPOSITORY/keys/$REGISTERED_DEPLOY_KEY_ID")" \
+  || { echo 'could not verify the registered GitHub deploy key' >&2; exit 1; }
+jq -e --arg public "$DEPLOY_PUBLIC" '
+  (.id | type) == "number" and
+  .read_only == false and
+  ((.key | split(" ")[0:2] | join(" "))
+    == ($public | split(" ")[0:2] | join(" ")))
+' <<<"$registered_key" >/dev/null \
+  || { echo 'registered GitHub deploy key verification failed' >&2; exit 1; }
+unset registered_key
+
+# Mint only after every other remote/setup check has succeeded. The one-off key
+# is the final side effect, so a later launchctl failure has one bounded key to
+# revoke and an ambiguous POST is never retried.
+if [[ "$TAILSCALE_OAUTH_KEYCHAIN" == 1 ]]; then
+  TAILSCALE_KEY_DESCRIPTION="sembla-hyperstack-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  tailscale_result="$WORK/tailscale-auth-key.json"
+  if ! printf '%s\0%s\0' \
+      "$TAILSCALE_OAUTH_CLIENT_ID" "$TAILSCALE_OAUTH_CLIENT_SECRET" \
+      | python3 "$TAILSCALE_AUTH_KEY_HELPER" create \
+          --tag "$TAILSCALE_TAG" \
+          --expiry-seconds 3600 \
+          --description "$TAILSCALE_KEY_DESCRIPTION" \
+          > "$tailscale_result"; then
+    echo 'Tailscale auth-key minting failed; no mint retry was attempted.' >&2
+    exit 1
+  fi
+  chmod 0600 "$tailscale_result"
+  TAILSCALE_AUTH_KEY="$(jq -er '.key' "$tailscale_result")" \
+    || { echo 'mint helper omitted the Tailscale auth key' >&2; exit 1; }
+  TAILSCALE_AUTH_KEY_ID="$(jq -er '.id' "$tailscale_result")" \
+    || { echo 'mint helper omitted the Tailscale auth-key ID' >&2; exit 1; }
+  [[ "$TAILSCALE_AUTH_KEY" =~ ^tskey-auth-[A-Za-z0-9-]+$ ]] \
+    || { echo 'mint helper returned an invalid Tailscale auth key' >&2; exit 1; }
+  [[ "$TAILSCALE_AUTH_KEY_ID" =~ ^[A-Za-z0-9_-]+$ ]] \
+    || { echo 'mint helper returned an invalid Tailscale auth-key ID' >&2; exit 1; }
+fi
+
 set_launchctl_value() {
   local name="$1" expected="$2" actual=''
   launchctl setenv "$name" "$expected"
@@ -288,17 +399,9 @@ set_launchctl_value TF_VAR_ssh_host_private_key "$TF_VAR_ssh_host_private_key"
 set_launchctl_value SSH_HOST_KEY_FINGERPRINT "$SSH_HOST_KEY_FINGERPRINT"
 set_launchctl_value SEMBLA_HOST_KEY_DIR "$SEMBLA_HOST_KEY_DIR"
 set_launchctl_value SEMBLA_EVIDENCE_DEPLOY_KEY_ID "$REGISTERED_DEPLOY_KEY_ID"
-
-registered_key="$(gh api "repos/$GITHUB_REPOSITORY/keys/$REGISTERED_DEPLOY_KEY_ID")" \
-  || { echo 'could not verify the registered GitHub deploy key' >&2; exit 1; }
-jq -e --arg public "$DEPLOY_PUBLIC" '
-  (.id | type) == "number" and
-  .read_only == false and
-  ((.key | split(" ")[0:2] | join(" "))
-    == ($public | split(" ")[0:2] | join(" ")))
-' <<<"$registered_key" >/dev/null \
-  || { echo 'registered GitHub deploy key verification failed' >&2; exit 1; }
-unset registered_key
+if [[ -n "$TAILSCALE_AUTH_KEY_ID" ]]; then
+  set_launchctl_value SEMBLA_TAILSCALE_AUTH_KEY_ID "$TAILSCALE_AUTH_KEY_ID"
+fi
 
 SUCCESS=1
 cat <<EOF
@@ -307,8 +410,12 @@ Paid-session credentials are ready.
   deploy key ID:       $REGISTERED_DEPLOY_KEY_ID
   host fingerprint:    $SSH_HOST_KEY_FINGERPRINT
   host-key directory:  $SEMBLA_HOST_KEY_DIR
+  Tailscale key ID:    ${TAILSCALE_AUTH_KEY_ID:-manual-key}
 
-Secrets were stored in launchctl and were not printed.
-After teardown, revoke deploy key $REGISTERED_DEPLOY_KEY_ID, clear the launchctl
-session variables, and remove the host-key directory.
+Only disposable/per-session values were stored in launchctl and none was
+printed. Long-lived Keychain values were not copied there. Apply a reviewed plan
+within one hour; otherwise discard it and prepare/review a fresh session. After
+teardown, revoke deploy key $REGISTERED_DEPLOY_KEY_ID, revoke the listed
+Tailscale key when present, clear the launchctl session variables, and remove the
+host-key directory.
 EOF

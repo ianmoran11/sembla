@@ -5,6 +5,7 @@ STATUS_DIR=/var/lib/sembla-bootstrap
 LOG_PATH=/var/log/sembla-bootstrap.log
 DIAGNOSTIC_LOG="$STATUS_DIR/diagnostics.log"
 CONSOLE_DEVICE=/dev/console
+TAILSCALE_AUTH_KEY_FILE=''
 install -d -m 0755 "$STATUS_DIR"
 exec > >(tee -a "$LOG_PATH") 2>&1
 
@@ -44,6 +45,10 @@ on_exit() {
   rc=$?
   trap - EXIT
   set +e
+  if [[ -n "$TAILSCALE_AUTH_KEY_FILE" ]]; then
+    rm -f -- "$TAILSCALE_AUTH_KEY_FILE"
+    TAILSCALE_AUTH_KEY_FILE=''
+  fi
   write_bootstrap_diagnostics
   if [[ "$rc" -ne 0 ]]; then
     rm -f "$STATUS_DIR/ready"
@@ -189,6 +194,41 @@ chmod 0644 "$STATUS_DIR/ssh-self-test.pub" "$STATUS_DIR/ssh-self-test.err"
 write_bootstrap_diagnostics
 console_note "OpenSSH restarted and local ED25519 key exchange passed"
 
+# Paid creation requires one disposable, tagged auth key. Join the tailnet before
+# repository checkout/build and before publishing readiness; a requested
+# Tailscale path must never silently degrade to public SSH.
+[[ -n "$TAILSCALE_AUTH_KEY" ]] \
+  || { echo 'paid bootstrap omitted the required disposable Tailscale auth key' >&2; exit 1; }
+if ! curl -fsSL https://tailscale.com/install.sh | sh; then
+  echo 'Tailscale installation failed' >&2
+  exit 1
+fi
+# --ssh=false keeps authentication on the pinned host/operator keys. Put the
+# auth key in a root-only /run file so process argv/telemetry sees only a path.
+# The key already carries the OAuth client's single approved tag.
+TAILSCALE_AUTH_KEY_FILE="$(mktemp /run/sembla-tailscale-auth.XXXXXX)"
+chmod 0600 "$TAILSCALE_AUTH_KEY_FILE"
+printf '%s' "$TAILSCALE_AUTH_KEY" > "$TAILSCALE_AUTH_KEY_FILE"
+unset TAILSCALE_AUTH_KEY
+if ! tailscale up --auth-key="file:$TAILSCALE_AUTH_KEY_FILE" \
+    --hostname=sembla-bench --ssh=false --accept-routes=false --timeout=120s; then
+  echo 'Tailscale registration failed' >&2
+  exit 1
+fi
+rm -f -- "$TAILSCALE_AUTH_KEY_FILE"
+TAILSCALE_AUTH_KEY_FILE=''
+TAILSCALE_IP="$(tailscale ip -4 2>/dev/null | head -1)"
+[[ "$TAILSCALE_IP" =~ ^100\. ]] \
+  || { echo 'Tailscale registration returned no 100.x IPv4 address' >&2; exit 1; }
+# The guest firewall otherwise drops tcp/22 from tailnet peers. Insert above
+# the public-SSH DROP and persist it before any expensive build work.
+iptables -I INPUT 3 -i tailscale0 -p tcp --dport 22 -j ACCEPT
+netfilter-persistent save
+tailscale status --json > "$STATUS_DIR/tailscale-status.json"
+printf '%s\n' "$TAILSCALE_IP" > "$STATUS_DIR/tailscale-ip"
+chmod 0644 "$STATUS_DIR/tailscale-status.json" "$STATUS_DIR/tailscale-ip"
+console_note "joined tailnet as sembla-bench ($TAILSCALE_IP)"
+
 # The selected immutable name must explicitly be an Ubuntu CUDA image. Do not
 # silently install or replace licensed NVIDIA drivers: exact hardware/software
 # provenance is decision evidence.
@@ -292,31 +332,5 @@ chown -R ${ssh_user}:${ssh_user} "$SPIKE_DIR" /home/${ssh_user}/run-spike.sh
 echo 'Sembla precision bootstrap ready; benchmark not started automatically.'
 printf '%s\n' "ready" > "$STATUS_DIR/ready"
 write_bootstrap_diagnostics
-# Optional tailnet join. The collector then reaches this host over WireGuard,
-# which does not depend on the operator's ISP carrying an SSH session, needs no
-# inbound security-group rule, and survives the operator's public IP changing.
-if [[ -n "$TAILSCALE_AUTH_KEY" ]]; then
-  if curl -fsSL https://tailscale.com/install.sh | sh; then
-    # --ssh=false: Tailscale SSH is deliberately NOT enabled. Authentication
-    # stays with the pinned host key and the operator keypair; the tailnet is a
-    # transport, not an additional way in.
-    if tailscale up --authkey="$TAILSCALE_AUTH_KEY" --hostname=sembla-bench \
-        --ssh=false --accept-routes=false --timeout=120s; then
-      # The guest firewall drops tcp/22 from anything but the operator /32, and
-      # tailnet peers arrive as 100.x on tailscale0 — so without this rule the
-      # tailnet path is established but unusable. Insert above the DROP.
-      iptables -I INPUT 3 -i tailscale0 -p tcp --dport 22 -j ACCEPT
-      netfilter-persistent save || true
-      tailscale ip -4 > "$STATUS_DIR/tailscale-ip" 2>/dev/null || true
-      console_note "joined tailnet as sembla-bench ($(cat "$STATUS_DIR/tailscale-ip" 2>/dev/null))"
-    else
-      console_note "WARNING: tailscale up failed; public-IP path remains"
-    fi
-  else
-    console_note "WARNING: tailscale install failed; public-IP path remains"
-  fi
-  unset TAILSCALE_AUTH_KEY
-fi
-
 console_note "READY; benchmark not started automatically"
 trap - EXIT

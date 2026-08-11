@@ -148,14 +148,14 @@ variable "evidence_deploy_key" {
 }
 
 variable "tailscale_auth_key" {
-  description = "Optional Tailscale auth key. When set, the guest joins the operator's tailnet as 'sembla-bench' and the collector reaches it over WireGuard instead of the public IP. Use an EPHEMERAL, pre-authorized, tagged key so the node removes itself on shutdown. Supply only through TF_VAR_tailscale_auth_key; never in tfvars."
+  description = "Disposable Tailscale auth key. Empty is allowed only for non-creating/offline plans; paid creation requires a one-off, ephemeral, pre-authorized, tagged tskey-auth value so the guest joins as 'sembla-bench'. Supply only through TF_VAR_tailscale_auth_key; never place a reusable key or tskey-client OAuth secret in tfvars/Terraform."
   type        = string
   sensitive   = true
   default     = ""
 
   validation {
-    condition     = var.tailscale_auth_key == "" || can(regex("^tskey-(auth|client)-[A-Za-z0-9-]+$", var.tailscale_auth_key))
-    error_message = "tailscale_auth_key must be empty or a tskey-auth-… / tskey-client-… key supplied through TF_VAR_tailscale_auth_key."
+    condition     = var.tailscale_auth_key == "" || can(regex("^tskey-auth-[A-Za-z0-9-]+$", var.tailscale_auth_key))
+    error_message = "tailscale_auth_key must be empty for an offline plan or a disposable tskey-auth-… key supplied through TF_VAR_tailscale_auth_key; never pass a tskey-client OAuth secret to Terraform."
   }
 }
 

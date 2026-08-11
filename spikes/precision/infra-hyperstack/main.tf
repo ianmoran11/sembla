@@ -107,9 +107,11 @@ check "paid_mode_is_explicit" {
       !var.offline_plan &&
       var.enable_discovery &&
       var.accept_paid_creation &&
-      nonsensitive(length(var.console_password_hash)) > 0
+      nonsensitive(length(var.console_password_hash)) > 0 &&
+      nonsensitive(length(var.tailscale_auth_key)) > 0
     )
-    error_message = "Paid creation requires offline_plan=false, enable_discovery=true, accept_paid_creation=true, and a temporary console recovery hash in TF_VAR_console_password_hash."
+    error_message = "Paid creation requires offline_plan=false, enable_discovery=true, accept_paid_creation=true, a temporary console recovery hash, and one disposable Tailscale tskey-auth value supplied through environment variables."
+
   }
 }
 
@@ -164,6 +166,10 @@ resource "hyperstack_core_virtual_machine" "gpu" {
     precondition {
       condition     = nonsensitive(length(var.console_password_hash)) > 0
       error_message = "Paid creation requires a temporary console recovery hash supplied only through TF_VAR_console_password_hash."
+    }
+    precondition {
+      condition     = nonsensitive(length(var.tailscale_auth_key)) > 0
+      error_message = "Paid creation requires one disposable Tailscale tskey-auth value; use the Keychain/OAuth preparation workflow and never pass a tskey-client secret."
     }
     precondition {
       condition     = !local.ssh_is_non_public

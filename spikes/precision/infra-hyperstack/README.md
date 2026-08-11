@@ -12,16 +12,27 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
 
 ## Security and alpha-provider constraints
 
-- `HYPERSTACK_API_KEY` stays only in the local process environment. It is never
-  placed in Terraform variables, state, user-data, outputs, or Git.
+- The long-lived `HYPERSTACK_API_KEY` is stored in macOS Keychain by the
+  optional credential helper. `keychain-credentials.sh` retrieves it only into
+  an explicitly credentialed child shell/command environment, after session
+  preparation succeeds. It is never put in launchctl, Terraform
+  variables/state/user-data, outputs, or Git.
+- The long-lived Tailscale OAuth client ID/secret also remain in Keychain. The
+  client has only `auth_keys` scope for `tag:sembla-bench`; each paid session
+  mints one one-off, ephemeral, pre-authorized, one-hour `tskey-auth` value.
+  Only that disposable value and its non-secret ID enter launchctl and
+  Terraform user-data/state. Cloud-init gives it to Tailscale through a
+  root-only temporary file rather than process argv. A `tskey-client` value is
+  rejected by Terraform.
 - SSH is allowed only on TCP/22 from one canonical public IPv4 `/32` and remains key-only. A temporary password enables trusted VNC-console recovery but is never accepted by `sshd`. Its plaintext is never passed to Terraform; the sensitive hash remains only in ignored local plan/state and rendered guest user-data until deletion.
 - Hyperstack creates VMs with no default ingress. Terraform adds the `/32` rule
   after VM creation; broad IPv4/IPv6 egress is provider-managed.
 - Collection requires an ED25519 SSH host-key fingerprint that is known
   independently of the connection being secured; trust-on-first-use is never
   accepted. **Amended 2026-07-25 — two sound paths, pick one:**
-  - *Pre-seeded (preferred, and the only unattended one).* `prepare-host-key.sh`
-    generates an ephemeral ED25519 host keypair locally; `TF_VAR_ssh_host_private_key`
+  - *Pre-seeded (preferred, and the only unattended one).* The paid-session
+    preparation invokes `prepare-host-key.sh` once to generate an ephemeral
+    ED25519 host keypair locally; `TF_VAR_ssh_host_private_key`
     carries it into rendered user-data, and cloud-init installs it as the VM's
     only host key before sshd is restarted, failing the bootstrap if sshd does
     not then serve it. The fingerprint is therefore known *before the VM exists*,
@@ -55,9 +66,12 @@ official alpha provider to `NexGenCloud/hyperstack` `1.50.2-alpha`.
 - `.terraform.lock.hcl` — checksums for the exactly pinned alpha provider;
 - `discover.sh` — authenticated, read-only region/flavor/stock/image/key/pricebook listing;
 - `main.tf` — zero-resource defaults, live selection guards, one VM, and exact `/32` rule;
-- `cloud-init.sh.tftpl` — early guest firewall/poweroff timer and CUDA/Rust bootstrap;
+- `cloud-init.sh.tftpl` — early guest firewall/poweroff timer, mandatory Tailscale join, and CUDA/Rust bootstrap;
+- `keychain-credentials.sh` — one-time Keychain storage plus credentialed command/shell and prepared-session entry points;
+- `tailscale-auth-key.py` — standard-library OAuth helper that mints or revokes one bounded disposable auth key without putting OAuth credentials in argv;
 - `prepare-console-password.sh` — Bash/OpenSSL 3 helper that reads the one-time VNC password without echo and emits only a hash export;
 - `prepare-host-key.sh` — generates the ephemeral ED25519 host keypair and emits only the two exports, so the fingerprint is known before first boot;
+- `prepare-paid-session.sh` — creates per-session console/deploy/host values and, in Keychain mode, mints the disposable Tailscale key as its final side effect with rollback;
 - `run-demographic-benchmark.sh` — unattended demographic-benchmark collection and mandatory destroy (§4b);
 - `remote-run-spike.sh` — one CUDA+Vulkan benchmark invocation with Hyperstack provenance;
 - `collect-runs.sh` — resolves the state IP, performs bounded/backed-off SSH readiness checks, then seeds, executes, and retrieves the required three independent runs;
@@ -76,11 +90,16 @@ terraform fmt -check -recursive
 terraform validate
 terraform plan -refresh=false -var-file=example.tfvars
 bash -n cloud-init.sh.tftpl
+bash -n keychain-credentials.sh
 bash -n prepare-console-password.sh
+bash -n prepare-paid-session.sh
 bash -n remote-run-spike.sh
 bash -n discover.sh
 bash -n collect-runs.sh
-python3 -m py_compile verify-artifacts.py review-paid-plan.py
+python3 -m py_compile tailscale-auth-key.py verify-artifacts.py review-paid-plan.py
+python3 ../../../scripts/tests/test_tailscale_auth_key.py
+python3 ../../../scripts/tests/test_keychain_credentials.py
+python3 ../../../scripts/tests/test_prepare_paid_session.py
 ```
 
 The offline plan must report **0 to add, 0 to change, 0 to destroy** and a null
@@ -88,18 +107,33 @@ The offline plan must report **0 to add, 0 to change, 0 to destroy** and a null
 
 ## 2. Authenticated read-only discovery
 
-The API key exported during account setup is not visible to an already-running
-Pi process. Run discovery yourself in the shell where it is exported:
+In the Tailscale admin console, first define `tag:sembla-bench`, restrict that
+tag so only the operator may reach TCP/22, and create an OAuth client with only
+`auth_keys` scope for that tag. Do not grant `devices:core`, `all`, or an
+administrative tag.
+
+Store the long-lived Hyperstack key plus that OAuth client ID/secret once. The
+macOS `security` tool prompts without putting values in argv/history:
 
 ```bash
 cd spikes/precision/infra-hyperstack
-bash discover.sh | tee hyperstack-discovery.txt
+bash keychain-credentials.sh store
+bash keychain-credentials.sh check
+```
+
+A wrapper loads the API key into only the requested child process, so this works
+from an already-running Pi process without restarting it:
+
+```bash
+bash keychain-credentials.sh exec \
+  bash discover.sh | tee hyperstack-discovery.txt
 ```
 
 If needed, target a listed region explicitly:
 
 ```bash
-bash discover.sh CANADA-1 | tee hyperstack-discovery.txt
+bash keychain-credentials.sh exec \
+  bash discover.sh CANADA-1 | tee hyperstack-discovery.txt
 ```
 
 The current official catalog suggests `CANADA-1` / `n3-A100x1` (one A100 80 GB
@@ -135,10 +169,11 @@ Refresh the operator address immediately before planning:
 printf '%s/32\n' "$(curl -4fsS https://api.ipify.org)"
 ```
 
-Then run:
+Then run the read-only plan through the same child-only injection:
 
 ```bash
-terraform plan -var-file=terraform.tfvars
+bash keychain-credentials.sh exec \
+  terraform plan -var-file=terraform.tfvars
 ```
 
 This reads the account but must still report **no resource actions**. Review the
@@ -150,26 +185,41 @@ input and is hard-capped by `max_hourly_price_usd` (default `$5/hour`).
 
 Before spending money:
 
-1. push the exact benchmark/infrastructure commit and set its 40-hex SHA as `repository_ref`;
-2. confirm live stock, image, `/32`, and complete hourly price again;
-3. choose a strong one-time VNC-console password and export only its SHA-512 crypt hash to Terraform. The helper must be launched with Bash and requires OpenSSL 3 with `passwd -6` support; it prints installation guidance rather than falling back to incompatible stock LibreSSL:
+1. push the exact benchmark/infrastructure commit and set its 40-hex SHA as
+   `repository_ref`;
+2. confirm live stock, image, `/32`, and complete hourly price again, then require
+   the API to report no orphaned VM:
+
+   ```bash
+   bash keychain-credentials.sh exec bash reconcile-orphans.sh
+   ```
+
+3. prepare the disposable/per-VM credentials and enter one child shell carrying
+   the Hyperstack key. This securely prompts only for the temporary VNC password
+   and deploy-key confirmation; the Tailscale key is minted automatically from
+   Keychain and is never displayed:
+
+   ```bash
+   bash keychain-credentials.sh prepare-shell
+   ```
+
+The VNC password is for console recovery as `ubuntu`; SSH password and
+keyboard-interactive authentication remain disabled. The Tailscale key is
+one-off and expires after one hour. The resulting shell imports the per-session
+launchctl values and sets `umask 077`; exit it to discard its process-environment
+copy of the Hyperstack API key.
+
+4. protect local state and the saved plan. Terraform's `sensitive` marker
+redacts display but does **not** encrypt storage. Plan/state contain the console
+hash, ephemeral host/deploy keys, and disposable Tailscale key inside sensitive
+user-data, but never either long-lived OAuth credential or the Hyperstack key:
 
 ```bash
-unset TF_VAR_console_password_hash
-eval "$(bash ./prepare-console-password.sh)"
-test -n "${TF_VAR_console_password_hash:-}"
-```
-
-Keep the plaintext only in a secure password manager until teardown. It is for the trusted VNC console account `ubuntu`; SSH password and keyboard-interactive authentication remain disabled. Keep the hash environment variable in the same authenticated shell through destroy.
-
-4. protect local state and the saved plan. Terraform's `sensitive` marker redacts display but does **not** encrypt plan/state storage; both contain the console password hash inside sensitive user-data:
-
-```bash
-umask 077
 chmod 600 terraform.tfstate terraform.tfstate.backup 2>/dev/null || true
 ```
 
-5. create, inspect, and retain a saved plan without changing the non-creating values in `terraform.tfvars`:
+5. create, inspect, and retain a saved plan without changing the non-creating
+values in `terraform.tfvars`:
 
 ```bash
 terraform plan -var-file=terraform.tfvars \
@@ -186,8 +236,11 @@ The plan must contain exactly:
 - no environment, keypair, volume, or unrelated resource creation.
 
 Do not apply until the user explicitly approves that exact saved plan. Apply it
-promptly; discard and re-plan if the operator `/32`, stock, image, commit, or
-price changes. If plan or apply fails, inspect Hyperstack immediately: if any VM
+promptly; discard and prepare/review a fresh session if the one-hour Tailscale
+key expires, or if the operator `/32`, stock, image, commit, or price changes.
+Never replace `TF_VAR_tailscale_auth_key` underneath a reviewed plan because it
+changes the bootstrap fingerprint and VM identity. If plan or apply fails,
+inspect Hyperstack immediately: if any VM
 exists, delete it in the console rather than assuming Terraform rolled it back.
 After approval, apply the saved plan rather than recomputing it:
 
@@ -198,9 +251,13 @@ terraform apply hyperstack-paid.tfplan
 ## 4. Bootstrap and three-run evidence collection
 
 Cloud-init installs an emergency guest poweroff timer first, but billing
-continues after poweroff. It then applies the guest `/32` defense, verifies the
-selected CUDA image, installs Rust/Vulkan prerequisites, checks out the exact
-commit, and compiles the spike. It does **not** start the benchmark automatically.
+continues after poweroff. It applies the guest `/32` defense, consumes the
+one-off auth key, and must verify the tagged Tailscale path before repository
+checkout/build or readiness. Installation, registration, or 100.x-address
+failure aborts bootstrap rather than silently falling back to public SSH. It
+then verifies the selected CUDA image, installs Rust/Vulkan prerequisites,
+checks out the exact commit, and compiles the spike. It does **not** start the
+benchmark automatically.
 
 Bootstrap writes start, local SSH self-test, ready, and failure diagnostics directly to the trusted Hyperstack VNC console. If interactive recovery is needed, log in there as `ubuntu` with the one-time console password; do not enable SSH passwords. Obtain the ED25519 fingerprint from the first-boot `SSH HOST KEY FINGERPRINTS` output or, after console login, run:
 
@@ -256,20 +313,22 @@ one session. A GPU host carries both the CUDA device and the ≥32 GiB the 50M C
 row needs, so CPU and CUDA scales come from the same machine and the same commit.
 
 It adds **no Terraform resources.** Run it after §3's reviewed paid apply, in
-place of §4's collector. With the pre-seeded host key there is no interactive
-step at all — generate the key, apply, collect:
+place of §4's collector. The credential workflow has already prepared and
+imported the pre-seeded host identity, so do not run `prepare-host-key.sh` again
+or override its exports:
 
 ```bash
-eval "$(bash prepare-host-key.sh)"       # exports the key and its fingerprint
-# ... §3's reviewed paid apply, with TF_VAR_ssh_host_private_key now in scope ...
-bash run-demographic-benchmark.sh        # unattended through to destroy
-rm -rf "$SEMBLA_HOST_KEY_DIR"            # the key dies with the VM
+bash keychain-credentials.sh prepare-shell  # prepares identity; opens paid shell
+# ... §3's reviewed plan/apply in this shell ...
+bash run-demographic-benchmark.sh           # unattended through to destroy
+bash keychain-credentials.sh cleanup-session
+exit
 ```
 
-`prepare-host-key.sh` prints the fingerprint to stderr and exports it as
-`SSH_HOST_KEY_FINGERPRINT`, so the collector pins a value that existed before the
-VM did. On the console-read path, export that variable by hand instead and leave
-`TF_VAR_ssh_host_private_key` unset; everything downstream is identical.
+The prepared `SSH_HOST_KEY_FINGERPRINT` pins a value that existed before the VM,
+and `TF_VAR_ssh_host_private_key` installs that exact identity. Re-preparing
+between plan, apply, and collection would break the reviewed-plan/collector
+binding and is forbidden.
 
 Everything after that point is unattended: it waits for bootstrap, builds,
 benchmarks CUDA then CPU, retrieves an evidence directory with `SHA256SUMS` and
@@ -308,10 +367,15 @@ terraform destroy -var-file=terraform.tfvars \
   -var=create_instance=true \
   -var=accept_paid_creation=true
 terraform state list
-rm -f hyperstack-paid.tfplan
 chmod 600 terraform.tfstate terraform.tfstate.backup 2>/dev/null || true
-unset TF_VAR_console_password_hash
+bash keychain-credentials.sh cleanup-session
+exit  # leave the credentialed child shell
 ```
+
+`cleanup-session` first requires empty paid Terraform state and a clean provider
+reconciliation. It then revokes/verifies the disposable Tailscale key and
+GitHub deploy key, removes the per-VM host-key directory and stale saved plan,
+and clears launchctl while retaining the three long-lived Keychain items.
 
 The alpha provider waits only 120 seconds for VM deletion. If destroy fails or
 times out, inspect the console immediately and delete the VM there. After the

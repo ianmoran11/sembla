@@ -11,6 +11,8 @@
 !example.tfvars
 !main.tf
 !outputs.tf
+!keychain-credentials.sh
+!tailscale-auth-key.py
 !reconcile-orphans.sh
 !prepare-console-password.sh
 !destroy-deadline.sh
