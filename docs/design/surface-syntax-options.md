@@ -1,17 +1,25 @@
-# Surface syntax: implemented command-style mathematics
+# Surface syntax: implemented command-style baseline
 
-**Status:** Implemented, 2026-07-20.
+**Status:** Historical implemented baseline, 2026-07-20; subsequently extended
+by the approved mathematical-model surface.
 **Scope:** Lean surface syntax only. The IR, JSON encoding, validator, Rust
-runtime, proofs, and checked fixtures were unchanged. The public reference is
-the [frontend README](../../frontend/README.md).
+runtime, proofs, and checked fixtures were unchanged. This document records the
+options and constraints of that earlier command-syntax decision; it is not the
+complete current syntax reference. The public extension guide is
+[Mathematical model surface](../guides/mathematical-model-surface.md), with the
+broader frontend overview in the [frontend README](../../frontend/README.md).
 
 ---
 
 ## 1. Decision and implemented status
 
-The human authoring surface is the indentation-structured `sembla_model`
-command. It layers mathematical notation over the same semantic kernel as the
-supported legacy `model%` form and emits byte-identical IR.
+The decision recorded here established the indentation-structured
+`sembla_model` command. It layers mathematical notation over the same semantic
+kernel as the supported legacy `model%` form and emits byte-identical IR. Later
+work added named domains, projected partitions, call notation, finite expression
+functions, state aliases, relations, `¬`/`≥`, and mixed Normal/LogNormal priors;
+those additions supersede any implication below that this baseline was the
+complete surface, without changing its compatibility guarantees.
 
 | Option | Status | Result |
 |---|---|---|
@@ -19,6 +27,7 @@ supported legacy `model%` form and emits byte-identical IR.
 | A — reaction arrows | **Implemented** | One enum guard/effect is written as a reaction arrow with deterministic system/attribute inference. |
 | C(ii) — `freq … over …` | **Implemented** | The exact keyed-frequency idiom has mathematical notation with the existing relational restrictions. |
 | D — command-style declarations | **Implemented** | Models use declaration-shaped, indentation-structured blocks with distinct source anchors. |
+| Indexed parameter/transition families | **Implemented** | Finite domains and pinned tables expand deterministically to the existing scalar IR. |
 | C(i) — keyed comprehensions | **Deferred** | Add only when a real model needs a non-frequency keyed count and can justify row-binder syntax. |
 | E — do-notation builder | **Rejected/deferred for humans** | Direct IR constructors remain the machine-writer path; an imperative builder is not the public mathematical surface. |
 
@@ -126,6 +135,16 @@ ASCII spellings. Legacy `parameter beta` and `system ... as "..."` forms remain
 available only through the compatibility syntax; they did not “die” at the
 kernel boundary.
 
+### Indexed families
+
+Ordered `index` domains, complete inline or SHA-pinned CSV/JSON parameter
+tables, and indexed transition heads are also frontend sugar. They expand in
+canonical Cartesian order to ordinary `ParamDecl` and `Transition` values.
+Same-named selected-system attributes receive injected equality guards; no
+runtime tensor, bounded-Int schema, or backend lookup was added. The complete
+contract and external schemas are in the
+[indexed-family decision record](../prds-indexed-families/README.md).
+
 ## 5. Implemented option A: reaction arrows
 
 A transition with exactly one enum equality guard and one write to that enum
@@ -197,6 +216,13 @@ inputs and outputs; count/sum/min/max views; wires; and all five summary
 reductions. It does not generate a giant quoted `model%` tree or maintain a
 second semantic builder.
 
+Observation-heavy boxes may scope repeated declarations with `views Table
+where`; entries containing `by` lower to grouped views, while other entries
+lower to ordinary views. `summaries Box where` similarly scopes temporal
+reductions to one box. These are collection-only conveniences over the same
+surface records and preserve the individual declaration forms as compatibility
+syntax.
+
 Distinct system, arrow, and general-transition syntax nodes are also distinct
 infoview anchors, realizing the cursor/source-granular workflow described in
 `DECISIONS.md` §A1.
@@ -227,5 +253,8 @@ only if future programmatic tooling demonstrates a need beyond raw constructors.
 - Positioned negatives: [`frontend/scripts/test-negative.sh`](../../frontend/scripts/test-negative.sh)
 - Literal canonical/runtime parity: [`frontend/scripts/check-parity.sh`](../../frontend/scripts/check-parity.sh)
 
-The complete implementation order and frozen contracts are recorded in
-[`docs/prds-surface-syntax/README.md`](../prds-surface-syntax/README.md).
+The implementation order and frozen contracts for this historical baseline are
+recorded in
+[`docs/prds-surface-syntax/README.md`](../prds-surface-syntax/README.md). The
+[current mathematical guide](../guides/mathematical-model-surface.md) records the
+later production surface and lowering rules.

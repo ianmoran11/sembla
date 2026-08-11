@@ -26,7 +26,7 @@ stays outside the runtime boundary, as `DESIGN.md` §10.5 requires.
 | `scaling.py` | Deterministic constrained Hare–Niemeyer apportionment |
 | `state_artifact.py` | Generic streaming `sembla.state/v1` writer driven by exported model JSON |
 | `build_state.py` | Three-scale 2010 slot allocation, artifacts and build report |
-| `rates.py` / `params/` | Annual fixed-rate derivation, prior registry and fidelity evidence |
+| `rates.py` / `params/` / `frontend/Sembla/Models/AustralianPopulation/Data/*.json` | Annual fixed-rate derivation, prior registry, four generated v2 parameter families and fidelity evidence |
 | `targets.py` / `targets/` | Versioned annual target ledgers, hashes and reduction evidence |
 | `score.py` | Strict run-to-target residual reports and ordered summary vectors |
 
@@ -42,11 +42,38 @@ python3 data/abs/build_state.py --scale hundredth --plan-only
 python3 data/abs/build_state.py --write-report
 python3 data/abs/build_state.py --scale hundredth \
   --model fixtures/australian-population/australian_population.hundredth.json
-python3 data/abs/rates.py                  # rebuild annual params and rates.md
+python3 data/abs/rates.py                  # rebuild annual params, rates.md and four v2 tables
 python3 data/abs/gravity_fit.py            # refit spatial parameters to the O-D table
 python3 data/abs/targets.py                # rebuild target ledgers and index
 ./scripts/check-abs-data.sh                # data, report and 1:100 artifact checks
 ```
+
+## Parameter source-of-truth and generation
+
+`rates.py` derives each annual map and constructs the prior registry in memory.
+The 2010 map plus that same registry generate four complete
+`sembla.parameter-family/v2` tables under the Australian model's `Data/`
+directory and retains a complete generated Lean ParamDecl reference under
+`data/abs/reference/` as structural evidence (never a production import). Their
+explicit 377-name order is: 17 authored migration scalars; births in state
+order; mortality in state→model-age-band→sex order; arrivals; and emigration.
+The generator rejects non-unique or incomplete names,
+non-finite values, a changed 17-free/360-fixed split, and any change from the
+seven named published-zero Normal-prior exceptions.
+
+Generated tables use UTF-8, LF endings, and a final newline. Regenerate from the
+repository root with `python3 data/abs/rates.py`. Tests isolate output with
+`--params-dir`, `--report`, `--parameter-tables`, and `--lean-parameters`
+under a temporary directory. `./scripts/check-abs-data.sh` hashes all four
+tables and the generated reference with the other
+generated artifacts before and after a full offline regeneration. Direct Lean
+elaboration of `AustralianPopulation/Validation.lean` re-reads their bytes and
+pins. Any mismatch is a hard failure; never refresh frozen fixtures to obtain
+parity.
+
+The hand-maintained Surface/Transitions modules, public assembly, full
+invariants, and validation commands are mapped in the
+[local Australian population maintenance README](../../frontend/Sembla/Models/AustralianPopulation/README.md).
 
 `gravity_fit.py` is the offline stage of migration calibration: a standard-library
 Poisson log-linear fit of the fifteen identifiable spatial parameters
@@ -133,7 +160,8 @@ places before trailing-zero trimming.
 sizes, constrained-rounding residuals and both ordinary and domain-separated
 artifact hashes. The 1:100 artifact and paired model are committed under
 `fixtures/state/`; 1:10 and full artifacts regenerate under ignored
-`data/abs/generated/`.
+`data/abs/generated/`. The separate 377-parameter Lean reference lives under
+`data/abs/reference/`.
 
 A **run year** is 1 July to 30 June, matching the model's annual runs
 (`DECISIONS.md` §N7). Run year *Y* carries stocks from 30 June *Y* to 30 June

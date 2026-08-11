@@ -1,6 +1,18 @@
 # Run queue
 
-**Pending:** `0001-observation-builders-and-macro-delegation.md` from the approved Lean IR foundational formalization track.
+**Pending:** 18 approved PRDs in one unattended software queue:
+
+1. `0001-observation-builders-and-macro-delegation.md` — the accepted Lean IR
+   prerequisite;
+2. `0002`–`0011` — the aggregate-first demographic-spine foundation bound by
+   [`prds-demographic-spine/README.md`](../prds-demographic-spine/README.md);
+   and
+3. `0012`–`0018` — compatibility policy, `sembla.parameters/v1`,
+   registry-driven contract documentation and CPU-safe backend conformance bound
+   by [`prds-contract-governance/README.md`](../prds-contract-governance/README.md).
+
+The separately gated paid-device PRDs are not in this queue; see
+[`prds-contract-governance-gpu/README.md`](../prds-contract-governance-gpu/README.md).
 
 ## Last cleared 2026-08-04 — transition frontend builders
 
@@ -95,16 +107,28 @@ their folder and this queue by design, which makes any such path unsatisfiable
 from the other location. Refer to "this PRD at its current path", and run
 `python3 scripts/check-prd-allowlist.py <the PRD>` before queueing — it now
 reports paths passed to a command that do not resolve, which is exactly this
-defect. See `DECISIONS.md` §M5.
+defect. See `DECISIONS.md` §M5. The only permitted pre-run exception is a command
+path explicitly marked `(new)` in that same PRD's Allowed files; implementation
+must create it before running the command. Every pre-existing command path and
+every PRD self-path must resolve before queueing.
 
 This folder exists to gather pending PRDs from several folders under sortable
-names, so one command runs them in the right order:
+names, so one command runs them in the right order. Start Pi with current working
+directory at the Sembla repository root (`pwd -P` must equal
+`git rev-parse --show-toplevel`) so cleanliness, config, staging and commits are
+scoped correctly. `/piprd` requires the first PRD **file**, not
+the folder:
 
 ```text
-/piprd run docs/prds-run-queue
+/piprd run docs/prds-run-queue/0001-observation-builders-and-macro-delegation.md
 ```
 
-Running it now executes only the approved observation-builders-and-macro-delegation PRD.
+The run contains no cloud provisioning, paid-resource action or interactive
+product/architecture choice. It may take longer than one night; it advances and
+commits serially until complete or stops on an explicit failed/inconclusive gate.
+Before launch, commit this queue and every binding document, require a clean
+Sembla working tree, and verify the configured models and Git identity work
+without prompts.
 
 ## How to use it
 

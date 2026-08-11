@@ -9,7 +9,19 @@ Run it from the Sembla repository with:
 ```
 
 `README.md` is ignored by `/piprd run`. Every numbered PRD must read this file
-first; the constraints below are binding.
+first; the constraints below were binding for that historical run.
+
+> **Superseding decision (later mathematical surface).** The constraints below
+> accurately freeze what this PRD set originally requested; they have not been
+> rewritten retroactively. A later approved delivery added named enum/range
+> domains and domain-typed attributes, projected partitions, mathematical
+> parameter calls, finite expression functions, reusable state aliases,
+> relations with same-domain `=`/`≠` filters, `from`/`become`, ordered claims,
+> `¬` and `≥`, `Normal` alongside `LogNormal`, and v2 mixed-prior tables. Those
+> additions preserve static lowering and the existing scalar IR but supersede
+> this run's feature-level prohibitions where they conflict. The current public
+> contract is the
+> [mathematical model guide](../guides/mathematical-model-surface.md).
 
 ## Authority and scope
 

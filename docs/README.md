@@ -9,7 +9,7 @@ This is the canonical entry point for Sembla's documentation. Documents are grou
 | New user | [Project overview](overview.md) | [Lean frontend](../frontend/README.md), [examples](examples/README.md) |
 | Model author | [Lean frontend](../frontend/README.md) | [composition guide](guides/composition.md), [state artifacts](guides/state-format.md) |
 | Contributor | [Contributing](../CONTRIBUTING.md) | [CI and local checks](contributing/ci.md), [roadmap](ROADMAP.md) |
-| Semantics or architecture reviewer | [Design authority](../DESIGN.md) | [decision record](../DECISIONS.md), [design notes](design/README.md) |
+| Semantics or architecture reviewer | [Design authority](../DESIGN.md) | [decision record](../DECISIONS.md), [architecture atlas](architecture/README.md), [design notes](design/README.md) |
 | Performance engineer | [Performance index](performance/README.md) | [measurement evidence](evidence/README.md) |
 | Project historian | [Archive](archive/README.md) | [PRD index](prds/README.md), [evidence index](evidence/README.md) |
 
@@ -49,6 +49,7 @@ A current document should say when it is intentionally descriptive rather than n
 ### Engineering
 
 - [CI and local checks](contributing/ci.md)
+- [Architecture atlas](architecture/README.md) — Advanced Canvas hierarchy, subsystem notes, contract registry and fitness functions.
 - [Performance index](performance/README.md)
 - [Design notes](design/README.md)
 - [CUDA crate notes](../crates/sembla-cuda/README.md)

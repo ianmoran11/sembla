@@ -19,20 +19,8 @@ use crate::codegen::{
     host_observation_fallback, FusedBuffer, GroupedObservationAxisLayout, GroupedObservationLayout,
     FUSED_BUFFER_COUNT, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
 };
+use crate::types::{CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum HashMode {
-    #[default]
-    FinalOnly,
-    EveryTick,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CudaRunResult {
-    pub final_state_hash: [u8; 32],
-    pub per_tick_state_hashes: Vec<[u8; 32]>,
-}
 
 /// Hidden final-state readback routes used by CUDA sweeps. The CLI selects its
 /// production default explicitly; this diagnostic API retains its legacy
@@ -78,6 +66,14 @@ pub struct CudaFinalStateBufferAccounting {
 }
 
 /// Conservative sweep admission including final-state treatment memory.
+///
+/// `device_bytes` includes the complete per-lane device-buffer census, a
+/// context/module/stream reserve for every lane, one process-level reserve,
+/// allocation-granularity rounding, and a 25% safety margin. `host_bytes` is
+/// an assumption rather than an OS admission check: the caller must provide at
+/// least this much available host memory. It covers the coordinator state,
+/// four state-sized retained/readback copies per lane, per-lane working
+/// reserve, a process reserve, and the same safety margin.
 #[doc(hidden)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CudaSweepCapacityEstimate {
@@ -121,29 +117,6 @@ pub struct CudaFinalStateReadback {
     pub total: Duration,
     pub downloaded_bytes: CudaFinalStateDownloadedBytes,
     pub buffer_accounting: CudaFinalStateBufferAccounting,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CudaDeviceIdentity {
-    pub gpu_model: String,
-    pub driver_version: String,
-}
-
-/// Conservative capacity bound for isolated retained CUDA sweep lanes.
-///
-/// `device_bytes` includes the complete per-lane device-buffer census, a
-/// context/module/stream reserve for every lane, one process-level reserve,
-/// allocation-granularity rounding, and a 25% safety margin. `host_bytes` is
-/// an assumption rather than an OS admission check: the caller must provide at
-/// least this much available host memory. It covers the coordinator state,
-/// four state-sized retained/readback copies per lane, per-lane working
-/// reserve, a process reserve, and the same safety margin.
-#[derive(Clone, Debug)]
-pub struct CudaTickObservation {
-    pub tick: u32,
-    pub state: StateStore,
-    pub fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
-    pub deferred_per_resource_table: Vec<(String, usize)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

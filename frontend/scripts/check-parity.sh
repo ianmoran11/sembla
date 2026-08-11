@@ -52,6 +52,11 @@ canonical_aliases=(
 
 cd "$frontend_root"
 lake build
+# Direct elaboration re-reads Australian parameter-family bytes through
+# Validation.include_str even when imported oleans are otherwise up to date.
+lake env lean Sembla/Models/AustralianPopulation/Validation.lean
+# The complete generated ParamDecl reference is evidence, not a production import.
+lake env lean ../data/abs/reference/AustralianPopulationParameters.lean
 bash scripts/test-negative.sh
 lake exe sembla-export sir "$tmp/sir.json"
 lake exe sembla-export Sembla.Models.sirPolicy "$tmp/sir_policy.json"
@@ -285,8 +290,9 @@ cmp "$repo_root/fixtures/demographic/demographic_slots.plan.json" "$tmp/demograp
 "$sembla" validate "$tmp/demographic_slots.plan.json"
 echo "Lean demographic model and direct-stable plan are byte-identical to canonical fixtures"
 
-# Australian population: generated movement/mortality lists, canonical model,
-# and feature-bearing plan remain byte-identical to the committed 1:100 schema.
+# Australian population: the Surface/Parameters/Transitions foundation refactor,
+# canonical assembly, and feature-bearing plan remain byte-identical to the
+# committed 1:100 fixtures (exact cmp, not normalized equivalence).
 (
   cd "$frontend_root"
   lake exe sembla-export australian_population "$tmp/australian_population.json"

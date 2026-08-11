@@ -1,0 +1,401 @@
+{
+  "registry_schema": "sembla.architecture-artifact-registry/v1",
+  "entries": [
+    {
+      "identifier": "sembla.abs-gravity-fit/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/gravity_fit.py",
+      "producers": ["data/abs/gravity_fit.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.abs-priors/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/rates.py",
+      "producers": ["data/abs/rates.py"],
+      "consumers": ["data/abs/theta.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.abs-sources/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/rates.py",
+      "producers": ["data/abs/normalise.py"],
+      "consumers": ["data/abs/rates.py", "data/abs/targets.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.architecture-artifact-registry/v1",
+      "kind": "artifact-schema",
+      "owner": "docs/architecture/artifact-registry.json",
+      "producers": ["docs/architecture/artifact-registry.json"],
+      "consumers": ["scripts/check-artifact-registry.py"],
+      "stability": "versioned",
+      "source_discovery": false
+    },
+    {
+      "identifier": "sembla.australian-population-baseline-evidence/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/chain.py",
+      "producers": ["data/abs/chain.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-calibration-comparison/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/calibrate.py",
+      "producers": ["data/abs/calibrate.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-chain-reproduction/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/chain.py",
+      "producers": ["data/abs/chain.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-chain/v1",
+      "kind": "artifact-schema",
+      "owner": "data/abs/chain.py",
+      "producers": ["data/abs/chain.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-fidelity/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/rates.py",
+      "producers": ["data/abs/rates.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-middle-year-reproduction/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/chain.py",
+      "producers": ["data/abs/chain.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-npe-loop/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/calibrate.py",
+      "producers": ["data/abs/calibrate.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-npe-pilot/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/calibrate.py",
+      "producers": ["data/abs/calibrate.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-point-predictive-gate/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/calibrate.py",
+      "producers": ["data/abs/calibrate.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-seed-coordinate/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/chain.py",
+      "producers": ["data/abs/chain.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-seed/v1",
+      "kind": "hash-domain",
+      "owner": "data/abs/chain.py",
+      "producers": ["data/abs/chain.py"],
+      "consumers": ["data/abs/chain.py"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-sweep/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/calibrate.py",
+      "producers": ["data/abs/calibrate.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-theta-draws/v1",
+      "kind": "artifact-schema",
+      "owner": "data/abs/theta.py",
+      "producers": ["data/abs/theta.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.australian-population-theta/v1",
+      "kind": "hash-domain",
+      "owner": "data/abs/theta.py",
+      "producers": ["data/abs/theta.py"],
+      "consumers": ["data/abs/theta.py"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.bundle-root/v1",
+      "kind": "hash-domain",
+      "owner": "crates/sembla-cli/src/manifest.rs",
+      "producers": ["frontend/Sembla/Composition/Bundle.lean"],
+      "consumers": ["crates/sembla-cli/src/manifest.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.bundle/v1",
+      "kind": "artifact-schema",
+      "owner": "crates/sembla-cli/src/manifest.rs",
+      "producers": ["frontend/Sembla/Composition/Bundle.lean"],
+      "consumers": ["crates/sembla-cli/src/inspect.rs"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.canonical-json/v1",
+      "kind": "encoding",
+      "owner": "crates/sembla-ir/src/canonical_json.rs",
+      "producers": ["frontend/Sembla/PlanJson.lean", "crates/sembla-ir/src/canonical_json.rs"],
+      "consumers": ["frontend/Sembla/PlanJson.lean", "crates/sembla-ir/src/canonical_json.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.composition-source/v1",
+      "kind": "artifact-schema",
+      "owner": "frontend/Sembla/Composition/Source.lean",
+      "producers": ["frontend/Main.lean"],
+      "consumers": ["frontend/Sembla/Composition/Json.lean", "frontend/Sembla/Composition/Link.lean"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.executable-plan/v1",
+      "kind": "artifact-schema",
+      "owner": "crates/sembla-ir/src/plan.rs",
+      "producers": ["frontend/Sembla/PlanExport.lean", "frontend/Sembla/Composition/Link.lean"],
+      "consumers": ["crates/sembla-cli/src/shared.rs", "crates/sembla-ir/src/plan.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.identity/legacy-positional-v1",
+      "kind": "identity-scheme",
+      "owner": "frontend/Sembla/Plan.lean",
+      "producers": ["frontend/Sembla/Plan.lean"],
+      "consumers": ["frontend/Sembla/PlanJson.lean"],
+      "stability": "legacy",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.identity/stable-v1",
+      "kind": "identity-scheme",
+      "owner": "crates/sembla-ir/src/plan.rs",
+      "producers": ["frontend/Sembla/PlanExport.lean", "frontend/Sembla/Composition/Link.lean"],
+      "consumers": ["crates/sembla-ir/src/plan.rs", "crates/sembla-runtime/src/rng.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.linker/v1",
+      "kind": "protocol",
+      "owner": "frontend/Sembla/Composition/Link.lean",
+      "producers": ["frontend/Sembla/Composition/Link.lean"],
+      "consumers": ["crates/sembla-ir/src/plan.rs", "crates/sembla-cli/src/manifest.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.parameter-family/v1",
+      "kind": "data-contract",
+      "owner": "frontend/Sembla/ParameterTable.lean",
+      "producers": ["data/abs/rates.py"],
+      "consumers": ["frontend/Sembla/ParameterTable.lean"],
+      "stability": "legacy",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.parameter-family/v2",
+      "kind": "data-contract",
+      "owner": "frontend/Sembla/ParameterTable.lean",
+      "producers": ["data/abs/rates.py"],
+      "consumers": ["frontend/Sembla/ParameterTable.lean"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.plan-core/v1",
+      "kind": "hash-domain",
+      "owner": "crates/sembla-ir/src/canonical_json.rs",
+      "producers": ["crates/sembla-ir/src/canonical_json.rs"],
+      "consumers": ["crates/sembla-cli/src/manifest.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.plan-envelope/v1",
+      "kind": "hash-domain",
+      "owner": "crates/sembla-ir/src/canonical_json.rs",
+      "producers": ["crates/sembla-ir/src/canonical_json.rs"],
+      "consumers": ["crates/sembla-cli/src/manifest.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.rule-word/v1",
+      "kind": "hash-domain",
+      "owner": "crates/sembla-ir/src/identity.rs",
+      "producers": ["crates/sembla-ir/src/identity.rs", "frontend/Sembla/Hash.lean"],
+      "consumers": ["crates/sembla-runtime/src/rng.rs", "frontend/Sembla/PlanExport.lean"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.source-artifact/v1",
+      "kind": "hash-domain",
+      "owner": "crates/sembla-ir/src/plan.rs",
+      "producers": ["frontend/Sembla/Composition/Link.lean"],
+      "consumers": ["crates/sembla-ir/src/plan.rs", "crates/sembla-cli/src/manifest.rs"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.source-map/v1",
+      "kind": "artifact-schema",
+      "owner": "frontend/Sembla/Composition/SourceMap.lean",
+      "producers": ["frontend/Sembla/Composition/Link.lean"],
+      "consumers": ["frontend/Sembla/Plan.lean", "crates/sembla-ir/src/plan.rs"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.state-artifact/v1",
+      "kind": "hash-domain",
+      "owner": "crates/sembla-runtime/src/state_artifact.rs",
+      "producers": ["crates/sembla-runtime/src/state_artifact.rs"],
+      "consumers": ["crates/sembla-cli/src/manifest.rs", "data/abs/chain.py"],
+      "stability": "frozen",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.state/v1",
+      "kind": "artifact-schema",
+      "owner": "crates/sembla-runtime/src/state_artifact.rs",
+      "producers": ["crates/sembla-runtime/src/state_artifact.rs"],
+      "consumers": ["crates/sembla-cli/src/shared.rs", "data/abs/chain.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.state/v2",
+      "kind": "test-identifier",
+      "owner": "crates/sembla-cli/src/manifest.rs",
+      "producers": ["crates/sembla-cli/src/manifest.rs"],
+      "consumers": ["crates/sembla-cli/src/manifest.rs"],
+      "stability": "internal",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.target-score/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/score.py",
+      "producers": ["data/abs/score.py"],
+      "consumers": ["data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.targets-execution/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/targets.py",
+      "producers": ["data/abs/targets.py"],
+      "consumers": ["data/abs/score.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.targets-index/v1",
+      "kind": "data-contract",
+      "owner": "data/abs/targets.py",
+      "producers": ["data/abs/targets.py"],
+      "consumers": ["data/abs/score.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "sembla.targets/v1",
+      "kind": "artifact-schema",
+      "owner": "data/abs/targets.py",
+      "producers": ["data/abs/targets.py"],
+      "consumers": ["data/abs/score.py", "data/abs/calibrate.py"],
+      "stability": "versioned",
+      "source_discovery": true
+    },
+    {
+      "identifier": "schema_versions.backend_identity=1",
+      "kind": "embedded-version",
+      "owner": "crates/sembla-cli/src/manifest.rs",
+      "producers": ["crates/sembla-cli/src/manifest.rs"],
+      "consumers": ["crates/sembla-cli/src/verify.rs"],
+      "stability": "versioned",
+      "source_discovery": false
+    },
+    {
+      "identifier": "schema_versions.manifest=1",
+      "kind": "embedded-version",
+      "owner": "crates/sembla-cli/src/manifest.rs",
+      "producers": ["crates/sembla-cli/src/manifest.rs"],
+      "consumers": ["crates/sembla-cli/src/verify.rs"],
+      "stability": "versioned",
+      "source_discovery": false
+    },
+    {
+      "identifier": "schema_versions.pairs=1",
+      "kind": "embedded-version",
+      "owner": "crates/sembla-cli/src/manifest.rs",
+      "producers": ["crates/sembla-cli/src/sweep.rs"],
+      "consumers": ["calibration/npe/contract.py"],
+      "stability": "versioned",
+      "source_discovery": false
+    },
+    {
+      "identifier": "SEMBLA_POP",
+      "kind": "artifact-schema",
+      "owner": "crates/sembla-runtime/src/population.rs",
+      "producers": ["crates/sembla-cli/src/synth.rs"],
+      "consumers": ["crates/sembla-cli/src/shared.rs"],
+      "stability": "legacy",
+      "source_discovery": false
+    }
+  ]
+}

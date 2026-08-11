@@ -1,0 +1,684 @@
+{
+  "metadata": {
+    "version": "1.0-1.0",
+    "frontmatter": {
+      "title": "Sembla runtime and backend architecture",
+      "status": "maintained",
+      "parent": "docs/architecture/Architecture.canvas",
+      "layout": "grouped compact cards; repository paths are labels rather than embedded previews"
+    },
+    "startNode": "runtime_summary"
+  },
+  "nodes": [
+    {
+      "id": "ir_group",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 600,
+      "height": 650,
+      "label": "Validated IR foundation",
+      "color": "3",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "cpu_group",
+      "type": "group",
+      "x": 730,
+      "y": 0,
+      "width": 760,
+      "height": 650,
+      "label": "Deterministic CPU oracle",
+      "color": "4",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "cuda_group",
+      "type": "group",
+      "x": 1620,
+      "y": 0,
+      "width": 720,
+      "height": 650,
+      "label": "Native f64 CUDA accelerator",
+      "color": "5",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "cli_group",
+      "type": "group",
+      "x": 2470,
+      "y": 0,
+      "width": 930,
+      "height": 900,
+      "label": "Process-level CLI orchestration",
+      "color": "2",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "assurance_group",
+      "type": "group",
+      "x": 0,
+      "y": 800,
+      "width": 2340,
+      "height": 500,
+      "label": "Differential and dependency assurance",
+      "color": "1",
+      "collapsed": false,
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "dashed"
+      }
+    },
+    {
+      "id": "runtime_summary",
+      "type": "text",
+      "x": 0,
+      "y": -300,
+      "width": 950,
+      "height": 190,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "# Runtime\nValidated IR → deterministic CPU oracle → native CUDA → CLI workflows.\n\n[Boundary note](runtime.md) · [Back to atlas](Architecture.canvas)"
+    },
+    {
+      "id": "ir_model",
+      "type": "text",
+      "x": 45,
+      "y": 100,
+      "width": 240,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**IR model**\n`sembla-ir/src/model.rs`"
+    },
+    {
+      "id": "ir_plan",
+      "type": "text",
+      "x": 315,
+      "y": 100,
+      "width": 240,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**IR plan**\n`sembla-ir/src/plan.rs`"
+    },
+    {
+      "id": "ir_validate",
+      "type": "text",
+      "x": 110,
+      "y": 350,
+      "width": 380,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**IR validate**\n`sembla-ir/src/validate.rs`"
+    },
+    {
+      "id": "cpu_executor",
+      "type": "text",
+      "x": 775,
+      "y": 90,
+      "width": 300,
+      "height": 170,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CPU executor**\n`sembla-runtime/src/executor.rs`"
+    },
+    {
+      "id": "cpu_eval",
+      "type": "text",
+      "x": 1135,
+      "y": 90,
+      "width": 300,
+      "height": 170,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CPU eval**\n`sembla-runtime/src/eval.rs`"
+    },
+    {
+      "id": "cpu_state",
+      "type": "text",
+      "x": 775,
+      "y": 340,
+      "width": 300,
+      "height": 160,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**CPU state**\n`sembla-runtime/src/state.rs`"
+    },
+    {
+      "id": "cpu_rng",
+      "type": "text",
+      "x": 1135,
+      "y": 340,
+      "width": 300,
+      "height": 160,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**CPU RNG**\n`sembla-runtime/src/rng.rs`"
+    },
+    {
+      "id": "cpu_contract",
+      "type": "text",
+      "x": 840,
+      "y": 545,
+      "width": 530,
+      "height": 70,
+      "text": "Executable semantics oracle; no concrete backend dependency.",
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "pill",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "cuda_codegen",
+      "type": "text",
+      "x": 1665,
+      "y": 90,
+      "width": 290,
+      "height": 180,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CUDA code generation**\n`sembla-cuda/src/codegen.rs`"
+    },
+    {
+      "id": "cuda_backend",
+      "type": "text",
+      "x": 2000,
+      "y": 90,
+      "width": 290,
+      "height": 180,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CUDA backend**\n`sembla-cuda/src/backend.rs`"
+    },
+    {
+      "id": "cuda_types",
+      "type": "text",
+      "x": 1745,
+      "y": 350,
+      "width": 460,
+      "height": 150,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**CUDA types**\n`sembla-cuda/src/types.rs`"
+    },
+    {
+      "id": "cuda_policy",
+      "type": "text",
+      "x": 1710,
+      "y": 545,
+      "width": 530,
+      "height": 70,
+      "text": "One accelerator, explicit availability, no silent CPU fallback.",
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "pill",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "cli_dispatch",
+      "type": "text",
+      "x": 2515,
+      "y": 90,
+      "width": 260,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "pill",
+        "textAlign": "left"
+      },
+      "text": "**CLI dispatch**\n`sembla-cli/src/main.rs`"
+    },
+    {
+      "id": "cli_shared",
+      "type": "text",
+      "x": 2820,
+      "y": 90,
+      "width": 260,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**CLI shared**\n`sembla-cli/src/shared.rs`"
+    },
+    {
+      "id": "cli_manifest",
+      "type": "text",
+      "x": 3125,
+      "y": 90,
+      "width": 230,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**CLI manifest**\n`sembla-cli/src/manifest.rs`"
+    },
+    {
+      "id": "cli_run",
+      "type": "text",
+      "x": 2515,
+      "y": 330,
+      "width": 260,
+      "height": 160,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CLI run**\n`sembla-cli/src/run.rs`"
+    },
+    {
+      "id": "cli_sweep",
+      "type": "text",
+      "x": 2820,
+      "y": 330,
+      "width": 260,
+      "height": 160,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CLI sweep**\n`sembla-cli/src/sweep.rs`"
+    },
+    {
+      "id": "cli_verify",
+      "type": "text",
+      "x": 3125,
+      "y": 330,
+      "width": 230,
+      "height": 160,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CLI verify**\n`sembla-cli/src/verify.rs`"
+    },
+    {
+      "id": "cli_compare",
+      "type": "text",
+      "x": 2590,
+      "y": 590,
+      "width": 280,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CLI compare**\n`sembla-cli/src/compare.rs`"
+    },
+    {
+      "id": "cli_diff",
+      "type": "text",
+      "x": 2980,
+      "y": 590,
+      "width": 300,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**CLI differential**\n`sembla-cli/src/diff_backends.rs`"
+    },
+    {
+      "id": "rust_arch_check",
+      "type": "text",
+      "x": 60,
+      "y": 910,
+      "width": 420,
+      "height": 220,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Rust architecture check**\n`scripts/check-rust-architecture.py`"
+    },
+    {
+      "id": "rust_check",
+      "type": "text",
+      "x": 540,
+      "y": 910,
+      "width": 380,
+      "height": 220,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Rust check**\n`scripts/check-rust.sh`"
+    },
+    {
+      "id": "gpu_diff_test",
+      "type": "text",
+      "x": 980,
+      "y": 910,
+      "width": 420,
+      "height": 220,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**GPU differential test**\n`sembla-cli/tests/gpu_differential.rs`"
+    },
+    {
+      "id": "generated_cuda_test",
+      "type": "text",
+      "x": 1460,
+      "y": 910,
+      "width": 380,
+      "height": 220,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Generated CUDA test**\n`sembla-cuda/src/codegen.rs`"
+    },
+    {
+      "id": "run_verification",
+      "type": "text",
+      "x": 1900,
+      "y": 910,
+      "width": 380,
+      "height": 220,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Run verification**\n`sembla-cli/tests/run_manifest.rs`"
+    }
+  ],
+  "edges": [
+    {
+      "id": "ir_to_cpu",
+      "fromNode": "ir_validate",
+      "fromSide": "right",
+      "toNode": "cpu_executor",
+      "toSide": "left",
+      "label": "ValidatedModel",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "ir_to_codegen",
+      "fromNode": "ir_validate",
+      "fromSide": "right",
+      "toNode": "cuda_codegen",
+      "toSide": "left",
+      "label": "same validated plan",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "eval_to_executor",
+      "fromNode": "cpu_eval",
+      "fromSide": "left",
+      "toNode": "cpu_executor",
+      "toSide": "right",
+      "label": "expression semantics",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "state_to_executor",
+      "fromNode": "cpu_state",
+      "fromSide": "top",
+      "toNode": "cpu_executor",
+      "toSide": "bottom",
+      "label": "snapshot / commit",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "rng_to_executor",
+      "fromNode": "cpu_rng",
+      "fromSide": "top",
+      "toNode": "cpu_executor",
+      "toSide": "bottom",
+      "label": "coordinate draws",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "codegen_to_backend",
+      "fromNode": "cuda_codegen",
+      "fromSide": "right",
+      "toNode": "cuda_backend",
+      "toSide": "left",
+      "label": "CUDA C / kernel metadata",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "types_to_backend",
+      "fromNode": "cuda_types",
+      "fromSide": "top",
+      "toNode": "cuda_backend",
+      "toSide": "bottom",
+      "label": "host data contract",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "direct"
+      }
+    },
+    {
+      "id": "cli_to_cpu",
+      "fromNode": "cli_run",
+      "fromSide": "left",
+      "toNode": "cpu_executor",
+      "toSide": "right",
+      "label": "CPU path",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "cli_to_cuda",
+      "fromNode": "cli_sweep",
+      "fromSide": "left",
+      "toNode": "cuda_backend",
+      "toSide": "right",
+      "label": "CUDA host orchestration",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "dispatch_to_workflows",
+      "fromNode": "cli_dispatch",
+      "fromSide": "bottom",
+      "toNode": "cli_run",
+      "toSide": "top",
+      "label": "dispatch",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "manifest_to_verify",
+      "fromNode": "cli_manifest",
+      "fromSide": "bottom",
+      "toNode": "cli_verify",
+      "toSide": "top",
+      "label": "replay contract",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "diff_to_cpu",
+      "fromNode": "cli_diff",
+      "fromSide": "left",
+      "toNode": "cpu_executor",
+      "toSide": "right",
+      "label": "oracle result",
+      "color": "1",
+      "styleAttributes": {
+        "path": "short-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "diff_to_cuda",
+      "fromNode": "cli_diff",
+      "fromSide": "left",
+      "toNode": "cuda_backend",
+      "toSide": "right",
+      "label": "accelerated result",
+      "color": "1",
+      "styleAttributes": {
+        "path": "short-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "arch_check_to_edges",
+      "fromNode": "rust_arch_check",
+      "fromSide": "top",
+      "toNode": "ir_validate",
+      "toSide": "bottom",
+      "label": "enforces direction",
+      "color": "1",
+      "styleAttributes": {
+        "path": "dotted",
+        "arrow": "circle-outline",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "gpu_test_to_codegen",
+      "fromNode": "gpu_diff_test",
+      "fromSide": "top",
+      "toNode": "cuda_codegen",
+      "toSide": "bottom",
+      "label": "bitwise conformance",
+      "color": "1",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "thin-triangle",
+        "pathfindingMethod": "a-star"
+      }
+    }
+  ]
+}

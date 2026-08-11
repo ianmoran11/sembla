@@ -3,8 +3,8 @@
 
 This module is deliberately offline and standard-library only.  It converts
 published rates and flows into the model's monthly hazards, writes complete
-2010--2024 parameter maps, records the fixed/free contract, and renders the
-human-readable rate evidence report.
+2010--2024 parameter maps, records the fixed/free contract, renders four pinned
+parameter-family tables, and renders the human-readable rate evidence report.
 """
 
 from __future__ import annotations
@@ -27,6 +27,13 @@ HERE = pathlib.Path(__file__).resolve().parent
 EXTRACTS = HERE / "extracts"
 PARAMS = HERE / "params"
 REPORT = EXTRACTS / "rates.md"
+PARAMETER_TABLES = (
+    HERE.parent.parent / "frontend" / "Sembla" / "Models"
+    / "AustralianPopulation" / "Data"
+)
+# Deterministic legacy structural evidence. Production imports the declarative
+# Surface and never imports or overwrites this generated reference.
+LEAN_PARAMETERS = HERE / "reference" / "AustralianPopulationParameters.lean"
 FIDELITY_EVIDENCE = PARAMS / "fidelity-2010.json"
 FIDELITY_PREDECLARATION = PARAMS / "fidelity-2010-predeclaration.json"
 FIDELITY_PREDECLARATION_SHA256 = (
@@ -95,6 +102,18 @@ FREE_DEFAULTS = {
     "peak_months": 360.0,
     "k": 0.00001,
 }
+
+PUBLISHED_ZERO_MORTALITY_2010 = frozenset(
+    {
+        "mortality_vic_10_14_female",
+        "mortality_sa_10_14_male",
+        "mortality_nt_05_09_female",
+        "mortality_nt_100_plus_male",
+        "mortality_act_05_09_male",
+        "mortality_act_05_09_female",
+        "mortality_act_20_24_female",
+    }
+)
 
 EXPECTED_HEADERS = {
     "births_state.csv": ["year", "state", "births"],
@@ -423,18 +442,30 @@ def load_inputs(extracts: pathlib.Path = EXTRACTS, sources_path: pathlib.Path = 
     )
 
 
-def expected_parameter_names() -> set[str]:
-    names = set(FREE_DEFAULTS)
-    names.update(f"birth_rate_{state}" for state in MODEL_STATES)
-    names.update(
+def ordered_parameter_names() -> tuple[str, ...]:
+    """Return the model's frozen semantic parameter order."""
+    names = ["interstate_base"]
+    for state in MODEL_STATES:
+        if state != "nsw":
+            names.extend((f"push_{state}", f"pull_{state}"))
+    names.extend(("peak_months", "k"))
+    names.extend(f"birth_rate_{state}" for state in MODEL_STATES)
+    names.extend(
         f"mortality_{state}_{model_band}_{sex}"
         for state in MODEL_STATES
         for model_band in MODEL_AGE_BANDS
         for sex in SEXES
     )
-    names.update(f"overseas_arrival_{state}" for state in MODEL_STATES)
-    names.update(f"emigration_{state}" for state in MODEL_STATES)
-    return names
+    names.extend(f"overseas_arrival_{state}" for state in MODEL_STATES)
+    names.extend(f"emigration_{state}" for state in MODEL_STATES)
+    ordered = tuple(names)
+    if len(ordered) != 377 or len(set(ordered)) != 377:
+        raise AssertionError("parameter order must contain 377 unique names")
+    return ordered
+
+
+def expected_parameter_names() -> set[str]:
+    return set(ordered_parameter_names())
 
 
 def entry_calculation(
@@ -707,6 +738,16 @@ def priors_payload(artifacts: RateArtifacts) -> dict:
     free = sum(item["classification"] == "free" for item in parameters.values())
     if (fixed, free) != (360, 17):
         raise AssertionError(f"fixed/free split changed to {(fixed, free)!r}")
+    normal = {
+        name
+        for name, item in parameters.items()
+        if item["lean_prior_2010"]["family"] == "normal"
+    }
+    if normal != PUBLISHED_ZERO_MORTALITY_2010:
+        raise AssertionError(
+            "published-zero Normal-prior exceptions changed: "
+            f"actual={sorted(normal)!r}"
+        )
     return {
         "format": "sembla.abs-priors/v1",
         "parameter_count": len(parameters),
@@ -719,6 +760,181 @@ def priors_payload(artifacts: RateArtifacts) -> dict:
         "parameters": parameters,
         "provenance_overrides": list(artifacts.fallback_provenance),
     }
+
+
+def _parameter_text(value: float) -> str:
+    """Preserve the exact decimal spelling used by generated Python artifacts."""
+    if not math.isfinite(value):
+        raise ValueError(f"parameter value must be finite, got {value!r}")
+    return repr(value)
+
+
+def parameter_family_payloads(artifacts: RateArtifacts) -> dict[str, dict]:
+    """Build the four complete 2010 parameter-family/v2 source tables."""
+    values = artifacts.annual_params[2010]
+    registry = priors_payload(artifacts)["parameters"]
+
+    def cell(name: str, key: dict[str, str]) -> dict:
+        prior = registry[name]["lean_prior_2010"]
+        family = prior["family"]
+        if family not in {"normal", "log_normal"}:
+            raise AssertionError(f"unsupported table prior family for {name}: {family}")
+        return {
+            "key": key,
+            "default": _parameter_text(values[name]),
+            "prior": {
+                "family": family,
+                "args": [
+                    _parameter_text(prior["location"]),
+                    _parameter_text(prior["spread"]),
+                ],
+            },
+        }
+
+    specifications = {
+        "birth_rate.json": (
+            ["area"],
+            [
+                cell(f"birth_rate_{area}", {"area": area})
+                for area in MODEL_STATES
+            ],
+        ),
+        "mortality.json": (
+            ["area", "band", "sex"],
+            [
+                cell(
+                    f"mortality_{area}_{band}_{sex}",
+                    {"area": area, "band": band, "sex": sex},
+                )
+                for area in MODEL_STATES
+                for band in MODEL_AGE_BANDS
+                for sex in SEXES
+            ],
+        ),
+        "overseas_arrival.json": (
+            ["area"],
+            [
+                cell(f"overseas_arrival_{area}", {"area": area})
+                for area in MODEL_STATES
+            ],
+        ),
+        "emigration.json": (
+            ["area"],
+            [
+                cell(f"emigration_{area}", {"area": area})
+                for area in MODEL_STATES
+            ],
+        ),
+    }
+    payloads = {
+        filename: {
+            "schema_version": "sembla.parameter-family/v2",
+            "dimensions": dimensions,
+            "cells": cells,
+        }
+        for filename, (dimensions, cells) in specifications.items()
+    }
+    expected_counts = {
+        "birth_rate.json": 8,
+        "mortality.json": 336,
+        "overseas_arrival.json": 8,
+        "emigration.json": 8,
+    }
+    if {name: len(payload["cells"]) for name, payload in payloads.items()} != expected_counts:
+        raise AssertionError("parameter-family table cell counts changed")
+    return payloads
+
+
+def render_parameter_family(payload: dict) -> str:
+    rendered = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    if "\r" in rendered or not rendered.endswith("\n"):
+        raise AssertionError("generated parameter tables must use LF and end with a newline")
+    return rendered
+
+
+def write_parameter_families(
+    artifacts: RateArtifacts, directory: pathlib.Path = PARAMETER_TABLES
+) -> None:
+    directory = pathlib.Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    for filename, payload in parameter_family_payloads(artifacts).items():
+        (directory / filename).write_text(
+            render_parameter_family(payload), encoding="utf-8", newline="\n"
+        )
+
+
+def _lean_scientific(value: float) -> str:
+    if not math.isfinite(value):
+        raise ValueError(f"Lean parameter value must be finite, got {value!r}")
+    rendered = repr(value)
+    return f"({rendered})" if value < 0 else rendered
+
+
+def render_lean_parameters(artifacts: RateArtifacts) -> str:
+    """Render the complete legacy 2010 ParamDecl reference in frozen order."""
+    order = ordered_parameter_names()
+    values = artifacts.annual_params[2010]
+    registry = priors_payload(artifacts)
+    if set(order) != set(values) or set(order) != set(registry["parameters"]):
+        raise AssertionError("Lean reference coverage differs from values or priors")
+
+    lines = [
+        "-- This file is generated in full. Do not edit it by hand.",
+        "-- Structural evidence only; production parameters come from Surface.lean.",
+        "-- Regenerate from the repository root with: python3 data/abs/rates.py",
+        "import Sembla.IR",
+        "",
+        "/-! 2010 Australian population defaults and priors in frozen semantic order. -/",
+        "",
+        "namespace Sembla.Models.AustralianPopulation.GeneratedReference",
+        "",
+        "open Sembla.IR",
+        "",
+        "private def logNormalParam (parameterName : String)",
+        "    (initialValue location spread : Scientific) : ParamDecl :=",
+        "  { name := parameterName",
+        "    ty := .real",
+        "    default := .real initialValue",
+        "    «prior» := some { family := .logNormal, args := [location, spread] } }",
+        "",
+        "private def normalParam (parameterName : String)",
+        "    (initialValue location spread : Scientific) : ParamDecl :=",
+        "  { name := parameterName",
+        "    ty := .real",
+        "    default := .real initialValue",
+        "    «prior» := some { family := .normal, args := [location, spread] } }",
+        "",
+        "set_option maxHeartbeats 800000 in",
+        "def parameters : List ParamDecl :=",
+    ]
+    for position, name in enumerate(order):
+        metadata = registry["parameters"][name]["lean_prior_2010"]
+        family = metadata["family"]
+        constructor = "normalParam" if family == "normal" else "logNormalParam"
+        if family not in {"normal", "log_normal"}:
+            raise AssertionError(f"unsupported Lean prior family for {name}: {family}")
+        prefix = "  [ " if position == 0 else "  , "
+        lines.append(
+            f'{prefix}{constructor} "{name}" '
+            f'{_lean_scientific(values[name])} '
+            f'{_lean_scientific(metadata["location"])} '
+            f'{_lean_scientific(metadata["spread"])}'
+        )
+    lines.extend([
+        "  ]", "", "end Sembla.Models.AustralianPopulation.GeneratedReference", ""
+    ])
+    rendered = "\n".join(lines)
+    if "\r" in rendered or not rendered.endswith("\n"):
+        raise AssertionError("generated Lean reference must use LF and end with a newline")
+    return rendered
+
+
+def write_lean_parameters(
+    artifacts: RateArtifacts, path: pathlib.Path = LEAN_PARAMETERS
+) -> None:
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_lean_parameters(artifacts), encoding="utf-8", newline="\n")
 
 
 def _load_fidelity(path: pathlib.Path) -> dict:
@@ -1031,12 +1247,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--fidelity-evidence", type=pathlib.Path, default=FIDELITY_EVIDENCE
     )
+    parser.add_argument(
+        "--parameter-tables", type=pathlib.Path, default=PARAMETER_TABLES,
+        help="generated parameter-family/v2 table directory",
+    )
+    parser.add_argument(
+        "--lean-parameters", type=pathlib.Path, default=LEAN_PARAMETERS,
+        help="generated legacy ParamDecl reference (safe temporary override)",
+    )
     args = parser.parse_args(argv)
     artifacts = derive_rates()
     write_artifacts(artifacts, args.params_dir, args.report, args.fidelity_evidence)
+    write_parameter_families(artifacts, args.parameter_tables)
+    write_lean_parameters(artifacts, args.lean_parameters)
     print(
         f"wrote {len(artifacts.annual_params)} annual parameter files, priors, "
-        f"and {args.report}"
+        f"{args.report}, four tables in {args.parameter_tables}, and reference "
+        f"{args.lean_parameters}"
     )
     return 0
 

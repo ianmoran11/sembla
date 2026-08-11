@@ -20,6 +20,9 @@ require_tool lake "install elan so frontend/lean-toolchain provides Lake; for Ru
 python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 -B scripts/check-markdown-links.py
 python3 -B scripts/check-cargo-metadata.py
+python3 -B scripts/check-artifact-registry.py
+python3 -B scripts/check-architecture-canvases.py
+python3 -B frontend/scripts/check-imports.py
 ./scripts/check-rust.sh
 bash frontend/scripts/check-proofs.sh
 bash frontend/scripts/check-parity.sh
@@ -29,4 +32,4 @@ if ! git diff --exit-code HEAD -- Cargo.lock; then
     exit 1
 fi
 
-echo "complete documentation, Rust, Lean proof-hygiene, parity, and lock checks passed"
+echo "complete documentation, architecture, Rust, Lean proof-hygiene, parity, and lock checks passed"

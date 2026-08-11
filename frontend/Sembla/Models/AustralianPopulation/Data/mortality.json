@@ -1,0 +1,5050 @@
+{
+  "schema_version": "sembla.parameter-family/v2",
+  "dimensions": [
+    "area",
+    "band",
+    "sex"
+  ],
+  "cells": [
+    {
+      "key": {
+        "area": "nsw",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "9.166666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.297351748965813",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "8.333333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.392661928770137",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.000125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.987196820661973",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "7.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.498022444427964",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.00019166666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.559752805835034",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.00010833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.130297664302647",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.0002916666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.139898960274769",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.000175",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.65072458404076",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.00045",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.706262975199909",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.00025833333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.261259817279036",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.000675",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.300797867091744",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.0004166666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.783224016336037",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0010916666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.8200496985630314",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0006666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.313220387090301",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.0017916666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.32460899363652",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.0011",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.812445099177812",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.003108333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.773668602120368",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.0019416666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.2442085681984825",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.005591666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.1864778847925015",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.0038",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.572754212249797",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.009883333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.616905442206512",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.007216666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.9313621132017476",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.017158333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.0652713147363935",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.013791666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.28369073395302",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.026",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.649658740960655",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.023125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.766840995583648",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.027941666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.5776362752979547",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nsw",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.03455833333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.3651065615178015",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "7.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.498022444427964",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "8.333333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.392661928770137",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.00011666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.056189692148925",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.00018333333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.604204568405867",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.00010833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.130297664302647",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.00025833333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.261259817279036",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00015833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.750808042597743",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.0004166666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.783224016336037",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.00025",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.294049640102028",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.0006333333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.3645136814778525",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.00038333333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.866605625275088",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0009833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.924562397298518",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0005583333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.490554402373217",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.0017833333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.3292710067423315",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.001075",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.835434617402511",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.0030583333333333335",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.789885173709613",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.0019083333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.261525018209944",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.005658333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.174625894205487",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.0037416666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.588224134021929",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.010075",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.59769817114939",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.007691666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.867617787261331",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.01725",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.059943135504768",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.014475",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.235332255523078",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.028858333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.545356477361761",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.024741666666666665",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.6992665470004233",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.04045833333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.207482641038758",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.03598333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.3246994106894303",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "0.000125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.987196820661973",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "9.166666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.297351748965813",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "0.00010833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.130297664302647",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "0.00011666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.056189692148925",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.00014166666666666668",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.862033677707966",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "9.166666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.297351748965813",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.00021666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.437150483742702",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.000125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.987196820661973",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.0003",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.111728083308073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00018333333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.604204568405867",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.00044166666666666665",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.724955108212061",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.0002666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.229511118964457",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.00065",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.338538195074591",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.0004166666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.783224016336037",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0011833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.739419964162923",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0006583333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.325799169297161",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.0018666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.283600969909143",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.0012166666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.711640400055846",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.0032333333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.73424168214091",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.0019333333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.248509650097873",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.0059",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.132802928070463",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.003941666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.53615163327225",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.010291666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.576420772702106",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.007875",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.84406209427044",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.017791666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.029025096101458",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.014516666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.232457864351735",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.028558333333333335",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.555806499889574",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.02245",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.7964646647938736",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.039775",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.2245167047582863",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.0359",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.3270179834879037",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "9.166666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.297351748965813",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "0.000125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.987196820661973",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.00014166666666666668",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.862033677707966",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "0.00010833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.130297664302647",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.00023333333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.36304251158898",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.00015833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.750808042597743",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.0003",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.111728083308073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00020833333333333335",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.476371196895983",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.000475",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.652195753929633",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.0002666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.229511118964457",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.0006916666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.276406413967585",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.00040833333333333336",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.803426723653557",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.00115",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.767993336606978",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0006",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.418580902748127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.001825",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.306175291947683",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.0011666666666666668",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.753604599154879",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.003075",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.784450377723656",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.002025",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.202185578423634",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.005816666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.14702791900181",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.004066666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.504931615911036",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.010616666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.545330185632074",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.0076",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.879607031689852",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.018508333333333335",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.9895341978697556",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.014841666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.210316738474521",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.025875",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.6544780273966038",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.0239",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.733876820044672",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.018866666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.9703585824411096",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.04373333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.1296446911402582",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "0.0001",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.210340371976184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "7.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.498022444427964",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "0.0001",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.210340371976184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "0.00010833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.130297664302647",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.00015",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.804875263868018",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.00018333333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.604204568405867",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.00011666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.056189692148925",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.00028333333333333335",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.168886497148021",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00016666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.699514748210191",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.00040833333333333336",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.803426723653557",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.0002666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.229511118964457",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.0006",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.418580902748127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.00035",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.957577403480815",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0010583333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.851059935305591",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0005666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.4757393165880766",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.0017833333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.3292710067423315",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.0010833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.8277125713086",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.003075",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.784450377723656",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.00165",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.406979991069647",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.005683333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.170217363920721",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.003491666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.657376101842045",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.010241666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.581290912198148",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.007083333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.950010672279821",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.017358333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.053682580503211",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.013083333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.336416123421829",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.024391666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.713513735072297",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.025058333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.686548838775654",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.04901666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.0155949026502427",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.034725",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.3602953903417294",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "0.0001",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.210340371976184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "7.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.498022444427964",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "7.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.498022444427964",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "0.00016666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.699514748210191",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.00015833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.750808042597743",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "8.333333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.392661928770137",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.0002666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.229511118964457",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.000125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.987196820661973",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.0003",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.111728083308073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00025",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.294049640102028",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.00045",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.706262975199909",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.00035",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.957577403480815",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.0007833333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.151952239494179",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.00040833333333333336",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.803426723653557",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0012416666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.691300715818724",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0008666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.05085612262281",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.0019166666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.257167712840988",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.0013916666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.577253209347428",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.003525",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.647874842717905",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.0025083333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.988136757015307",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.0066",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.0206856299497575",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.0046",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.381698975487088",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.01115",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.496315781076009",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.008575",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.758904285930133",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.019",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.9633162998156966",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.016991666666666665",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.075032251189728",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.025925",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.652547524866546",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.025625",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.664186841523565",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.024508333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.708742083210188",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.03551666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.3377532091056206",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "0.000175",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.65072458404076",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "0.00011666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.056189692148925",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "2.5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.596634733096073",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "9.166666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.297351748965813",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "0.00021666666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.437150483742702",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "0.00015833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.750808042597743",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "8.333333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.392661928770137",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "0.0002",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.517193191416238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "6.666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.615805480084347",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "0.000225",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.399410155759854",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "0.00011666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.056189692148925",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.0002916666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.139898960274769",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "0.00019166666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.559752805835034",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.000375",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.888584531993863",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "0.000225",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.399410155759854",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.000575",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.461140517166924",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00038333333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.866605625275088",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.000725",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.229338903109599",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.000375",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.888584531993863",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.0011833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.739419964162923",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.0006",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.418580902748127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0016",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.437751649736401",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0008583333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.060518033534548",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.0027916666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.881116489939116",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.001875",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.2791466195597625",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.0036416666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.615313826668593",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.002825",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.869246914383733",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.0072",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.933674252960127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.004125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.490689259195492",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.013183333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.328801873436584",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.009325",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.675056313452258",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.013258333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.323128993426396",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.0148",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.213128098212068",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.020833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.871201010907891",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.041666666666666664",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.1780538303479458",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.036158333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.3198478359658323",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "00_04",
+        "sex": "male"
+      },
+      "default": "9.166666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.297351748965813",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "00_04",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "05_09",
+        "sex": "male"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "05_09",
+        "sex": "female"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "10_14",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "10_14",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "15_19",
+        "sex": "male"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "15_19",
+        "sex": "female"
+      },
+      "default": "1.6666666666666667e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.002099841204238",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "20_24",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "20_24",
+        "sex": "female"
+      },
+      "default": "0.0",
+      "prior": {
+        "family": "normal",
+        "args": [
+          "0.0",
+          "4.166666666666667e-06"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "25_29",
+        "sex": "male"
+      },
+      "default": "4.1666666666666665e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.085809109330082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "25_29",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "30_34",
+        "sex": "male"
+      },
+      "default": "5e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.903487552536127",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "30_34",
+        "sex": "female"
+      },
+      "default": "8.333333333333334e-06",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-11.695247021764184",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "35_39",
+        "sex": "male"
+      },
+      "default": "0.00014166666666666668",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.862033677707966",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "35_39",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "40_44",
+        "sex": "male"
+      },
+      "default": "0.00014166666666666668",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.862033677707966",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "40_44",
+        "sex": "female"
+      },
+      "default": "3.3333333333333335e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-10.308952660644293",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "45_49",
+        "sex": "male"
+      },
+      "default": "0.000125",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.987196820661973",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "45_49",
+        "sex": "female"
+      },
+      "default": "5.833333333333333e-05",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-9.74933687270887",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "50_54",
+        "sex": "male"
+      },
+      "default": "0.00025833333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.261259817279036",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "50_54",
+        "sex": "female"
+      },
+      "default": "0.00013333333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.922658299524402",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "55_59",
+        "sex": "male"
+      },
+      "default": "0.00035833333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.934046906070621",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "55_59",
+        "sex": "female"
+      },
+      "default": "0.00015833333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-8.750808042597743",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "60_64",
+        "sex": "male"
+      },
+      "default": "0.0005",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.600902459542082",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "60_64",
+        "sex": "female"
+      },
+      "default": "0.00036666666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.911057387845922",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "65_69",
+        "sex": "male"
+      },
+      "default": "0.0009",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.013115794639964",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "65_69",
+        "sex": "female"
+      },
+      "default": "0.0006333333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-7.3645136814778525",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "70_74",
+        "sex": "male"
+      },
+      "default": "0.001625",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.422247463200436",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "70_74",
+        "sex": "female"
+      },
+      "default": "0.00105",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.858965114812705",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "75_79",
+        "sex": "male"
+      },
+      "default": "0.0030583333333333335",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.789885173709613",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "75_79",
+        "sex": "female"
+      },
+      "default": "0.001958333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-6.235661507620025",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "80_84",
+        "sex": "male"
+      },
+      "default": "0.005",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.298317366548036",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "80_84",
+        "sex": "female"
+      },
+      "default": "0.0033083333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.711310741076993",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "85_89",
+        "sex": "male"
+      },
+      "default": "0.01105",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.505324851018376",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "85_89",
+        "sex": "female"
+      },
+      "default": "0.007475",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.896191159705387",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "90_94",
+        "sex": "male"
+      },
+      "default": "0.020708333333333332",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.877219083233454",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "90_94",
+        "sex": "female"
+      },
+      "default": "0.014116666666666666",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-4.260399146552183",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "95_99",
+        "sex": "male"
+      },
+      "default": "0.03141666666666667",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.4604167413221263",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "95_99",
+        "sex": "female"
+      },
+      "default": "0.023683333333333334",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.742983713107137",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "100_plus",
+        "sex": "male"
+      },
+      "default": "0.08333333333333333",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-2.4849066497880004",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act",
+        "band": "100_plus",
+        "sex": "female"
+      },
+      "default": "0.03",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-3.506557897319982",
+          "0.5"
+        ]
+      }
+    }
+  ]
+}

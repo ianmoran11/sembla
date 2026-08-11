@@ -155,6 +155,65 @@ private def fullInputShape : Bool :=
 #guard hazardPanelProps? Namespaced.CommandFeatureTour "policy" "restrict" ==
   hazardPanelProps? legacyFeatureTour "policy" "restrict"
 
+namespace ScopedObservationSyntax
+
+sembla_model LongForm
+    (name := "scoped_observation_syntax")
+    (dt := 1.0) where
+  box population where
+    system Row (rows := 4) where
+      status : {active, inactive}
+      age : Int
+      score : ℝ
+
+    view active := count Row where status = active
+    view all_rows := count Row
+    view total_score := sum Row using score
+    view minimum_active_score := min Row where status = active using score
+    view maximum_score := max Row using score
+    grouped view cells :=
+      count Row by status, band age 12 where status = active
+    grouped view all_cells := count Row by status, band age 12
+
+  summary final_active := last population.active
+  summary total_score_over_time := sum population.total_score
+  summary minimum_active_score := min population.minimum_active_score
+  summary maximum_score := max population.maximum_score
+  summary maximum_score_tick := argmaxₜ population.maximum_score
+
+sembla_model ScopedForm
+    (name := "scoped_observation_syntax")
+    (dt := 1.0) where
+  box population where
+    -- The scoped block deliberately precedes its source to pin multi-pass lookup.
+    views Row where
+      active := count where status = active
+      cells := count
+        where status = active
+        by status, band(age, 12)
+      all_rows := count
+      total_score := sum score
+      minimum_active_score := min score where status = active
+      maximum_score := max score
+      all_cells := count by status, band(age, 12)
+
+    system Row (rows := 4) where
+      status : {active, inactive}
+      age : Int
+      score : ℝ
+
+  summaries population where
+    final_active := last active
+    total_score_over_time := sum total_score
+    minimum_active_score := min minimum_active_score
+    maximum_score := max maximum_score
+    maximum_score_tick := argmaxₜ maximum_score
+
+#guard ScopedForm == LongForm
+#guard Sembla.IR.toJson ScopedForm == Sembla.IR.toJson LongForm
+
+end ScopedObservationSyntax
+
 -- A separate deliberately interleaved model pins stable partitioning for every IR list.
 sembla_model InterleavedOrder (dt := 1.0) where
   param zeta : ℝ := 0.2

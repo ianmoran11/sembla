@@ -1,35 +1,9 @@
 use sembla_ir::ValidatedModel;
 use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::state::{StateStore, TableInit};
+use sembla_runtime::state::TableInit;
 
+use crate::types::{CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
 use crate::{CudaAvailability, CudaError, PhiloxCoordinate};
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum HashMode {
-    #[default]
-    FinalOnly,
-    EveryTick,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CudaRunResult {
-    pub final_state_hash: [u8; 32],
-    pub per_tick_state_hashes: Vec<[u8; 32]>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CudaDeviceIdentity {
-    pub gpu_model: String,
-    pub driver_version: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct CudaTickObservation {
-    pub tick: u32,
-    pub state: StateStore,
-    pub fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
-    pub deferred_per_resource_table: Vec<(String, usize)>,
-}
 
 /// Feature-off request surface. It returns an explicit diagnostic and cannot
 /// construct or hide a CPU executor.

@@ -1,0 +1,623 @@
+{
+  "metadata": {
+    "version": "1.0-1.0",
+    "frontmatter": {
+      "title": "Sembla contract architecture",
+      "status": "maintained",
+      "parent": "docs/architecture/Architecture.canvas",
+      "layout": "grouped compact cards; repository paths are labels rather than embedded previews"
+    },
+    "startNode": "contracts_summary"
+  },
+  "nodes": [
+    {
+      "id": "model_group",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 720,
+      "height": 720,
+      "label": "Model and executable-plan contract",
+      "color": "3",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "identity_group",
+      "type": "group",
+      "x": 850,
+      "y": 0,
+      "width": 680,
+      "height": 720,
+      "label": "Canonical identity and hashes",
+      "color": "6",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "execution_group",
+      "type": "group",
+      "x": 1660,
+      "y": 0,
+      "width": 720,
+      "height": 720,
+      "label": "Execution and state artifacts",
+      "color": "4",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "estimation_group",
+      "type": "group",
+      "x": 2510,
+      "y": 0,
+      "width": 720,
+      "height": 720,
+      "label": "Estimator-facing artifacts",
+      "color": "2",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "registry_group",
+      "type": "group",
+      "x": 850,
+      "y": 860,
+      "width": 1530,
+      "height": 420,
+      "label": "Ownership registry and conformance",
+      "color": "1",
+      "collapsed": false,
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "dashed"
+      }
+    },
+    {
+      "id": "contracts_summary",
+      "type": "text",
+      "x": 0,
+      "y": -300,
+      "width": 950,
+      "height": 190,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "# Contracts\nVersioned models, plans, identities, state and estimator-facing artifacts.\n\n[Boundary note](contracts.md) · [Back to atlas](Architecture.canvas)"
+    },
+    {
+      "id": "model_type",
+      "type": "text",
+      "x": 45,
+      "y": 90,
+      "width": 290,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Model type**\n`sembla-ir/src/model.rs`"
+    },
+    {
+      "id": "plan_type",
+      "type": "text",
+      "x": 385,
+      "y": 90,
+      "width": 290,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Plan type**\n`sembla-ir/src/plan.rs`"
+    },
+    {
+      "id": "validator",
+      "type": "text",
+      "x": 45,
+      "y": 330,
+      "width": 290,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Validator**\n`sembla-ir/src/validate.rs`"
+    },
+    {
+      "id": "lean_plan",
+      "type": "text",
+      "x": 385,
+      "y": 330,
+      "width": 290,
+      "height": 170,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Lean plan**\n`Sembla/Plan.lean`"
+    },
+    {
+      "id": "plan_boundary_note",
+      "type": "text",
+      "x": 110,
+      "y": 560,
+      "width": 500,
+      "height": 110,
+      "text": "Lean produces bytes; Rust serde + semantic validation is the runtime schema of record. Golden parity checks bind both sides.",
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document"
+      }
+    },
+    {
+      "id": "canonical_json",
+      "type": "text",
+      "x": 895,
+      "y": 90,
+      "width": 280,
+      "height": 170,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Canonical JSON**\n`sembla-ir/src/canonical_json.rs`"
+    },
+    {
+      "id": "identity",
+      "type": "text",
+      "x": 1210,
+      "y": 90,
+      "width": 280,
+      "height": 170,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Identity**\n`sembla-ir/src/identity.rs`"
+    },
+    {
+      "id": "lean_hash",
+      "type": "text",
+      "x": 895,
+      "y": 330,
+      "width": 280,
+      "height": 160,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Lean hash**\n`Sembla/Hash.lean`"
+    },
+    {
+      "id": "lean_plan_json",
+      "type": "text",
+      "x": 1210,
+      "y": 330,
+      "width": 280,
+      "height": 160,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Lean plan JSON**\n`Sembla/PlanJson.lean`"
+    },
+    {
+      "id": "identity_rules",
+      "type": "text",
+      "x": 970,
+      "y": 550,
+      "width": 450,
+      "height": 110,
+      "text": "Domain-separated SHA-256 + canonical JSON + stable occurrence/rule identities define reproducible coordinates.",
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document"
+      }
+    },
+    {
+      "id": "run_manifest",
+      "type": "text",
+      "x": 1705,
+      "y": 90,
+      "width": 300,
+      "height": 180,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Run manifest**\n`sembla-cli/src/manifest.rs`"
+    },
+    {
+      "id": "state_artifact",
+      "type": "text",
+      "x": 2040,
+      "y": 90,
+      "width": 300,
+      "height": 180,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**State artifact**\n`sembla-runtime/src/state_artifact.rs`"
+    },
+    {
+      "id": "bundle",
+      "type": "text",
+      "x": 1705,
+      "y": 340,
+      "width": 300,
+      "height": 160,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Bundle**\n`Sembla/Composition/Bundle.lean`"
+    },
+    {
+      "id": "verify",
+      "type": "text",
+      "x": 2040,
+      "y": 340,
+      "width": 300,
+      "height": 160,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Verify**\n`sembla-cli/src/verify.rs`"
+    },
+    {
+      "id": "run_rule",
+      "type": "text",
+      "x": 1780,
+      "y": 560,
+      "width": 480,
+      "height": 100,
+      "text": "A result without seed, theta, model/plan identity, backend identity and hashes does not carry the run contract.",
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document"
+      }
+    },
+    {
+      "id": "estimation_protocol",
+      "type": "text",
+      "x": 2555,
+      "y": 85,
+      "width": 300,
+      "height": 180,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Estimation protocol**\n[Open document](../design/estimation-protocol.md)"
+    },
+    {
+      "id": "pairs_contract",
+      "type": "text",
+      "x": 2890,
+      "y": 85,
+      "width": 300,
+      "height": 180,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Pairs contract**\n`calibration/npe/contract.py`"
+    },
+    {
+      "id": "targets",
+      "type": "text",
+      "x": 2555,
+      "y": 340,
+      "width": 300,
+      "height": 160,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**Targets**\n`data/abs/targets.py`"
+    },
+    {
+      "id": "scores",
+      "type": "text",
+      "x": 2890,
+      "y": 340,
+      "width": 300,
+      "height": 160,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Scores**\n`data/abs/score.py`"
+    },
+    {
+      "id": "parameter_gap",
+      "type": "text",
+      "x": 2630,
+      "y": 555,
+      "width": 480,
+      "height": 110,
+      "text": "Current estimated parameter transport is plain JSON. A provenance envelope is a documented gap, not an implemented schema.",
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dotted"
+      }
+    },
+    {
+      "id": "artifact_registry",
+      "type": "text",
+      "x": 900,
+      "y": 950,
+      "width": 430,
+      "height": 230,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**Artifact registry**\n[Open registry](artifact-registry.json)"
+    },
+    {
+      "id": "registry_checker",
+      "type": "text",
+      "x": 1395,
+      "y": 950,
+      "width": 430,
+      "height": 230,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Registry checker**\n`scripts/check-artifact-registry.py`"
+    },
+    {
+      "id": "parity_checker",
+      "type": "text",
+      "x": 1890,
+      "y": 950,
+      "width": 430,
+      "height": 230,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Parity checker**\n`scripts/check-parity.sh`"
+    }
+  ],
+  "edges": [
+    {
+      "id": "lean_to_model",
+      "fromNode": "lean_plan",
+      "fromSide": "left",
+      "toNode": "model_type",
+      "toSide": "right",
+      "label": "encodes same vocabulary",
+      "color": "3",
+      "styleAttributes": {
+        "path": "short-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "model_to_plan",
+      "fromNode": "model_type",
+      "fromSide": "right",
+      "toNode": "plan_type",
+      "toSide": "left",
+      "label": "embedded in envelope",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "validator_to_model",
+      "fromNode": "validator",
+      "fromSide": "top",
+      "toNode": "model_type",
+      "toSide": "bottom",
+      "label": "enforces invariants",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "direct"
+      }
+    },
+    {
+      "id": "canonical_to_plan",
+      "fromNode": "canonical_json",
+      "fromSide": "left",
+      "toNode": "plan_type",
+      "toSide": "right",
+      "label": "identity-bearing bytes",
+      "color": "6",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "identity_to_plan",
+      "fromNode": "identity",
+      "fromSide": "left",
+      "toNode": "plan_type",
+      "toSide": "right",
+      "label": "rule words / occurrences",
+      "color": "6",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "plan_to_manifest",
+      "fromNode": "plan_type",
+      "fromSide": "right",
+      "toNode": "run_manifest",
+      "toSide": "left",
+      "label": "recorded identity",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "state_to_manifest",
+      "fromNode": "state_artifact",
+      "fromSide": "left",
+      "toNode": "run_manifest",
+      "toSide": "right",
+      "label": "state hash tuple",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "manifest_to_verify",
+      "fromNode": "run_manifest",
+      "fromSide": "bottom",
+      "toNode": "verify",
+      "toSide": "left",
+      "label": "replay contract",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "targets_to_scores",
+      "fromNode": "targets",
+      "fromSide": "right",
+      "toNode": "scores",
+      "toSide": "left",
+      "label": "fitted / held-out ledger",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "pairs_to_protocol",
+      "fromNode": "pairs_contract",
+      "fromSide": "left",
+      "toNode": "estimation_protocol",
+      "toSide": "right",
+      "label": "one protocol member",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "registry_to_checker",
+      "fromNode": "artifact_registry",
+      "fromSide": "right",
+      "toNode": "registry_checker",
+      "toSide": "left",
+      "label": "validated by",
+      "color": "1",
+      "styleAttributes": {
+        "path": "dotted",
+        "arrow": "circle-outline",
+        "pathfindingMethod": "direct"
+      }
+    },
+    {
+      "id": "registry_to_contracts",
+      "fromNode": "artifact_registry",
+      "fromSide": "top",
+      "toNode": "run_manifest",
+      "toSide": "bottom",
+      "label": "records ownership",
+      "color": "1",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "thin-triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "parity_to_lean",
+      "fromNode": "parity_checker",
+      "fromSide": "top",
+      "toNode": "lean_plan_json",
+      "toSide": "bottom",
+      "label": "byte conformance",
+      "color": "1",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "thin-triangle",
+        "pathfindingMethod": "a-star"
+      }
+    }
+  ]
+}

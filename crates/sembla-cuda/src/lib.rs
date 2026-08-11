@@ -6,6 +6,7 @@
 mod availability;
 mod codegen;
 mod error;
+mod types;
 
 #[cfg(feature = "cuda")]
 mod backend;
@@ -17,6 +18,7 @@ pub use availability::CudaAvailability;
 pub use codegen::generate_fused_batch;
 pub use codegen::{generate, GeneratedCuda, DUMP_ENV};
 pub use error::CudaError;
+pub use types::{CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
 
 /// One coordinate in the shared PRD-0003 Philox namespace.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,14 +50,12 @@ impl PhiloxCoordinate {
 
 #[cfg(feature = "cuda")]
 pub use backend::{
-    CudaBackend, CudaDeviceIdentity, CudaFinalStateBufferAccounting, CudaFinalStateDownloadedBytes,
-    CudaFinalStateReadback, CudaFinalStateReadbackMode, CudaFusedBatchMetadata, CudaRunResult,
-    CudaSweepCapacityEstimate, CudaTickObservation, FusedReusedCudaTickObservations, HashMode,
+    CudaBackend, CudaFinalStateBufferAccounting, CudaFinalStateDownloadedBytes,
+    CudaFinalStateReadback, CudaFinalStateReadbackMode, CudaFusedBatchMetadata,
+    CudaSweepCapacityEstimate, FusedReusedCudaTickObservations,
 };
 #[cfg(not(feature = "cuda"))]
-pub use backend_stub::{
-    CudaBackend, CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode,
-};
+pub use backend_stub::CudaBackend;
 
 /// The version of the Sembla CUDA crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

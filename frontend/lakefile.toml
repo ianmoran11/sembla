@@ -1,6 +1,6 @@
 name = "sembla_frontend"
 version = "0.1.0"
-defaultTargets = ["Sembla", "sembla-export", "sembla-link"]
+defaultTargets = ["Sembla", "SemblaTests", "sembla-export", "sembla-link"]
 
 [[require]]
 name = "mathlib"
@@ -14,6 +14,9 @@ rev = "v0.0.44"
 
 [[lean_lib]]
 name = "Sembla"
+
+[[lean_lib]]
+name = "SemblaTests"
 
 [[lean_exe]]
 name = "sembla-export"

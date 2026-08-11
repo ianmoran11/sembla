@@ -5,10 +5,20 @@ Australian states and territories. It carries individual age, sex and state
 from 30 June 2010 and represents interstate migration as a write to the same
 row's enum-valued `area`, preserving identity across movement.
 
-The implementation is in
+The public assembly remains
 [`frontend/Sembla/Models/AustralianPopulation.lean`](../../frontend/Sembla/Models/AustralianPopulation.lean).
-The calibrated fifteen-year chain and validation evidence are delivered by the
-remaining [Australian population PRDs](../prds-australian-population/README.md).
+Its complete declarative foundation is
+[`Surface.lean`](../../frontend/Sembla/Models/AustralianPopulation/Surface.lean),
+with four generated v2 tables under `AustralianPopulation/Data/`.
+[`Parameters.lean`](../../frontend/Sembla/Models/AustralianPopulation/Parameters.lean)
+and [`Transitions.lean`](../../frontend/Sembla/Models/AustralianPopulation/Transitions.lean)
+are compatibility projections, while `Validation.lean` directly pins table
+bytes and structural/public invariants.
+The [local maintenance README](../../frontend/Sembla/Models/AustralianPopulation/README.md)
+defines ownership, regeneration, invariants, and failure policy. Public
+`Sembla.Models` names and model/plan semantics are unchanged. The calibrated
+fifteen-year chain and validation evidence are delivered by the remaining
+[Australian population PRDs](../prds-australian-population/README.md).
 
 ## State and lifecycle
 
@@ -27,11 +37,11 @@ Identity is `(row ordinal, generation)`. Interstate movement changes `area`,
 sets `prev_area`, and leaves generation and age untouched; the independent
 monthly ageing transition advances age on that tick.
 
-## Generated transitions
+## Declarative transitions
 
-The schema and observations use the existing `sembla_model` command. Ordinary
-Lean list functions generate the repetitive raw IR and the authoritative
-post-splice checker validates the result:
+The complete model uses named domains, a projected `AgeBand`, reusable state
+aliases, and relation declarations. Compile-time expansion emits the unchanged
+scalar transition list:
 
 - 56 directed `move_<origin>_<destination>` transitions;
 - 336 mortality transitions: eight states × 21 five-year age bands through
@@ -60,6 +70,17 @@ no-params defaults are the ABS-derived 2010 values, and
 [`data/abs/params/2010.json`](../../data/abs/params/2010.json) carries the same
 complete map. Files through `2024.json` provide each subsequent run year's full
 parameter environment. All hazards are monthly.
+
+`data/abs/rates.py` is the source of truth for the frozen semantic order and
+generates four complete v2 parameter tables from the same in-memory 2010
+defaults and priors that produce `params/2010.json` and `params/priors.json`.
+It retains a generated 377-parameter Lean reference under `data/abs/reference/`
+for deterministic structural evidence, but production imports the declarative
+surface. The exact order is
+`interstate_base`; alternating non-NSW push/pull factors in model-state order;
+`peak_months`; `k`; births by state; mortality by state, model age band, then
+sex; arrivals by state; and emigration by state. Generation rejects duplicate,
+missing, non-finite, or extra values.
 
 The 360 direct parameters remain fixed during inference; only the 17 migration
 parameters are free. Positive direct defaults use median-centred LogNormal

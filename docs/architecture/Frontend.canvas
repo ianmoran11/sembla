@@ -1,0 +1,623 @@
+{
+  "metadata": {
+    "version": "1.0-1.0",
+    "frontmatter": {
+      "title": "Lean frontend architecture",
+      "status": "maintained",
+      "parent": "docs/architecture/Architecture.canvas",
+      "layout": "grouped compact cards; repository paths are labels rather than embedded previews"
+    },
+    "startNode": "frontend_summary"
+  },
+  "nodes": [
+    {
+      "id": "foundation_group",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 620,
+      "height": 650,
+      "label": "Deep representation and encoding",
+      "color": "3",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "semantics_group",
+      "type": "group",
+      "x": 750,
+      "y": 0,
+      "width": 650,
+      "height": 650,
+      "label": "Checked semantics and builders",
+      "color": "6",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "authoring_group",
+      "type": "group",
+      "x": 1530,
+      "y": 0,
+      "width": 650,
+      "height": 650,
+      "label": "Authoring and presentation",
+      "color": "5",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "composition_group",
+      "type": "group",
+      "x": 2310,
+      "y": 0,
+      "width": 760,
+      "height": 650,
+      "label": "Composition source and canonical linker",
+      "color": "4",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "build_group",
+      "type": "group",
+      "x": 0,
+      "y": 800,
+      "width": 1400,
+      "height": 500,
+      "label": "Build surfaces and import fitness function",
+      "color": "1",
+      "collapsed": false,
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "dashed"
+      }
+    },
+    {
+      "id": "models_group",
+      "type": "group",
+      "x": 1530,
+      "y": 800,
+      "width": 1540,
+      "height": 500,
+      "label": "Models, demos and tutorials",
+      "color": "2",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "frontend_summary",
+      "type": "text",
+      "x": 0,
+      "y": -300,
+      "width": 900,
+      "height": 190,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "# Frontend\nLean IR → checked semantics → authoring → composition.\n\n[Boundary note](frontend.md) · [Back to atlas](Architecture.canvas)"
+    },
+    {
+      "id": "ir",
+      "type": "text",
+      "x": 35,
+      "y": 100,
+      "width": 250,
+      "height": 150,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**IR**\n`Sembla/IR.lean`"
+    },
+    {
+      "id": "hash",
+      "type": "text",
+      "x": 330,
+      "y": 100,
+      "width": 250,
+      "height": 150,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Hash**\n`Sembla/Hash.lean`"
+    },
+    {
+      "id": "plan",
+      "type": "text",
+      "x": 35,
+      "y": 310,
+      "width": 250,
+      "height": 150,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Plan**\n`Sembla/Plan.lean`"
+    },
+    {
+      "id": "json",
+      "type": "text",
+      "x": 330,
+      "y": 310,
+      "width": 250,
+      "height": 150,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**JSON**\n`Sembla/PlanJson.lean`"
+    },
+    {
+      "id": "parameter_table",
+      "type": "text",
+      "x": 130,
+      "y": 500,
+      "width": 350,
+      "height": 100,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**Parameter table**\n`Sembla/ParameterTable.lean`"
+    },
+    {
+      "id": "semantics",
+      "type": "text",
+      "x": 790,
+      "y": 100,
+      "width": 260,
+      "height": 180,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Semantics**\n`Sembla/Semantics.lean`"
+    },
+    {
+      "id": "builders",
+      "type": "text",
+      "x": 1100,
+      "y": 100,
+      "width": 260,
+      "height": 180,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Builders**\n`Sembla/Frontend/Builders.lean`"
+    },
+    {
+      "id": "proof_audit",
+      "type": "text",
+      "x": 850,
+      "y": 370,
+      "width": 450,
+      "height": 140,
+      "color": "6",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Proof audit**\n`Sembla/Semantics/ProofAudit.lean`"
+    },
+    {
+      "id": "dsl",
+      "type": "text",
+      "x": 1580,
+      "y": 100,
+      "width": 250,
+      "height": 200,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**DSL**\n`Sembla/DSL.lean`"
+    },
+    {
+      "id": "widgets",
+      "type": "text",
+      "x": 1880,
+      "y": 100,
+      "width": 250,
+      "height": 200,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Widgets**\n`Sembla/WidgetDisplay.lean`"
+    },
+    {
+      "id": "composition_surface",
+      "type": "text",
+      "x": 1680,
+      "y": 390,
+      "width": 350,
+      "height": 150,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Composition surface**\n`Sembla/Composition/Surface.lean`"
+    },
+    {
+      "id": "composition_source",
+      "type": "text",
+      "x": 2350,
+      "y": 90,
+      "width": 300,
+      "height": 150,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Composition source**\n`Sembla/Composition/Source.lean`"
+    },
+    {
+      "id": "composition_link",
+      "type": "text",
+      "x": 2720,
+      "y": 90,
+      "width": 300,
+      "height": 150,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Composition link**\n`Sembla/Composition/Link.lean`"
+    },
+    {
+      "id": "composition_bundle",
+      "type": "text",
+      "x": 2350,
+      "y": 330,
+      "width": 300,
+      "height": 140,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Composition bundle**\n`Sembla/Composition/Bundle.lean`"
+    },
+    {
+      "id": "composition_spec",
+      "type": "text",
+      "x": 2720,
+      "y": 330,
+      "width": 300,
+      "height": 140,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Composition spec**\n`Sembla/Composition/SpecStatements.lean`"
+    },
+    {
+      "id": "production_lib",
+      "type": "text",
+      "x": 50,
+      "y": 900,
+      "width": 280,
+      "height": 150,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Production library**\n`Sembla.lean`"
+    },
+    {
+      "id": "test_lib",
+      "type": "text",
+      "x": 380,
+      "y": 900,
+      "width": 280,
+      "height": 150,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Test library**\n`SemblaTests.lean`"
+    },
+    {
+      "id": "exporter",
+      "type": "text",
+      "x": 710,
+      "y": 900,
+      "width": 280,
+      "height": 150,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "pill",
+        "textAlign": "left"
+      },
+      "text": "**Exporter**\n`Main.lean`"
+    },
+    {
+      "id": "import_checker",
+      "type": "text",
+      "x": 1040,
+      "y": 900,
+      "width": 300,
+      "height": 150,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Import checker**\n`scripts/check-imports.py`"
+    },
+    {
+      "id": "models",
+      "type": "text",
+      "x": 1580,
+      "y": 900,
+      "width": 280,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Models**\n`Sembla/Models.lean`"
+    },
+    {
+      "id": "australian_model",
+      "type": "text",
+      "x": 1910,
+      "y": 900,
+      "width": 340,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Australian model**\n`Sembla/Models/AustralianPopulation.lean`"
+    },
+    {
+      "id": "demos",
+      "type": "text",
+      "x": 2300,
+      "y": 900,
+      "width": 280,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Demos**\n`Sembla/Demos.lean`"
+    },
+    {
+      "id": "tutorial",
+      "type": "text",
+      "x": 2630,
+      "y": 900,
+      "width": 280,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Tutorial**\n`Sembla/Tutorial.lean`"
+    }
+  ],
+  "edges": [
+    {
+      "id": "ir_to_semantics",
+      "fromNode": "ir",
+      "fromSide": "right",
+      "toNode": "semantics",
+      "toSide": "left",
+      "label": "checked interpretation",
+      "color": "6",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "plan_to_composition",
+      "fromNode": "plan",
+      "fromSide": "right",
+      "toNode": "composition_source",
+      "toSide": "left",
+      "label": "contract vocabulary",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "source_to_link",
+      "fromNode": "composition_source",
+      "fromSide": "right",
+      "toNode": "composition_link",
+      "toSide": "left",
+      "label": "canonical lowering",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "link_to_bundle",
+      "fromNode": "composition_link",
+      "fromSide": "bottom",
+      "toNode": "composition_bundle",
+      "toSide": "right",
+      "label": "plan + provenance",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "semantics_to_builders",
+      "fromNode": "semantics",
+      "fromSide": "right",
+      "toNode": "builders",
+      "toSide": "left",
+      "label": "typed builders",
+      "color": "6",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "builders_to_dsl",
+      "fromNode": "builders",
+      "fromSide": "right",
+      "toNode": "dsl",
+      "toSide": "left",
+      "label": "elaboration primitives",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "dsl_to_surface",
+      "fromNode": "dsl",
+      "fromSide": "bottom",
+      "toNode": "composition_surface",
+      "toSide": "left",
+      "label": "shared expression kernel",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "dsl_to_models",
+      "fromNode": "dsl",
+      "fromSide": "bottom",
+      "toNode": "models",
+      "toSide": "top",
+      "label": "authors",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "production_to_exporter",
+      "fromNode": "production_lib",
+      "fromSide": "right",
+      "toNode": "exporter",
+      "toSide": "left",
+      "label": "production import closure",
+      "color": "1",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "production_to_tests",
+      "fromNode": "production_lib",
+      "fromSide": "right",
+      "toNode": "test_lib",
+      "toSide": "left",
+      "label": "tested by",
+      "color": "1",
+      "styleAttributes": {
+        "path": "short-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "checker_to_split",
+      "fromNode": "import_checker",
+      "fromSide": "left",
+      "toNode": "test_lib",
+      "toSide": "right",
+      "label": "enforces separation",
+      "color": "1",
+      "styleAttributes": {
+        "path": "dotted",
+        "arrow": "circle-outline",
+        "pathfindingMethod": "direct"
+      }
+    },
+    {
+      "id": "proof_audit_to_semantics",
+      "fromNode": "proof_audit",
+      "fromSide": "top",
+      "toNode": "semantics",
+      "toSide": "bottom",
+      "label": "axiom policy",
+      "color": "6",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "direct"
+      }
+    }
+  ]
+}

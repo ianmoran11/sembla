@@ -1,0 +1,707 @@
+{
+  "metadata": {
+    "version": "1.0-1.0",
+    "frontmatter": {
+      "title": "Sembla external estimation architecture",
+      "status": "maintained boundary; method choices remain decision-controlled",
+      "parent": "docs/architecture/Architecture.canvas",
+      "layout": "grouped compact cards; repository paths are labels rather than embedded previews"
+    },
+    "startNode": "estimation_summary"
+  },
+  "nodes": [
+    {
+      "id": "data_group",
+      "type": "group",
+      "x": 0,
+      "y": 0,
+      "width": 720,
+      "height": 760,
+      "label": "Observed data and aggregate targets",
+      "color": "3",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "protocol_group",
+      "type": "group",
+      "x": 850,
+      "y": 0,
+      "width": 760,
+      "height": 760,
+      "label": "Simulator-facing protocol",
+      "color": "4",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "estimators_group",
+      "type": "group",
+      "x": 1740,
+      "y": 0,
+      "width": 790,
+      "height": 760,
+      "label": "Estimator implementations",
+      "color": "2",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "output_group",
+      "type": "group",
+      "x": 2660,
+      "y": 0,
+      "width": 720,
+      "height": 760,
+      "label": "Parameters, forward validation and chain",
+      "color": "5",
+      "collapsed": false,
+      "zIndex": 0
+    },
+    {
+      "id": "science_group",
+      "type": "group",
+      "x": 850,
+      "y": 900,
+      "width": 1680,
+      "height": 460,
+      "label": "Scientific gates and architecture proposals",
+      "color": "1",
+      "collapsed": false,
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "dashed"
+      }
+    },
+    {
+      "id": "estimation_summary",
+      "type": "text",
+      "x": 0,
+      "y": -300,
+      "width": 900,
+      "height": 190,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "# Estimation\nObserved data → simulator protocol → inference → forward validation.\n\n[Boundary note](estimation.md) · [Back to atlas](Architecture.canvas)"
+    },
+    {
+      "id": "fetch",
+      "type": "text",
+      "x": 45,
+      "y": 90,
+      "width": 290,
+      "height": 150,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "parallelogram",
+        "textAlign": "left"
+      },
+      "text": "**Fetch**\n`data/abs/fetch.py`"
+    },
+    {
+      "id": "normalise",
+      "type": "text",
+      "x": 385,
+      "y": 90,
+      "width": 290,
+      "height": 150,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Normalise**\n`data/abs/normalise.py`"
+    },
+    {
+      "id": "targets",
+      "type": "text",
+      "x": 45,
+      "y": 330,
+      "width": 290,
+      "height": 160,
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**Targets**\n`data/abs/targets.py`"
+    },
+    {
+      "id": "observed_contract",
+      "type": "text",
+      "x": 385,
+      "y": 330,
+      "width": 290,
+      "height": 160,
+      "text": "**sembla.targets/v1**\nObservation + period + source vintage + fitted/held-out role",
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document"
+      }
+    },
+    {
+      "id": "data_rule",
+      "type": "text",
+      "x": 110,
+      "y": 570,
+      "width": 500,
+      "height": 110,
+      "text": "Data acquisition and target construction remain standard-library-only and outside runtime crates.",
+      "color": "3",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "pill",
+        "textAlign": "center"
+      }
+    },
+    {
+      "id": "protocol_doc",
+      "type": "text",
+      "x": 895,
+      "y": 80,
+      "width": 300,
+      "height": 170,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Protocol doc**\n[Open document](../design/estimation-protocol.md)"
+    },
+    {
+      "id": "run_workflow",
+      "type": "text",
+      "x": 1255,
+      "y": 80,
+      "width": 300,
+      "height": 170,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Run workflow**\n`sembla-cli/src/run.rs`"
+    },
+    {
+      "id": "sweep_workflow",
+      "type": "text",
+      "x": 895,
+      "y": 330,
+      "width": 300,
+      "height": 170,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Sweep workflow**\n`sembla-cli/src/sweep.rs`"
+    },
+    {
+      "id": "pairs_contract",
+      "type": "text",
+      "x": 1255,
+      "y": 330,
+      "width": 300,
+      "height": 170,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Pairs contract**\n`calibration/npe/contract.py`"
+    },
+    {
+      "id": "run_manifest",
+      "type": "text",
+      "x": 985,
+      "y": 570,
+      "width": 480,
+      "height": 110,
+      "color": "4",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Run manifest**\n`sembla-cli/src/manifest.rs`"
+    },
+    {
+      "id": "gravity_fit",
+      "type": "text",
+      "x": 1785,
+      "y": 80,
+      "width": 300,
+      "height": 180,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Gravity fit**\n`data/abs/gravity_fit.py`"
+    },
+    {
+      "id": "npe_train",
+      "type": "text",
+      "x": 2145,
+      "y": 80,
+      "width": 300,
+      "height": 180,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**NPE train**\n`calibration/npe/train.py`"
+    },
+    {
+      "id": "npe_sbc",
+      "type": "text",
+      "x": 2145,
+      "y": 330,
+      "width": 300,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**NPE SBC**\n`calibration/npe/sbc.py`"
+    },
+    {
+      "id": "calibrate_harness",
+      "type": "text",
+      "x": 1785,
+      "y": 330,
+      "width": 300,
+      "height": 150,
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Calibrate harness**\n`data/abs/calibrate.py`"
+    },
+    {
+      "id": "future_estimator",
+      "type": "text",
+      "x": 1870,
+      "y": 570,
+      "width": 490,
+      "height": 110,
+      "text": "Future ABC / SMM / residual micro-only inference\nUses the same theta, observation and manifest contracts.",
+      "color": "2",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dotted"
+      }
+    },
+    {
+      "id": "params_output",
+      "type": "text",
+      "x": 2705,
+      "y": 80,
+      "width": 300,
+      "height": 170,
+      "text": "# Parameter assignment\nPlain validated name -> value JSON\n\nOrigin may be human, aggregate fit, NPE or later method.",
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document"
+      }
+    },
+    {
+      "id": "forward_run",
+      "type": "text",
+      "x": 3045,
+      "y": 80,
+      "width": 290,
+      "height": 170,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Forward run**\n`scripts/run-australian-population.sh`"
+    },
+    {
+      "id": "score",
+      "type": "text",
+      "x": 2705,
+      "y": 330,
+      "width": 300,
+      "height": 160,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Score**\n`data/abs/score.py`"
+    },
+    {
+      "id": "chain",
+      "type": "text",
+      "x": 3045,
+      "y": 330,
+      "width": 290,
+      "height": 160,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left"
+      },
+      "text": "**Chain**\n`data/abs/chain.py`"
+    },
+    {
+      "id": "state_artifact",
+      "type": "text",
+      "x": 2790,
+      "y": 570,
+      "width": 460,
+      "height": 110,
+      "color": "5",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "database",
+        "textAlign": "left"
+      },
+      "text": "**State artifact**\n`sembla-runtime/src/state_artifact.rs`"
+    },
+    {
+      "id": "spine_proposal",
+      "type": "text",
+      "x": 900,
+      "y": 1000,
+      "width": 480,
+      "height": 230,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dotted",
+        "textAlign": "left"
+      },
+      "text": "**Spine proposal**\n[Open document](../design/demographic-spine-and-modular-calibration.md)"
+    },
+    {
+      "id": "decision_record",
+      "type": "text",
+      "subpath": "#g-parameters-and-calibration-the-amendment",
+      "x": 1450,
+      "y": 1000,
+      "width": 480,
+      "height": 230,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "text": "**Decision record**\n[Open document](../../DECISIONS.md)"
+    },
+    {
+      "id": "quarantine_test",
+      "type": "text",
+      "x": 2000,
+      "y": 1000,
+      "width": 480,
+      "height": 230,
+      "color": "1",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "border": "dashed",
+        "textAlign": "left"
+      },
+      "text": "**Quarantine test**\n`calibration/npe/tests/test_quarantine.py`"
+    }
+  ],
+  "edges": [
+    {
+      "id": "fetch_to_normalise",
+      "fromNode": "fetch",
+      "fromSide": "right",
+      "toNode": "normalise",
+      "toSide": "left",
+      "label": "pinned raw data",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "normalise_to_targets",
+      "fromNode": "normalise",
+      "fromSide": "bottom",
+      "toNode": "targets",
+      "toSide": "top",
+      "label": "committed extracts",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "targets_to_contract",
+      "fromNode": "targets",
+      "fromSide": "right",
+      "toNode": "observed_contract",
+      "toSide": "left",
+      "label": "versioned ledger",
+      "color": "3",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "sweep_to_pairs",
+      "fromNode": "sweep_workflow",
+      "fromSide": "right",
+      "toNode": "pairs_contract",
+      "toSide": "left",
+      "label": "theta, x + sidecar",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "manifest_records_sweep",
+      "fromNode": "sweep_workflow",
+      "fromSide": "bottom",
+      "toNode": "run_manifest",
+      "toSide": "top",
+      "label": "records forward contract",
+      "color": "4",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "targets_to_gravity",
+      "fromNode": "observed_contract",
+      "fromSide": "right",
+      "toNode": "gravity_fit",
+      "toSide": "left",
+      "label": "aggregate cells",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "pairs_to_npe",
+      "fromNode": "pairs_contract",
+      "fromSide": "right",
+      "toNode": "npe_train",
+      "toSide": "left",
+      "label": "independent-noise training pairs",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "npe_to_sbc",
+      "fromNode": "npe_train",
+      "fromSide": "bottom",
+      "toNode": "npe_sbc",
+      "toSide": "top",
+      "label": "posterior diagnostics",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "gravity_to_harness",
+      "fromNode": "gravity_fit",
+      "fromSide": "bottom",
+      "toNode": "calibrate_harness",
+      "toSide": "top",
+      "label": "aggregate estimate",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "npe_to_harness",
+      "fromNode": "npe_sbc",
+      "fromSide": "left",
+      "toNode": "calibrate_harness",
+      "toSide": "right",
+      "label": "accepted posterior or fallback",
+      "color": "2",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "harness_to_params",
+      "fromNode": "calibrate_harness",
+      "fromSide": "right",
+      "toNode": "params_output",
+      "toSide": "left",
+      "label": "estimated theta",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "params_to_run",
+      "fromNode": "params_output",
+      "fromSide": "right",
+      "toNode": "forward_run",
+      "toSide": "left",
+      "label": "--params",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "run_to_score",
+      "fromNode": "forward_run",
+      "fromSide": "bottom",
+      "toNode": "score",
+      "toSide": "right",
+      "label": "observations + manifest",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "run_to_chain",
+      "fromNode": "forward_run",
+      "fromSide": "bottom",
+      "toNode": "chain",
+      "toSide": "top",
+      "label": "final state",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "chain_to_state",
+      "fromNode": "chain",
+      "fromSide": "bottom",
+      "toNode": "state_artifact",
+      "toSide": "right",
+      "label": "hashed annual state",
+      "color": "5",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      }
+    },
+    {
+      "id": "state_to_next_run",
+      "fromNode": "state_artifact",
+      "fromSide": "top",
+      "toNode": "forward_run",
+      "toSide": "bottom",
+      "toEnd": "arrow",
+      "label": "next period population",
+      "color": "5",
+      "styleAttributes": {
+        "path": "short-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "proposal_guides_future",
+      "fromNode": "spine_proposal",
+      "fromSide": "top",
+      "toNode": "future_estimator",
+      "toSide": "bottom",
+      "label": "proposes parameter partition",
+      "color": "1",
+      "styleAttributes": {
+        "path": "dotted",
+        "arrow": "circle-outline",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "decision_governs_npe",
+      "fromNode": "decision_record",
+      "fromSide": "top",
+      "toNode": "npe_train",
+      "toSide": "bottom",
+      "label": "current normative method",
+      "color": "1",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "thin-triangle",
+        "pathfindingMethod": "a-star"
+      }
+    },
+    {
+      "id": "quarantine_checks_protocol",
+      "fromNode": "quarantine_test",
+      "fromSide": "top",
+      "toNode": "protocol_doc",
+      "toSide": "bottom",
+      "label": "enforces dependency direction",
+      "color": "1",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "thin-triangle",
+        "pathfindingMethod": "a-star"
+      }
+    }
+  ]
+}

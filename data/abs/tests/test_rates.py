@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import hashlib
+import io
 import json
 import math
 import pathlib
+import re
 import shutil
 import sys
 import tempfile
@@ -20,6 +23,10 @@ import rates  # noqa: E402
 HERE = pathlib.Path(__file__).resolve().parent
 EXTRACTS = HERE.parent / "extracts"
 PARAMS = HERE.parent / "params"
+PARAMETER_TABLES = (
+    HERE.parent.parent.parent / "frontend" / "Sembla" / "Models"
+    / "AustralianPopulation" / "Data"
+)
 
 
 class TestRateInputs(unittest.TestCase):
@@ -166,6 +173,26 @@ class TestRateDerivation(unittest.TestCase):
                         ]
                         self.assertEqual(actual, float(source / 12_000))
 
+    def test_frozen_semantic_parameter_order_is_exact(self):
+        expected = ["interstate_base"]
+        for state in ("vic", "qld", "sa", "wa", "tas", "nt", "act"):
+            expected.extend((f"push_{state}", f"pull_{state}"))
+        expected.extend(("peak_months", "k"))
+        expected.extend(f"birth_rate_{state}" for state in rates.MODEL_STATES)
+        expected.extend(
+            f"mortality_{state}_{band}_{sex}"
+            for state in rates.MODEL_STATES
+            for band in rates.MODEL_AGE_BANDS
+            for sex in rates.SEXES
+        )
+        expected.extend(
+            f"overseas_arrival_{state}" for state in rates.MODEL_STATES
+        )
+        expected.extend(f"emigration_{state}" for state in rates.MODEL_STATES)
+        self.assertEqual(rates.ordered_parameter_names(), tuple(expected))
+        self.assertEqual(len(expected), 377)
+        self.assertEqual(len(set(expected)), 377)
+
     def test_every_annual_file_fully_specifies_the_model(self):
         expected = rates.expected_parameter_names()
         self.assertEqual(len(expected), 377)
@@ -268,6 +295,67 @@ class TestRateArtifacts(unittest.TestCase):
                 0.05 / 12_000,
             )
 
+    def test_parameter_family_tables_are_complete_ordered_and_exact(self):
+        payloads = rates.parameter_family_payloads(self.artifacts)
+        self.assertEqual(
+            list(payloads),
+            [
+                "birth_rate.json",
+                "mortality.json",
+                "overseas_arrival.json",
+                "emigration.json",
+            ],
+        )
+        self.assertEqual(
+            {name: len(payload["cells"]) for name, payload in payloads.items()},
+            {
+                "birth_rate.json": 8,
+                "mortality.json": 336,
+                "overseas_arrival.json": 8,
+                "emigration.json": 8,
+            },
+        )
+        self.assertEqual(payloads["birth_rate.json"]["dimensions"], ["area"])
+        self.assertEqual(
+            payloads["mortality.json"]["dimensions"], ["area", "band", "sex"]
+        )
+        self.assertEqual(payloads["overseas_arrival.json"]["dimensions"], ["area"])
+        self.assertEqual(payloads["emigration.json"]["dimensions"], ["area"])
+
+        mortality = payloads["mortality.json"]["cells"]
+        expected_keys = [
+            {"area": area, "band": band, "sex": sex}
+            for area in rates.MODEL_STATES
+            for band in rates.MODEL_AGE_BANDS
+            for sex in rates.SEXES
+        ]
+        self.assertEqual([cell["key"] for cell in mortality], expected_keys)
+        self.assertEqual(
+            sum(cell["prior"]["family"] == "normal" for cell in mortality), 7
+        )
+        names = []
+        for filename, stem in (
+            ("birth_rate.json", "birth_rate"),
+            ("mortality.json", "mortality"),
+            ("overseas_arrival.json", "overseas_arrival"),
+            ("emigration.json", "emigration"),
+        ):
+            dimensions = payloads[filename]["dimensions"]
+            for cell in payloads[filename]["cells"]:
+                names.append(stem + "_" + "_".join(cell["key"][d] for d in dimensions))
+                self.assertEqual(
+                    cell["default"],
+                    repr(self.artifacts.annual_params[2010][names[-1]]),
+                )
+                prior = self.priors["parameters"][names[-1]]["lean_prior_2010"]
+                self.assertEqual(cell["prior"]["family"], prior["family"])
+                self.assertEqual(
+                    cell["prior"]["args"],
+                    [repr(prior["location"]), repr(prior["spread"])],
+                )
+        self.assertEqual(names, list(rates.ordered_parameter_names())[17:])
+        self.assertEqual(len(names), 360)
+
     def test_generation_is_byte_reproducible_and_matches_committed_files(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             first = pathlib.Path(first)
@@ -279,6 +367,8 @@ class TestRateArtifacts(unittest.TestCase):
                     directory / "rates.md",
                     rates.FIDELITY_EVIDENCE,
                 )
+                rates.write_parameter_families(self.artifacts, directory / "tables")
+                rates.write_lean_parameters(self.artifacts, directory / "reference.lean")
             first_files = {
                 path.relative_to(first): path.read_bytes()
                 for path in first.rglob("*")
@@ -291,12 +381,93 @@ class TestRateArtifacts(unittest.TestCase):
             }
             self.assertEqual(first_files, second_files)
             for relative, content in first_files.items():
-                committed = (
-                    EXTRACTS / "rates.md"
-                    if relative == pathlib.Path("rates.md")
-                    else PARAMS / relative.relative_to("params")
-                )
+                if relative == pathlib.Path("rates.md"):
+                    committed = EXTRACTS / "rates.md"
+                elif relative.parts[0] == "tables":
+                    committed = PARAMETER_TABLES / relative.name
+                elif relative == pathlib.Path("reference.lean"):
+                    committed = rates.LEAN_PARAMETERS
+                else:
+                    committed = PARAMS / relative.relative_to("params")
                 self.assertEqual(content, committed.read_bytes(), str(committed))
+
+    def test_main_writes_all_outputs_to_explicit_temporary_paths(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = pathlib.Path(temporary)
+            params_dir = temporary / "params"
+            report = temporary / "reports" / "rates.md"
+            fidelity = temporary / "evidence" / "fidelity-2010.json"
+            parameter_tables = temporary / "tables"
+            lean_reference = temporary / "reference" / "Parameters.lean"
+            fidelity.parent.mkdir(parents=True)
+            shutil.copyfile(rates.FIDELITY_EVIDENCE, fidelity)
+
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                result = rates.main(
+                    [
+                        "--params-dir", str(params_dir),
+                        "--report", str(report),
+                        "--fidelity-evidence", str(fidelity),
+                        "--parameter-tables", str(parameter_tables),
+                        "--lean-parameters", str(lean_reference),
+                    ]
+                )
+
+            self.assertEqual(result, 0)
+            self.assertIn(str(report), stdout.getvalue())
+            self.assertIn(str(parameter_tables), stdout.getvalue())
+            self.assertIn(str(lean_reference), stdout.getvalue())
+            expected_json = {f"{year}.json" for year in rates.RUN_YEARS} | {
+                "priors.json"
+            }
+            self.assertEqual(
+                {path.name for path in params_dir.glob("*.json")}, expected_json
+            )
+            self.assertTrue(report.is_file())
+            self.assertTrue(fidelity.is_file())
+            self.assertEqual(
+                {path.name for path in parameter_tables.glob("*.json")},
+                {
+                    "birth_rate.json", "mortality.json",
+                    "overseas_arrival.json", "emigration.json",
+                },
+            )
+            self.assertEqual(
+                lean_reference.read_bytes(),
+                rates.render_lean_parameters(self.artifacts).encode("utf-8"),
+            )
+
+    def test_generated_reference_positions_defaults_and_priors_are_exact(self):
+        pattern = re.compile(
+            r'^  [,[] (normalParam|logNormalParam) "([^"]+)" '
+            r'(\([^)]*\)|\S+) (\([^)]*\)|\S+) (\([^)]*\)|\S+)$'
+        )
+        records = []
+        for line in rates.render_lean_parameters(self.artifacts).splitlines():
+            match = pattern.match(line)
+            if match:
+                constructor, name, default, location, spread = match.groups()
+                number = lambda text: float(text.strip("()"))
+                records.append(
+                    (name, constructor, number(default), number(location), number(spread))
+                )
+        self.assertEqual([row[0] for row in records], list(rates.ordered_parameter_names()))
+        self.assertEqual(len(records), 377)
+        for position, (name, constructor, default, location, spread) in enumerate(records):
+            with self.subTest(position=position, name=name):
+                metadata = self.priors["parameters"][name]["lean_prior_2010"]
+                expected_constructor = (
+                    "normalParam" if metadata["family"] == "normal" else "logNormalParam"
+                )
+                self.assertEqual(constructor, expected_constructor)
+                self.assertEqual(default, self.artifacts.annual_params[2010][name])
+                self.assertEqual(location, metadata["location"])
+                self.assertEqual(spread, metadata["spread"])
+        self.assertEqual(
+            {name for name, constructor, *_ in records if constructor == "normalParam"},
+            rates.PUBLISHED_ZERO_MORTALITY_2010,
+        )
 
     def test_annual_files_are_flat_numeric_cli_parameter_objects(self):
         for year in rates.RUN_YEARS:

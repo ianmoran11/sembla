@@ -260,6 +260,9 @@ check_failure_exact Negative/CommandUnknownRef.lean \
 check_failure_exact Negative/CommandUnknownSummaryView.lean \
   "Negative/CommandUnknownSummaryView.lean:7:21: error: summary 's' refers to undeclared view 'b.missing'"
 
+check_failure_exact Negative/CommandScopedUnknownSummaryView.lean \
+  "Negative/CommandScopedUnknownSummaryView.lean:9:13: error: summary 's' refers to undeclared view 'b.missing'"
+
 check_failure_exact Negative/CommandUnknownTransitionAttribute.lean \
   "Negative/CommandUnknownTransitionAttribute.lean:8:12: error: unknown state or attribute 'missing'"
 
@@ -274,6 +277,9 @@ check_failure_exact Negative/CommandUnknownTransitionSystem.lean \
 
 check_failure_exact Negative/CommandUnknownViewSource.lean \
   "Negative/CommandUnknownViewSource.lean:6:20: error: view 'v' refers to unknown table 'Missing'"
+
+check_failure_exact Negative/CommandScopedUnknownViewSource.lean \
+  "Negative/CommandScopedUnknownViewSource.lean:6:10: error: view 'v' refers to unknown table 'Missing'"
 
 check_failure_exact Negative/CommandUnknownViewValue.lean \
   "Negative/CommandUnknownViewValue.lean:7:26: error: view 'v': unknown state or attribute 'missing'"
@@ -419,16 +425,112 @@ check_failure_exact Negative/CommandGroupedRealKey.lean \
   "Negative/CommandGroupedRealKey.lean:8:42: error: grouped key 'rate' has type Real; expected Enum, Ref, or banded Int"
 check_failure_exact Negative/CommandGroupedBandEnum.lean \
   "Negative/CommandGroupedBandEnum.lean:8:47: error: band is supported only for Int grouped keys; 'sex' has type Enum"
+check_failure_exact Negative/CommandScopedGroupedBandEnum.lean \
+  "Negative/CommandScopedGroupedBandEnum.lean:9:29: error: band is supported only for Int grouped keys; 'sex' has type Enum"
 check_failure_exact Negative/CommandGroupedMissingBand.lean \
   "Negative/CommandGroupedMissingBand.lean:8:42: error: Int grouped key 'age' requires 'band age <positive-width>'"
+check_failure_exact Negative/CommandScopedGroupedMissingBand.lean \
+  "Negative/CommandScopedGroupedMissingBand.lean:9:24: error: Int grouped key 'age' requires 'band(age, <positive-width>)'"
 check_failure_exact Negative/CommandGroupedZeroBand.lean \
   "Negative/CommandGroupedZeroBand.lean:8:51: error: grouped band width must be greater than zero"
+check_failure_exact Negative/CommandScopedGroupedZeroBand.lean \
+  "Negative/CommandScopedGroupedZeroBand.lean:9:34: error: grouped band width must be greater than zero"
 check_failure_exact Negative/CommandGroupedTooManyKeys.lean \
   "Negative/CommandGroupedTooManyKeys.lean:8:62: error: grouped view 'cells' supports at most 4 keys"
 check_failure_exact Negative/CommandGroupedDuplicateView.lean \
   "Negative/CommandGroupedDuplicateView.lean:9:17: error: duplicate view 'cells'"
 check_failure_exact Negative/CommandGroupedAggregateFilter.lean \
   "Negative/CommandGroupedAggregateFilter.lean:10:52: error: aggregates are not supported in grouped view filters"
+
+check_failure_exact Negative/IndexedFamilyMissingCell.lean \
+  "Negative/IndexedFamilyMissingCell.lean:5:8: error: parameter family is missing cell [1]"
+check_failure_exact Negative/IndexedFamilyDuplicateCell.lean \
+  "Negative/IndexedFamilyDuplicateCell.lean:7:4: error: duplicate parameter-family cell"
+check_failure_exact Negative/IndexedFamilyUnknownIndex.lean \
+  "Negative/IndexedFamilyUnknownIndex.lean:4:13: error: unknown index 'age'"
+check_failure_exact Negative/IndexedFamilyHashMismatch.lean \
+  "Negative/IndexedFamilyHashMismatch.lean:7:4: error: SHA-256 mismatch: expected 0000000000000000000000000000000000000000000000000000000000000000, found 613195059792a4054b01c98e083d375865c7cfaf14515285cdc90b6cf04ce3fc"
+check_failure_exact Negative/IndexedFamilyMalformedHashMismatch.lean \
+  "Negative/IndexedFamilyMalformedHashMismatch.lean:6:4: error: SHA-256 mismatch: expected 0000000000000000000000000000000000000000000000000000000000000000, found aca99a8ed9c062f29c8777e26d8df19b51ee029b42e05e5331480faf28edaf65"
+check_failure_exact Negative/IndexedFamilyUnboundReference.lean \
+  "Negative/IndexedFamilyUnboundReference.lean:13:18: error: index 'age' is not bound by this transition family"
+check_failure_exact Negative/IndexedFamilyBinderType.lean \
+  "Negative/IndexedFamilyBinderType.lean:12:11: error: range index 'age' requires an Int attribute"
+check_failure_exact Negative/IndexedFamilyCap.lean \
+  "Negative/IndexedFamilyCap.lean:7:8: error: parameter family expansion exceeds sembla.maxFamilyExpansion=3"
+check_failure_exact Negative/IndexedTransitionCap.lean \
+  "Negative/IndexedTransitionCap.lean:12:4: error: transition family expansion exceeds sembla.maxFamilyExpansion=3"
+check_failure_exact Negative/IndexedFamilyIntRealDefault.lean \
+  "Negative/IndexedFamilyIntRealDefault.lean:6:11: error: Int parameter defaults require an integer literal"
+check_failure_exact Negative/IndexedFamilyIntPrior.lean \
+  "Negative/IndexedFamilyIntPrior.lean:6:4: error: priors are not supported on Int parameter families"
+check_failure_exact Negative/IndexedFamilyIntCsvPrior.lean \
+  "Negative/IndexedFamilyIntCsvPrior.lean:6:8: error: priors are not supported on Int parameter families"
+check_failure_exact Negative/IndexedFamilyIntJsonPrior.lean \
+  "Negative/IndexedFamilyIntJsonPrior.lean:6:8: error: priors are not supported on Int parameter families"
+check_failure_exact Negative/IndexedFamilyOutOfDomainKey.lean \
+  "Negative/IndexedFamilyOutOfDomainKey.lean:7:5: error: parameter-family key member '2' is outside its index domain"
+check_failure_exact Negative/IndexedFamilyNameCollision.lean \
+  "Negative/IndexedFamilyNameCollision.lean:7:4: error: duplicate parameter 'beta_foo_bar'"
+check_failure_exact Negative/IndexedTransitionNameCollision.lean \
+  "Negative/IndexedTransitionNameCollision.lean:9:4: error: duplicate transition 'infect_foo_bar'"
+check_failure_exact Negative/IndexedFamilyEmptyBinders.lean \
+  "Negative/IndexedFamilyEmptyBinders.lean:7:4: error: indexed transition family requires at least one index"
+check_failure_exact Negative/IndexedFamilyAbsolutePath.lean \
+  "Negative/IndexedFamilyAbsolutePath.lean:5:31: error: parameter table path must be relative to the declaring Lean source"
+
+check_failure_exact Negative/MathematicalDomainSystemAmbiguity.lean \
+  "Negative/MathematicalDomainSystemAmbiguity.lean:4:9: error: name 'Person' is ambiguous between a domain and a system"
+check_failure_exact Negative/MathematicalPartitionNonInt.lean \
+  "Negative/MathematicalPartitionNonInt.lean:4:26: error: partition projection attribute must have type Int"
+check_failure_exact Negative/MathematicalPartitionGap.lean \
+  "Negative/MathematicalPartitionGap.lean:6:4: error: partition cells must be contiguous; expected lower bound 1"
+check_failure_exact Negative/MathematicalDuplicateAlias.lean \
+  "Negative/MathematicalDuplicateAlias.lean:9:10: error: duplicate state alias 'Active'"
+check_failure_exact Negative/MathematicalPartitionAliasCollision.lean \
+  "Negative/MathematicalPartitionAliasCollision.lean:11:10: error: name 'Active' is ambiguous between a partition and a state alias"
+check_failure_exact Negative/MathematicalAliasDuplicateArgument.lean \
+  "Negative/MathematicalAliasDuplicateArgument.lean:8:28: error: duplicate state alias argument 'x'"
+check_failure_exact Negative/MathematicalAliasIncompatibleAssignment.lean \
+  "Negative/MathematicalAliasIncompatibleAssignment.lean:10:6: error: state assignment has incompatible type"
+check_failure_exact Negative/MathematicalAliasUnknownSystem.lean \
+  "Negative/MathematicalAliasUnknownSystem.lean:5:20: error: unknown system 'Missing'"
+check_failure_exact Negative/MathematicalAliasUnknownDomain.lean \
+  "Negative/MathematicalAliasUnknownDomain.lean:6:22: error: unknown domain 'Missing'"
+check_failure_exact Negative/MathematicalAliasUnknownAttribute.lean \
+  "Negative/MathematicalAliasUnknownAttribute.lean:7:6: error: unknown state or attribute 'missing'"
+check_failure_exact Negative/MathematicalAliasWrongPredicate.lean \
+  "Negative/MathematicalAliasWrongPredicate.lean:8:6: error: state match expression must have type Bool"
+check_failure_exact Negative/MathematicalAliasRefAssignment.lean \
+  "Negative/MathematicalAliasRefAssignment.lean:9:6: error: state aliases cannot match Ref attributes by assignment"
+check_failure_exact Negative/MathematicalAliasAggregate.lean \
+  "Negative/MathematicalAliasAggregate.lean:10:15: error: aggregates are not supported in state aliases"
+check_failure_exact Negative/MathematicalAliasPredicateBecome.lean \
+  "Negative/MathematicalAliasPredicateBecome.lean:9:6: error: state alias containing match cannot be used after become"
+check_failure_exact Negative/MathematicalPartitionBecome.lean \
+  "Negative/MathematicalPartitionBecome.lean:16:13: error: projected partitions cannot appear after become"
+check_failure_exact Negative/MathematicalRelationCap.lean \
+  "Negative/MathematicalRelationCap.lean:12:13: error: transition family expansion exceeds sembla.maxFamilyExpansion=63"
+check_failure_exact Negative/MathematicalLegacyFamilyDomainMismatch.lean \
+  "Negative/MathematicalLegacyFamilyDomainMismatch.lean:14:18: error: index 'area' has domain 'other'; expected 'area'"
+check_failure_exact Negative/MathematicalConstraintUnknownBinder.lean \
+  "Negative/MathematicalConstraintUnknownBinder.lean:11:78: error: unknown relation constraint binder 'missing'"
+check_failure_exact Negative/MathematicalConstraintIncompatibleBinder.lean \
+  "Negative/MathematicalConstraintIncompatibleBinder.lean:12:68: error: relation constraint operands must have the same domain"
+check_failure_exact Negative/MathematicalExprFunctionMissingCell.lean \
+  "Negative/MathematicalExprFunctionMissingCell.lean:5:11: error: expression function is missing cell [b]"
+check_failure_exact Negative/MathematicalExprFunctionDuplicateCell.lean \
+  "Negative/MathematicalExprFunctionDuplicateCell.lean:7:4: error: duplicate expression-function cell"
+check_failure_exact Negative/MathematicalExprFunctionCall.lean \
+  "Negative/MathematicalExprFunctionCall.lean:6:4: error: expression-function calls are not supported in function cells"
+check_failure_exact Negative/MathematicalExprFunctionWrongResult.lean \
+  "Negative/MathematicalExprFunctionWrongResult.lean:6:4: error: expression function 'F' cell has type Int; expected Real"
+check_failure_exact Negative/MathematicalExprFunctionAggregate.lean \
+  "Negative/MathematicalExprFunctionAggregate.lean:6:12: error: aggregates are not supported in expression-function cells"
+check_failure_exact Negative/MathematicalCsvV1Normal.lean \
+  "Negative/MathematicalCsvV1Normal.lean:5:34: error: CSV row 2: prior columns must be empty or use 'log_normal' with exactly two arguments"
+check_failure_exact Negative/MathematicalCsvV2Schema.lean \
+  "Negative/MathematicalCsvV2Schema.lean:6:11: error: CSV schema must be 'sembla.parameter-family/v2'"
 
 lake env lean Positive/ForwardRefPriorless.lean
 lake env lean Positive/OutputFieldOrder.lean
@@ -437,4 +539,7 @@ lake env lean Positive/OptionBBindersNames.lean
 lake env lean Sembla/ReactionArrowTests.lean
 lake env lean Sembla/FrequencyTests.lean
 lake env lean Sembla/CommandFrontendTests.lean
+lake env lean Sembla/ParameterTableTests.lean
+lake env lean Sembla/IndexedFamilyTests.lean
+lake env lean Sembla/MathematicalSurfaceTests.lean
 echo "Lean positioned negative and positive elaboration tests passed"

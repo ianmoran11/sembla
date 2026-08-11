@@ -1,0 +1,112 @@
+{
+  "schema_version": "sembla.parameter-family/v2",
+  "dimensions": [
+    "area"
+  ],
+  "cells": [
+    {
+      "key": {
+        "area": "nsw"
+      },
+      "default": "0.005408332032700994",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.219814545546841",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "vic"
+      },
+      "default": "0.004831060415177164",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.3326892877589875",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "qld"
+      },
+      "default": "0.005432512989448913",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.215353454773702",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "sa"
+      },
+      "default": "0.005367819428515974",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.227333518381529",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "wa"
+      },
+      "default": "0.004906839844493987",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.317125160578194",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "tas"
+      },
+      "default": "0.00567856927731018",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.17105596577564",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "nt"
+      },
+      "default": "0.005298028488692229",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.240420510892615",
+          "0.5"
+        ]
+      }
+    },
+    {
+      "key": {
+        "area": "act"
+      },
+      "default": "0.004936365572114512",
+      "prior": {
+        "family": "log_normal",
+        "args": [
+          "-5.311125932699634",
+          "0.5"
+        ]
+      }
+    }
+  ]
+}

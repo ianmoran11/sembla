@@ -1,8 +1,9 @@
 # Sembla Lean frontend
 
 This Lean 4 package contains Sembla's pure deep IR, the public command-style
-modeling language, a supported compatibility syntax, structure widgets, proofs,
-and eight Lean-authored canonical models. The foundational IR-semantics track
+modeling language (including the later mathematical finite-domain surface), a
+supported compatibility syntax, structure widgets, proofs, and eight
+Lean-authored canonical models. The foundational IR-semantics track
 pins Mathlib for future checked and semantic layers; the existing raw IR and
 surface remain separate. `lean-toolchain` pins Lean 4.13.0, so an `elan`
 installation selects the same compiler automatically.
@@ -20,9 +21,19 @@ Lake resolves pinned Mathlib and ProofWidgets4 dependencies compatible with
 Lean 4.13.0. Their complete transitive revisions are recorded in
 `lake-manifest.json`.
 
+The default build includes two libraries: `Sembla` is the production import
+surface used by `sembla-export` and `sembla-link`; `SemblaTests` imports the
+compile-time test and model-validation corpus separately. This keeps tests out
+of executable import closures without weakening the default `lake build`
+contract. `frontend/scripts/check-imports.py` enforces the split and the main
+contract/semantics/composition import directions.
+
 ## Public command surface
 
-Human-authored models use `sembla_model`. The command header defines an ordinary
+Human-authored models use `sembla_model`. The overview below covers the command
+foundation; the complete current domain/partition/function/alias/relation
+surface is documented in the
+[mathematical model guide](../docs/guides/mathematical-model-surface.md). The command header defines an ordinary
 namespace-respecting `Sembla.IR.Model` constant. `(dt := ...)` is mandatory;
 `(name := ...)` is optional and sets the exact runtime model name.
 
@@ -57,10 +68,11 @@ sembla_model WorkplacePolicy
       infected : Int := count where health = I
       total_risk : ℝ := sum (risk)
 
-    view infectious := count Person where health = I
-    view total_risk := sum Person using risk
-    view minimum_visits := min Person using visits
-    view active_risk_max := max Person where health = I using risk
+    views Person where
+      infectious := count where health = I
+      total_risk := sum risk
+      minimum_visits := min visits
+      active_risk_max := max risk where health = I
 
   box policy where
     system Controller (rows := 1) where
@@ -82,8 +94,10 @@ sembla_model WorkplacePolicy
 
   wire population activity -> policy activity
   wire policy restriction -> population restriction
-  summary peak_I := max population.infectious
-  summary peak_tick := argmaxₜ population.infectious
+
+  summaries population where
+    peak_I := max infectious
+    peak_tick := argmaxₜ infectious
 
 end Example
 ```
@@ -134,15 +148,56 @@ param offset : Int := -3
 `Int` parameters lower to the existing integer IR parameter type and can be
 used anywhere the scalar expression typechecker accepts `Int`, including guards
 and integer `set` effects. Priors remain real-valued: attaching any prior to an
-`Int` parameter is rejected. Defaults and optional `LogNormal` priors on real
-parameters remain first-class IR metadata. The surface accepts `ℝ`, mathematical
-multiplication `·`, conjunction `∧`, inequality `≠`, and less-than-or-equal `≤`.
-Its ASCII operators are `*`, `/`,
-`+`, `-`, `=`, `<`, `>`, and `&&`; there are deliberately no ASCII `!=` or
-`<=` forms. Expressions also support numeric arithmetic, enum comparisons, `inputSum`, and the
-restricted aggregate forms described below. Real values are stored as exact
+`Int` parameter is rejected. Defaults and optional `Normal` or `LogNormal`
+priors on real parameters remain first-class IR metadata. The current surface
+accepts `ℝ`, mathematical multiplication `·`, conjunction `∧`, negation `¬`,
+inequality `≠`, and comparisons `≤` and `≥`. Its ASCII operators are `*`, `/`,
+`+`, `-`, `=`, `<`, `>`, and `&&`; there are deliberately no ASCII `!=`, `<=`,
+or `>=` forms. Expressions also support numeric arithmetic, enum comparisons,
+`inputSum`, and the restricted aggregate forms described below. Real values are stored as exact
 coefficient/exponent `Scientific` data, preserving supported finite
 `f64`-range decimals.
+
+### Indexed parameter and transition families
+
+Finite compile-time domains can expand a demographic table without adding a
+tensor node to the IR:
+
+```lean
+index age := 0 .. 120
+index sex := {male, female}
+
+param β[age, sex] : ℝ where
+  [0, male] := 0.10
+  [0, female] := 0.09
+  -- every remaining cell is required
+```
+
+Use the same indexes on an explicitly selected transition:
+
+```lean
+infect[age, sex] on Person : health: S →[
+  β[age, sex] · freq (health = I) over employer
+] I
+```
+
+The selected system must have same-named compatible attributes. Expansion is
+canonical and produces ordinary names such as `beta_0_male` and
+`infect_0_male`. Large complete tables may use strict source-relative CSV or
+JSON declarations, each with a mandatory exact-byte SHA-256 pin. See the
+[indexed-family guide](../docs/guides/indexed-parameter-families.md) for schemas,
+ordering, expansion limits, hashing and regeneration.
+
+### Named mathematical domains and relations
+
+The indexed forms above remain supported. New mathematical models can also use
+named enum/range domains as attribute types, projected integer partitions,
+parenthesized parameter calls, complete finite expression functions, reusable
+`state` aliases, and filtered `relation` declarations. All are checked static
+sugar that expands to the same scalar IR; no runtime tensor, domain, alias, or
+relation node is introduced. The syntax, restrictions, deterministic ordering,
+mixed-prior v2 tables, and Australian production example are in the
+[mathematical model guide](../docs/guides/mathematical-model-surface.md).
 
 ### Systems, attributes, and forward references
 
@@ -224,13 +279,20 @@ defense.
 
 ### Grouped observations
 
-Grouped count views are authored in a box with one to four Enum, Ref, or banded
-Int keys:
+Grouped count views are authored in a table-scoped `views` block with one to
+four Enum, Ref, or banded Int keys. The presence of `by` selects grouped-view
+lowering:
 
 ```lean
-grouped view population_cells :=
-  count PersonSlot by sex, area, band age_months 60 where occupancy = present
+views PersonSlot where
+  population := count where occupancy = present
+  population_cells := count
+    where occupancy = present
+    by sex, area, band(age_months, 60)
 ```
+
+The individual `view ...` and `grouped view ...` forms remain supported as
+long-form compatibility syntax.
 
 The surface always elaborates the complete `GroupedViewDecl`; authoring has no
 runtime feature context. Execution is default-off and requires repeatable
@@ -281,16 +343,25 @@ output activity from Person where
   total_risk : ℝ := sum (risk)
 ```
 
-Count builders have a filter and no value; sum builders have a value. Views use
-`count`, `sum`, `min`, or `max`; count has no `using`, while valued reductions
-require it. An optional `where` filter remains row-local:
+Count builders have a filter and no value; sum builders have a value. The
+preferred observation syntax scopes a block to one source table. Views use
+`count`, `sum`, `min`, or `max`; numeric reductions take their value expression
+directly, and an optional `where` filter remains row-local. A `by` clause makes
+the entry a grouped count view:
 
 ```lean
-view infectious := count Person where health = I
-view total_risk := sum Person using risk
-view minimum_visits := min Person using visits
-view active_risk_max := max Person where health = I using risk
+views Person where
+  infectious := count where health = I
+  total_risk := sum risk
+  minimum_visits := min visits
+  active_risk_max := max risk where health = I
+  active_age_cells := count
+    where health = I
+    by employer, band(visits, 5)
 ```
+
+The existing one-line forms remain available when declarations from different
+tables need to be interleaved.
 
 Wires use four endpoint identifiers and ASCII `->`. Schemas must match and a
 destination may be delivered to only once:
@@ -299,9 +370,19 @@ destination may be delivered to only once:
 wire population activity -> policy activity
 ```
 
-Model-level summaries fold `box.view` streams with exactly `sum`, `min`, `max`,
-`last`, or `argmaxₜ`; `argmaxₜ` returns the earliest tick attaining the maximum.
-Views are observation sinks and cannot feed transitions except through explicit
+Model-level summaries fold ordinary view streams with exactly `sum`, `min`,
+`max`, `last`, or `argmaxₜ`; `argmaxₜ` returns the earliest tick attaining the
+maximum. A scoped block writes the box once:
+
+```lean
+summaries population where
+  final_infectious := last infectious
+  peak_infectious := max infectious
+  peak_tick := argmaxₜ infectious
+```
+
+The individual `summary name := reduce box.view` form remains supported. Views
+are observation sinks and cannot feed transitions except through explicit
 output/input ports and one-tick-delayed wires.
 
 ## Compatibility and machine-writer paths

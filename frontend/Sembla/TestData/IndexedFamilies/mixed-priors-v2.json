@@ -1,0 +1,16 @@
+{
+  "schema_version": "sembla.parameter-family/v2",
+  "dimensions": ["group"],
+  "cells": [
+    {
+      "key": {"group": "a"},
+      "default": "1.0",
+      "prior": {"family": "normal", "args": ["1.0", "0.25"]}
+    },
+    {
+      "key": {"group": "b"},
+      "default": "2.0",
+      "prior": {"family": "log_normal", "args": ["0.6931471805599453", "0.5"]}
+    }
+  ]
+}

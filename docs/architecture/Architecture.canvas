@@ -1,0 +1,314 @@
+{
+  "metadata": {
+    "version": "1.0-1.0",
+    "frontmatter": {
+      "title": "Sembla architecture atlas",
+      "status": "maintained navigation",
+      "authority": "DESIGN.md, DECISIONS.md, interfaces and fitness functions",
+      "plugin": "Advanced Canvas",
+      "layout": "overview cards link to detailed subsystem canvases"
+    },
+    "startNode": "atlas_summary"
+  },
+  "nodes": [
+    {
+      "id": "assurance_group",
+      "type": "group",
+      "collapsed": false,
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "dashed"
+      },
+      "x": 1240,
+      "y": 0,
+      "width": 520,
+      "height": 640,
+      "color": "1",
+      "label": "Assurance and retained evidence"
+    },
+    {
+      "id": "lifecycle_group",
+      "type": "group",
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "solid"
+      },
+      "x": -40,
+      "y": 40,
+      "width": 1200,
+      "height": 640,
+      "color": "4",
+      "label": "Core lifecycle · follow the arrows clockwise"
+    },
+    {
+      "id": "atlas_summary",
+      "type": "text",
+      "text": "# Sembla architecture atlas\n**Author → validate → execute → infer.** Use the links in each subsystem card to open its detailed canvas and boundary note.\n\nThis overview intentionally hides implementation-level nodes; diagrams navigate, while code, contracts and recorded decisions remain authoritative.",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 0,
+      "y": -500,
+      "width": 1760,
+      "height": 160,
+      "color": "6"
+    },
+    {
+      "id": "design_authority",
+      "type": "text",
+      "text": "**Design**\nSystem model and stable architecture.\n\n[Open DESIGN.md](../../DESIGN.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 40,
+      "y": -210,
+      "width": 320,
+      "height": 140,
+      "color": "6"
+    },
+    {
+      "id": "decision_authority",
+      "type": "text",
+      "text": "**Decisions**\nNormative commitments and scientific gates.\n\n[Open DECISIONS.md](../../DECISIONS.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 400,
+      "y": -210,
+      "width": 320,
+      "height": 140,
+      "color": "6"
+    },
+    {
+      "id": "roadmap",
+      "type": "text",
+      "text": "**Roadmap**\nSequencing, adoption and deferred work.\n\n[Open roadmap](../ROADMAP.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 760,
+      "y": -210,
+      "width": 320,
+      "height": 140,
+      "color": "6"
+    },
+    {
+      "id": "artifact_registry",
+      "type": "text",
+      "text": "**Artifact registry**\nVersioned identifiers, owners and compatibility boundaries.\n\n[Open registry](artifact-registry.json)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 1290,
+      "y": 85,
+      "width": 420,
+      "height": 160,
+      "color": "1"
+    },
+    {
+      "id": "evidence_index",
+      "type": "text",
+      "text": "**Evidence**\nRetained conformance and benchmark records.\n\n[Open evidence index](../evidence/README.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 1290,
+      "y": 270,
+      "width": 420,
+      "height": 140,
+      "color": "1"
+    },
+    {
+      "id": "fitness_note",
+      "type": "text",
+      "text": "**Fitness functions**\nExecutable checks for layering, vocabulary, parity and determinism.\n\n[Open fitness functions](fitness-functions.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "document",
+        "textAlign": "left"
+      },
+      "x": 1290,
+      "y": 415,
+      "width": 420,
+      "height": 160,
+      "color": "1"
+    },
+    {
+      "id": "frontend",
+      "type": "text",
+      "text": "## 1 · Frontend\nLean authoring, static checking, composition and export.\n\n[Open detailed canvas](Frontend.canvas) · [Boundary note](frontend.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left",
+        "border": "solid"
+      },
+      "x": 20,
+      "y": 110,
+      "width": 460,
+      "height": 190,
+      "color": "5"
+    },
+    {
+      "id": "contracts",
+      "type": "text",
+      "text": "## 2 · Contracts\nVersioned model, plan, state, manifest and identity boundaries.\n\n[Open detailed canvas](Contracts.canvas) · [Boundary note](contracts.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left",
+        "border": "solid"
+      },
+      "x": 640,
+      "y": 110,
+      "width": 460,
+      "height": 190,
+      "color": "3"
+    },
+    {
+      "id": "runtime",
+      "type": "text",
+      "text": "## 3 · Runtime\nValidated CPU-oracle and CUDA execution with CLI orchestration.\n\n[Open detailed canvas](Runtime.canvas) · [Boundary note](runtime.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left",
+        "border": "solid"
+      },
+      "x": 640,
+      "y": 430,
+      "width": 460,
+      "height": 190,
+      "color": "4"
+    },
+    {
+      "id": "estimation",
+      "type": "text",
+      "text": "## 4 · Estimation\nExternal data preparation, inference and parameter assignment.\n\n[Open detailed canvas](Estimation.canvas) · [Boundary note](estimation.md)",
+      "zIndex": 2,
+      "styleAttributes": {
+        "shape": "predefined-process",
+        "textAlign": "left",
+        "border": "solid"
+      },
+      "x": 20,
+      "y": 430,
+      "width": 460,
+      "height": 190,
+      "color": "2"
+    },
+    {
+      "id": "authority_group",
+      "type": "group",
+      "collapsed": false,
+      "zIndex": 0,
+      "styleAttributes": {
+        "border": "dashed"
+      },
+      "x": 0,
+      "y": -280,
+      "width": 1120,
+      "height": 240,
+      "color": "6",
+      "label": "Authority and sequencing"
+    }
+  ],
+  "edges": [
+    {
+      "id": "frontend_contracts",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      },
+      "fromNode": "frontend",
+      "fromSide": "right",
+      "toNode": "contracts",
+      "toSide": "left",
+      "color": "5",
+      "label": "model + plan"
+    },
+    {
+      "id": "contracts_runtime",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      },
+      "fromNode": "contracts",
+      "fromSide": "bottom",
+      "toNode": "runtime",
+      "toSide": "top",
+      "color": "3",
+      "label": "validated artifacts"
+    },
+    {
+      "id": "runtime_estimation",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      },
+      "fromNode": "runtime",
+      "fromSide": "left",
+      "toNode": "estimation",
+      "toSide": "right",
+      "color": "4",
+      "label": "run outputs"
+    },
+    {
+      "id": "estimation_frontend",
+      "styleAttributes": {
+        "path": "solid",
+        "arrow": "triangle",
+        "pathfindingMethod": "square"
+      },
+      "fromNode": "estimation",
+      "fromSide": "top",
+      "toNode": "frontend",
+      "toSide": "bottom",
+      "color": "2",
+      "label": "theta + targets"
+    },
+    {
+      "id": "registry_contracts",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "square"
+      },
+      "fromNode": "artifact_registry",
+      "fromSide": "left",
+      "toNode": "contracts",
+      "toSide": "right",
+      "color": "1",
+      "label": "owns identifiers"
+    },
+    {
+      "id": "fitness_runtime",
+      "styleAttributes": {
+        "path": "long-dashed",
+        "arrow": "triangle-outline",
+        "pathfindingMethod": "square"
+      },
+      "fromNode": "fitness_note",
+      "fromSide": "left",
+      "toNode": "runtime",
+      "toSide": "right",
+      "color": "1",
+      "label": "checks boundaries"
+    }
+  ]
+}

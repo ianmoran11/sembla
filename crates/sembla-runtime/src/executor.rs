@@ -58,6 +58,9 @@ pub struct ViewValue {
 }
 
 /// Conservative IR-only eligibility for one declared observation view.
+///
+/// This is a backend-capability description derived from oracle semantics, not
+/// a device implementation type. It deliberately names no hardware API.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceViewEligibility {
     pub box_name: String,
@@ -68,7 +71,8 @@ pub struct DeviceViewEligibility {
 
 /// Run-wide device-observation decision. State download may be skipped only
 /// when this decision is eligible; one host-bound view forces the complete run
-/// back to host observation.
+/// back to host observation. Backends consume this semantic decision; the
+/// runtime neither selects nor depends on a backend.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceObservationEligibility {
     pub eligible: bool,
@@ -77,6 +81,11 @@ pub struct DeviceObservationEligibility {
 }
 
 /// Decides device-observation eligibility from validated IR.
+///
+/// The policy is hosted beside the CPU oracle because eligibility means
+/// "preserves the oracle's exact observation contract." Pulling it into one
+/// backend would make that implementation independently reproduce semantic
+/// fallback rules. The returned plain data is the complete boundary.
 ///
 /// The expression check deliberately reuses the evaluator's gather predicate:
 /// `Expr::Agg`, `Expr::Input`, and row-fallible checked integer arithmetic are
@@ -763,17 +772,12 @@ pub fn run_with_features(
                 .find(|(name, _)| name == table)
                 .map_or(0, |(_, count)| *count);
             if exceeds_saturation_threshold(*deferred_count, fired_count) {
-                let warning = SaturationWarning {
+                warnings.push(SaturationWarning {
                     tick,
                     table: table.clone(),
                     deferred_count: *deferred_count,
                     fired_count,
-                };
-                eprintln!(
-                    "warning: tick {} resource table '{}': {} deferred exceeds 10% of {} fired",
-                    warning.tick, warning.table, warning.deferred_count, warning.fired_count
-                );
-                warnings.push(warning);
+                });
             }
         }
         ticks.push(outcome.report);

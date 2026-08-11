@@ -12,7 +12,12 @@ if ! command -v git >/dev/null 2>&1; then
     echo "error: Rust-only checks require git to verify that Cargo.lock is unchanged" >&2
     exit 1
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "error: Rust-only checks require Python 3 for the standard-library architecture policy checker" >&2
+    exit 1
+fi
 
+python3 -B scripts/check-rust-architecture.py
 cargo fmt --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
@@ -66,4 +71,4 @@ if ! git diff --exit-code HEAD -- Cargo.lock; then
     exit 1
 fi
 
-echo "Rust formatting, lint, tests, dependency policy, and lock checks passed"
+echo "Rust architecture, formatting, lint, tests, dependency policy, and lock checks passed"

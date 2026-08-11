@@ -6,7 +6,8 @@ It contains these checks:
 - **Rust and documentation hygiene:** installs the root `rust-toolchain.toml`
   pin, restores the Cargo cache, parses the workflow YAML, runs the standard-
   library Markdown-link tests and tracked-document scan, then runs
-  `scripts/check-rust.sh` for formatting, Clippy, workspace tests,
+  `scripts/check-rust.sh` for workspace dependency layering, core/backend
+  vocabulary and reporting boundaries, formatting, Clippy, workspace tests,
   dependency/RNG policy, and lock verification. It finishes with the
   dependency-free Lean proof-hygiene guard and does not repeat an equivalent
   Cargo build or test afterward.
@@ -55,10 +56,11 @@ committed lock and fail rather than regenerating it.
 
 | Contract | Command | Environment and claim |
 | --- | --- | --- |
-| Fast Rust | `./scripts/check-rust.sh` | Requires the pinned Rust toolchain and Git, but not Lean. Runs formatting, Clippy, workspace tests, runtime dependency/RNG policy, and verifies `Cargo.lock` is unchanged. |
+| Fast Rust | `./scripts/check-rust.sh` | Requires the pinned Rust toolchain, Git and Python 3, but not Lean. Checks the exact workspace dependency matrix and core-library boundaries, then runs formatting, Clippy, workspace tests, runtime dependency/RNG policy, and verifies `Cargo.lock` is unchanged. |
+| Architecture fitness | `python3 scripts/check-artifact-registry.py && python3 scripts/check-architecture-canvases.py && python3 frontend/scripts/check-imports.py` | Standard-library checks for contract ownership, Advanced Canvas portals/file references/styles, production-vs-test Lean closure, and high-value Lean import direction. Rust architecture rules are part of the Fast Rust contract. |
 | Documentation links | `python3 scripts/check-markdown-links.py` | Uses only the Python standard library. Checks tracked Markdown relative targets, ignores `.piprd` managed records, remote/mailto links, images, fenced examples, and pure anchors, and does not claim anchor-fragment validation. |
 | ABS data | `./scripts/check-abs-data.sh` | Uses only the Python standard library and the verified local cache. Runs reader/extract tests, regenerates every committed extract and reconciliation report byte-identically, and performs no network access. |
-| Complete local | `./scripts/check.sh` | Requires Cargo, Git, Python 3, and Lake from the pinned Rust/Lean toolchains. Runs the Markdown check and its temporary-fixture tests, Rust contract, Lean proof hygiene, and full frontend parity; a missing tool is an error, never a skip. |
+| Complete local | `./scripts/check.sh` | Requires Cargo, Git, Python 3, and Lake from the pinned Rust/Lean toolchains. Runs documentation and architecture checks (including their temporary-fixture tests), the Rust contract, Lean proof hygiene, and full frontend parity; a missing tool is an error, never a skip. |
 | Determinism | `./scripts/check-determinism.sh` | Requires the pinned Rust toolchain. Repeats CPU run and sweep workflows and compares their outputs byte-for-byte. |
 | NPE smoke | `PYTHON=calibration/npe/.venv/bin/python ./scripts/check-npe-smoke.sh` | Requires the pinned Python 3.12 environment described in `calibration/npe/README.md`. This is reduced contract/training evidence, not SBC. |
 | NPE lock | `./scripts/check-npe-lock.sh` | Requires Docker. In the immutable Linux/amd64 CPython 3.12.8 image, regenerates and compares the hashed lock, performs a fresh install without isolated build resolution, and runs the full reduced NPE smoke check. |

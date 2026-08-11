@@ -30,6 +30,32 @@ const FIDELITY_AGE_BANDS: [&str; 21] = [
     "0-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54",
     "55-59", "60-64", "65-69", "70-74", "75-79", "80-84", "85-89", "90-94", "95-99", "100+",
 ];
+const PARAMETER_AGE_BANDS: [&str; 21] = [
+    "00_04", "05_09", "10_14", "15_19", "20_24", "25_29", "30_34", "35_39", "40_44", "45_49",
+    "50_54", "55_59", "60_64", "65_69", "70_74", "75_79", "80_84", "85_89", "90_94", "95_99",
+    "100_plus",
+];
+
+fn expected_parameter_names_in_order() -> Vec<String> {
+    let mut names = vec!["interstate_base".to_owned()];
+    for state in &FIDELITY_STATES[1..] {
+        names.push(format!("push_{state}"));
+        names.push(format!("pull_{state}"));
+    }
+    names.extend(["peak_months".to_owned(), "k".to_owned()]);
+    names.extend(FIDELITY_STATES.map(|state| format!("birth_rate_{state}")));
+    for state in FIDELITY_STATES {
+        for age_band in PARAMETER_AGE_BANDS {
+            for sex in ["male", "female"] {
+                names.push(format!("mortality_{state}_{age_band}_{sex}"));
+            }
+        }
+    }
+    names.extend(FIDELITY_STATES.map(|state| format!("overseas_arrival_{state}")));
+    names.extend(FIDELITY_STATES.map(|state| format!("emigration_{state}")));
+    assert_eq!(names.len(), 377);
+    names
+}
 
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -415,6 +441,15 @@ fn generated_model_has_frozen_schema_parameter_and_transition_counts() {
     let model = validated_model();
     assert_eq!(model.model().name, "australian_population");
     assert_eq!(model.model().params.len(), 377);
+    assert_eq!(
+        model
+            .model()
+            .params
+            .iter()
+            .map(|parameter| parameter.name.clone())
+            .collect::<Vec<_>>(),
+        expected_parameter_names_in_order()
+    );
     assert!(model
         .model()
         .params

@@ -46,6 +46,27 @@ tests, verifies the pinned cache without touching the network, reconciles
 the committed extracts, and confirms they regenerate byte-identically. It
 uses only the Python standard library and needs no virtual environment.
 
+For Australian population foundation changes, `data/abs/rates.py` is the sole
+generator of the four complete v2 parameter tables and the non-production Lean
+ParamDecl reference under `data/abs/reference/`. `Parameters.lean` is now a
+compatibility projection and must never be overwritten by generation. In tests,
+redirect `--parameter-tables`, `--lean-parameters`, `--params-dir`, and
+`--report` to temporary paths. The module map, semantic order, 17/360 split,
+seven published-zero exceptions, frozen fixture hashes, and hard failure policy
+are documented in the
+[local maintenance README](frontend/Sembla/Models/AustralianPopulation/README.md).
+
+Indexed parameter-family CSV/JSON inputs are compile-time sources and must have
+a mandatory exact-byte SHA-256 literal in the declaring Lean file. Paths are
+relative to that Lean source. Regenerate the whole complete table
+deterministically and update the file and hash together; never update a pin to
+hide an unexplained data change. Lean 4.13 does not track arbitrary table files
+as Lake dependencies, so direct elaboration of
+`Sembla/IndexedFamilyTests.lean` and
+`Sembla/Models/AustralianPopulation/Validation.lean` is part of the validation
+contract. See the
+[indexed-family guide](docs/guides/indexed-parameter-families.md).
+
 The directly runnable Markdown checker uses only the Python standard library.
 It checks relative targets in tracked Markdown, excludes managed `.piprd`
 records, and does not test remote URLs or anchor fragments. The complete check
@@ -126,7 +147,10 @@ authorized:
 
 If authorization is absent or the documented environment is unavailable, stop
 and report the result as blocked or unanswered rather than manufacturing new
-evidence.
+evidence. Source-owned generated modules are not frozen scientific evidence:
+when their documented generator changes, regenerate them in the same change
+and prove exact reproducibility. This exception does not authorize refreshing
+any model, plan, state, golden, calibration, or evidence fixture.
 
 ## Managed PRD runs and agent output
 

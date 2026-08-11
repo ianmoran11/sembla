@@ -10,6 +10,9 @@ fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
         .0
 }
 
+const CLI_RUN: &str = include_str!("../../sembla-cli/src/run.rs");
+const CLI_SWEEP: &str = include_str!("../../sembla-cli/src/sweep.rs");
+
 #[test]
 fn cuda_backend_retains_and_refreshes_one_host_state_store() {
     let backend = include_str!("../src/backend.rs");
@@ -52,7 +55,7 @@ fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
     assert!(constructor.contains(".new_stream()"));
     assert!(constructor.contains("context.default_stream()"));
 
-    let cli = include_str!("../../sembla-cli/src/main.rs");
+    let cli = CLI_SWEEP;
     assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_LOCKSTEP_STREAMS"));
     assert!(cli.contains("CudaBackend::new_nonblocking_stream("));
     assert!(cli.contains(".run_draw_lockstep("));
@@ -92,15 +95,15 @@ fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
     assert!(fused_tick.contains("if active_width == 0"));
     assert!(fused_tick.contains("must be reset with at least one active draw"));
 
-    let cli = include_str!("../../sembla-cli/src/main.rs");
+    let cli = CLI_SWEEP;
     assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_FUSED_DRAWS"));
     assert!(cli.contains("prepared.chunks(capacity)"));
     assert!(cli.contains("CudaBackend::new_fused_batch("));
     assert!(cli.contains("run_tick_observed_reused_fused()"));
     let fused_cli = section(
         cli,
-        "#[cfg(feature = \"cuda\")]\nfn run_fused_sweep_spike(",
-        "\n#[cfg(not(feature = \"cuda\"))]\nfn run_fused_sweep_spike(",
+        "#[cfg(feature = \"cuda\")]\npub(crate) fn run_fused_sweep_spike(",
+        "\n#[cfg(not(feature = \"cuda\"))]\npub(crate) fn run_fused_sweep_spike(",
     );
     assert!(fused_cli.contains("failures[slot] = Some(format!"));
     assert!(fused_cli.contains(".finish(model, None)\n                    .and_then("));
@@ -109,7 +112,7 @@ fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
 
 #[test]
 fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
-    let cli = include_str!("../../sembla-cli/src/main.rs");
+    let cli = CLI_SWEEP;
     assert!(cli.contains("SEMBLA_SWEEP_SPIKE_CUDA_FREE_STREAMS"));
     assert!(cli.contains("SweepConcurrencyMode::CudaFreeNonblocking"));
 
@@ -158,7 +161,7 @@ fn final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffer
     assert!(!backend.contains("struct DeviceHashPlan"));
     assert!(!backend.contains("hash_digest: CudaSlice"));
 
-    let cli = include_str!("../../sembla-cli/src/main.rs");
+    let cli = CLI_SWEEP;
     assert!(cli.contains("SEMBLA_SWEEP_CUDA_FINAL_STATE_MODE"));
     assert_eq!(cli.matches(".final_state_readback(").count(), 2);
     assert!(cli.contains("sembla-cuda-final-state-readback-v2"));
@@ -219,11 +222,11 @@ fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
 
 #[test]
 fn cuda_cli_uses_the_reused_state_path_and_moves_the_state_only_at_run_end() {
-    let cli = include_str!("../../sembla-cli/src/main.rs");
+    let cli = CLI_RUN;
     let cuda_run = section(
         cli,
-        "#[cfg(feature = \"cuda\")]\nfn run_results_output_cuda(",
-        "\n#[cfg(feature = \"cuda\")]\nfn run_results_output_cuda_timed(",
+        "#[cfg(feature = \"cuda\")]\npub(crate) fn run_results_output_cuda(",
+        "\n#[cfg(feature = \"cuda\")]\npub(crate) fn run_results_output_cuda_timed(",
     );
     assert!(cuda_run.contains("run_tick_observed_reused()"));
     assert!(cuda_run.contains("backend.observed_state()"));
@@ -232,8 +235,8 @@ fn cuda_cli_uses_the_reused_state_path_and_moves_the_state_only_at_run_end() {
 
     let timed = section(
         cli,
-        "#[cfg(feature = \"cuda\")]\nfn run_results_output_cuda_timed(",
-        "\nfn summaries_csv(",
+        "#[cfg(feature = \"cuda\")]\npub(crate) fn run_results_output_cuda_timed(",
+        "\npub(crate) fn summaries_csv(",
     );
     assert!(timed.contains("run_tick_observed_reused_timed()"));
     assert!(timed.contains("backend.observed_state()"));

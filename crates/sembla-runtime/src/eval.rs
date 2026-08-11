@@ -1197,7 +1197,7 @@ pub(crate) fn expr_is_gather_eligible(
 
 /// Reuses the gather predicate for device observations that additionally need
 /// a positively identified `Int` root. Keeping the row-local decision here
-/// prevents CUDA observation from growing a second expression whitelist.
+/// prevents device observation from growing a second expression whitelist.
 pub(crate) fn expr_is_gather_eligible_int(
     expr: &Expr,
     table: EvalTable<'_>,

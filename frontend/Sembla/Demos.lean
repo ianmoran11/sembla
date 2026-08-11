@@ -2,7 +2,6 @@ import Sembla.Demos.Modeling
 import Sembla.Demos.DeepIR
 import Sembla.Demos.CanonicalModels
 import Sembla.Demos.Composition
-import Sembla.Demos.CompositionTests
 import Sembla.Demos.Serialization
 import Sembla.Demos.Widgets
 import Sembla.Demos.Proofs

@@ -144,6 +144,7 @@ class PreparePaidSessionTest(unittest.TestCase):
             "SSH_HOST_KEY_FINGERPRINT",
             "SEMBLA_HOST_KEY_DIR",
             "SEMBLA_EVIDENCE_DEPLOY_KEY_ID",
+            "SEMBLA_TAILSCALE_AUTH_KEY_ID",
         )
         for name in names:
             with self.subTest(name=name):
@@ -194,6 +195,10 @@ DEPLOY_PUBLIC='ssh-ed25519 AAAA'
 HOST_KEY_DIR=''
 RETURNED_HOST_KEY_DIR=''
 WORK=''
+TAILSCALE_AUTH_KEY_ID=''
+TAILSCALE_OAUTH_CLIENT_ID=''
+TAILSCALE_OAUTH_CLIENT_SECRET=''
+TAILSCALE_AUTH_KEY_HELPER=/not-used
 {functions}
 find_registered_deploy_key_id() {{
   n=$(cat {counter!s}); n=$((n + 1)); printf '%s' "$n" > {counter!s}
@@ -228,6 +233,73 @@ printf 'rc=%s\\n' "$rc"
         self.assertIn('if ! host_exports="$(HOST_KEY_DIR=', source)
         self.assertIn('.host-key-paid-', source)
         self.assertNotIn('eval "$(bash', source)
+
+    def test_keychain_oauth_mints_only_a_disposable_session_key(self):
+        source = SCRIPT.read_text()
+        create_call = '"$TAILSCALE_AUTH_KEY_HELPER" create'
+        self.assertIn("--tailscale-oauth-keychain", source)
+        self.assertIn("security find-generic-password", source)
+        self.assertIn(create_call, source)
+        self.assertIn("--expiry-seconds 3600", source)
+        self.assertIn("--tag \"$TAILSCALE_TAG\"", source)
+        self.assertIn("^tskey-client-", source)
+        self.assertIn("^tskey-auth-", source)
+        self.assertNotIn("set_launchctl_value TAILSCALE_OAUTH_CLIENT", source)
+        self.assertNotIn("set_launchctl_value HYPERSTACK_API_KEY", source)
+        self.assertLess(
+            source.index("registered_key=\"$(gh api"),
+            source.index(create_call),
+        )
+        self.assertLess(
+            source.index(create_call),
+            source.index("set_launchctl_value TF_VAR_tailscale_auth_key"),
+        )
+
+    def test_oauth_rollback_revokes_derived_key_and_never_retries_create(self):
+        source = SCRIPT.read_text()
+        create_call = '"$TAILSCALE_AUTH_KEY_HELPER" create'
+        self.assertIn("revoke_minted_tailscale_key", source)
+        self.assertIn('"$TAILSCALE_AUTH_KEY_HELPER" delete', source)
+        self.assertIn("SEMBLA_TAILSCALE_AUTH_KEY_ID", source)
+        self.assertIn("no mint retry was attempted", source)
+        self.assertEqual(source.count(create_call), 1)
+
+    def test_long_lived_oauth_values_are_unset_and_not_printed(self):
+        source = SCRIPT.read_text()
+        self.assertIn("unset TAILSCALE_AUTH_KEY TAILSCALE_OAUTH_CLIENT_ID", source)
+        self.assertNotIn('echo "$TAILSCALE_OAUTH_CLIENT_ID"', source)
+        self.assertNotIn('echo "$TAILSCALE_OAUTH_CLIENT_SECRET"', source)
+        self.assertNotIn('printf \'%s\\n\' "$TAILSCALE_OAUTH_CLIENT_SECRET"', source)
+        self.assertLess(
+            source.index('TAILSCALE_OAUTH_CLIENT_ID="$(keychain_read_item'),
+            source.index("MUTATED=1"),
+        )
+
+    def test_rollback_revokes_known_tailscale_key_id(self):
+        source = SCRIPT.read_text()
+        start = source.index("revoke_minted_tailscale_key() {")
+        end = source.index("\ncleanup() {", start)
+        function = source[start:end]
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "python.log"
+            script = f"""set -Eeuo pipefail
+TAILSCALE_AUTH_KEY_ID=key123
+TAILSCALE_OAUTH_CLIENT_ID=oauth-id
+TAILSCALE_OAUTH_CLIENT_SECRET=tskey-client-secret
+TAILSCALE_AUTH_KEY_HELPER=/helper.py
+{function}
+python3() {{
+  cat >/dev/null
+  printf '%s\\n' \"$*\" >> {log!s}
+}}
+revoke_minted_tailscale_key
+[[ -z \"$TAILSCALE_AUTH_KEY_ID\" ]]
+"""
+            result = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(log.read_text().strip(), "/helper.py delete --key-id key123")
 
 
 if __name__ == "__main__":

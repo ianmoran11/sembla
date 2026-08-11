@@ -1,0 +1,5 @@
+age,sex,default,prior_family,prior_arg_1,prior_arg_2
+1,female,0.4,,,
+0,male,0.10,log_normal,-2.302585092994046,2.5e-1
+1,male,6.25e-2,,,
+0,female,0.123456789012345678901234567890,,,

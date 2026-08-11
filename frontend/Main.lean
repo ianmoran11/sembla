@@ -5,41 +5,52 @@ open Sembla
 private def usage : String :=
   "usage: sembla-export [--plan|--source] <name> <out.json>"
 
+private structure ModelRegistration where
+  aliases : List String
+  model : IR.Model
+
+private def modelAliases (camel snake : String) : List String :=
+  [ camel
+  , snake
+  , s!"Sembla.Models.{camel}"
+  , s!"Sembla.Models.{snake}"
+  , s!"Sembla/Models/{camel}"
+  , s!"Sembla/Models/{snake}" ].eraseDups
+
+private def modelRegistry : List ModelRegistration :=
+  [ { aliases := modelAliases "sir" "sir", model := Models.sir }
+  , { aliases := modelAliases "sirPolicy" "sir_policy", model := Models.sirPolicy }
+  , { aliases := modelAliases "observations" "observations", model := Models.observations }
+  , { aliases := modelAliases "reversibleCtmc" "reversible_ctmc", model := Models.reversibleCtmc }
+  , { aliases := modelAliases "radioactiveDecayChain" "radioactive_decay_chain",
+      model := Models.radioactiveDecayChain }
+  , { aliases := modelAliases "sisImportation" "sis_importation", model := Models.sisImportation }
+  , { aliases := modelAliases "seirsWaning" "seirs_waning", model := Models.seirsWaning }
+  , { aliases := modelAliases "noisyVoter" "noisy_voter", model := Models.noisyVoter }
+  , { aliases := modelAliases "demographicSlots" "demographic_slots",
+      model := Models.demographicSlots }
+  , { aliases := modelAliases "australianPopulation" "australian_population",
+      model := Models.australianPopulation } ]
+
+private def lookupRegisteredModel (name : String) : List ModelRegistration → Option IR.Model
+  | [] => none
+  | registration :: rest =>
+      if registration.aliases.contains name then some registration.model
+      else lookupRegisteredModel name rest
+
 private def lookupModel (name : String) : Option IR.Model :=
-  match name with
-  | "sir" | "Sembla.Models.sir" | "Sembla/Models/sir" => some Models.sir
-  | "sirPolicy" | "sir_policy"
-  | "Sembla.Models.sirPolicy" | "Sembla.Models.sir_policy"
-  | "Sembla/Models/sirPolicy" | "Sembla/Models/sir_policy" => some Models.sirPolicy
-  | "observations" | "Sembla.Models.observations" | "Sembla/Models/observations" =>
-      some Models.observations
-  | "reversibleCtmc" | "reversible_ctmc"
-  | "Sembla.Models.reversibleCtmc" | "Sembla.Models.reversible_ctmc"
-  | "Sembla/Models/reversibleCtmc" | "Sembla/Models/reversible_ctmc" =>
-      some Models.reversibleCtmc
-  | "radioactiveDecayChain" | "radioactive_decay_chain"
-  | "Sembla.Models.radioactiveDecayChain" | "Sembla.Models.radioactive_decay_chain"
-  | "Sembla/Models/radioactiveDecayChain" | "Sembla/Models/radioactive_decay_chain" =>
-      some Models.radioactiveDecayChain
-  | "sisImportation" | "sis_importation"
-  | "Sembla.Models.sisImportation" | "Sembla.Models.sis_importation"
-  | "Sembla/Models/sisImportation" | "Sembla/Models/sis_importation" =>
-      some Models.sisImportation
-  | "seirsWaning" | "seirs_waning"
-  | "Sembla.Models.seirsWaning" | "Sembla.Models.seirs_waning"
-  | "Sembla/Models/seirsWaning" | "Sembla/Models/seirs_waning" => some Models.seirsWaning
-  | "noisyVoter" | "noisy_voter"
-  | "Sembla.Models.noisyVoter" | "Sembla.Models.noisy_voter"
-  | "Sembla/Models/noisyVoter" | "Sembla/Models/noisy_voter" => some Models.noisyVoter
-  | "demographicSlots" | "demographic_slots"
-  | "Sembla.Models.demographicSlots" | "Sembla.Models.demographic_slots"
-  | "Sembla/Models/demographicSlots" | "Sembla/Models/demographic_slots" =>
-      some Models.demographicSlots
-  | "australianPopulation" | "australian_population"
-  | "Sembla.Models.australianPopulation" | "Sembla.Models.australian_population"
-  | "Sembla/Models/australianPopulation" | "Sembla/Models/australian_population" =>
-      some Models.australianPopulation
-  | _ => none
+  lookupRegisteredModel name modelRegistry
+
+private def modelAliasesAreUnique : Bool :=
+  let aliases := (modelRegistry.map fun registration => registration.aliases).join
+  aliases.eraseDups.length == aliases.length
+
+private def modelNamesAreUnique : Bool :=
+  let names := modelRegistry.map fun registration => registration.model.name
+  names.eraseDups.length == names.length
+
+#guard modelAliasesAreUnique
+#guard modelNamesAreUnique
 
 private def lookupSource (name : String) : Option Composition.CompositionSourceV1 :=
   (Demos.Composition.lookup name).orElse fun _ =>
