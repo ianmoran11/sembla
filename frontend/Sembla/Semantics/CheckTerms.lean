@@ -117,14 +117,52 @@ inductive ModelCheckPathSegment where
   | summaryBox | summaryView | summaryReducer
   deriving Repr, BEq, DecidableEq
 
+/-- Syntax-independent, nondependent scalar spelling retained only for trusted
+frontend diagnostic rendering. -/
+inductive DiagnosticScalarSort where
+  | real | int | bool | enum | ref
+  deriving Repr, BEq, DecidableEq
+
+/-- Syntax-independent aggregate operation retained for diagnostics. -/
+inductive DiagnosticAggregateKind where
+  | count | sum
+  deriving Repr, BEq, DecidableEq
+
+/-- Syntax-independent ordinary-view reducer retained for diagnostics. -/
+inductive DiagnosticViewReducer where
+  | count | sum | min | max
+  deriving Repr, BEq, DecidableEq
+
+/-- Observational data already available at the authoritative checker failure
+site. It cannot affect acceptance, precedence, checked values, or erasure. -/
+structure CheckerDiagnosticMetadata where
+  actualSort : Option DiagnosticScalarSort := none
+  expectedSort : Option DiagnosticScalarSort := none
+  leftSort : Option DiagnosticScalarSort := none
+  rightSort : Option DiagnosticScalarSort := none
+  actualCount : Option Nat := none
+  expectedCount : Option Nat := none
+  minimumCount : Option Nat := none
+  maximumCount : Option Nat := none
+  bandWidth : Option Nat := none
+  aggregateKind : Option DiagnosticAggregateKind := none
+  viewReducer : Option DiagnosticViewReducer := none
+  valuePresent : Option Bool := none
+  offendingName : Option String := none
+  contextName : Option String := none
+  expectedName : Option String := none
+  deriving Repr, BEq, DecidableEq
+
 structure TermCheckError where
   category : TermCheckErrorCategory
   path : List ModelCheckPathSegment
+  metadata : CheckerDiagnosticMetadata := {}
   deriving Repr, BEq, DecidableEq
 
 def termError (category : TermCheckErrorCategory)
-    (path : List ModelCheckPathSegment) : Except TermCheckError α :=
-  .error ⟨category, path⟩
+    (path : List ModelCheckPathSegment)
+    (metadata : CheckerDiagnosticMetadata := {}) : Except TermCheckError α :=
+  .error ⟨category, path, metadata⟩
 
 /-! ## Intrinsic synthesis witnesses -/
 
@@ -760,8 +798,27 @@ end
 /-! ## Canonical executable elaboration -/
 
 private def pathError (category : TermCheckErrorCategory)
-    (path : List ModelCheckPathSegment) : Except TermCheckError α :=
-  .error ⟨category, path⟩
+    (path : List ModelCheckPathSegment)
+    (metadata : CheckerDiagnosticMetadata := {}) : Except TermCheckError α :=
+  .error ⟨category, path, metadata⟩
+
+private def diagnosticSortOfOrigin {Γ : TermContext}
+    {scope : RowScope Γ.model Γ.current Γ.inputs} {sort : ScalarSort Γ.model.catalog} :
+    SortOrigin Γ scope sort → DiagnosticScalarSort
+  | .real => .real
+  | .int => .int
+  | .bool => .bool
+  | .enum .. => .enum
+  | .ref .. => .ref
+
+private def diagnosticSortOfResult {Γ : TermContext}
+    {scope : RowScope Γ.model Γ.current Γ.inputs} :
+    CheckedExprResult Γ scope → DiagnosticScalarSort
+  | ⟨_, _, origin⟩ => diagnosticSortOfOrigin origin
+
+private def simpleAttributeName? : IR.Expr → Option String
+  | .selfAttr name => some name
+  | _ => none
 
 private def numericOfResult {Γ : TermContext}
     {scope : RowScope Γ.model Γ.current Γ.inputs}
@@ -808,7 +865,7 @@ mutual
     | .enum _ => pathError .cannotInferEnumOwner path
     | .param name =>
         match Γ.model.params.lookup name with
-        | none => pathError .unknownParameter path
+        | none => pathError .unknownParameter path { offendingName := some name }
         | some id =>
             let term : Expr Γ.model Γ.current Γ.inputs scope
                 ((Γ.model.params.get id).sort.scalarSort Γ.model.catalog) := .param id
@@ -825,7 +882,7 @@ mutual
                 pure ⟨.int, cast (by rw [sortProof]) term, .int⟩
     | .selfAttr name =>
         match scope.schema.lookupAttribute name with
-        | none => pathError .unknownAttribute path
+        | none => pathError .unknownAttribute path { offendingName := some name }
         | some attr =>
             pure ⟨scope.schema.attributeSort attr, .selfAttr attr,
               SortOrigin.ofAttribute Γ attr⟩
@@ -839,7 +896,9 @@ mutual
                 match numeric with
                 | .real => pure ⟨.real, .add .real leftExpr rightExpr, .real⟩
                 | .int => pure ⟨.int, .add .int leftExpr rightExpr, .int⟩
-        | _, _ => pathError .expectedNumeric path
+        | _, _ => pathError .expectedNumeric path {
+            leftSort := some (diagnosticSortOfResult left)
+            rightSort := some (diagnosticSortOfResult right) }
     | .sub lhs rhs =>
         let left ← synthExprFuel (fuel - 1) Γ scope lhs (path ++ [.lhs])
         let right ← synthExprFuel (fuel - 1) Γ scope rhs (path ++ [.rhs])
@@ -850,7 +909,9 @@ mutual
                 match numeric with
                 | .real => pure ⟨.real, .sub .real leftExpr rightExpr, .real⟩
                 | .int => pure ⟨.int, .sub .int leftExpr rightExpr, .int⟩
-        | _, _ => pathError .expectedNumeric path
+        | _, _ => pathError .expectedNumeric path {
+            leftSort := some (diagnosticSortOfResult left)
+            rightSort := some (diagnosticSortOfResult right) }
     | .mul lhs rhs =>
         let left ← synthExprFuel (fuel - 1) Γ scope lhs (path ++ [.lhs])
         let right ← synthExprFuel (fuel - 1) Γ scope rhs (path ++ [.rhs])
@@ -861,14 +922,18 @@ mutual
                 match numeric with
                 | .real => pure ⟨.real, .mul .real leftExpr rightExpr, .real⟩
                 | .int => pure ⟨.int, .mul .int leftExpr rightExpr, .int⟩
-        | _, _ => pathError .expectedNumeric path
+        | _, _ => pathError .expectedNumeric path {
+            leftSort := some (diagnosticSortOfResult left)
+            rightSort := some (diagnosticSortOfResult right) }
     | .div lhs rhs =>
         let left ← synthExprFuel (fuel - 1) Γ scope lhs (path ++ [.lhs])
         let right ← synthExprFuel (fuel - 1) Γ scope rhs (path ++ [.rhs])
         match numericOfResult left, numericOfResult right with
         | some leftNumeric, some rightNumeric =>
             pure ⟨.real, .div (toReal leftNumeric) (toReal rightNumeric), .real⟩
-        | _, _ => pathError .expectedNumeric path
+        | _, _ => pathError .expectedNumeric path {
+            leftSort := some (diagnosticSortOfResult left)
+            rightSort := some (diagnosticSortOfResult right) }
     | .eq lhs rhs => checkEqualityFuel (fuel - 1) Γ scope true lhs rhs path
     | .ne lhs rhs => checkEqualityFuel (fuel - 1) Γ scope false lhs rhs path
     | .lt lhs rhs => checkOrderingFuel (fuel - 1) Γ scope .lt lhs rhs path
@@ -888,17 +953,23 @@ mutual
         pure ⟨.bool, .not checked, .bool⟩
     | .enumIs attrName variantName =>
         match scope.schema.lookupAttribute attrName with
-        | none => pathError .unknownAttribute path
+        | none => pathError .unknownAttribute path { offendingName := some attrName }
         | some attr =>
             match shapeEq : (scope.schema.attr attr).shape with
             | .enum enumSchema =>
                 match enumSchema.lookup scope.schema attr shapeEq variantName with
-                | none => pathError .unknownEnumVariant path
+                | none => pathError .unknownEnumVariant path {
+                    offendingName := some variantName
+                    contextName := some attrName }
                 | some variant => pure ⟨.bool, .enumIs attr enumSchema variant, .bool⟩
-            | _ => pathError .sortMismatch path
+            | _ => pathError .sortMismatch path {
+                actualSort := some (diagnosticSortOfOrigin (SortOrigin.ofAttribute Γ attr))
+                expectedSort := some .enum
+                offendingName := some attrName }
     | .input portName aggregate =>
         match Γ.inputs.lookup portName with
-        | none => pathError .unknownInput (path ++ [.inputPort])
+        | none => pathError .unknownInput (path ++ [.inputPort]) {
+            offendingName := some portName }
         | some port =>
             let checked ← synthAggregateFuel (fuel - 1) Γ port aggregate (path ++ [.aggregate])
             match checked with
@@ -906,7 +977,8 @@ mutual
                 pure ⟨.real, .input port aggregate, .real⟩
             | ⟨.int, aggregate, .int⟩ =>
                 pure ⟨.int, .input port aggregate, .int⟩
-            | _ => pathError .expectedNumeric path
+            | ⟨_, _, origin⟩ => pathError .expectedNumeric path {
+                actualSort := some (diagnosticSortOfOrigin origin) }
     | .agg op tableName fkName selfFkName filter =>
         checkRelationalAggregateFuel (fuel - 1) Γ scope op tableName fkName selfFkName filter path
     else pathError .sortMismatch path
@@ -924,9 +996,14 @@ mutual
         match expectedOrigin with
         | .enum attr enumSchema shapeEq =>
             match enumSchema.lookup scope.schema attr shapeEq variantName with
-            | none => pathError .unknownEnumVariant path
+            | none => pathError .unknownEnumVariant path {
+                offendingName := some variantName
+                contextName := some (scope.schema.attributeName attr) }
             | some variant => pure (.enum attr enumSchema variant)
-        | _ => pathError .sortMismatch path
+        | _ => pathError .sortMismatch path {
+            actualSort := some .enum
+            expectedSort := some (diagnosticSortOfOrigin expectedOrigin)
+            offendingName := some variantName }
     | _ =>
       let actual ← synthExprFuel (fuel - 1) Γ scope raw path
       match actual with
@@ -937,9 +1014,15 @@ mutual
               (fun sort => Expr Γ.model Γ.current Γ.inputs scope sort) same) actualExpr)
         | none =>
             match expectedOrigin with
-            | .bool => pathError .expectedBool path
-            | .real => pathError .expectedReal path
-            | _ => pathError .sortMismatch path
+            | .bool => pathError .expectedBool path {
+                actualSort := some (diagnosticSortOfOrigin actualOrigin)
+                expectedSort := some .bool }
+            | .real => pathError .expectedReal path {
+                actualSort := some (diagnosticSortOfOrigin actualOrigin)
+                expectedSort := some .real }
+            | _ => pathError .sortMismatch path {
+                actualSort := some (diagnosticSortOfOrigin actualOrigin)
+                expectedSort := some (diagnosticSortOfOrigin expectedOrigin) }
     else pathError .sortMismatch path
   termination_by fuel
   decreasing_by all_goals omega
@@ -960,7 +1043,9 @@ mutual
           match numericOfResult checked with
           | some (.real expr) => pure ⟨.real, .sum .real expr, .real⟩
           | some (.int expr) => pure ⟨.int, .sum .int expr, .int⟩
-          | none => pathError .expectedNumeric (path ++ [.aggregateValue])
+          | none => pathError .expectedNumeric (path ++ [.aggregateValue]) {
+              actualSort := some (diagnosticSortOfResult checked)
+              aggregateKind := some .sum }
     else pathError .sortMismatch path
   termination_by fuel
   decreasing_by all_goals omega
@@ -998,7 +1083,10 @@ mutual
     | .enum variant, other =>
         let right ← synthExprFuel (fuel - 1) Γ scope other (path ++ [.rhs])
         match enumOfResult right with
-        | none => pathError .incompatibleEquality path
+        | none => pathError .incompatibleEquality path {
+            leftSort := some .enum
+            rightSort := some (diagnosticSortOfResult right)
+            offendingName := some variant }
         | some anchored =>
             let left ← checkExprFuel (fuel - 1) Γ scope (.enum variant)
               (.enum scope.schema anchored.attr anchored.enumSchema anchored.shapeEq)
@@ -1008,7 +1096,10 @@ mutual
     | other, .enum variant =>
         let left ← synthExprFuel (fuel - 1) Γ scope other (path ++ [.lhs])
         match enumOfResult left with
-        | none => pathError .incompatibleEquality path
+        | none => pathError .incompatibleEquality path {
+            leftSort := some (diagnosticSortOfResult left)
+            rightSort := some .enum
+            offendingName := some variant }
         | some anchored =>
             let right ← checkExprFuel (fuel - 1) Γ scope (.enum variant)
               (.enum scope.schema anchored.attr anchored.enumSchema anchored.shapeEq)
@@ -1036,7 +1127,9 @@ mutual
                       rightExpr
                   if isEq then pure ⟨.bool, .eq leftExpr castRight, .bool⟩
                   else pure ⟨.bool, .ne leftExpr castRight, .bool⟩
-              | none => pathError .incompatibleEquality path
+              | none => pathError .incompatibleEquality path {
+                  leftSort := some (diagnosticSortOfOrigin leftOrigin)
+                  rightSort := some (diagnosticSortOfOrigin rightOrigin) }
     else pathError .sortMismatch path
   termination_by fuel
   decreasing_by all_goals omega
@@ -1060,7 +1153,9 @@ mutual
               | .gt => .gt numeric leftExpr rightExpr
               | .ge => .ge numeric leftExpr rightExpr
             pure ⟨.bool, expr, .bool⟩
-    | _, _ => pathError .expectedNumeric path
+    | _, _ => pathError .expectedNumeric path {
+        leftSort := some (diagnosticSortOfResult left)
+        rightSort := some (diagnosticSortOfResult right) }
     else pathError .sortMismatch path
   termination_by fuel
   decreasing_by all_goals omega
@@ -1073,17 +1168,20 @@ mutual
     if positive : 0 < fuel then do
       let box := scope.owner.box
       let table ← match Γ.model.catalog.lookupTable box tableName with
-        | none => pathError .unknownTable (path ++ [.tableTarget])
+        | none => pathError .unknownTable (path ++ [.tableTarget]) {
+            offendingName := some tableName }
         | some table => pure table
       let related : TableTarget Γ.model.catalog := scope.relatedTarget table
       let relatedScope : RowScope Γ.model Γ.current Γ.inputs := .table related
       let fkId ← match (Γ.model.schemaFor related).lookupAttribute fkName with
-        | none => pathError .unknownJoinAttribute (path ++ [.joinForeignAttribute])
+        | none => pathError .unknownJoinAttribute (path ++ [.joinForeignAttribute]) {
+            offendingName := some fkName }
         | some attr => pure attr
       match fkShape : ((Γ.model.schemaFor related).attr fkId).shape with
       | .ref joinTarget =>
         let selfFkId ← match scope.schema.lookupAttribute selfFkName with
-          | none => pathError .unknownJoinAttribute (path ++ [.joinSelfAttribute])
+          | none => pathError .unknownJoinAttribute (path ++ [.joinSelfAttribute]) {
+              offendingName := some selfFkName }
           | some attr => pure attr
         match selfShape : (scope.schema.attr selfFkId).shape with
         | .ref selfTarget =>
@@ -1110,10 +1208,21 @@ mutual
                 pure ⟨.real, .agg table joinTarget fk selfFk checkedOp checkedFilter, .real⟩
             | .int, checkedOp, .int =>
                 pure ⟨.int, .agg table joinTarget fk selfFk checkedOp checkedFilter, .int⟩
-            | _, _, _ => pathError .expectedNumeric path
-          else pathError .incompatibleJoinTargets path
-        | _ => pathError .expectedReference (path ++ [.joinSelfAttribute])
-      | _ => pathError .expectedReference (path ++ [.joinForeignAttribute])
+            | _, _, origin => pathError .expectedNumeric path {
+                actualSort := some (diagnosticSortOfOrigin origin) }
+          else pathError .incompatibleJoinTargets path {
+            contextName := some (Γ.model.catalog.tableName ⟨box, selfTarget⟩)
+            expectedName := some (Γ.model.catalog.tableName ⟨box, joinTarget⟩) }
+        | _ => pathError .expectedReference (path ++ [.joinSelfAttribute]) {
+            actualSort := some (diagnosticSortOfOrigin
+              (SortOrigin.ofAttribute Γ (scope := scope) selfFkId))
+            expectedSort := some .ref
+            offendingName := some selfFkName }
+      | _ => pathError .expectedReference (path ++ [.joinForeignAttribute]) {
+          actualSort := some (diagnosticSortOfOrigin
+            (SortOrigin.ofAttribute Γ (scope := relatedScope) fkId))
+          expectedSort := some .ref
+          offendingName := some fkName }
     else pathError .sortMismatch path
   termination_by fuel
   decreasing_by all_goals omega
@@ -1145,7 +1254,8 @@ def checkEffect (Γ : TermContext) (raw : IR.Effect)
   match raw with
   | .setAttr name value =>
       let destination ← match (Γ.model.schemaFor Γ.current).lookupAttribute name with
-        | none => pathError .unknownAttribute (path ++ [.destination])
+        | none => pathError .unknownAttribute (path ++ [.destination]) {
+            offendingName := some name }
         | some destination => pure destination
       let checked ← checkExpr Γ (.table Γ.current) value
         ((Γ.model.schemaFor Γ.current).attributeSort destination)
@@ -1174,7 +1284,10 @@ def checkClaim (Γ : TermContext) (raw : IR.ResourceClaim)
     Except TermCheckError (ResourceClaim Γ.model Γ.current Γ.inputs) := do
   let resourceResult ← synthExpr Γ (.table Γ.current) raw.resource (path ++ [.resource])
   let resource ← match refOfResult resourceResult with
-    | none => pathError .expectedReference (path ++ [.resource])
+    | none => pathError .expectedReference (path ++ [.resource]) {
+        actualSort := some (diagnosticSortOfResult resourceResult)
+        expectedSort := some .ref
+        offendingName := simpleAttributeName? raw.resource }
     | some resource => pure resource
   match raw.ordering with
   | .raceTime =>
@@ -1215,7 +1328,9 @@ def checkClaim (Γ : TermContext) (raw : IR.ResourceClaim)
                   orderingDomain := domain
                   orderingAvailability := .rawCheckable
                   ordering := .key domain keyExpr }
-          | none => pathError .expectedOrderable (path ++ [.orderingKey])
+          | none => pathError .expectedOrderable (path ++ [.orderingKey]) {
+              actualSort := some (diagnosticSortOfResult key)
+              offendingName := simpleAttributeName? rawKey }
 
 /-! ## Structural raw-expression equality -/
 
@@ -1551,7 +1666,10 @@ def checkClaims (Γ : TermContext) (raws : List IR.ResourceClaim)
     Except TermCheckError (List (ResourceClaim Γ.model Γ.current Γ.inputs)) := do
   match firstDuplicateResource? raws with
   | some index =>
-      pathError .duplicateResourceClaim (path ++ [.contests, .claim index, .resource])
+      let offendingName := (raws.get? index).bind fun claim =>
+        simpleAttributeName? claim.resource
+      pathError .duplicateResourceClaim (path ++ [.contests, .claim index, .resource]) {
+        offendingName := offendingName }
   | none => checkClaimsAux Γ path 0 raws
 
 private def rawClaimCovers (claims : List IR.ResourceClaim) (rhs : IR.Expr) : Bool :=
@@ -1635,7 +1753,11 @@ def checkTransitionTerms (Γ : TermContext) (raw : IR.Transition)
   let claims ← checkClaims Γ raw.contests path
   match firstUnclaimedRefWrite? Γ raw.effects raw.contests with
   | some index =>
-      pathError .unclaimedRefWrite (path ++ [.effects, .effect index, .value])
+      let offendingName := (raw.effects.get? index).map fun effect =>
+        match effect with
+        | .setAttr destination _ => destination
+      pathError .unclaimedRefWrite (path ++ [.effects, .effect index, .value]) {
+        offendingName := offendingName }
   | none => pure { guard, hazard, effects, claims }
 
 /-! ## Independent syntax-directed judgments -/
@@ -3599,7 +3721,9 @@ private theorem declarativeFuel_complete {Γ : TermContext}
         rw [shapeSame]
         change (match enumSchema.lookup scope.schema attr shapeEq
             (enumSchema.variantName scope.schema attr variant) with
-          | none => pathError .unknownEnumVariant path
+          | none => pathError .unknownEnumVariant path {
+              offendingName := some (enumSchema.variantName scope.schema attr variant)
+              contextName := some (scope.schema.attributeName attr) }
           | some found => Except.ok (Expr.enum attr enumSchema found)) =
             Except.ok (Expr.enum attr enumSchema variant)
         rw [EnumSchema.lookup_variantName_self]

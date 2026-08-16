@@ -345,4 +345,283 @@ private def nestedInterleavedOrder : Bool :=
 
 #guard nestedInterleavedOrder
 
+namespace ClaimedRefExactRaw
+open Sembla.Frontend.Builders
+
+sembla_model Checked (name := "claimed_ref_exact_raw") (dt := 1.0) where
+  box arena where
+    system Resource (name := "runtime_resource") (rows := 1)
+    system Writer (name := "runtime_writer") (rows := 1) where
+      parent : Resource
+      backup : Resource
+      visits : Int
+    transition rewrite on Writer where
+      guard true
+      hazard 1.0
+      contest parent by race_time
+      contest backup by race_time
+      set visits := 1
+      set parent := parent
+
+private def exactRaw : Model :=
+  Model.mk "claimed_ref_exact_raw" 1.0 []
+    [Box.mk "arena"
+      [ Table.mk "runtime_resource" 1 []
+      , Table.mk "runtime_writer" 1
+          [ Attr.mk "parent" (.ref "runtime_resource")
+          , Attr.mk "backup" (.ref "runtime_resource")
+          , Attr.mk "visits" .int ] ]
+      [TransitionRaw.transition "rewrite" "runtime_writer" (.bool true) (.real 1.0)
+        [ TransitionRaw.setAttribute "visits" (.int 1)
+        , TransitionRaw.setAttribute "parent" (.selfAttr "parent") ]
+        [ TransitionRaw.raceClaim (.selfAttr "parent")
+        , TransitionRaw.raceClaim (.selfAttr "backup") ]]
+      [] [] [] []]
+    [] []
+
+#guard Checked == exactRaw
+#guard Sembla.IR.toJson Checked == Sembla.IR.toJson exactRaw
+
+end ClaimedRefExactRaw
+
+namespace AliasTransitionPlanningParity
+open Sembla.Frontend.Builders
+
+sembla_model Checked (name := "alias_transition_planning_parity") (dt := 1.0) where
+  domain Region := {north, south}
+  box population where
+    system Person (name := "people") (rows := 2) where
+      region : Region
+      status : {susceptible, infected}
+      visits : Int
+      score : ℝ
+    state Susceptible on Person where
+      status := susceptible
+      match visits ≥ 0
+    state InRegion (selected : Region) on Person where
+      region := selected
+    state Moved (selected : Region) on Person where
+      region := selected
+      status := infected
+      visits := 2
+    transition idle on Person where
+      guard true
+      hazard 0.01
+      set visits := 0
+    relation move (origin : Region, target : Region) on Person subject to origin ≠ target where
+      from Susceptible, InRegion(origin)
+      hazard 0.25
+      set score := 1.5
+      become Moved(target)
+
+private def exactRaw : Model :=
+  Model.mk "alias_transition_planning_parity" 1.0 []
+    [Box.mk "population"
+      [Table.mk "people" 2
+        [ Attr.mk "region" (.enum ["north", "south"])
+        , Attr.mk "status" (.enum ["susceptible", "infected"])
+        , Attr.mk "visits" .int
+        , Attr.mk "score" .real ]]
+      [ TransitionRaw.transition "idle" "people" (.bool true) (.real 0.01)
+          [TransitionRaw.setAttribute "visits" (.int 0)] []
+      , TransitionRaw.transition "move_north_south" "people"
+          (.and (.enumIs "status" "susceptible")
+            (.and (.ge (.selfAttr "visits") (.int 0))
+              (.enumIs "region" "north")))
+          (.real 0.25)
+          [ TransitionRaw.setAttribute "score" (.real 1.5)
+          , TransitionRaw.setAttribute "region" (.enum "south")
+          , TransitionRaw.setAttribute "status" (.enum "infected")
+          , TransitionRaw.setAttribute "visits" (.int 2) ] []
+      , TransitionRaw.transition "move_south_north" "people"
+          (.and (.enumIs "status" "susceptible")
+            (.and (.ge (.selfAttr "visits") (.int 0))
+              (.enumIs "region" "south")))
+          (.real 0.25)
+          [ TransitionRaw.setAttribute "score" (.real 1.5)
+          , TransitionRaw.setAttribute "region" (.enum "north")
+          , TransitionRaw.setAttribute "status" (.enum "infected")
+          , TransitionRaw.setAttribute "visits" (.int 2) ] [] ]
+      [] [] [] []]
+    [] []
+
+private def transitionList := Checked.boxes.bind (·.transitions)
+
+#guard Checked == exactRaw
+#guard Sembla.IR.toJson Checked == Sembla.IR.toJson exactRaw
+#guard transitionList.map (·.name) == ["idle", "move_north_south", "move_south_north"]
+#guard (transitionList.get? 1).map (·.guard) == some
+  (.and (.enumIs "status" "susceptible")
+    (.and (.ge (.selfAttr "visits") (.int 0)) (.enumIs "region" "north")))
+#guard (transitionList.get? 1).map (·.effects) == some
+  [ .setAttr "score" (.real 1.5)
+  , .setAttr "region" (.enum "south")
+  , .setAttr "status" (.enum "infected")
+  , .setAttr "visits" (.int 2) ]
+
+end AliasTransitionPlanningParity
+
+namespace ZeroInstanceAliasPlanningParity
+open Sembla.Frontend.Builders
+
+sembla_model Checked (name := "zero_instance_alias_planning_parity") (dt := 1.0) where
+  domain OnlyDomain := {only}
+  box population where
+    system Person (name := "people") (rows := 1) where
+      status : {present, absent}
+    state Present on Person where
+      status := present
+    transition keep on Person where
+      guard true
+      hazard 0.1
+      set status := present
+    relation impossible (left : OnlyDomain, right : OnlyDomain) on Person
+        subject to left ≠ right where
+      from Present
+      hazard 0.5
+      become Present
+
+private def exactRaw : Model :=
+  Model.mk "zero_instance_alias_planning_parity" 1.0 []
+    [Box.mk "population"
+      [Table.mk "people" 1 [Attr.mk "status" (.enum ["present", "absent"])]]
+      [TransitionRaw.transition "keep" "people" (.bool true) (.real 0.1)
+        [TransitionRaw.setAttribute "status" (.enum "present")] []]
+      [] [] [] []]
+    [] []
+
+#guard Checked == exactRaw
+#guard Sembla.IR.toJson Checked == Sembla.IR.toJson exactRaw
+#guard Checked.boxes.head?.map (fun modelBox => modelBox.transitions.map (·.name)) ==
+  some ["keep"]
+
+end ZeroInstanceAliasPlanningParity
+
+namespace UsedAliasCheckerProbes
+
+/- The used source emits a valid Ref equality followed by an invalid predicate.
+The unused validator would reject the Ref assignment first, so this Bool error
+proves the emitted source reached the authoritative guard checker. -/
+/--
+error: guard has type Int; expected Bool
+-/
+#guard_msgs (error) in
+sembla_model UsedSourceAliasError (dt := 1.0) where
+  domain One := {only}
+  box population where
+    system Family (rows := 1)
+    system Person (rows := 1) where
+      parent : Family
+      status : {susceptible, infected}
+    state Broken on Person where
+      parent := parent
+      match 1
+    state Infected on Person where
+      status := infected
+    relation apply (_x : One) on Person where
+      from Broken
+      hazard 0.1
+      become Infected
+
+/- The used destination emits a Ref write without a claim. The unused validator
+would reject the Ref assignment immediately, while the authoritative checker
+reports claim ownership after checking the emitted effect. -/
+/--
+error: writes to Ref attributes require resource claims, which are not supported by this DSL
+-/
+#guard_msgs (error) in
+sembla_model UsedDestinationAliasError (dt := 1.0) where
+  domain One := {only}
+  box population where
+    system Family (rows := 1)
+    system Person (rows := 1) where
+      parent : Family
+      status : {susceptible, infected}
+    state Susceptible on Person where
+      status := susceptible
+    state Broken on Person where
+      parent := parent
+    relation apply (_x : One) on Person where
+      from Susceptible
+      hazard 0.1
+      become Broken
+
+end UsedAliasCheckerProbes
+
+namespace LogicalGuardDiagnosticParity
+
+/--
+error: left operand of ∧ must have type Bool
+-/
+#guard_msgs (error) in
+sembla_model BadAndLeft (dt := 1.0) where
+  box b where
+    system Person (rows := 1) where value : ℝ
+    transition bad on Person where
+      guard value ∧ true
+      hazard 0.1
+      set value := value
+
+/--
+error: right operand of ∧ must have type Bool
+-/
+#guard_msgs (error) in
+sembla_model BadAndRight (dt := 1.0) where
+  box b where
+    system Person (rows := 1) where value : ℝ
+    transition bad on Person where
+      guard true ∧ value
+      hazard 0.1
+      set value := value
+
+/--
+error: left operand of ∧ must have type Bool
+-/
+#guard_msgs (error) in
+sembla_model BadNestedAnd (dt := 1.0) where
+  box b where
+    system Person (rows := 1) where value : ℝ
+    transition bad on Person where
+      guard true ∧ (value ∧ true)
+      hazard 0.1
+      set value := value
+
+/--
+error: operand of ¬ must have type Bool
+-/
+#guard_msgs (error) in
+sembla_model BadNot (dt := 1.0) where
+  box b where
+    system Person (rows := 1) where value : ℝ
+    transition bad on Person where
+      guard ¬value
+      hazard 0.1
+      set value := value
+
+/--
+error: left operand of && must have type Bool
+-/
+#guard_msgs (error) in
+sembla_model BadAsciiAnd (dt := 1.0) where
+  box b where
+    system Person (rows := 1) where value : ℝ
+    transition bad on Person where
+      guard value && true
+      hazard 0.1
+      set value := value
+
+/--
+error: guard has type Real; expected Bool
+-/
+#guard_msgs (error) in
+sembla_model BadRootGuard (dt := 1.0) where
+  box b where
+    system Person (rows := 1) where value : ℝ
+    transition bad on Person where
+      guard value
+      hazard 0.1
+      set value := value
+
+end LogicalGuardDiagnosticParity
+
 end Sembla.CommandFrontendTests

@@ -245,6 +245,95 @@ private def expectTermError (result : Except TermCheckError α)
   .expectedBool []
 #guard expectTermError (checkExpr Γ tableScope (.int 1) .real .real [])
   .expectedReal []
+
+private def expectTermMetadata (result : Except TermCheckError α)
+    (metadata : CheckerDiagnosticMetadata) : Bool :=
+  match result with
+  | .error error => error.metadata == metadata
+  | .ok _ => false
+
+#guard expectTermMetadata (synthExpr Γ tableScope (.param "missing") [])
+  { offendingName := some "missing" }
+#guard expectTermMetadata (synthExpr Γ tableScope (.selfAttr "missing") [])
+  { offendingName := some "missing" }
+#guard expectTermMetadata (synthExpr Γ tableScope
+    (.input "missing" (.mk .count none)) [])
+  { offendingName := some "missing" }
+#guard expectTermMetadata (synthExpr Γ tableScope
+    (.agg .count "missing" "region" "region" (.bool true)) [])
+  { offendingName := some "missing" }
+#guard expectTermMetadata (checkExpr Γ tableScope (.enum "missing")
+    (.enum (Γ.model.schemaFor Γ.current) statusAttr statusSchema statusShape)
+    (.enum (Γ := Γ) (scope := tableScope) statusAttr statusSchema statusShape) [])
+  { offendingName := some "missing", contextName := some "status" }
+#guard expectTermMetadata (checkExpr Γ tableScope (.int 1) .bool .bool [])
+  { actualSort := some .int, expectedSort := some .bool }
+#guard expectTermMetadata (checkExpr Γ tableScope (.int 1) .real .real [])
+  { actualSort := some .int, expectedSort := some .real }
+
+private def expectExactTermError (result : Except TermCheckError α)
+    (category : TermCheckErrorCategory) (path : List ModelCheckPathSegment)
+    (metadata : CheckerDiagnosticMetadata) : Bool :=
+  match result with
+  | .error error => error.category == category && error.path == path &&
+      error.metadata == metadata
+  | .ok _ => false
+
+/- Exact metadata for each reachable term failure family enriched in Phase B1. -/
+#guard expectExactTermError
+  (synthExpr Γ tableScope (.enumIs "count" "open") []) .sortMismatch []
+  { actualSort := some .int, expectedSort := some .enum,
+    offendingName := some "count" }
+#guard expectExactTermError
+  (checkExpr Γ tableScope (.enum "open") .bool .bool []) .sortMismatch []
+  { actualSort := some .enum, expectedSort := some .bool,
+    offendingName := some "open" }
+#guard expectExactTermError
+  (synthExpr Γ tableScope (.add (.bool true) (.int 1)) []) .expectedNumeric []
+  { leftSort := some .bool, rightSort := some .int }
+#guard expectExactTermError
+  (synthExpr Γ tableScope (.lt (.int 1) (.bool true)) []) .expectedNumeric []
+  { leftSort := some .int, rightSort := some .bool }
+#guard expectExactTermError
+  (synthExpr Γ tableScope
+    (.agg .count "Event" "amount" "region" (.bool true)) [])
+  .expectedReference [.joinForeignAttribute]
+  { actualSort := some .real, expectedSort := some .ref,
+    offendingName := some "amount" }
+#guard expectExactTermError
+  (synthExpr Γ tableScope
+    (.agg .count "Event" "region" "count" (.bool true)) [])
+  .expectedReference [.joinSelfAttribute]
+  { actualSort := some .int, expectedSort := some .ref,
+    offendingName := some "count" }
+#guard expectExactTermError
+  (checkClaim Γ { resource := .int 1, ordering := .raceTime } [])
+  .expectedReference [.resource]
+  { actualSort := some .int, expectedSort := some .ref }
+#guard expectExactTermError
+  (checkClaim Γ { resource := .selfAttr "region", ordering := .key (.bool true) } [])
+  .expectedOrderable [.orderingKey]
+  { actualSort := some .bool }
+#guard expectExactTermError
+  (checkClaim Γ
+    { resource := .selfAttr "region", ordering := .key (.selfAttr "manager") } [])
+  .expectedOrderable [.orderingKey]
+  { actualSort := some .ref, offendingName := some "manager" }
+#guard expectExactTermError
+  (synthExpr Γ tableScope (.eq (.bool true) (.int 1)) [])
+  .incompatibleEquality []
+  { leftSort := some .bool, rightSort := some .int }
+#guard expectExactTermError
+  (synthExpr Γ tableScope (.eq (.enum "open") (.int 1)) [])
+  .incompatibleEquality []
+  { leftSort := some .enum, rightSort := some .int,
+    offendingName := some "open" }
+#guard expectExactTermError
+  (synthExpr Γ tableScope
+    (.agg .count "Event" "other" "manager" (.bool true)) [])
+  .incompatibleJoinTargets []
+  { contextName := some "Region", expectedName := some "Event" }
+
 #guard expectTermError (synthExpr Γ tableScope (.eq (.bool true) (.int 1)) [])
   .incompatibleEquality []
 #guard expectTermError (synthExpr Γ tableScope
@@ -269,6 +358,14 @@ private def expectModelError (raw : IR.Model) (category : ModelTermErrorCategory
     (path : List ModelCheckPathSegment) : Bool :=
   match checkModel raw with
   | .error (.model error) => error.category == category && error.path == path
+  | _ => false
+
+private def expectModelMetadata (raw : IR.Model)
+    (category : ModelTermErrorCategory) (path : List ModelCheckPathSegment)
+    (metadata : CheckerDiagnosticMetadata) : Bool :=
+  match checkModel raw with
+  | .error (.model error) => error.category == category && error.path == path &&
+      error.metadata == metadata
   | _ => false
 
 private def expectDeclarationError (raw : IR.Model) (category : CheckErrorCategory) : Bool :=
@@ -367,6 +464,13 @@ private def badRealSumDestination : IR.Model := withOutput
   { outputDecl with schema := [rowsAttr, countAttr, { realAttr with ty := .int }] }
 #guard expectModelError badRealSumDestination .outputFieldSortMismatch
   [.model, .box 0, .output 0, .outputFields, .outputField 2, .fieldOperation]
+
+private def badOutputSumValue : IR.Model := withOutput
+  { outputDecl with builder := (.perTable "People"
+      [rowsField, { countField with op := .sum (.bool true) }, realField]) }
+#guard expectModelError badOutputSumValue (.term .expectedNumeric)
+  [.model, .box 0, .output 0, .outputFields, .outputField 1,
+    .fieldOperation, .aggregateValue]
 
 private def badViewShape : IR.Model :=
   { positiveModel with
@@ -546,6 +650,13 @@ private def badGroupedUnexpectedBand : IR.Model :=
 #guard expectModelError badGroupedUnexpectedBand .unexpectedGroupedBand
   [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedBand]
 
+private def badGroupedRefBand : IR.Model :=
+  { positiveModel with boxes := [{ box with groupedViews := [
+      { grouped with keys := [{ attr := "region", bandWidth := some 2 }] }
+    ] }] }
+#guard expectModelError badGroupedRefBand .unexpectedGroupedBand
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedBand]
+
 private def badGroupedFilter : IR.Model :=
   { positiveModel with boxes := [{ box with groupedViews := [
       { grouped with filter := some (.input "flow" (.mk .count none)) }
@@ -559,6 +670,141 @@ private def badGroupedBooleanFilter : IR.Model :=
     ] }] }
 #guard expectModelError badGroupedBooleanFilter (.term .expectedBool)
   [.model, .box 0, .groupedView 0, .viewFilter]
+
+/- Exact model-level metadata, including unchanged forwarding from nested term
+failures through `ModelTermErrorCategory.term`. -/
+#guard expectModelMetadata badOutputTable .unresolvedOutputTable
+  [.model, .box 0, .output 0, .outputBuilder, .tableTarget]
+  { offendingName := some "missing", contextName := some "flow" }
+#guard expectModelMetadata badOutputName .outputFieldNameMismatch
+  [.model, .box 0, .output 0, .outputFields, .outputField 0, .fieldName]
+  { offendingName := some "wrong", expectedName := some "rows" }
+#guard expectModelMetadata badOutputCount .outputFieldCountMismatch
+  [.model, .box 0, .output 0, .outputFields, .outputSchema]
+  { actualCount := some 0, expectedCount := some 3, contextName := some "flow" }
+#guard expectModelMetadata badOutputExtra .outputFieldCountMismatch
+  [.model, .box 0, .output 0, .outputFields, .outputSchema]
+  { actualCount := some 4, expectedCount := some 3, contextName := some "flow" }
+#guard expectModelMetadata badOutputDuplicate .duplicateOutputField
+  [.model, .box 0, .output 0, .outputFields, .outputField 1, .fieldName]
+  { offendingName := some "rows" }
+#guard expectModelMetadata badCountDestination .outputFieldSortMismatch
+  [.model, .box 0, .output 0, .outputFields, .outputField 0, .fieldOperation]
+  { actualSort := some .int, expectedSort := some .real,
+    aggregateKind := some .count, offendingName := some "rows" }
+#guard expectModelMetadata badIntSumDestination .outputFieldSortMismatch
+  [.model, .box 0, .output 0, .outputFields, .outputField 1, .fieldOperation]
+  { actualSort := some .int, expectedSort := some .real,
+    aggregateKind := some .sum, offendingName := some "totalCount" }
+#guard expectModelMetadata badRealSumDestination .outputFieldSortMismatch
+  [.model, .box 0, .output 0, .outputFields, .outputField 2, .fieldOperation]
+  { actualSort := some .real, expectedSort := some .int,
+    aggregateKind := some .sum, offendingName := some "total" }
+#guard expectModelMetadata badOutputSumValue (.term .expectedNumeric)
+  [.model, .box 0, .output 0, .outputFields, .outputField 1,
+    .fieldOperation, .aggregateValue]
+  { actualSort := some .bool, aggregateKind := some .sum }
+#guard expectModelMetadata badViewTable .unresolvedViewTable
+  [.model, .box 0, .view 0, .viewTable]
+  { offendingName := some "missing", contextName := some "bad" }
+#guard expectModelMetadata badViewShape .invalidViewReducerShape
+  [.model, .box 0, .view 0, .viewReducer]
+  { viewReducer := some .count, valuePresent := some true,
+    contextName := some "bad" }
+#guard expectModelMetadata badViewValueSort .invalidViewReducerShape
+  [.model, .box 0, .view 0, .viewValue]
+  { actualSort := some .bool, viewReducer := some .sum,
+    valuePresent := some true, contextName := some "bad" }
+#guard expectModelMetadata (invalidViewWithoutValue .sum) .invalidViewReducerShape
+  [.model, .box 0, .view 0, .viewReducer]
+  { viewReducer := some .sum, valuePresent := some false,
+    contextName := some "bad" }
+#guard expectModelMetadata (invalidViewWithoutValue .min) .invalidViewReducerShape
+  [.model, .box 0, .view 0, .viewReducer]
+  { viewReducer := some .min, valuePresent := some false,
+    contextName := some "bad" }
+#guard expectModelMetadata (invalidViewWithoutValue .max) .invalidViewReducerShape
+  [.model, .box 0, .view 0, .viewReducer]
+  { viewReducer := some .max, valuePresent := some false,
+    contextName := some "bad" }
+#guard expectModelMetadata badGroupedCount .invalidGroupedKeyCount
+  [.model, .box 0, .groupedView 0, .groupedKeys]
+  { actualCount := some 0, minimumCount := some 1, maximumCount := some 4,
+    contextName := some "byKeys" }
+#guard expectModelMetadata badGroupedFive .invalidGroupedKeyCount
+  [.model, .box 0, .groupedView 0, .groupedKeys]
+  { actualCount := some 5, minimumCount := some 1, maximumCount := some 4,
+    contextName := some "byKeys" }
+#guard expectModelMetadata badGroupedUnknownKey .unresolvedGroupedKey
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedAttribute]
+  { offendingName := some "missing" }
+#guard expectModelMetadata badGroupedRealKey .invalidGroupedKeySort
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedAttribute]
+  { actualSort := some .real, offendingName := some "rate" }
+#guard expectModelMetadata badGroupedBand .nonpositiveGroupedBand
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedBand]
+  { actualSort := some .int, bandWidth := some 0, offendingName := some "count" }
+#guard expectModelMetadata badGroupedMissingBand .missingGroupedBand
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedBand]
+  { actualSort := some .int, offendingName := some "count" }
+#guard expectModelMetadata badGroupedUnexpectedBand .unexpectedGroupedBand
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedBand]
+  { actualSort := some .enum, bandWidth := some 1,
+    offendingName := some "status" }
+#guard expectModelMetadata badGroupedRefBand .unexpectedGroupedBand
+  [.model, .box 0, .groupedView 0, .groupedKeys, .groupedKey 0, .groupedBand]
+  { actualSort := some .ref, bandWidth := some 2,
+    offendingName := some "region" }
+#guard expectModelMetadata badGroupedFilter .aggregateInGroupedFilter
+  [.model, .box 0, .groupedView 0, .viewFilter]
+  { contextName := some "byKeys" }
+#guard expectModelMetadata badGroupedBooleanFilter (.term .expectedBool)
+  [.model, .box 0, .groupedView 0, .viewFilter]
+  { actualSort := some .int, expectedSort := some .bool }
+#guard expectModelMetadata badSummaryBox .unresolvedSummaryBox
+  [.model, .summary 0, .summaryBox]
+  { offendingName := some "missing", contextName := some "bad" }
+#guard expectModelMetadata badSummaryView .unresolvedSummaryView
+  [.model, .summary 0, .summaryView]
+  { offendingName := some "missing", contextName := some "bad",
+    expectedName := some "Sim" }
+#guard expectModelMetadata badSummaryGroupedOnly .unresolvedSummaryView
+  [.model, .summary 0, .summaryView]
+  { offendingName := some "byKeys", contextName := some "bad",
+    expectedName := some "Sim" }
+#guard expectModelMetadata badEnumTestSort (.term .sortMismatch)
+  [.model, .box 0, .transition 0, .guard]
+  { actualSort := some .int, expectedSort := some .enum,
+    offendingName := some "count" }
+#guard expectModelMetadata badClaimResource (.term .expectedReference)
+  [.model, .box 0, .transition 0, .contests, .claim 0, .resource]
+  { actualSort := some .int, expectedSort := some .ref }
+#guard expectModelMetadata badDuplicateClaim (.term .duplicateResourceClaim)
+  [.model, .box 0, .transition 0, .contests, .claim 1, .resource]
+  { offendingName := some "region" }
+#guard expectModelMetadata badBoolClaimKey (.term .expectedOrderable)
+  [.model, .box 0, .transition 0, .contests, .claim 0, .orderingKey]
+  { actualSort := some .bool }
+#guard expectModelMetadata badRefClaimKey (.term .expectedOrderable)
+  [.model, .box 0, .transition 0, .contests, .claim 0, .orderingKey]
+  { actualSort := some .ref, offendingName := some "manager" }
+#guard expectModelMetadata badUnclaimedWrite (.term .unclaimedRefWrite)
+  [.model, .box 0, .transition 0, .effects, .effect 0, .value]
+  { offendingName := some "region" }
+#guard expectModelMetadata badViewFilter (.term .expectedBool)
+  [.model, .box 0, .view 0, .viewFilter]
+  { actualSort := some .int, expectedSort := some .bool }
+private def badNestedViewLookup : IR.Model :=
+  { positiveModel with
+    boxes := [{ box with views := [
+      { name := "bad", table := "People",
+        filter := some (.and (.bool true) (.selfAttr "missing")),
+        value := none, reduce := .count }
+    ] }]
+    summaries := [] }
+#guard expectModelMetadata badNestedViewLookup (.term .unknownAttribute)
+  [.model, .box 0, .view 0, .viewFilter, .rhs]
+  { offendingName := some "missing" }
 
 /-- The declaration bridge is exercised at generic and concrete boundaries. -/
 example : (declarations.inputPortSchemas simBox).map BoxPortSchema.name = ["flow"] := by

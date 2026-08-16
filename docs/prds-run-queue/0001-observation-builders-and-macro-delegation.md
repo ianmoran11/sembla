@@ -122,11 +122,102 @@ tables and rendering diagnostics. Its translation from final builder
 category/path values to source positions must be exhaustive. It must not rerun
 name, schema or term-validity logic to choose a diagnostic. Remaining macro
 checks must be explicitly classified as parsing or current surface-shape
-compatibility checks.
+compatibility checks. The only trusted semantic compatibility exceptions are
+the unused-state-alias validator and compile-time expression-function validator
+sanctioned below. Neither authorizes semantic rechecking while lowering or
+diagnosing an emitted alias atom or substituted expression-function use.
 
 Exact positioned-diagnostic compatibility is governed by the existing negative
 harness, including exact lines and columns. This PRD does not permit changing
 that harness or its expected fixtures.
+
+### Sanctioned diagnostic-only PRD 0006 amendment
+
+PRD 0009 may enrich `TermCheckError` and `ModelTermError` with
+syntax-independent rendering metadata already available at the authoritative
+checker failure site. This metadata is observational only: category, path,
+success/failure, failure precedence, checked result, erasure and the accepted
+raw-model boundary remain unchanged. No source positions, parser syntax,
+alternate checker or new semantic rejection category may be introduced.
+Nested term metadata must be preserved unchanged through
+`TransitionBuilderError.term`, `ModelTermErrorCategory.term` and
+`ModelCheckError.model`. The metadata vocabulary must remain nondependent and
+structured; arbitrary rendered message strings are forbidden.
+
+### Sanctioned unused state-alias compatibility exception
+
+Raw IR V1 has no state-alias declaration. An alias declaration that contributes
+no expanded guard atom or effect to the complete raw candidate therefore cannot
+be checked by `buildSurfaceCompleteModel` or `checkModel`. To preserve existing
+diagnostics, `frontend/Sembla/DSL.lean` may retain exactly one trusted semantic
+compatibility path for **unused state-alias declarations**.
+
+An alias declaration is **used** iff, during the single authoritative transition
+expansion for its containing box, at least one application contributes at least
+one alias-derived raw guard atom or effect to an emitted transition instance. It
+is **unused** otherwise, including when no transition instance is emitted. Usage
+must be recorded from the same expansion results that produce emitted terms and
+sidecars; a second expansion, name-generation pass, semantic lookup pass or
+post-failure reconstruction solely to determine usage is forbidden.
+
+For an unused alias only, one named trusted validator invoked at most once may
+retain the current assignment-destination lookup, Ref-assignment rejection,
+Enum-member validation, scalar assignment compatibility, expression name/type
+validation and predicate-`Bool` requirement. It introduces no syntax, raw
+constructor, checker category/path or metadata, and retains existing messages,
+declaration order, token positions and first-error order. Alias namespace,
+formal/domain, aggregate, substitution and raw-encoding-shape checks remain
+ordinary expansion checks rather than part of this exception.
+
+For every used alias application, each emitted guard atom and effect is checked
+exactly once by the authoritative builder/checker. The DSL may resolve the
+application and select a raw encoding such as `enumIs`/`enum`, but may not at
+declaration pass or use site check final destination existence, Enum membership,
+Ref validity/claims, equality or RHS sort compatibility, predicate `Bool`
+validity, or nested emitted-expression validity. Authored and emitted-order
+provenance must remain exhaustive.
+
+The exception is exclusive to unused `SurfaceStateAlias` declarations. It does
+not apply to used aliases, named reactions, relations, reaction or relation
+terms, projected partitions, parameter families, expression-function cells or
+core declarations. The separate expression-function compatibility path below
+is not part of this alias exception.
+
+### Sanctioned compile-time expression-function compatibility exception
+
+Raw IR V1 has no expression-function declaration or cell table. A surface
+expression function is finite compile-time substitution data, so a declared
+cell that is never substituted into an emitted raw expression cannot be checked
+by `buildSurfaceCompleteModel` or `checkModel`. To retain existing complete-cell
+and declaration-site diagnostics, `frontend/Sembla/DSL.lean` may retain exactly
+one named trusted compatibility validator,
+`trustedValidateExprFunctionCompatibility`.
+
+The validator is invoked exactly once after the complete parameter,
+parameter-family, domain, partition and expression-function declarations have
+been collected and before transition/observation substitution. In declaration
+and cell source order it may retain only the existing empty-row-scope expression
+name/type validation, formal/domain substitution compatibility and declared
+cell-result sort requirement. Existing function-table completeness, duplicate
+cell/key, recursive-call prohibition, aggregate prohibition and expansion-cap
+checks remain ordinary expansion/current-surface-shape checks rather than part
+of this exception.
+
+This validator introduces no syntax, raw constructor, checker category/path,
+metadata or rendered-message string, and it retains existing declaration order,
+token positions and first-error order. It is declaration-only: it may not be
+called from function application lowering, transition/observation lowering,
+error translation or token mapping, and it may not authorize a second
+substitution or raw-expression expansion. Every substituted raw expression is
+still emitted once and checked by the authoritative transition/model checker;
+the compatibility result is not reused as checker evidence and does not replace,
+short-circuit or alter any builder/checker result.
+
+This exception is exclusive to compile-time `SurfaceExprFunction` cells. It
+does not apply to aliases, named reactions, relations, projected partitions,
+parameter families, core declarations or any other unused surface declaration.
+Any further semantic compatibility exception requires another explicit
+amendment.
 
 ## Macro delegation requirements
 
@@ -135,7 +226,10 @@ input/output/view/grouped-view/summary paths so that:
 
 1. macros parse syntax and retain source-token/index information;
 2. pure PRD 0007–0009 APIs perform semantic candidate construction,
-   declaration/term resolution and complete model assembly;
+   declaration/term resolution and complete model assembly, except for the two
+   named trusted declaration-compatibility validators sanctioned above;
+   every semantic decision represented by an emitted alias atom or substituted
+   expression-function use remains owned by the authoritative builder/checker;
 3. macros translate structured failures to the existing diagnostic categories
    and positions; and
 4. macros splice the successful exact raw result without independently
@@ -143,6 +237,11 @@ input/output/view/grouped-view/summary paths so that:
 
 The race-only current transition surface must delegate specifically through
 `buildSurfaceTransition`.
+
+Alias usage collection, raw lowering and emitted-order diagnostic provenance
+are expansion/token-bookkeeping responsibilities, not authorization to validate
+emitted alias terms. The unused-alias validator is declaration-only and may not
+be called from named-reaction or relation application lowering.
 
 Existing composition-source and wire macros may remain compatibility-tested
 adapters. They may pass an exact opaque raw wire list to final assembly, but no
@@ -190,19 +289,35 @@ Direct builder fixtures must cover:
 - an exact nonempty raw wire-list preservation fixture with no validity claim;
   and
 - complete raw equality for representative current command-model shapes,
-  including the feature-tour and interleaved-order fixtures.
+  including the feature-tour and interleaved-order fixtures;
+- the existing exact unused-alias failures for unknown assignment destination,
+  non-`Bool` predicate, Ref assignment and incompatible assignment, exercising
+  only the sanctioned alias compatibility path;
+- the existing exact expression-function missing/duplicate/recursive,
+  aggregate and wrong-result failures, with the unused wrong-result cell
+  exercising only the sanctioned expression-function compatibility path;
+- one-defect applied-alias probes showing used source/destination expansions
+  reach authoritative checker categories and paths; and
+- positive parity showing valid alias expansion preserves guard/effect order and
+  canonical bytes after typed use-site validation is removed.
 
 Run the existing positive/negative elaboration, canonical-model and export
 parity suites. No canonical fixture regeneration is permitted without an
 explicit schema decision. Update `docs/design/lean-ir-coverage.md` with literal
 builder/category fixtures and update `frontend/README.md` to state the exact
-proved-builder versus trusted-macro boundary.
+proved-builder versus trusted-macro boundary. Both documents must name the
+unused-state-alias exception, explain that raw IR V1 has no alias declaration,
+list its retained unused-only semantic checks, and state that emitted used-alias
+semantics are checker-owned; the exception must not be described as proved.
 
 ## Allowed files
 
 - `frontend/Sembla/Frontend/Builders/Observation.lean`
 - `frontend/Sembla/Frontend/Builders/ObservationTests.lean`
 - `frontend/Sembla/Frontend/Builders.lean`
+- `frontend/Sembla/Semantics/CheckTerms.lean`
+- `frontend/Sembla/Semantics/CheckModel.lean`
+- `frontend/Sembla/Semantics/CheckModelTests.lean`
 - `frontend/Sembla/DSL.lean`
 - `frontend/Sembla/CommandFrontendTests.lean`
 - `frontend/Sembla.lean`
@@ -211,9 +326,10 @@ proved-builder versus trusted-macro boundary.
 
 ## Non-goals
 
-- Editing accepted core, transition or `Sembla.Semantics` modules. If their
-  public contracts are insufficient, stop and amend scope rather than weakening
-  encapsulation.
+- Editing accepted core, transition or `Sembla.Semantics` modules except for the
+  exact additive diagnostic-metadata amendment to `CheckTerms.lean`,
+  `CheckModel.lean` and `CheckModelTests.lean` sanctioned above. Any further
+  insufficiency remains a stop condition requiring another scope amendment.
 - Verifying Lean metaprograms, parser expansion, token bookkeeping or diagnostic
   rendering.
 - Changing public syntax, positioned diagnostic expectations, canonical raw
@@ -249,14 +365,24 @@ verified declaration boundary and must not be presented as proved.
 ## Acceptance criteria
 
 1. Every current model-local semantic construction path delegates to the pure
-   PRD 0007–0009 APIs, culminating in one complete raw-model assembly function.
+   PRD 0007–0009 APIs, culminating in one complete raw-model assembly function,
+   except for the sanctioned one-pass validation of unused state-alias
+   declarations and compile-time expression-function cells that have no raw IR
+   declarations. Every emitted used-alias guard/effect and substituted
+   expression-function raw expression remains fully delegated.
 2. Final assembly preserves exact core, transition, observation, summary and raw
    wire structure, is accepted by `checkModel`, and has exact checked erasure.
 3. Builder soundness, completeness, failure, attachment/order and erasure
    theorem families pass the automated audit.
-4. Macros contain only parsing/current-surface compatibility, token bookkeeping,
-   exhaustive error translation and result splicing; this trusted boundary is
-   documented honestly.
+4. Macros contain only parsing/current-surface compatibility, expansion and
+   raw-encoding selection, token/provenance bookkeeping, exhaustive error
+   translation and result splicing, plus exactly the two documented trusted
+   semantic compatibility validators sanctioned above. The alias validator is
+   invoked at most once per unused alias and never for a used alias. The
+   expression-function validator is invoked exactly once per collected surface
+   model, never from application lowering, and its result is never used as
+   checker evidence. No final semantic validation is duplicated at alias or
+   expression-function application sites.
 5. Direct builder fixtures, positive/negative elaboration, positioned
    diagnostics, canonical raw models and export bytes are unchanged and pass.
 6. Focused build, proof hygiene, movable-path allowlist, full repository checks

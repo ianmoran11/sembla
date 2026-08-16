@@ -500,6 +500,95 @@ verifies zero diff and the original Git blob IDs for all four boundary modules.
 This is mutation evidence for inventory exhaustiveness, not a persistent schema
 change.
 
+## PRD 0009 observation and final-model builder discharge
+
+The pure implementation is
+[`Frontend/Builders/Observation.lean`](../../frontend/Sembla/Frontend/Builders/Observation.lean),
+with literal fixtures in
+[`ObservationTests.lean`](../../frontend/Sembla/Frontend/Builders/ObservationTests.lean).
+`ObservationRaw.input_exact`, `outputField_exact`,
+`output_fields_preserve_supplied_order`, `view_exact`, `groupKey_exact`,
+`groupedView_exact` and `summary_exact` establish constructor fidelity.
+`lowerSurfaceOutputFields_schema_order` separately proves current surface output
+projection follows schema order. `CompleteModelSpec.rawBoxes_get`, the
+`toRaw_{core_box_names,core_tables,transitions,inputs,outputs,views,groupedViews,
+summaries,wires}_exact` family and complete raw equality fixtures establish
+ordinal attachment and exact source-order preservation without zip, truncation,
+name reassociation or wire-validity claims.
+
+`buildCompleteModel_sound`,
+`buildCompleteModel_model_acceptance_and_erasure`,
+`buildCompleteModel_complete` and `buildCompleteModel_failure_iff` are the final
+acceptance, erasure, independent-completeness and noncircular failure theorems.
+The complete-candidate fixtures include two boxes with unequal transition and
+observation counts, an input aggregate in a transition and view, every ordinary
+and summary reducer, Enum/Ref/banded grouped keys, interleaved raw versus
+schema-ordered surface fields, a nonempty opaque wire, and exact fragment
+round-trip equality. Command frontend feature-tour, scoped observation and
+interleaved-order guards continue to compare complete raw models and exports.
+
+The mechanical `ModelTermErrorCategory` traceability matrix is:
+
+| Category | Literal coverage |
+| --- | --- |
+| `term` | `nestedModelTermFixtures` and `nestedTransitionTermFixtures`: `unknownParameter`, `unknownAttribute`, `unknownEnumVariant`, `unknownInput`, `unknownTable`, `unknownJoinAttribute`, `nestedInputAggregate`, `cannotInferEnumOwner`, `expectedBool`, `expectedReal`, `expectedNumeric`, `expectedReference`, `expectedOrderable`, `sortMismatch`, `incompatibleEquality`, `incompatibleJoinTargets`, `duplicateResourceClaim`, `unclaimedRefWrite` |
+| `unresolvedOutputTable` | `observationErrorFixtures` (`outputTableErrorExact` is the named representative) |
+| `duplicateOutputField` | `observationErrorFixtures` |
+| `outputFieldCountMismatch` | `observationErrorFixtures` |
+| `outputFieldNameMismatch` | `observationErrorFixtures` |
+| `outputFieldSortMismatch` | `observationErrorFixtures` |
+| `unresolvedViewTable` | `observationErrorFixtures` |
+| `invalidViewReducerShape` | `observationErrorFixtures` |
+| `invalidGroupedKeyCount` | `observationErrorFixtures` |
+| `unresolvedGroupedKey` | `observationErrorFixtures` |
+| `invalidGroupedKeySort` | `observationErrorFixtures` |
+| `missingGroupedBand` | `observationErrorFixtures` (`groupedBandErrorExact` is the named representative) |
+| `unexpectedGroupedBand` | `observationErrorFixtures` |
+| `nonpositiveGroupedBand` | `observationErrorFixtures` zero-band mutation |
+| `aggregateInGroupedFilter` | `observationErrorFixtures` |
+| `unresolvedSummaryBox` | `observationErrorFixtures` (`summaryErrorExact` is the named representative) |
+| `unresolvedSummaryView` | `observationErrorFixtures` |
+
+The three executable corpora are evaluated by
+`observationErrorFixtures.all modelFixturePasses`,
+`nestedModelTermFixtures.all modelFixturePasses`, and
+`nestedTransitionTermFixtures.all transitionFixturePasses`; constructor lists
+alone are not treated as evidence.
+
+Final semantic paths are the authoritative `ModelCheckPathSegment` values; the
+observation surface path type is restricted to lowering/token positions. Parser
+expansion, compatibility checks, token mapping, diagnostic rendering, trusted
+evaluation/splicing and composition-source handling are tested macro concerns,
+not proved builder claims.
+
+Raw IR V1 has no state-alias declaration. Alias use is therefore derived only
+from guard/effect provenance produced by the same transition expansion that
+emits the raw candidate: at least one emitted alias atom/effect means used, and
+no emitted contribution—including a zero-instance family—means unused. The
+trusted, not proved, `trustedValidateUnusedStateAliasCompatibility` validator
+runs at most once per unused alias in declaration order and retains only
+assignment-destination lookup, Ref-assignment rejection, Enum-member validation,
+scalar assignment compatibility, expression name/type validation, and the
+predicate-`Bool` requirement. Used emitted alias guards/effects bypass it and
+are checker-owned. `AliasTransitionPlanningParity` and
+`ZeroInstanceAliasPlanningParity` pin positive ordering/bytes and zero-instance
+classification; the applied-alias source/destination probes pin authoritative
+checker reachability, while the four `MathematicalAlias*` unused failures pin
+the alias compatibility exception.
+
+Raw IR V1 also has no expression-function declaration or finite cell table. The
+trusted, not proved, `trustedValidateExprFunctionCompatibility` validator runs
+exactly once after the complete compile-time declaration environment is
+collected and before substitution. It retains only empty-row-scope expression
+name/type validation, formal/domain substitution compatibility and declared
+cell-result sort checking in source order. It is never called from application
+lowering and contributes no checker evidence; every substituted raw expression
+is still checker-owned. `MathematicalExprFunctionMissingCell`,
+`MathematicalExprFunctionDuplicateCell`, `MathematicalExprFunctionCall`,
+`MathematicalExprFunctionAggregate` and
+`MathematicalExprFunctionWrongResult` pin the expansion rules and the narrowly
+sanctioned unused-cell compatibility diagnostic.
+
 [raw-classifiers]: ../../frontend/Sembla/Semantics/Raw.lean
 [raw-fixtures]: ../../frontend/Sembla/Semantics/RawTests.lean
 [checked-types]: ../../frontend/Sembla/Semantics/Types.lean

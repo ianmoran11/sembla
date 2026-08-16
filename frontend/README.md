@@ -530,3 +530,53 @@ Automated props and rendering-structure assertions live in
 state graphs, hazards, probability/prior plots, responsive SVG, long labels,
 loops and opposing routes, badges and empty states, JSON encoding, and all three
 theme presets. Final layout and theme verification remains intentionally manual.
+
+## Observation and complete-model builder boundary
+
+`Sembla.Frontend.Builders.Observation` is the proved, syntax-independent final
+frontend boundary. `ObservationRaw` preserves input, output, scalar-view,
+grouped-view and summary fields exactly. `CompleteModelSpec` embeds exactly one
+`TransitionOverlaySpec`, attaches observations by `Fin` box ordinal, preserves
+summaries and opaque raw wires in source order, derives declaration and term
+contexts from the complete input-bearing candidate, delegates current race-only
+transitions through `buildSurfaceTransition`, and certifies the final raw model
+with `checkModel`. Successful certification exposes exact checked erasure.
+`CompleteModelSpec.toRaw` is the sole complete raw assembly path; the command
+frontend no longer constructs `IR.Box` or `IR.Model` directly. Its private
+fragment-to-dependent-index adapter is trusted token/bookkeeping glue.
+
+The following remain trusted and regression-tested rather than verified: parser
+expansion, family/alias/partition lowering, current surface-shape compatibility
+checks, the two declaration-only compatibility validators described below,
+source-token bookkeeping, structured category/path-to-position mapping,
+diagnostic rendering, metaprogram evaluation and result splicing, widget
+attachment, and composition/wire compatibility checks. Wires are preserved
+exactly but the builder makes no `WiresWellFormed`, delivery, linker or
+composition claim. The existing negative harness remains the oracle for exact
+message positions.
+
+Raw IR V1 has no state-alias declaration, so an alias is recorded as **used**
+only when the single transition expansion that emits the raw candidate also
+records at least one alias-derived guard atom or effect in emitted provenance.
+An alias with no such emitted contribution—including an alias referenced only
+by a zero-instance family—is **unused**. The trusted, not proved,
+`trustedValidateUnusedStateAliasCompatibility` path runs at most once for each
+unused alias in declaration order. It retains only assignment-destination
+lookup, Ref-assignment rejection, Enum-member validation, scalar assignment
+compatibility, expression name/type validation, and the predicate-`Bool`
+requirement. Every emitted guard/effect from a used alias bypasses that
+compatibility path and is checked exactly once by the transition builder/final
+checker; macro lowering only selects raw encodings and retains source tokens and
+ordinals.
+
+Raw IR V1 likewise has no expression-function declaration or finite cell table.
+The trusted, not proved, `trustedValidateExprFunctionCompatibility` path runs
+exactly once after all compile-time parameter/family/domain/partition/function
+declarations are collected and before substitution. In cell source order it
+retains only empty-row-scope expression name/type validation, formal/domain
+substitution compatibility and the declared cell-result sort requirement;
+function-table completeness, duplicate/recursive/aggregate and expansion-cap
+rules remain surface expansion checks. The validator is never called from a
+function application, lowering, token mapping or diagnostic rendering, and its
+result is not checker evidence. Every substituted raw expression is emitted once
+and remains fully checked by the authoritative transition/model checker.

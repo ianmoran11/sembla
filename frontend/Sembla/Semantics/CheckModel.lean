@@ -38,6 +38,7 @@ inductive ModelTermErrorCategory where
 structure ModelTermError where
   category : ModelTermErrorCategory
   path : List ModelCheckPathSegment
+  metadata : CheckerDiagnosticMetadata := {}
   deriving Repr, BEq, DecidableEq
 
 inductive ModelCheckError where
@@ -46,14 +47,15 @@ inductive ModelCheckError where
   deriving Repr, BEq, DecidableEq
 
 private def modelError (category : ModelTermErrorCategory)
-    (path : List ModelCheckPathSegment) : Except ModelTermError α :=
-  .error ⟨category, path⟩
+    (path : List ModelCheckPathSegment)
+    (metadata : CheckerDiagnosticMetadata := {}) : Except ModelTermError α :=
+  .error ⟨category, path, metadata⟩
 
 private def liftTerm {α : Type} (result : Except TermCheckError α) :
     Except ModelTermError α :=
   match result with
   | .ok value => .ok value
-  | .error error => .error ⟨.term error.category, error.path⟩
+  | .error error => .error ⟨.term error.category, error.path, error.metadata⟩
 
 /-! ## Source-ordered checked declarations -/
 
@@ -320,6 +322,34 @@ private def outputExpectedOrigin? {Γ : TermContext}
       some (Eq.mpr (congrArg (SortOrigin Γ (.table Γ.current)) expectedEq) .real)
   | .enum _ | .ref _ => none
 
+private def diagnosticSortOfModelOrigin {Γ : TermContext}
+    {scope : RowScope Γ.model Γ.current Γ.inputs} {sort : ScalarSort Γ.model.catalog} :
+    SortOrigin Γ scope sort → DiagnosticScalarSort
+  | .real => .real
+  | .int => .int
+  | .bool => .bool
+  | .enum .. => .enum
+  | .ref .. => .ref
+
+private def diagnosticSortOfAttribute {Γ : TermContext}
+    (schema : TableSchema Γ.model.catalog Γ.current) (attr : AttributeId schema) :
+    DiagnosticScalarSort :=
+  match (schema.attr attr).shape with
+  | .real => .real
+  | .int => .int
+  | .enum _ => .enum
+  | .ref _ => .ref
+
+private def diagnosticAggregateKind : IR.AggOp → DiagnosticAggregateKind
+  | .count => .count
+  | .sum _ => .sum
+
+private def diagnosticViewReducer : IR.ViewReduce → DiagnosticViewReducer
+  | .count => .count
+  | .sum => .sum
+  | .min => .min
+  | .max => .max
+
 private def castAggOp {Γ : TermContext} {scope : RowScope Γ.model Γ.current Γ.inputs}
     {actual expected : ScalarSort Γ.model.catalog}
     (same : actual = expected)
@@ -335,7 +365,9 @@ private def checkOutputField (Γ : TermContext)
     Except ModelTermError (CheckedOutputField Γ schema) := do
   let attr : AttributeId schema := ⟨schemaOrdinal⟩
   if raw.name != schema.attributeName attr then
-    modelError .outputFieldNameMismatch (path ++ [.outputField index, .fieldName])
+    modelError .outputFieldNameMismatch (path ++ [.outputField index, .fieldName]) {
+      offendingName := some raw.name
+      expectedName := some (schema.attributeName attr) }
   else
     let checked ← liftTerm
       (synthAggOpFuel (rawAggOpDepth raw.op * 4 + 8) Γ (.table Γ.current)
@@ -350,13 +382,21 @@ private def checkOutputField (Γ : TermContext)
             pure ⟨index, raw.name, attr, castAggOp same.down op, filter⟩
         | none =>
             modelError .outputFieldSortMismatch
-              (path ++ [.outputField index, .fieldOperation])
+              (path ++ [.outputField index, .fieldOperation]) {
+                actualSort := some (diagnosticSortOfModelOrigin _origin)
+                expectedSort := some (diagnosticSortOfModelOrigin expectedOrigin)
+                aggregateKind := some (diagnosticAggregateKind raw.op)
+                offendingName := some raw.name }
     | none =>
         modelError .outputFieldSortMismatch
-          (path ++ [.outputField index, .fieldOperation])
+          (path ++ [.outputField index, .fieldOperation]) {
+            actualSort := some (diagnosticSortOfModelOrigin _origin)
+            expectedSort := some (diagnosticSortOfAttribute schema attr)
+            aggregateKind := some (diagnosticAggregateKind raw.op)
+            offendingName := some raw.name }
 
 private def checkOutputFieldsAux (Γ : TermContext)
-    (schema : TableSchema Γ.model.catalog Γ.current)
+    (schema : TableSchema Γ.model.catalog Γ.current) (contextName : String)
     (path : List ModelCheckPathSegment) :
     Nat → List IR.OutputField →
       Except ModelTermError (List (CheckedOutputField Γ schema))
@@ -364,21 +404,28 @@ private def checkOutputFieldsAux (Γ : TermContext)
   | index, raw :: raws => do
       if bound : index < schema.attributes.entries.length then
         let checked ← checkOutputField Γ schema raw index ⟨index, bound⟩ path
-        let rest ← checkOutputFieldsAux Γ schema path (index + 1) raws
+        let rest ← checkOutputFieldsAux Γ schema contextName path (index + 1) raws
         pure (checked :: rest)
-      else modelError .outputFieldCountMismatch (path ++ [.outputSchema])
+      else modelError .outputFieldCountMismatch (path ++ [.outputSchema]) {
+        actualCount := some (index + (raw :: raws).length)
+        expectedCount := some schema.attributes.entries.length
+        contextName := some contextName }
 
 private def checkOutputFields (Γ : TermContext)
-    (schema : TableSchema Γ.model.catalog Γ.current)
+    (schema : TableSchema Γ.model.catalog Γ.current) (contextName : String)
     (raws : List IR.OutputField) (path : List ModelCheckPathSegment) :
     Except ModelTermError (List (CheckedOutputField Γ schema)) := do
   if raws.length != schema.attributes.entries.length then
-    modelError .outputFieldCountMismatch (path ++ [.outputSchema])
+    modelError .outputFieldCountMismatch (path ++ [.outputSchema]) {
+      actualCount := some raws.length
+      expectedCount := some schema.attributes.entries.length
+      contextName := some contextName }
   else if unique : (raws.map IR.OutputField.name).Nodup then
-    checkOutputFieldsAux Γ schema path 0 raws
+    checkOutputFieldsAux Γ schema contextName path 0 raws
   else
     let index := (firstDuplicateIndex? (raws.map IR.OutputField.name)).getD 0
-    modelError .duplicateOutputField (path ++ [.outputField index, .fieldName])
+    modelError .duplicateOutputField (path ++ [.outputField index, .fieldName]) {
+      offendingName := (raws.get? index).map IR.OutputField.name }
 
 private def outputPortSchemaAt (ctx : DeclarationContext)
     (box : BoxId ctx.modelSchema.catalog) (index : Nat)
@@ -397,11 +444,13 @@ private def checkOutput (ctx : DeclarationContext)
   match raw.builder with
   | .perTable tableName fields =>
       match found : ctx.modelSchema.catalog.lookupTable box tableName with
-      | none => modelError .unresolvedOutputTable (root ++ [.outputBuilder, .tableTarget])
+      | none => modelError .unresolvedOutputTable (root ++ [.outputBuilder, .tableTarget]) {
+          offendingName := some tableName
+          contextName := some raw.name }
       | some target =>
           let Γ : TermContext := ⟨ctx, box, target⟩
           let schema := portSchema.instantiate target
-          let checkedFields ← checkOutputFields Γ schema fields (root ++ [.outputFields])
+          let checkedFields ← checkOutputFields Γ schema raw.name fields (root ++ [.outputFields])
           pure ⟨index, raw.name, target, portSchema, checkedFields⟩
 
 private def checkOutputsAux (ctx : DeclarationContext)
@@ -413,10 +462,17 @@ private def checkOutputsAux (ctx : DeclarationContext)
         let checked ← checkOutput ctx box raw index bound [.model, .box boxIndex, .output index]
         let rest ← checkOutputsAux ctx box boxIndex (index + 1) raws
         pure (checked :: rest)
-      else modelError .outputFieldCountMismatch [.model, .box boxIndex, .output index]
+      else modelError .outputFieldCountMismatch [.model, .box boxIndex, .output index] {
+        actualCount := some (index + (raw :: raws).length)
+        expectedCount := some (ctx.outputs box).length
+        contextName := some raw.name }
 
 private def checkViewValue (Γ : TermContext) (raw : IR.ViewDecl)
     (root : List ModelCheckPathSegment) : Except ModelTermError (CheckedViewValue Γ) := do
+  let metadata : CheckerDiagnosticMetadata := {
+    viewReducer := some (diagnosticViewReducer raw.reduce)
+    valuePresent := some raw.value.isSome
+    contextName := some raw.name }
   match raw.reduce, raw.value with
   | .count, none => pure .count
   | .sum, some value | .min, some value | .max, some value =>
@@ -427,22 +483,25 @@ private def checkViewValue (Γ : TermContext) (raw : IR.ViewDecl)
           | .sum => pure (.sumInt expr)
           | .min => pure (.minInt expr)
           | .max => pure (.maxInt expr)
-          | .count => modelError .invalidViewReducerShape (root ++ [.viewReducer])
+          | .count => modelError .invalidViewReducerShape (root ++ [.viewReducer]) metadata
       | ⟨.real, expr, .real⟩ =>
           match raw.reduce with
           | .sum => pure (.sumReal expr)
           | .min => pure (.minReal expr)
           | .max => pure (.maxReal expr)
-          | .count => modelError .invalidViewReducerShape (root ++ [.viewReducer])
-      | _ => modelError .invalidViewReducerShape (root ++ [.viewValue])
-  | _, _ => modelError .invalidViewReducerShape (root ++ [.viewReducer])
+          | .count => modelError .invalidViewReducerShape (root ++ [.viewReducer]) metadata
+      | ⟨_, _, origin⟩ => modelError .invalidViewReducerShape (root ++ [.viewValue]) {
+          metadata with actualSort := some (diagnosticSortOfModelOrigin origin) }
+  | _, _ => modelError .invalidViewReducerShape (root ++ [.viewReducer]) metadata
 
 private def checkView (ctx : DeclarationContext)
     (box : BoxId ctx.modelSchema.catalog) (raw : IR.ViewDecl)
     (index : Nat) (root : List ModelCheckPathSegment) :
     Except ModelTermError (CheckedViewDecl ctx box) := do
   match ctx.modelSchema.catalog.lookupTable box raw.table with
-  | none => modelError .unresolvedViewTable (root ++ [.viewTable])
+  | none => modelError .unresolvedViewTable (root ++ [.viewTable]) {
+      offendingName := some raw.table
+      contextName := some raw.name }
   | some target =>
       let Γ : TermContext := ⟨ctx, box, target⟩
       let filter ← checkOptionalBool Γ raw.filter (root ++ [.viewFilter])
@@ -461,7 +520,8 @@ private def checkViewsAux (ctx : DeclarationContext)
 private def checkGroupKey (Γ : TermContext) (raw : IR.GroupKey) (index : Nat)
     (root : List ModelCheckPathSegment) : Except ModelTermError (CheckedGroupKey Γ) := do
   match (Γ.model.schemaFor Γ.current).lookupAttribute raw.attr with
-  | none => modelError .unresolvedGroupedKey (root ++ [.groupedKey index, .groupedAttribute])
+  | none => modelError .unresolvedGroupedKey (root ++ [.groupedKey index, .groupedAttribute]) {
+      offendingName := some raw.attr }
   | some attr =>
       match shapeEq : ((Γ.model.schemaFor Γ.current).attr attr).shape with
       | .int =>
@@ -469,13 +529,40 @@ private def checkGroupKey (Γ : TermContext) (raw : IR.GroupKey) (index : Nat)
           | some width =>
               if positive : 0 < width then
                 pure ⟨index, attr, some width, by simp [GroupBandValid, shapeEq, positive]⟩
-              else modelError .nonpositiveGroupedBand (root ++ [.groupedKey index, .groupedBand])
-          | none => modelError .missingGroupedBand (root ++ [.groupedKey index, .groupedBand])
-      | .enum _ | .ref _ =>
+              else
+                modelError .nonpositiveGroupedBand
+                  (root ++ [.groupedKey index, .groupedBand]) {
+                    actualSort := some .int
+                    bandWidth := some width
+                    offendingName := some raw.attr }
+          | none =>
+              modelError .missingGroupedBand
+                (root ++ [.groupedKey index, .groupedBand]) {
+                  actualSort := some .int
+                  offendingName := some raw.attr }
+      | .enum _ =>
           match raw.bandWidth with
           | none => pure ⟨index, attr, none, by simp [GroupBandValid, shapeEq]⟩
-          | some _ => modelError .unexpectedGroupedBand (root ++ [.groupedKey index, .groupedBand])
-      | .real => modelError .invalidGroupedKeySort (root ++ [.groupedKey index, .groupedAttribute])
+          | some width =>
+              modelError .unexpectedGroupedBand
+                (root ++ [.groupedKey index, .groupedBand]) {
+                  actualSort := some .enum
+                  bandWidth := some width
+                  offendingName := some raw.attr }
+      | .ref _ =>
+          match raw.bandWidth with
+          | none => pure ⟨index, attr, none, by simp [GroupBandValid, shapeEq]⟩
+          | some width =>
+              modelError .unexpectedGroupedBand
+                (root ++ [.groupedKey index, .groupedBand]) {
+                  actualSort := some .ref
+                  bandWidth := some width
+                  offendingName := some raw.attr }
+      | .real =>
+          let metadata : CheckerDiagnosticMetadata :=
+            { actualSort := some .real, offendingName := some raw.attr }
+          modelError .invalidGroupedKeySort
+            (root ++ [.groupedKey index, .groupedAttribute]) metadata
 
 private def checkGroupKeysAux (Γ : TermContext) (root : List ModelCheckPathSegment) :
     Nat → List IR.GroupKey → Except ModelTermError (List (CheckedGroupKey Γ))
@@ -486,13 +573,14 @@ private def checkGroupKeysAux (Γ : TermContext) (root : List ModelCheckPathSegm
       pure (checked :: rest)
 
 private def checkGroupedFilter (Γ : TermContext) (raw : Option IR.Expr)
-    (root : List ModelCheckPathSegment) :
+    (contextName : String) (root : List ModelCheckPathSegment) :
     Except ModelTermError (Option (Term Γ.model Γ.current Γ.inputs .bool)) := do
   match raw with
   | none => pure none
   | some value =>
       if rawExprContainsAggregate value then
-        modelError .aggregateInGroupedFilter (root ++ [.viewFilter])
+        modelError .aggregateInGroupedFilter (root ++ [.viewFilter]) {
+          contextName := some contextName }
       else
         pure (some (← liftTerm (checkExpr Γ (.table Γ.current)
           value .bool .bool (root ++ [.viewFilter]))))
@@ -502,16 +590,26 @@ private def checkGroupedView (ctx : DeclarationContext)
     (index : Nat) (root : List ModelCheckPathSegment) :
     Except ModelTermError (CheckedGroupedViewDecl ctx box) := do
   match ctx.modelSchema.catalog.lookupTable box raw.table with
-  | none => modelError .unresolvedViewTable (root ++ [.viewTable])
+  | none => modelError .unresolvedViewTable (root ++ [.viewTable]) {
+      offendingName := some raw.table
+      contextName := some raw.name }
   | some target =>
       if count : 1 ≤ raw.keys.length ∧ raw.keys.length ≤ 4 then
         let Γ : TermContext := ⟨ctx, box, target⟩
         let keys ← checkGroupKeysAux Γ (root ++ [.groupedKeys]) 0 raw.keys
-        let filter ← checkGroupedFilter Γ raw.filter root
+        let filter ← checkGroupedFilter Γ raw.filter raw.name root
         if checkedCount : 1 ≤ keys.length ∧ keys.length ≤ 4 then
           pure ⟨index, raw.name, target, keys, checkedCount, filter⟩
-        else modelError .invalidGroupedKeyCount (root ++ [.groupedKeys])
-      else modelError .invalidGroupedKeyCount (root ++ [.groupedKeys])
+        else modelError .invalidGroupedKeyCount (root ++ [.groupedKeys]) {
+          actualCount := some keys.length
+          minimumCount := some 1
+          maximumCount := some 4
+          contextName := some raw.name }
+      else modelError .invalidGroupedKeyCount (root ++ [.groupedKeys]) {
+        actualCount := some raw.keys.length
+        minimumCount := some 1
+        maximumCount := some 4
+        contextName := some raw.name }
 
 private def checkGroupedViewsAux (ctx : DeclarationContext)
     (box : BoxId ctx.modelSchema.catalog) (boxIndex : Nat) :
@@ -568,14 +666,22 @@ private def checkBoxes (ctx : DeclarationContext) :
 private def checkSummary (ctx : DeclarationContext) (raw : IR.SummaryDecl)
     (index : Nat) : Except ModelTermError (CheckedSummaryDecl ctx) := do
   match ctx.modelSchema.catalog.lookupBox raw.box with
-  | none => modelError .unresolvedSummaryBox [.model, .summary index, .summaryBox]
+  | none => modelError .unresolvedSummaryBox [.model, .summary index, .summaryBox] {
+      offendingName := some raw.box
+      contextName := some raw.name }
   | some box =>
       match found : (ctx.views box).findIdx? (fun view => view.name == raw.view) with
-      | none => modelError .unresolvedSummaryView [.model, .summary index, .summaryView]
+      | none => modelError .unresolvedSummaryView [.model, .summary index, .summaryView] {
+          offendingName := some raw.view
+          contextName := some raw.name
+          expectedName := some raw.box }
       | some viewIndex =>
           if bound : viewIndex < (ctx.views box).length then
             pure ⟨index, raw.name, box, ⟨viewIndex, bound⟩, raw.reduce⟩
-          else modelError .unresolvedSummaryView [.model, .summary index, .summaryView]
+          else modelError .unresolvedSummaryView [.model, .summary index, .summaryView] {
+            offendingName := some raw.view
+            contextName := some raw.name
+            expectedName := some raw.box }
 
 private def checkSummariesAux (ctx : DeclarationContext) :
     Nat → List IR.SummaryDecl → Except ModelTermError (List (CheckedSummaryDecl ctx))
@@ -957,11 +1063,11 @@ private theorem checkOutputField_complete {Γ : TermContext}
 
 private theorem checkOutputFieldsAux_sound {Γ : TermContext}
     {portSchema : BoxPortSchema Γ.model.catalog Γ.box}
-    {path index raws checked}
+    {contextName path index raws checked}
     (bound : index + raws.length ≤
       (portSchema.instantiate Γ.currentTable).attributes.entries.length)
     (success : checkOutputFieldsAux Γ (portSchema.instantiate Γ.currentTable)
-      path index raws = .ok checked) :
+      contextName path index raws = .ok checked) :
     List.Forall₂ (OutputFieldWellFormed (portSchema := portSchema)) raws checked ∧
       checked.map CheckedOutputField.sourceOrdinal = List.range' index raws.length := by
   induction raws generalizing index checked with
@@ -985,11 +1091,11 @@ private theorem checkOutputFieldsAux_sound {Γ : TermContext}
 
 private theorem checkOutputFieldsAux_complete {Γ : TermContext}
     {portSchema : BoxPortSchema Γ.model.catalog Γ.box}
-    {path index raws checked}
+    {contextName path index raws checked}
     (typed : List.Forall₂ (OutputFieldWellFormed (portSchema := portSchema)) raws checked)
     (order : checked.map CheckedOutputField.sourceOrdinal = List.range' index raws.length) :
     checkOutputFieldsAux Γ (portSchema.instantiate Γ.currentTable)
-      path index raws = .ok checked := by
+      contextName path index raws = .ok checked := by
   induction typed generalizing index with
   | nil => rfl
   | cons head tail ih =>
@@ -1017,9 +1123,9 @@ private theorem checkOutputFieldsAux_complete {Γ : TermContext}
       rfl
 
 private theorem checkOutputFields_sound {Γ : TermContext}
-    {portSchema : BoxPortSchema Γ.model.catalog Γ.box} {raws checked path}
+    {portSchema : BoxPortSchema Γ.model.catalog Γ.box} {contextName raws checked path}
     (success : checkOutputFields Γ (portSchema.instantiate Γ.currentTable)
-      raws path = .ok checked) :
+      contextName raws path = .ok checked) :
     List.Forall₂ (OutputFieldWellFormed (portSchema := portSchema)) raws checked ∧
       checked.map CheckedOutputField.sourceOrdinal = List.range raws.length ∧
       raws.length = (portSchema.instantiate Γ.currentTable).attributes.entries.length ∧
@@ -1043,13 +1149,14 @@ private theorem checkOutputFields_sound {Γ : TermContext}
     · simp [modelError] at success
 
 private theorem checkOutputFields_complete {Γ : TermContext}
-    {portSchema : BoxPortSchema Γ.model.catalog Γ.box} {raws checked path}
+    {portSchema : BoxPortSchema Γ.model.catalog Γ.box} {contextName raws checked path}
     (typed : List.Forall₂ (OutputFieldWellFormed (portSchema := portSchema)) raws checked)
     (order : checked.map CheckedOutputField.sourceOrdinal = List.range raws.length)
     (count : raws.length =
       (portSchema.instantiate Γ.currentTable).attributes.entries.length)
     (unique : (raws.map IR.OutputField.name).Nodup) :
-    checkOutputFields Γ (portSchema.instantiate Γ.currentTable) raws path = .ok checked := by
+    checkOutputFields Γ (portSchema.instantiate Γ.currentTable)
+      contextName raws path = .ok checked := by
   simp only [checkOutputFields]
   rw [if_neg (by simpa [count])]
   rw [dif_pos unique]
@@ -1433,8 +1540,8 @@ private theorem checkGroupKeysAux_complete {Γ : TermContext} {root index raws c
       rw [ih tailOrder]
       rfl
 
-private theorem checkGroupedFilter_sound {Γ : TermContext} {raw checked root}
-    (success : checkGroupedFilter Γ raw root = .ok checked) :
+private theorem checkGroupedFilter_sound {Γ : TermContext} {raw checked contextName root}
+    (success : checkGroupedFilter Γ raw contextName root = .ok checked) :
     OptionalRel (ExprChecks Γ (.table Γ.current) .bool) raw checked ∧
       AggregateFreeFilter raw := by
   cases raw with
@@ -1456,9 +1563,9 @@ private theorem checkGroupedFilter_sound {Γ : TermContext} {raw checked root}
 
 private theorem checkGroupedFilter_complete {Γ : TermContext} {raw checked}
     (typed : OptionalRel (ExprChecks Γ (.table Γ.current) .bool) raw checked)
-    (aggregateFree : AggregateFreeFilter raw)
+    (aggregateFree : AggregateFreeFilter raw) (contextName : String)
     (root : List ModelCheckPathSegment) :
-    checkGroupedFilter Γ raw root = .ok checked := by
+    checkGroupedFilter Γ raw contextName root = .ok checked := by
   cases typed with
   | none => rfl
   | some typed =>
@@ -1514,7 +1621,7 @@ private theorem checkGroupedView_complete {ctx : DeclarationContext}
       rw [checkGroupKeysAux_complete keys
         (by simpa only [List.range_eq_range'] using keyOrder)]
       simp only
-      rw [checkGroupedFilter_complete filter aggregateFree root]
+      rw [checkGroupedFilter_complete filter aggregateFree rawName root]
       simp only
       rw [dif_pos (by simpa using checked.keyCount)]
       cases name
