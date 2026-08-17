@@ -10,6 +10,7 @@
 
 # Generated agent runtime artifacts
 /.pi-subagents/
+/.piprd/
 
 # Editors and operating systems
 .DS_Store
