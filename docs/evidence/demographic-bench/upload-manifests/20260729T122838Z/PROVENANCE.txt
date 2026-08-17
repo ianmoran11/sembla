@@ -1,0 +1,4 @@
+source branch: evidence/hyperstack-20260729T122838Z
+source commit: 32a0728952d4
+extracted:     2026-08-18
+original path: docs/evidence/demographic-bench/demographic-bench/
