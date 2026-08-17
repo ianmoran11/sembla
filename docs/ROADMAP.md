@@ -57,6 +57,8 @@ Every performance or scientific claim should point to a retained evidence artifa
 
 The demographic and justice drivers remain useful because they demand different behavior. A runtime primitive should normally be supported by more than one domain or by decisive evidence that an existing representation is inadequate.
 
+The pending [aggregate-first demographic-spine foundation track](prds-demographic-spine/README.md) records the driver-closure work without claiming that aggregate parity, age identification or facet fusion is already implemented.
+
 Shared demands include:
 
 - identity-preserving transfer;

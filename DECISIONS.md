@@ -2537,3 +2537,181 @@ relative to gravity-only without rewriting the declared θ̂ decisions.
 belong to the canonical scorer, strict improvement has no fitted knob, and the
 fitted/held-out boundary remains intact. MAE prevents broad degradation while
 RMSE prevents a few large fitted residuals from being hidden by the mean.
+
+## O. Aggregate-first calibration and demographic spine foundation (accepted 2026-08-11)
+
+### O1. Estimate parameters at the cheapest identified level
+
+**Decision.** Every domain partitions its parameters into directly estimable,
+aggregate-dynamical, micro-only and coupling/scenario blocks. Published
+occurrence/exposure evidence owns the directly estimable block, and published
+stock-flow evidence or a deterministic aggregate companion owns the
+aggregate-dynamical block. Stochastic simulation is not used to relearn either
+block; it is reserved for identified micro-only questions, explicit couplings
+and scenario generation.
+
+**Alternatives.** One monolithic NPE over every parameter and target is
+rejected, as is assigning a parameter to the microsimulation merely because a
+simulator is available.
+
+**Reason.** Identification and evidence ownership, not implementation
+convenience, determine the estimator. Using the cheapest scientifically
+adequate level preserves strong aggregate information, exposes unidentified
+blocks and spends simulation only where individual history or interaction is
+material.
+
+### O2. The retained NPE run remains immutable evidence
+
+**Decision.** The 2026-08-07 artifacts and §§N20–N21 remain truthful, immutable
+records of the old declared experiment and its point-estimate gates. The
+aggregate-first path is a subsequent, adjacent experiment based on that
+measured result, not a rewrite of §N. No retained report, parameter or
+diagnostic is regenerated, relabelled or edited.
+
+**Alternatives.** Retrospectively describing the retained run as
+aggregate-first, replacing its accepted parameters in place, regenerating its
+reports under the new method, or relabelling its failures as if a new gate had
+applied are rejected.
+
+**Reason.** A failed or superseded method remains scientific evidence only if
+its declaration, outputs and diagnostics stay historically truthful. Adjacent
+artifacts preserve provenance and permit the replacement to be compared with,
+rather than substituted for, the retained experiment.
+
+### O3. Migration age is fitted by pooled profile likelihood
+
+**Decision.** For every positive `peak_months, k` candidate, all fifteen annual
+spatial coefficients are re-profiled against the 56 origin-destination cells.
+One pooled positive age pair is then fitted over 2010–2024 from conditional
+state/direction/sex/age compositions. The incompatible 2020 source totals are
+preserved rather than reconciled by conditioning within each source group.
+Uncertainty is reported with clustered or overdispersed treatment rather than
+as the Poisson inverse Hessian alone.
+
+**Alternatives.** Updating the spatial block with weak micro summaries, fitting
+thirty independent annual age parameters before testing a pooled pair, forcing
+the 2020 totals into one count likelihood, and pretending that the inverse
+Poisson Hessian is complete uncertainty are rejected.
+
+**Reason.** The 56 cells directly identify the spatial gravity/profile block,
+while pooled conditional compositions target the two age quantities without
+allowing weak micro summaries to degrade that fit. Conditioning respects the
+observed source-total conflict, and robust uncertainty acknowledges the
+rejected separable gravity form and repeated yearly evidence.
+
+### O4. A deterministic aggregate companion precedes residual simulation
+
+**Decision.** A deterministic companion reproduces the actual monthly race,
+contest, lifecycle and ageing semantics over sufficient aggregate cells before
+any residual simulation stage. A result is called exact only where closure is
+established; otherwise the approximation is named and measured against
+replicated micro-runs. The companion is a quarantined standard-library Python
+workflow, not a Rust backend or runtime mode.
+
+**Alternatives.** Starting with broad simulator inference, substituting an
+unrelated cohort-component approximation, silently calling an unproved closure
+exact, and adding a Rust backend or execution mode for the companion are
+rejected.
+
+**Reason.** Deterministic propagation is the cheapest way to identify
+aggregate-dynamical parameters and diagnose structural discrepancy, but it is
+credible only when it matches the executable tick semantics. Quarantine keeps
+scientific estimation outside the runtime contract while replicated micro-runs
+measure any non-closure honestly.
+
+### O5. Calibration selection is blockwise and support preserving
+
+**Decision.** The spatial estimate remains the direct gravity/profile optimum.
+An identified pooled age estimate may replace the age prior centre; otherwise
+the declared centre is retained and non-identification is reported. Any later
+residual inference operates only on the responsible low-dimensional block in
+log or logit coordinates. Failure of that residual stage cannot invalidate the
+spatial fit.
+
+**Alternatives.** Clipping inadmissible estimates, replacing the full parameter
+vector with a raw-coordinate posterior, allowing one failed block to discard a
+directly identified block, and tuning a gate after observing the result are
+rejected.
+
+**Reason.** Blockwise selection keeps each estimate attached to its identifying
+evidence and preserves the intrinsic positive or bounded support. A weak or
+failed correction then has a declared fallback without corrupting the spatial
+optimum or manufacturing acceptance after measurement.
+
+### O6. Person facets are statically fused, not shared at runtime
+
+**Decision.** Lean authoring may combine separately declared person facets into
+one table and one ordinary primitive box before executable IR exists, emitting
+unchanged V1 IR. Generated names are namespaced, every mutable attribute has
+one owner, and the final current `checkModel` boundary certifies the result.
+Facets are absent from serialized plans.
+
+**Alternatives.** Calling static fusion V1 `Share` or `Identify`, creating a
+second model checker, retaining facets as executable leaves, and changing
+CompositionSource, plan or Rust contracts in this track are rejected.
+
+**Reason.** Pre-IR construction can provide modular authoring without claiming
+shared runtime identity or introducing new executable semantics. One primitive
+box remains governed by the existing checker and backend contract, while
+namespacing and singular ownership prevent accidental state aliasing.
+
+### O7. Entry reset is atomic and generation-safe; vacant state is inactive
+
+**Decision.** The base demographic model owns occupancy, generation and event
+choice. Every facet field has one literal-or-facet-parameter initializer
+appended to each named base entry transition, and every generated facet
+transition and observation requires `occupancy = present`. Initializers cannot
+read values written by that entry because all effects read tick-start state.
+Exit leaves domain bytes inactive; the next entry overwrites them before the
+incremented-generation state becomes visible. A domain event and exit may still
+both be counted in one tau-leap tick, so every real domain model must report
+timestep sensitivity.
+
+**Alternatives.** Exit cleanup that can conflict with a same-tick domain write,
+making domain events contest and defer demographic exits, independently racing
+initialization rules, initializers that rely on effect order, and identity based
+on row ordinal alone are rejected.
+
+**Reason.** Appending all reset effects to the base entry transition makes reset
+atomic with lifecycle activation and prevents stale state from crossing a
+generation. Treating vacant bytes as inactive avoids accepted-write conflicts
+without hiding the existing tau-leap possibility that a domain event and exit
+are both counted from the same tick-start person.
+
+### O8. Fixed geography is unrolled; general semantics remain deferred
+
+**Decision.** The fixed eight-state case may compile to guarded transition
+families and scalar-input families. This bounded lowering does not introduce a
+generic enum-keyed join, and the one global scheduler domain remains binding.
+Dynamic sparse rows, person-granular output projection, cross-row writes,
+generic enum-keyed joins, scheduled clocks and heterogeneous schedulers retain
+their §J12 or otherwise deferred status until a retained driver-model failure
+justifies a separate decision.
+
+**Alternatives.** Generalising the eight-state lowering into a runtime join,
+adding any of the deferred constructs speculatively, or silently accepting an
+inert placeholder for them are rejected.
+
+**Reason.** Finite unrolling emits existing V1 constructs and is testable at the
+known geography, whereas each general capability changes validation, plans or
+backend semantics. A measured driver failure, not surface convenience, must
+justify that compatibility cost.
+
+### O9. The first labour and justice models are synthetic proof models
+
+**Decision.** The first labour and justice models are synthetic proof models
+for facet ownership, lifecycle, regional feedback and explicit coupling. They
+acquire no real domain data and support no empirical or causal claim. Real
+labour or justice calibration, joint population synthesis and full event
+ontologies require later dedicated decision and PRD tracks.
+
+**Alternatives.** Treating synthetic conformance output as empirical evidence,
+acquiring real labour or justice data inside this foundation track, claiming a
+causal coupling without linked evidence, and expanding the pilot into a full
+event ontology are rejected.
+
+**Reason.** Synthetic drivers can prove that the frontend boundary, ownership
+and lifecycle contracts are executable without conflating software
+conformance with scientific validity. Real calibration and ontology design
+have separate data, identification and semantic obligations that require their
+own predeclared scope and evidence gates.

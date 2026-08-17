@@ -1,9 +1,10 @@
 # Demographic spine and modular aggregate-first calibration
 
-Status: proposal; descriptive and non-normative
+Status: accepted foundation design; implemented by [`docs/prds-demographic-spine/`](../prds-demographic-spine/README.md)
 Date: 2026-08-10
-Authority: [`DESIGN.md`](../../DESIGN.md) and [`DECISIONS.md`](../../DECISIONS.md) remain binding. This proposal does not amend either authority.
+Authority: [`DECISIONS.md`](../../DECISIONS.md) §O is binding for this foundation design; [`DESIGN.md`](../../DESIGN.md) and `DECISIONS.md` §§J/N remain predecessor authorities.
 Builds on: [the Australian population model](australian-population-model.md), [its calibration guide](../guides/australian-population-calibration.md), [the composition architecture](option-d-architecture.md), [the model algebra](model-algebra.md), and [the justice implementation sequence](../justice-event-schema-implementation-sequence.md).
+Foundation scope: synthetic labour and justice proof models only; real labour or justice calibration is excluded.
 
 ## Purpose
 

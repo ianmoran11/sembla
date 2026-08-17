@@ -14,6 +14,7 @@ The executable pending-work source is [`../prds-run-queue/README.md`](../prds-ru
 | [`prds-lean-ir-formalization/`](../prds-lean-ir-formalization/README.md) | approved proof-complete Lean frontend and V1 IR semantics track |
 | [`prds-npe-path/`](../prds-npe-path/README.md) | neural posterior estimation workflow |
 | [`prds-demographic-slots/`](../prds-demographic-slots/README.md) | demographic fixed-slot model, state artifacts, and grouped observations |
+| [`prds-demographic-spine/`](../prds-demographic-spine/README.md) | aggregate-first demographic calibration and Lean-only person-facet foundation |
 | [`prds-precision-spike/`](../prds-precision-spike/README.md) | GPU precision decision evidence |
 | [`prds-portable-sampler/`](../prds-portable-sampler/README.md) | portable sampling behavior |
 | [`prds-cuda-validation-parallelism/`](../prds-cuda-validation-parallelism/README.md) | validation and claim-resolution CUDA parallelism |
