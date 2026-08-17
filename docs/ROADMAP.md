@@ -16,7 +16,7 @@ This consolidated roadmap removes the former situation in which two roadmaps wer
 Sembla currently has:
 
 - a versioned IR and executable-plan contract;
-- deterministic CPU execution and native-`f64` CUDA execution;
+- deterministic CPU execution, which is authoritative, and native-`f64` CUDA execution, which is a qualified accelerator;
 - Lean authoring, reusable components, canonical linking, bundles, widgets, and parity checks;
 - stable draw identities and common-random-number comparisons;
 - views, grouped observations, summaries, manifests, and portable state artifacts;
@@ -24,7 +24,21 @@ Sembla currently has:
 - tracked benchmark and conformance evidence;
 - a specification-level proof precedent and an open path to full Lean semantics.
 
-The [run queue](prds-run-queue/README.md) is the operational source for pending PRDs. At consolidation time it is empty. Outstanding paid-hardware evidence is documented by the relevant performance track and evidence collectors rather than represented as an active PRD.
+Sembla does not yet have the capability that governs everything above: a
+complete path from a statistical model fitted to aggregate observations,
+through an explicit parameter handoff, into a microsimulation whose output is
+checked against evidence it never saw. Individually the pieces exist. The
+pipeline does not.
+
+The [run queue](prds-run-queue/README.md) is the operational source for pending PRDs. Outstanding paid-hardware evidence is documented by the relevant performance track and evidence collectors rather than represented as an active PRD.
+
+### Backend boundary
+
+CPU is the authoritative backend for the first complete pipeline. CUDA remains
+supported and its retained differential evidence stands, but CUDA throughput is
+not on the critical path and is qualified separately at a later milestone. The
+benchmark evidence collected 2026-07-24 to 2026-07-30 predates this boundary;
+see [`evidence/demographic-bench/PRUNED.md`](evidence/demographic-bench/PRUNED.md).
 
 ## Governing priorities
 
@@ -115,14 +129,40 @@ Before claiming a stable public contract, define:
 
 | Milestone | Purpose | Exit direction |
 | --- | --- | --- |
-| **Current consolidation** | one documentation and workflow story | canonical docs, current examples, explicit history and evidence boundaries |
+| **Synthetic pipeline proof** | prove the aggregate-to-microsimulation pipeline against known truth | independent truth oracle, transparent aggregate fit, versioned parameter handoff, aggregate/micro parity, hidden-detail validation, reproducible evidence package |
+| **Australian evidence application** | apply the proven pipeline to real observations | ABS-calibrated result with declared limitations, held-out checks, and a verifiable package |
 | **Assurance and authoring** | make existing capabilities easy to use and inspect | better diagnostics, trace/explain, sensitivity and model-card workflows |
 | **Driver closure** | credible demographic and justice baselines | versioned external artifacts, held-out checks, quantified approximations |
 | **Evidence-gated semantics** | add only primitives required by measured model gaps | complete surface/backend/provenance contract for every construct |
 | **Formal semantics** | connect Lean meaning, plans, and transformation proofs | executable V1 semantics and first end-to-end preservation theorems |
+| **CUDA qualification** | admit the accelerator on evidence | retained CPU/CUDA differential evidence against the authoritative CPU result |
 | **1.0 contract** | stable reproducible platform | compatibility policy, complete conformance matrix, honest determinism guarantees |
 
 These are dependency directions, not date commitments.
+
+The first two milestones are ordered deliberately. Synthetic data has known true
+parameters, so it can distinguish a broken pipeline from a hard inference
+problem; real observations cannot. Australian data is the first application of
+a proven pipeline, not the proof of one.
+
+### Governing sequence
+
+1. An independent, transparent oracle generates synthetic individual truth from
+   known parameters, and exposes only aggregate observations for fitting.
+2. A statistical model fits interpretable count and exposure likelihoods to
+   those aggregate observations.
+3. A versioned mapping artifact translates estimates, with uncertainty, into
+   microsimulation parameters, and declares what stays fixed or micro-only.
+4. Aggregate/micro parity confirms both models mean the same thing by each
+   shared parameter before any fitted value is promoted.
+5. Microsimulation runs predict joint and path-dependent outcomes, plus
+   held-back totals, that the aggregate model never saw.
+6. A versioned evidence package records the result, verified by fast integrity
+   checks plus selected deterministic replay.
+
+A failed or inconclusive gate retains its diagnostics and blocks promotion of
+the fitted mapping. Thresholds and splits are predeclared, never tuned after
+seeing results.
 
 ## Work records
 
@@ -130,8 +170,9 @@ Implementation work remains documented in track directories:
 
 - `docs/prds/` contains the original V1 PRDs.
 - `docs/prds-*` directories contain focused implementation tracks and their status records.
+- [`docs/prds/TRACKS.md`](prds/TRACKS.md) marks every track `active`, `background`, `closed`, or `superseded`. Tracks stay at their established paths because immutable decisions, archived roadmaps, and retained evidence link to them.
 - `docs/prds-run-queue/` is the single executable queue for pending work.
-- `.piprd/` contains managed runner reviews and implementation records; it is workflow state, not reader documentation.
+- `.piprd/` contains managed runner reviews and implementation records; it is untracked workflow state, not reader documentation.
 
 The [documentation index](README.md) separates these records from current guidance. Completed PRDs and evidence remain immutable even when their paths or assumptions are historical.
 
