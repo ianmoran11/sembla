@@ -1,15 +1,49 @@
 # Run queue
 
-**Pending:** 18 approved PRDs in one unattended software queue:
+**The queue is paused and is not authorised to run unattended.** It was re-cut on
+2026-08-18 against the milestone ordering in [`ROADMAP.md`](../ROADMAP.md).
+The managed run `2026-08-11T23-26-31-970Z` is stopped and must not be resumed
+until the migration decision is closed.
 
-1. `0001-observation-builders-and-macro-delegation.md` — the accepted Lean IR
-   prerequisite;
-2. `0002`–`0011` — the aggregate-first demographic-spine foundation bound by
-   [`prds-demographic-spine/README.md`](../prds-demographic-spine/README.md);
-   and
-3. `0012`–`0018` — compatibility policy, `sembla.parameters/v1`,
-   registry-driven contract documentation and CPU-safe backend conformance bound
-   by [`prds-contract-governance/README.md`](../prds-contract-governance/README.md).
+| PRDs | Standing | Reason |
+| --- | --- | --- |
+| `0001` | accepted | Lean IR observation builders; implementation commit `49ee9b7` |
+| `0002` | accepted | `DECISIONS.md` §O and the track contract; documentation committed |
+| `0003`–`0005` | needs revision | The pipeline core, but written against real ABS evidence |
+| `0006`–`0011` | deferred | Demographic breadth, not pipeline completion |
+| `0012`–`0018` | deferred | Governance and conformance; no workflow gap yet demands them |
+
+## Why 0003–0005 need revision before they run
+
+These three are the right work: an aggregate parameter fit, a deterministic
+expectation runner, and an aggregate/micro parity and selection gate. Together
+they are the aggregate-to-microsimulation pipeline the roadmap now leads with.
+
+They were written to fit real ABS observations directly, against the frozen
+prior registry at `data/abs/params/priors.json`. The milestone ordering puts a
+synthetic known-truth proof first, because only synthetic data has true
+parameters to recover, and so only synthetic data can tell a broken pipeline
+apart from a hard inference problem. Each must be rewritten to run first against
+an independent synthetic oracle, and to treat the ABS fit as the later
+application of an already-proven pipeline.
+
+Two contracts they depend on are still undecided:
+
+- the synthetic truth oracle — its states, events, known parameter blocks,
+  exposed aggregate tables, and hidden joint and path-dependent outcomes;
+- the parameter handoff artifact — how aggregate estimates and their uncertainty
+  become microsimulation parameters, and what stays fixed or micro-only.
+
+Until both are settled, revising 0003–0005 would encode guesses as
+specifications. Neither is deferred work; both are open decisions.
+
+## Admission rule
+
+A PRD enters this queue only when it names a workflow gap on the critical path
+to the current milestone, or a proven delivery blocker. Being already written,
+already approved, or already numbered is not admission. Everything at
+`deferred` above keeps its reasoning and its binding track, and confers no
+execution authority.
 
 The separately gated paid-device PRDs are not in this queue; see
 [`prds-contract-governance-gpu/README.md`](../prds-contract-governance-gpu/README.md).
