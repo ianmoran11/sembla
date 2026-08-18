@@ -56,8 +56,6 @@ jobs:
           python3 -B scripts/check-cargo-metadata.py
       - name: Rust formatting, lint, tests, and dependency policy
         run: ./scripts/check-rust.sh
-      - name: Lean proof hygiene
-        run: bash frontend/scripts/check-proofs.sh
 
   determinism:
     name: Determinism
@@ -83,6 +81,8 @@ jobs:
         with:
           lake-package-directory: frontend
           auto-config: false
+      - name: Lean proof hygiene
+        run: bash frontend/scripts/check-proofs.sh
       - name: Build and test the Lean frontend
         run: bash frontend/scripts/check-parity.sh
 
