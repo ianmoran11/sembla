@@ -2,8 +2,9 @@
 
 **The queue is paused and is not authorised to run unattended.** It was re-cut on
 2026-08-18 against the milestone ordering in [`ROADMAP.md`](../ROADMAP.md).
-The managed run `2026-08-11T23-26-31-970Z` is stopped and must not be resumed
-until the migration decision is closed.
+The managed run `2026-08-11T23-26-31-970Z` is permanently retired and must
+never be resumed. Its retained `.piprd` state is historical evidence; issue #20
+records the migration disposition.
 
 | PRDs | Standing | Reason |
 | --- | --- | --- |
