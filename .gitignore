@@ -1,10 +1,6 @@
 # Rust
 /target/
 
-# Lean
-/.lake/
-/frontend/.lake/
-
 # Python
 /.pytest_cache/
 

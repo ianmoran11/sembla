@@ -31,7 +31,7 @@ PRDs. D1 is N1, D2 is N8, D3 is N7, D4 is N6 and N11, D5 is N9, and D6 is N10.
 The demographic track has landed PRDs 0001–0008, so this is an extension rather
 than a new build:
 
-- `frontend/Sembla/Models/DemographicSlots.lean` — a working fixed-pool slot
+- `sembla-lean/Sembla/Models/DemographicSlots.lean` — a working fixed-pool slot
   model with monthly ageing, births, three-band mortality, overseas and internal
   migration, grouped views, and summaries.
 - `sembla.state/v1` artifacts with `--export-state`, hash-linked through run

@@ -7,7 +7,7 @@ the *contents* of the symbols below, never their structure.
 
 Companion to [`DESIGN.md`](../../DESIGN.md) §4–§5, which states the same
 commitments in prose. This document is the notation those commitments should be
-reasoned in; [`frontend/`](../../frontend/) is where they become Lean.
+reasoned in; [`sembla-lean/`](https://github.com/ianmoran11/sembla-lean/blob/main/) is where they become Lean.
 
 ---
 
@@ -293,7 +293,7 @@ What can be proved at this altitude, without ever opening a query:
 5. **Lumping** is a coalgebra quotient: a surjection $h : S \to S'$ with
    $u' \circ h = h \circ u$. The group-by rewrite is the search for such an $h$,
    and its correctness is that square commuting — see
-   [`frontend/Sembla/Lumping.lean`](../../frontend/Sembla/Lumping.lean).
+   [`sembla-lean/Sembla/Lumping.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Lumping.lean).
 6. **Kurtz / mean-field** is *not* a homomorphism but a limit: as
    $|\mathcal E| \to \infty$ the population coalgebra converges to an ODE box.
    Agent model and compartmental model are one object at two resolutions.

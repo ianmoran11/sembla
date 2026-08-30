@@ -24,6 +24,7 @@ The overview deliberately links to—rather than live-embeds—the detailed canv
 Each canvas links to maintained notes rather than attempting to display every source file:
 
 - [Frontend boundary](frontend.md)
+- [Repository boundary](repositories.md)
 - [Contract boundary](contracts.md)
 - [Runtime and backend boundary](runtime.md)
 - [Estimation boundary](estimation.md)
@@ -34,7 +35,8 @@ Each canvas links to maintained notes rather than attempting to display every so
 The hierarchy is deliberately split:
 
 1. [`DESIGN.md`](../../DESIGN.md) and [`DECISIONS.md`](../../DECISIONS.md) are normative.
-2. Rust/Lean interfaces, serialized artifacts and executable checks are operationally authoritative.
+2. Rust and Lean interfaces, serialized artifacts, and executable checks in
+   their owning repositories are operationally authoritative.
 3. The [artifact registry](artifact-registry.json) is machine-checked ownership metadata.
 4. These canvases and notes are human navigation views.
 
@@ -45,9 +47,9 @@ A canvas disagreement with code or a fitness function is a documentation defect;
 The conceptual node layout is maintained manually because architectural importance cannot be inferred from file counts. Several underlying facts are checked automatically:
 
 - Cargo workspace edges: `scripts/check-rust-architecture.py`;
-- Lean import boundaries: `frontend/scripts/check-imports.py`;
+- Lean import boundaries: `sembla-lean/scripts/check-imports.py`;
 - versioned contract ownership: `scripts/check-artifact-registry.py` and `artifact-registry.json`;
-- cross-language byte parity: `frontend/scripts/check-parity.sh`; and
+- cross-language compatibility: `sembla-lean/scripts/check-backend-compat.sh`; and
 - deterministic result contracts: `scripts/check-determinism.sh`.
 
 When a checked boundary changes, update the relevant nested canvas and note in the same change. Do not add a node for every file; add one only when it represents a distinct responsibility, contract or separately changeable subsystem.

@@ -27,13 +27,19 @@ HERE = pathlib.Path(__file__).resolve().parent
 EXTRACTS = HERE / "extracts"
 PARAMS = HERE / "params"
 REPORT = EXTRACTS / "rates.md"
+FRONTEND_EXPORT_ROOT = HERE / "generated" / "frontend"
 PARAMETER_TABLES = (
-    HERE.parent.parent / "frontend" / "Sembla" / "Models"
-    / "AustralianPopulation" / "Data"
+    FRONTEND_EXPORT_ROOT / "Sembla" / "Models" / "AustralianPopulation" / "Data"
 )
 # Deterministic legacy structural evidence. Production imports the declarative
 # Surface and never imports or overwrites this generated reference.
-LEAN_PARAMETERS = HERE / "reference" / "AustralianPopulationParameters.lean"
+LEAN_PARAMETERS = (
+    FRONTEND_EXPORT_ROOT
+    / "Sembla"
+    / "TestData"
+    / "AustralianPopulation"
+    / "AustralianPopulationParameters.lean"
+)
 FIDELITY_EVIDENCE = PARAMS / "fidelity-2010.json"
 FIDELITY_PREDECLARATION = PARAMS / "fidelity-2010-predeclaration.json"
 FIDELITY_PREDECLARATION_SHA256 = (

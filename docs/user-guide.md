@@ -58,7 +58,7 @@ The central promise is a single contract:
 | You are | Read | Then |
 | --- | --- | --- |
 | Evaluating Sembla | [[#2. The mental model]], [[#4. Quick start]] | [Project overview](overview.md) |
-| Authoring a model | [[#6. Authoring models in Lean]], [[#7. The mathematical surface]] | [Lean frontend](../frontend/README.md) |
+| Authoring a model | [[#6. Authoring models in Lean]], [[#7. The mathematical surface]] | [Lean frontend](https://github.com/ianmoran11/sembla-lean/blob/main/README.md) |
 | Running experiments | [[#10. Command reference]], [[#12. Calibration workflow]] | [SIR example](examples/sir.md) |
 | Building reusable components | [[#9. Composition]] | [Composition guide](guides/composition.md) |
 | Auditing a result | [[#13. Reproducibility and verification]] | [State artifacts](guides/state-format.md) |
@@ -121,8 +121,8 @@ Views, grouped views, and summaries are evaluated from committed state *after* t
 | Tool | Purpose | Notes |
 | --- | --- | --- |
 | Rust / Cargo | runtime, IR, CLI | pinned by `rust-toolchain` |
-| [elan](https://github.com/leanprover/elan) | Lean toolchain manager | `lean-toolchain` pins Lean 4.13.0, selected automatically |
-| Git | check scripts and parity | required by the strict check |
+| [elan](https://github.com/leanprover/elan) | Lean toolchain manager | `sembla-lean/lean-toolchain` pins Lean 4.13.0, selected automatically |
+| Git | check scripts and compatibility | required by the strict checks |
 | CUDA + NVRTC | optional GPU backend | only for `--backend cuda` and GPU evidence |
 | Python | reduced NPE smoke test, import checks | optional |
 
@@ -132,11 +132,12 @@ Views, grouped views, and summaries are evaluated from committed state *after* t
 # Rust side
 cargo build --release
 
-# Lean side
-cd frontend && lake build
+# Lean side, from a sibling frontend checkout
+(cd ../sembla-lean && lake build)
 ```
 
-`lake` resolves pinned Mathlib and ProofWidgets4 dependencies; the complete transitive revisions are recorded in `frontend/lake-manifest.json`.
+`lake` resolves pinned Mathlib and ProofWidgets4 dependencies; the complete
+transitive revisions are recorded in `sembla-lean/lake-manifest.json`.
 
 The Lean build produces two libraries. `Sembla` is the production import surface used by `sembla-export` and `sembla-link`. `SemblaTests` holds the compile-time test and model-validation corpus, kept out of executable import closures.
 
@@ -147,7 +148,10 @@ The Lean build produces two libraries. `Sembla` is the production import surface
 ./scripts/check.sh        # strict complete repository contract
 ```
 
-The strict check requires Cargo, Git, and Lake, and runs Rust validation, Lean proof hygiene, and frontend parity **without silently skipping a missing tool**. The canonical matrix — including the determinism check, the reduced NPE smoke test, and the manual GPU evidence command with their environment requirements — is in [CI and local checks](contributing/ci.md#local-check-contract).
+The backend strict check requires Cargo, Git, and Python. Lean build, proof
+hygiene, and backend compatibility run independently in `sembla-lean`. The
+canonical matrix — including determinism, reduced NPE smoke, and manual GPU
+evidence — is in [CI and local checks](contributing/ci.md#local-check-contract).
 
 ```sh
 cargo run -p sembla-cli -- --version
@@ -214,9 +218,9 @@ Both commands must print identical hashes and produce byte-identical CSV, summar
 ### 4.4 Export, link, and run a composition
 
 ```sh
-(cd frontend && lake exe sembla-export --source surface_epidemic_policy \
+(cd ../sembla-lean && lake exe sembla-export --source surface_epidemic_policy \
   /tmp/epidemic_policy.source.json)
-(cd frontend && lake exe sembla-link /tmp/epidemic_policy.source.json \
+(cd ../sembla-lean && lake exe sembla-link /tmp/epidemic_policy.source.json \
   --plan /tmp/epidemic_policy.plan.json)
 cargo run -p sembla-cli -- run /tmp/epidemic_policy.plan.json \
   --population 1000 --seed 55 --ticks 40
@@ -662,11 +666,10 @@ The `from` applications *are* the runtime guard: each alias expands in atom orde
 Lean elaborates, inspects, renders widgets, proves specification-level results, and serialises models. Rust validates whole exported models and executes them.
 
 ```sh
-cd frontend
+(cd ../sembla-lean
 lake exe sembla-export sir /tmp/sir.json
 lake exe sembla-export Sembla.Models.sirPolicy /tmp/sir_policy.json
-lake exe sembla-export observations /tmp/observations.json
-cd ..
+lake exe sembla-export observations /tmp/observations.json)
 cargo run -p sembla-cli -- validate /tmp/sir.json
 cmp examples/sir.json /tmp/sir.json
 cargo run -p sembla-cli -- diff-ir examples/sir.json /tmp/sir.json
@@ -680,17 +683,18 @@ The exporter accepts concise snake-case and camel-case spellings plus `Sembla.Mo
 ### Parity
 
 ```sh
-bash frontend/scripts/check-parity.sh
+../sembla-lean/scripts/check-backend-compat.sh "$(pwd)"
 ```
 
 This exports all eight canonical models and every accepted alias, validates both sides, and uses literal `cmp` against checked-in fixtures before supplemental `diff-ir` checks. It then runs checked and exported models with fixed seeds, comparing CSV bytes, summaries, final-state hashes, and output hashes, while asserting nontrivial dynamics and conserved state counts. **No fixture regeneration is part of the workflow.**
 
 ### Negative tests
 
-Complete ill-formed models under `frontend/Negative/` pin full ordered sets of positioned errors:
+Complete ill-formed models under `Negative/` in `sembla-lean` pin full ordered
+sets of positioned errors:
 
 ```sh
-cd frontend && bash scripts/test-negative.sh
+(cd ../sembla-lean && bash scripts/test-negative.sh)
 ```
 
 ---
@@ -735,17 +739,17 @@ Exactly one root instance, an exact lowercase slug name, the outer `dt`, root pa
 Single-file mode writes an independently runnable plan, plus an optional non-semantic link report:
 
 ```sh
-cd frontend
-lake exe sembla-link ../build/epidemic_policy.source.json \
-  --plan ../build/epidemic_policy.plan.json \
-  --report ../build/epidemic_policy.link-report.json
+(cd ../sembla-lean
+lake exe sembla-link /tmp/epidemic_policy.source.json \
+  --plan /tmp/epidemic_policy.plan.json \
+  --report /tmp/epidemic_policy.link-report.json)
 ```
 
 Bundle mode writes the frozen four-file layout into a new or empty directory:
 
 ```sh
-lake exe sembla-link ../build/epidemic_policy.source.json \
-  --bundle ../build/epidemic_policy.bundle
+(cd ../sembla-lean && lake exe sembla-link /tmp/epidemic_policy.source.json \
+  --bundle /tmp/epidemic_policy.bundle)
 ```
 
 ```text
@@ -1136,7 +1140,7 @@ set_option sembla.widget.theme "academic"  -- also: "editor" or "notebook"
 
 `academic` is the restrained default (`professional` is an alias). `editor` follows standard VS Code widget chrome; `notebook` is softer and more rounded. All themes inherit the active VS Code foreground/background, so dark and high-contrast modes work.
 
-To verify manually: build the frontend, open the repository with the VS Code Lean 4 extension, and place the cursor on a `system` declaration (expect a state-machine panel), on a reaction arrow (expect a transition panel with hazard, defaults, priors, and where applicable a `p(dt) = 1 - exp(-lambda * dt)` chart), and on a general transition (expect a distinct panel). Step-by-step checks are in the [frontend guide](../frontend/README.md).
+To verify manually: build the frontend, open the repository with the VS Code Lean 4 extension, and place the cursor on a `system` declaration (expect a state-machine panel), on a reaction arrow (expect a transition panel with hazard, defaults, priors, and where applicable a `p(dt) = 1 - exp(-lambda * dt)` chart), and on a general transition (expect a distinct panel). Step-by-step checks are in the [frontend guide](https://github.com/ianmoran11/sembla-lean/blob/main/README.md).
 
 ---
 
@@ -1150,8 +1154,7 @@ To verify manually: build the frontend, open the repository with the VS Code Lea
 `Sembla.Semantics.ProofAudit` provides the deterministic environment inventory used by the hygiene guard: it enumerates every theorem and lemma in the covered module roots and rejects transitive axioms outside `{propext, Classical.choice, Quot.sound}`.
 
 ```sh
-bash frontend/scripts/check-proofs.sh
-./scripts/check.sh   # includes the guard
+(cd ../sembla-lean && bash scripts/check-proofs.sh)
 ```
 
 The syntax-independent frontend boundary is `Sembla.Frontend.Builders.Observation`. `CompleteModelSpec.toRaw` is the sole complete raw assembly path — the command frontend no longer constructs `IR.Box` or `IR.Model` directly. Parser expansion, family/alias/partition lowering, source-token bookkeeping, diagnostic rendering, widget attachment, and composition/wire compatibility checks remain **trusted and regression-tested rather than verified**; the negative harness is the oracle for exact message positions.
@@ -1213,7 +1216,7 @@ Scientific limits of the shipped substantive models are documented per model —
 
 ### Authoring
 
-- [Lean frontend](../frontend/README.md) — the complete DSL, exporter, widgets, proofs
+- [Lean frontend](https://github.com/ianmoran11/sembla-lean/blob/main/README.md) — the complete DSL, exporter, widgets, proofs
 - [Mathematical model surface](guides/mathematical-model-surface.md)
 - [Indexed parameter families](guides/indexed-parameter-families.md)
 - [Composition](guides/composition.md)
@@ -1240,7 +1243,7 @@ Scientific limits of the shipped substantive models are documented per model —
 
 | Area | Responsibility |
 | --- | --- |
-| `frontend/` | Lean DSL, IR construction, linker, canonical plan export, widgets, proofs |
+| [`sembla-lean`](https://github.com/ianmoran11/sembla-lean) | Lean DSL, IR construction, linker, canonical plan export, widgets, proofs |
 | `crates/sembla-ir` | versioned IR and plan types, stable identities, canonical serialization, validation |
 | `crates/sembla-runtime` | state store, expression evaluation, CPU tick execution, synthetic state, Philox |
 | `crates/sembla-cuda` | CUDA lowering and native execution path |

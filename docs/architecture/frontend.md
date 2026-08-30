@@ -2,7 +2,10 @@
 
 ## Responsibility
 
-`frontend/` owns model authoring, static checking, composition source/linking, structure widgets and the developing Lean semantics. It produces serialized contracts; it does not execute Rust or select an execution backend.
+The independent [`sembla-lean`](https://github.com/ianmoran11/sembla-lean)
+repository owns model authoring, static checking, composition source/linking,
+structure widgets, and Lean semantics. It produces serialized contracts; it
+does not execute Rust or select an execution backend.
 
 ## Conceptual layers
 
@@ -27,14 +30,17 @@ This split keeps tests, negative fixtures and validation-only modules out of exe
 
 ## Dependency rules
 
-`frontend/scripts/check-imports.py` enforces:
+`scripts/check-imports.py` in `sembla-lean` enforces:
 
 - production modules never import test modules;
 - IR/plan/encoding contracts do not depend on the DSL, models or widgets;
 - foundational semantics does not depend on composition, except the explicit `Semantics.Raw` source/source-map classification edge; and
 - composition core does not depend on its surface, widgets or fixtures.
 
-Byte parity with Rust remains a conformance test rather than a shared implementation: `frontend/scripts/check-parity.sh` exports golden models/sources/plans, validates them in Rust and compares exact bytes and selected executions.
+Byte parity with Rust remains a conformance test rather than a shared
+implementation. `scripts/check-backend-compat.sh` in `sembla-lean` accepts an
+explicit backend checkout, exports golden models/sources/plans, validates them
+in Rust, and compares exact bytes and selected executions.
 
 ## Change locality
 

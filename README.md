@@ -2,28 +2,34 @@
 
 [![CI](https://github.com/ianmoran11/sembla/actions/workflows/ci.yml/badge.svg)](https://github.com/ianmoran11/sembla/actions/workflows/ci.yml)
 
-CI builds, lints, and tests Rust and Lean, runs the reduced Python NPE smoke test on relevant changes, and byte-compares repeated CPU runs and sweeps for determinism.
+CI builds, lints, and tests the Rust backend, runs the reduced Python NPE smoke
+test on relevant changes, and byte-compares repeated CPU runs and sweeps for
+determinism.
 
-Sembla is a simulation framework with a Lean frontend and a deterministic Rust runtime. Its composition pipeline authors reusable components in Lean, links canonical sources into stable-identity executable plans, and verifies portable artifact bundles. See [DESIGN.md](DESIGN.md) for the architecture and project scope.
+Sembla is a deterministic Rust simulation backend. Model authoring, checked
+semantics, composition linking, and proofs live in the independent
+[`sembla-lean`](https://github.com/ianmoran11/sembla-lean) repository. The two
+repositories communicate through versioned canonical artifacts. See
+[DESIGN.md](DESIGN.md) for the architecture and project scope.
 
 ## Build and test
 
-Run the fast Rust-only contract without requiring Lean:
+Run the fast Rust contract:
 
 ```sh
 ./scripts/check-rust.sh
 ```
 
-Run the strict complete repository contract when both pinned toolchains are
-available:
+Run the strict complete backend repository contract:
 
 ```sh
 ./scripts/check.sh
 ```
 
-The complete command requires Cargo, Git, and Lake; it runs Rust validation,
-Lean proof hygiene, and frontend parity without silently skipping a missing
-tool. The canonical [check matrix](docs/contributing/ci.md#local-check-contract) also lists
+The complete command requires Cargo, Git, and Python. Frontend checks run in
+the `sembla-lean` repository; its compatibility workflow checks out the pinned
+backend revision explicitly. The canonical
+[check matrix](docs/contributing/ci.md#local-check-contract) also lists
 the determinism check, reduced NPE smoke test, and manual GPU evidence command
 with their environment requirements.
 
@@ -34,12 +40,12 @@ cargo run -p sembla-cli -- --version
 cargo run -p sembla-cli -- validate examples/two_state.json
 ```
 
-After authoring a `sembla_composition`, export its source, link it, and run the
-standalone plan with three commands:
+After authoring a `sembla_composition` in a `sembla-lean` checkout, export its
+source, link it, and run the standalone plan with three commands:
 
 ```sh
-(cd frontend && lake exe sembla-export --source surface_epidemic_policy /tmp/epidemic_policy.source.json)
-(cd frontend && lake exe sembla-link /tmp/epidemic_policy.source.json --plan /tmp/epidemic_policy.plan.json)
+(cd ../sembla-lean && lake exe sembla-export --source surface_epidemic_policy /tmp/epidemic_policy.source.json)
+(cd ../sembla-lean && lake exe sembla-link /tmp/epidemic_policy.source.json --plan /tmp/epidemic_policy.plan.json)
 cargo run -p sembla-cli -- run /tmp/epidemic_policy.plan.json --population 1000 --seed 55 --ticks 40
 ```
 
@@ -66,7 +72,8 @@ the [SIR policy guide](docs/examples/sir_policy.md).
 
 ## Canonical finite-state examples
 
-Five additional Lean-authored models cover a reversible two-state CTMC, a
+Five additional models authored in
+[`sembla-lean`](https://github.com/ianmoran11/sembla-lean) cover a reversible two-state CTMC, a
 radioactive decay chain, SIS with importation, SEIRS with waning immunity, and
 mean-field noisy voter dynamics. Each checked-in JSON model validates and runs
 from numeric `--population` initialization using deterministic generic
@@ -102,5 +109,5 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
   canonical serialization, and semantic validation.
 - `crates/sembla-runtime`: deterministic CPU simulation, synthetic population,
   prior-sampling, and local Philox RNG implementation.
-- [`frontend/`](frontend/README.md): minimal-dependency Lean DSL, IR exporter,
-  linker, and ProofWidgets structure panels (no mathlib).
+- [`ianmoran11/sembla-lean`](https://github.com/ianmoran11/sembla-lean): Lean
+  DSL, IR exporter, composition linker, checked semantics, and proofs.

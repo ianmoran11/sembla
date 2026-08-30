@@ -8,16 +8,15 @@ It contains these checks:
   library Markdown-link tests and tracked-document scan, then runs
   `scripts/check-rust.sh` for workspace dependency layering, core/backend
   vocabulary and reporting boundaries, formatting, Clippy, workspace tests,
-  dependency/RNG policy, and lock verification. It finishes with the
-  dependency-free Lean proof-hygiene guard and does not repeat an equivalent
-  Cargo build or test afterward.
+  dependency/RNG policy, and lock verification. No Lean toolchain is installed
+  in backend CI.
 - **Determinism:** runs `scripts/check-determinism.sh`, which executes the SIR
   model twice and compares the result CSV, summary CSV, and manifest bytes. It
   also executes the same sweep twice and compares every output and the sweep
   manifest.
-- **Lean frontend:** installs the root Rust pin and
-  `frontend/lean-toolchain` pin, restores the Cargo and Lake caches, and runs the
-  build, elaboration, export, runtime parity, and Cargo-lock checks.
+- **Frontend compatibility:** runs in the independent
+  [`sembla-lean`](https://github.com/ianmoran11/sembla-lean) workflow, which
+  checks out the backend commit recorded in `compat/backend.json` explicitly.
 - **NPE smoke:** runs when `calibration/**`, `docs/prds-npe-path/**`, its
   `scripts/check-npe-smoke.sh` or `scripts/check-npe-lock.sh` harness, or
   `.github/workflows/ci.yml` changes. The direct
@@ -44,8 +43,8 @@ release comments. Repository-local actions may use an explicit `./` path
 because their content is fixed by the checked-out commit.
 
 `.github/dependabot.yml` requests grouped weekly updates only for the
-`github-actions` ecosystem. Cargo, Python, Terraform, and Lean dependency
-updates are intentionally outside this policy. The path-detection and manual
+`github-actions` ecosystem. Cargo, Python, and Terraform dependency updates are
+intentionally outside this policy. The path-detection and manual
 GPU-stub jobs have five-minute timeouts; their existing minimal read permissions
 and the GPU workflow's dispatch-only trigger remain unchanged.
 
@@ -57,20 +56,20 @@ committed lock and fail rather than regenerating it.
 | Contract | Command | Environment and claim |
 | --- | --- | --- |
 | Fast Rust | `./scripts/check-rust.sh` | Requires the pinned Rust toolchain, Git and Python 3, but not Lean. Checks the exact workspace dependency matrix and core-library boundaries, then runs formatting, Clippy, workspace tests, runtime dependency/RNG policy, and verifies `Cargo.lock` is unchanged. |
-| Architecture fitness | `python3 scripts/check-artifact-registry.py && python3 scripts/check-architecture-canvases.py && python3 frontend/scripts/check-imports.py` | Standard-library checks for contract ownership, Advanced Canvas portals/file references/styles, production-vs-test Lean closure, and high-value Lean import direction. Rust architecture rules are part of the Fast Rust contract. |
+| Architecture fitness | `python3 scripts/check-artifact-registry.py && python3 scripts/check-architecture-canvases.py` | Standard-library checks for local and external contract ownership plus Advanced Canvas portals, file references, and styles. Rust architecture rules are part of the Fast Rust contract. |
 | Documentation links | `python3 scripts/check-markdown-links.py` | Uses only the Python standard library. Checks tracked Markdown relative targets, ignores `.piprd` managed records, remote/mailto links, images, fenced examples, and pure anchors, and does not claim anchor-fragment validation. |
 | ABS data | `./scripts/check-abs-data.sh` | Uses only the Python standard library and the verified local cache. Runs reader/extract tests, regenerates every committed extract and reconciliation report byte-identically, and performs no network access. |
-| Complete local | `./scripts/check.sh` | Requires Cargo, Git, Python 3, and Lake from the pinned Rust/Lean toolchains. Runs documentation and architecture checks (including their temporary-fixture tests), the Rust contract, Lean proof hygiene, and full frontend parity; a missing tool is an error, never a skip. |
+| Complete local | `./scripts/check.sh` | Requires Cargo, Git, and Python 3. Runs documentation and architecture checks (including their temporary-fixture tests) plus the full Rust contract; a missing tool is an error, never a skip. |
 | Determinism | `./scripts/check-determinism.sh` | Requires the pinned Rust toolchain. Repeats CPU run and sweep workflows and compares their outputs byte-for-byte. |
 | NPE smoke | `PYTHON=calibration/npe/.venv/bin/python ./scripts/check-npe-smoke.sh` | Requires the pinned Python 3.12 environment described in `calibration/npe/README.md`. This is reduced contract/training evidence, not SBC. |
 | NPE lock | `./scripts/check-npe-lock.sh` | Requires Docker. In the immutable Linux/amd64 CPython 3.12.8 image, regenerates and compares the hashed lock, performs a fresh install without isolated build resolution, and runs the full reduced NPE smoke check. |
 | GPU manual evidence | `bash crates/sembla-cuda/scripts/run-differential-corpus.sh` | Requires a clean committed worktree and remote NVIDIA CUDA/NVRTC environment. The dispatch-only hosted workflow is a stub and is not GPU evidence. |
 
-The Lean parity component can also be run directly when Git and both pinned
-toolchains are installed:
+From a `sembla-lean` checkout, cross-repository compatibility can be run
+against an explicit backend checkout:
 
 ```sh
-bash frontend/scripts/check-parity.sh
+./scripts/check-backend-compat.sh /path/to/sembla
 ```
 
 Workflow and Dependabot YAML are parsed; immutable action pins and comments,

@@ -1,0 +1,12 @@
+{
+  "schema": "sembla.frontend-compatibility-pin/v1",
+  "repository": "https://github.com/ianmoran11/sembla-lean",
+  "commit": "0647cac52e6012a1ba42bf1026ffb9f62243918d",
+  "contracts": {
+    "bundle": "sembla.bundle/v1",
+    "canonical_json": "sembla.canonical-json/v1",
+    "executable_plan": "sembla.executable-plan/v1",
+    "identity": "sembla.identity/stable-v1",
+    "source_map": "sembla.source-map/v1"
+  }
+}

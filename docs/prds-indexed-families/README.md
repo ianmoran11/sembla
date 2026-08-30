@@ -108,5 +108,5 @@ Lean source and forces recompilation. Fresh CI and direct elaboration detect a
 file changed without its pin.
 
 Exact inline/CSV/JSON/manual twins live in
-[`frontend/Sembla/IndexedFamilyTests.lean`](../../frontend/Sembla/IndexedFamilyTests.lean).
+[`frontend/Sembla/IndexedFamilyTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/IndexedFamilyTests.lean).
 The Australian population model is deliberately not migrated by this feature.

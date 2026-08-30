@@ -3,8 +3,8 @@
 These examples exercise dynamical systems that fit Sembla's current fast path:
 finite row state, continuous-time hazard specifications, declaration-ordered
 transitions, and optional group aggregates. Each model is authored in Lean,
-checked in as canonical JSON, validated by Rust, and run twice in
-`frontend/scripts/check-parity.sh` to verify byte-for-byte determinism.
+checked in as canonical JSON, validated by Rust, and checked by
+`sembla-lean/scripts/check-backend-compat.sh` for byte-for-byte compatibility.
 
 The formulas below are the canonical hazards of the corresponding continuous-
 time jump processes. The current runtime evaluates them with snapshot-isolated,
@@ -41,14 +41,13 @@ cargo build --release -p sembla-cli
 To export fresh JSON from the Lean definitions:
 
 ```sh
-cd frontend
+(cd ../sembla-lean
 lake build
 lake exe sembla-export reversible_ctmc /tmp/reversible_ctmc.json
 lake exe sembla-export radioactive_decay_chain /tmp/radioactive_decay_chain.json
 lake exe sembla-export sis_importation /tmp/sis_importation.json
 lake exe sembla-export seirs_waning /tmp/seirs_waning.json
-lake exe sembla-export noisy_voter /tmp/noisy_voter.json
-cd ..
+lake exe sembla-export noisy_voter /tmp/noisy_voter.json)
 ./target/release/sembla diff-ir examples/reversible_ctmc.json /tmp/reversible_ctmc.json
 ```
 

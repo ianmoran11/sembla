@@ -23,12 +23,6 @@ import rates  # noqa: E402
 HERE = pathlib.Path(__file__).resolve().parent
 EXTRACTS = HERE.parent / "extracts"
 PARAMS = HERE.parent / "params"
-PARAMETER_TABLES = (
-    HERE.parent.parent.parent / "frontend" / "Sembla" / "Models"
-    / "AustralianPopulation" / "Data"
-)
-
-
 class TestRateInputs(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -383,10 +377,12 @@ class TestRateArtifacts(unittest.TestCase):
             for relative, content in first_files.items():
                 if relative == pathlib.Path("rates.md"):
                     committed = EXTRACTS / "rates.md"
-                elif relative.parts[0] == "tables":
-                    committed = PARAMETER_TABLES / relative.name
-                elif relative == pathlib.Path("reference.lean"):
-                    committed = rates.LEAN_PARAMETERS
+                elif relative.parts[0] == "tables" or relative == pathlib.Path(
+                    "reference.lean"
+                ):
+                    # These are exported to the independent Lean repository;
+                    # cross-repository compatibility checks compare its pin.
+                    continue
                 else:
                     committed = PARAMS / relative.relative_to("params")
                 self.assertEqual(content, committed.read_bytes(), str(committed))

@@ -14,11 +14,9 @@ echo "== cache verification (no network) =="
 python3 fetch.py
 
 echo
-echo "== extracts, rates, targets, parameters, reports, and parameter tables regenerate byte-identically =="
+echo "== extracts, rates, targets, parameters, and reports regenerate byte-identically =="
 artifacts=(extracts/*.csv extracts/*.md params/*.json params/gravity/*.json
-  targets/*.json targets/sensitivity/*.json
-  reference/AustralianPopulationParameters.lean
-  ../../frontend/Sembla/Models/AustralianPopulation/Data/{birth_rate,mortality,overseas_arrival,emigration}.json)
+  targets/*.json targets/sensitivity/*.json)
 before="$(shasum -a 256 "${artifacts[@]}")"
 python3 normalise.py >/dev/null
 python3 reconcile.py >/dev/null
@@ -28,7 +26,7 @@ python3 gravity_fit.py >/dev/null
 python3 targets.py >/dev/null
 after="$(shasum -a 256 "${artifacts[@]}")"
 if [ "$before" != "$after" ]; then
-  echo "extracts, rates, targets, parameters, reports, or parameter tables are not byte-reproducible" >&2
+  echo "extracts, rates, targets, parameters, or reports are not byte-reproducible" >&2
   diff <(echo "$before") <(echo "$after") >&2 || true
   exit 1
 fi

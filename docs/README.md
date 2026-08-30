@@ -7,7 +7,7 @@ This is the canonical entry point for Sembla's documentation. Documents are grou
 | Reader | First document | Then read |
 | --- | --- | --- |
 | New user | [User guide](user-guide.md) | [project overview](overview.md), [examples](examples/README.md) |
-| Model author | [User guide](user-guide.md) | [Lean frontend](../frontend/README.md), [composition guide](guides/composition.md), [state artifacts](guides/state-format.md) |
+| Model author | [User guide](user-guide.md) | [Lean frontend](https://github.com/ianmoran11/sembla-lean/blob/main/README.md), [composition guide](guides/composition.md), [state artifacts](guides/state-format.md) |
 | Contributor | [Contributing](../CONTRIBUTING.md) | [CI and local checks](contributing/ci.md), [roadmap](ROADMAP.md) |
 | Semantics or architecture reviewer | [Design authority](../DESIGN.md) | [decision record](../DECISIONS.md), [architecture atlas](architecture/README.md), [design notes](design/README.md) |
 | Performance engineer | [Performance index](performance/README.md) | [measurement evidence](evidence/README.md) |
@@ -36,7 +36,7 @@ A current document should say when it is intentionally descriptive rather than n
 ### Authoring and execution
 
 - [User guide](user-guide.md) — end-to-end walkthrough from install to authoring, composition, calibration, and verification.
-- [Lean frontend](../frontend/README.md) — DSL, examples, exporter, widgets, and proofs.
+- [Lean frontend](https://github.com/ianmoran11/sembla-lean/blob/main/README.md) — DSL, examples, exporter, widgets, and proofs.
 - [Composition guide](guides/composition.md) — components, linking, bundles, identities, and comparison.
 - [State artifacts](guides/state-format.md) — portable state files and chained runs.
 - [Visual guide](guides/visual-guide.md) — diagrams of boxes, tables, wires, and dynamics.

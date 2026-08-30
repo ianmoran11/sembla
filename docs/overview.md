@@ -54,7 +54,7 @@ Views and summaries are sinks. They are evaluated from committed state and canno
 
 | Area | Responsibility |
 | --- | --- |
-| `frontend/` | Lean DSL, IR construction, linker, canonical plan export, widgets, and proofs |
+| [`sembla-lean`](https://github.com/ianmoran11/sembla-lean) | Lean DSL, IR construction, linker, canonical plan export, widgets, and proofs |
 | `crates/sembla-ir` | versioned Rust IR and plan types, stable identities, canonical serialization, validation |
 | `crates/sembla-runtime` | state store, expression evaluation, CPU tick execution, synthetic state generation, Philox |
 | `crates/sembla-cuda` | CUDA lowering and native execution path |
@@ -72,7 +72,8 @@ Views and summaries are sinks. They are evaluated from committed state and canno
 ./scripts/check.sh
 ```
 
-The complete contract requires the pinned Rust and Lean toolchains. See [CI and local checks](contributing/ci.md).
+The backend contract requires the pinned Rust toolchain. Frontend checks run in
+`sembla-lean`. See [CI and local checks](contributing/ci.md).
 
 ### Run a direct model
 
@@ -85,9 +86,9 @@ cargo run -p sembla-cli -- run examples/two_state.json \
 ### Export, link, and run a composition
 
 ```sh
-(cd frontend && lake exe sembla-export --source surface_epidemic_policy \
+(cd ../sembla-lean && lake exe sembla-export --source surface_epidemic_policy \
   /tmp/epidemic_policy.source.json)
-(cd frontend && lake exe sembla-link /tmp/epidemic_policy.source.json \
+(cd ../sembla-lean && lake exe sembla-link /tmp/epidemic_policy.source.json \
   --plan /tmp/epidemic_policy.plan.json)
 cargo run -p sembla-cli -- run /tmp/epidemic_policy.plan.json \
   --population 1000 --seed 55 --ticks 40
@@ -114,7 +115,7 @@ Proposed features in historical roadmaps or design discussions are not implement
 ## Documentation map
 
 - [Documentation home](README.md)
-- [Lean frontend](../frontend/README.md)
+- [Lean frontend](https://github.com/ianmoran11/sembla-lean/blob/main/README.md)
 - [Examples](examples/README.md)
 - [Models](models/README.md)
 - [Performance](performance/README.md)

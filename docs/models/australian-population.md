@@ -6,15 +6,15 @@ from 30 June 2010 and represents interstate migration as a write to the same
 row's enum-valued `area`, preserving identity across movement.
 
 The public assembly remains
-[`frontend/Sembla/Models/AustralianPopulation.lean`](../../frontend/Sembla/Models/AustralianPopulation.lean).
+[`Sembla/Models/AustralianPopulation.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation.lean).
 Its complete declarative foundation is
-[`Surface.lean`](../../frontend/Sembla/Models/AustralianPopulation/Surface.lean),
+[`Surface.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/Surface.lean),
 with four generated v2 tables under `AustralianPopulation/Data/`.
-[`Parameters.lean`](../../frontend/Sembla/Models/AustralianPopulation/Parameters.lean)
-and [`Transitions.lean`](../../frontend/Sembla/Models/AustralianPopulation/Transitions.lean)
+[`Parameters.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/Parameters.lean)
+and [`Transitions.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/Transitions.lean)
 are compatibility projections, while `Validation.lean` directly pins table
 bytes and structural/public invariants.
-The [local maintenance README](../../frontend/Sembla/Models/AustralianPopulation/README.md)
+The [frontend maintenance README](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/README.md)
 defines ownership, regeneration, invariants, and failure policy. Public
 `Sembla.Models` names and model/plan semantics are unchanged. The calibrated
 fifteen-year chain and validation evidence are delivered by the remaining
