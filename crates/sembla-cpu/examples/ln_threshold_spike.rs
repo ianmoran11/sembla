@@ -26,7 +26,7 @@
 //! lands within a few ULPs of the threshold, so a clean bulk result proves
 //! nothing on its own.
 //!
-//!   cargo run --release -p sembla-runtime --example ln_threshold_spike
+//!   cargo run --release -p sembla-cpu --example ln_threshold_spike
 
 use sembla_runtime::rng::uniform_f64;
 

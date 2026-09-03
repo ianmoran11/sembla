@@ -24,7 +24,7 @@
 //! Everything here is integer arithmetic plus one comparison, so all arms are
 //! bit-identical by construction; the spike asserts it anyway.
 //!
-//!   cargo run --release -p sembla-runtime --example rng_batch_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example rng_batch_spike -- [rows] [reps]
 
 // Guard predicates are transcribed verbatim from
 // fixtures/demographic/benchmark/demographic_slots.no-grouped.json so a reader

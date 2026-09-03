@@ -16,7 +16,7 @@
 //! Arms compute the same predicate over the same data; popcount is asserted
 //! equal so a faster arm cannot be a wrong arm.
 //!
-//!   cargo run --release -p sembla-runtime --example bitset_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example bitset_spike -- [rows] [reps]
 
 use std::time::Instant;
 

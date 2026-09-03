@@ -1,8 +1,8 @@
 #![cfg(feature = "cuda")]
 
+use sembla_cpu::run_tick;
 use sembla_cuda::{generate, CudaBackend, CudaFinalStateReadbackMode, HashMode};
 use sembla_runtime::core::ParamEnv;
-use sembla_runtime::cpu::run_tick;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 fn claim_overflow_model() -> sembla_ir::ValidatedModel {

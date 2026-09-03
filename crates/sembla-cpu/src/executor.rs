@@ -16,10 +16,12 @@ use crate::eval::{
     tick_worker_count, tiled_expr_footprint, AggCache, EvalTable, PreparedColumn, PreparedExpr,
     PreparedValue, TiledExprFootprint, ValueColumn,
 };
-use crate::observation::{GroupedViewValue, ObservationValue, SummaryValue, ViewValue};
-use crate::params::ParamEnv;
-use crate::rng::{exp_f64, exp_f64_from_uniform, uniform_f64};
-use crate::state::{ColumnData, InputTable, ResolvedWriteColumn, Snapshot, StateError, StateStore};
+use sembla_runtime::core::{
+    ColumnData, GroupedViewValue, InputTable, ObservationValue, ParamEnv, Snapshot, StateError,
+    StateStore, SummaryValue, ViewValue,
+};
+use sembla_runtime::engine::{exp_f64_from_uniform, ResolvedWriteColumn};
+use sembla_runtime::rng::{exp_f64, uniform_f64};
 
 /// Relative slack below the `exp(-lambda * dt)` boundary used only to reject
 /// certain non-firers. Near the benchmark's thresholds, one binary64 ULP is at
@@ -2756,8 +2758,8 @@ fn transition_name(model: &ValidatedModel, rule_id: u32) -> &str {
 #[cfg(test)]
 mod double_write_bitmap_tests {
     use super::*;
-    use crate::state::{ColumnData, ColumnInit, StateStore, TableInit};
     use sembla_ir::{validate, Attr, Box as ModelBox, Effect, Model, Table, Transition};
+    use sembla_runtime::core::{ColumnData, ColumnInit, StateStore, TableInit};
 
     #[test]
     fn scratch_reuses_storage_and_sizes_only_written_columns() {
@@ -2855,11 +2857,11 @@ mod double_write_bitmap_tests {
 mod parallel_tests {
     use super::*;
     use crate::eval::with_test_tick_tiles;
-    use crate::state::{ColumnInit, StateStore, TableInit};
     use sembla_ir::{
         parse_json, validate, Attr, Box as ModelBox, Model, ParamDecl, ParamType, ParamValue,
         ResourceClaim, Table, Transition, ViewDecl,
     };
+    use sembla_runtime::core::{ColumnInit, StateStore, TableInit};
 
     fn tiled_fixture(row_count: usize) -> (ValidatedModel, StateStore) {
         let model = validate(Model {

@@ -1,6 +1,6 @@
+use sembla_cpu::{eval_column, AggCache, EvalTable, ValueColumn};
 use sembla_ir::{AggJoin, AggOp, Attr, AttrType, Box as IrBox, Expr, Model, Table};
 use sembla_runtime::core::ParamEnv;
-use sembla_runtime::cpu::{eval_column, AggCache, EvalTable, ValueColumn};
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 const EVAL_SOURCE: &str = include_str!("../src/eval.rs");

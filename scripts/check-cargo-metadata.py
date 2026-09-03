@@ -15,6 +15,7 @@ EXPECTED_LICENSE = "MIT OR Apache-2.0"
 EXPECTED_REPOSITORY = "https://github.com/ianmoran11/sembla"
 EXPECTED_PACKAGES = {
     "sembla-cli",
+    "sembla-cpu",
     "sembla-cuda",
     "sembla-ir",
     "sembla-runtime",

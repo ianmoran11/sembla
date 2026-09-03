@@ -1245,7 +1245,8 @@ Scientific limits of the shipped substantive models are documented per model —
 | --- | --- |
 | [`sembla-lean`](https://github.com/ianmoran11/sembla-lean) | Lean DSL, IR construction, linker, canonical plan export, widgets, proofs |
 | `crates/sembla-ir` | versioned IR and plan types, stable identities, canonical serialization, validation |
-| `crates/sembla-runtime` | state store, expression evaluation, CPU tick execution, synthetic state, Philox |
+| `crates/sembla-runtime` | backend-neutral state, parameters, observations, synthetic state, Philox |
+| `crates/sembla-cpu` | CPU expression evaluation, tick execution, conflict resolution, observation reduction |
 | `crates/sembla-cuda` | CUDA lowering and native execution path |
 | `crates/sembla-cli` | validation, execution, sweeps, comparison, verification, backend differentials |
 | `calibration/` | external calibration and NPE workflow material |

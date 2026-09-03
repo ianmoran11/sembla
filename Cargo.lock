@@ -121,6 +121,7 @@ dependencies = [
 name = "sembla-cli"
 version = "0.3.0"
 dependencies = [
+ "sembla-cpu",
  "sembla-cuda",
  "sembla-ir",
  "sembla-runtime",
@@ -130,10 +131,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sembla-cpu"
+version = "0.3.0"
+dependencies = [
+ "sembla-ir",
+ "sembla-runtime",
+ "sha2",
+]
+
+[[package]]
 name = "sembla-cuda"
 version = "0.3.0"
 dependencies = [
  "cudarc",
+ "sembla-cpu",
  "sembla-ir",
  "sembla-runtime",
  "serde_json",

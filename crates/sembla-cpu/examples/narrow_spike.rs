@@ -20,7 +20,7 @@
 //! validator, or recorded in the state artifact — and what happens when a
 //! value escapes it.
 //!
-//!   cargo run --release -p sembla-runtime --example narrow_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example narrow_spike -- [rows] [reps]
 
 // Guard predicates are transcribed verbatim from
 // fixtures/demographic/benchmark/demographic_slots.no-grouped.json so a reader

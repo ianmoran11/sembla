@@ -1,6 +1,4 @@
-use sembla_ir::{ValidatedModel, ViewReduce};
-
-use crate::eval::{expr_is_gather_eligible, expr_is_gather_eligible_int, EvalTable};
+use sembla_ir::{Attr, AttrType, Expr, ParamType, ValidatedModel, ViewReduce};
 
 /// A numeric observation scalar. Real equality is bitwise so report equality
 /// remains an exact determinism check, including signed zero and NaN payloads.
@@ -53,12 +51,107 @@ pub struct DeviceObservationEligibility {
     pub views: Vec<DeviceViewEligibility>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NumericKind {
+    Real,
+    Int,
+}
+
+fn row_numeric_kind(
+    expr: &Expr,
+    model: &ValidatedModel,
+    row_attrs: &[Attr],
+) -> Option<NumericKind> {
+    match expr {
+        Expr::Real { .. } => Some(NumericKind::Real),
+        Expr::Int { .. } => Some(NumericKind::Int),
+        Expr::Param { name } => model
+            .model()
+            .params
+            .iter()
+            .find(|param| param.name == *name)
+            .map(|param| match param.ty {
+                ParamType::Real => NumericKind::Real,
+                ParamType::Int => NumericKind::Int,
+            }),
+        Expr::SelfAttr { name } => {
+            row_attrs
+                .iter()
+                .find(|attr| attr.name == *name)
+                .and_then(|attr| match attr.ty {
+                    AttrType::Real => Some(NumericKind::Real),
+                    AttrType::Int => Some(NumericKind::Int),
+                    AttrType::Enum { .. } | AttrType::Ref { .. } => None,
+                })
+        }
+        Expr::Add { lhs, rhs } | Expr::Sub { lhs, rhs } | Expr::Mul { lhs, rhs } => {
+            let lhs = row_numeric_kind(lhs, model, row_attrs)?;
+            let rhs = row_numeric_kind(rhs, model, row_attrs)?;
+            Some(if lhs == NumericKind::Real || rhs == NumericKind::Real {
+                NumericKind::Real
+            } else {
+                NumericKind::Int
+            })
+        }
+        Expr::Div { lhs, rhs } => {
+            row_numeric_kind(lhs, model, row_attrs)?;
+            row_numeric_kind(rhs, model, row_attrs)?;
+            Some(NumericKind::Real)
+        }
+        Expr::Bool { .. }
+        | Expr::Enum { .. }
+        | Expr::Eq { .. }
+        | Expr::Ne { .. }
+        | Expr::Lt { .. }
+        | Expr::Le { .. }
+        | Expr::Gt { .. }
+        | Expr::Ge { .. }
+        | Expr::And { .. }
+        | Expr::Or { .. }
+        | Expr::Not { .. }
+        | Expr::EnumIs { .. }
+        | Expr::Input { .. }
+        | Expr::Agg { .. } => None,
+    }
+}
+
+fn row_expr_is_infallible(expr: &Expr, model: &ValidatedModel, row_attrs: &[Attr]) -> bool {
+    match expr {
+        Expr::Real { .. }
+        | Expr::Int { .. }
+        | Expr::Bool { .. }
+        | Expr::Enum { .. }
+        | Expr::Param { .. }
+        | Expr::SelfAttr { .. }
+        | Expr::EnumIs { .. } => true,
+        Expr::Add { lhs, rhs } | Expr::Sub { lhs, rhs } | Expr::Mul { lhs, rhs } => {
+            row_numeric_kind(expr, model, row_attrs) == Some(NumericKind::Real)
+                && row_expr_is_infallible(lhs, model, row_attrs)
+                && row_expr_is_infallible(rhs, model, row_attrs)
+        }
+        Expr::Div { lhs, rhs }
+        | Expr::Eq { lhs, rhs }
+        | Expr::Ne { lhs, rhs }
+        | Expr::Lt { lhs, rhs }
+        | Expr::Le { lhs, rhs }
+        | Expr::Gt { lhs, rhs }
+        | Expr::Ge { lhs, rhs }
+        | Expr::And { lhs, rhs }
+        | Expr::Or { lhs, rhs } => {
+            row_expr_is_infallible(lhs, model, row_attrs)
+                && row_expr_is_infallible(rhs, model, row_attrs)
+        }
+        Expr::Not { expr } => row_expr_is_infallible(expr, model, row_attrs),
+        Expr::Input { .. } | Expr::Agg { .. } => false,
+    }
+}
+
 /// Decides device-observation eligibility from validated IR.
 ///
 /// Eligibility means that a backend can preserve the CPU oracle's exact
 /// observation contract without materializing host state. The expression check
-/// deliberately reuses the evaluator's gather predicate, keeping this policy
-/// backend-neutral and avoiding another expression whitelist.
+/// is defined here over validated IR so accelerator capability policy cannot
+/// depend on the CPU implementation crate.
 pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservationEligibility {
     const ELIGIBLE: &str = "all scalar and grouped views are device-eligible";
     const FALLBACK: &str = "at least one view requires host observation";
@@ -74,11 +167,15 @@ pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservati
     let mut views = Vec::new();
     for model_box in &model.model().boxes {
         for view in &model_box.views {
-            let table = EvalTable::new(model, &model_box.name, &view.table);
-            let filter_eligible = table.is_ok_and(|table| {
-                view.filter.as_ref().map_or(true, |filter| {
-                    expr_is_gather_eligible(filter, table).unwrap_or(false)
-                })
+            let table_attrs = model_box
+                .tables
+                .iter()
+                .find(|table| table.name == view.table)
+                .map(|table| table.attrs.as_slice());
+            let filter_eligible = table_attrs.is_some_and(|attrs| {
+                view.filter
+                    .as_ref()
+                    .map_or(true, |filter| row_expr_is_infallible(filter, model, attrs))
             });
             let (eligible, reason) = if !filter_eligible {
                 (false, FILTER)
@@ -87,12 +184,13 @@ pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservati
                     ViewReduce::Count => (true, COUNT),
                     ViewReduce::Sum => (false, SUM),
                     ViewReduce::Min | ViewReduce::Max => {
-                        let value_eligible = EvalTable::new(model, &model_box.name, &view.table)
-                            .ok()
-                            .zip(view.value.as_ref())
-                            .is_some_and(|(table, value)| {
-                                expr_is_gather_eligible_int(value, table).unwrap_or(false)
-                            });
+                        let value_eligible =
+                            table_attrs
+                                .zip(view.value.as_ref())
+                                .is_some_and(|(attrs, value)| {
+                                    row_numeric_kind(value, model, attrs) == Some(NumericKind::Int)
+                                        && row_expr_is_infallible(value, model, attrs)
+                                });
                         if value_eligible {
                             (true, INT_MIN_MAX)
                         } else {
@@ -109,10 +207,13 @@ pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservati
             });
         }
         for view in &model_box.grouped_views {
-            let filter_eligible =
-                EvalTable::new(model, &model_box.name, &view.table).is_ok_and(|table| {
+            let filter_eligible = model_box
+                .tables
+                .iter()
+                .find(|table| table.name == view.table)
+                .is_some_and(|table| {
                     view.filter.as_ref().map_or(true, |filter| {
-                        expr_is_gather_eligible(filter, table).unwrap_or(false)
+                        row_expr_is_infallible(filter, model, &table.attrs)
                     })
                 });
             views.push(DeviceViewEligibility {

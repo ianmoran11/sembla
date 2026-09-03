@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use sembla_cpu::{self as executor, ObservationValue, SummaryValue};
 use sembla_cuda::{CudaBackend, HashMode};
 use sembla_ir::{AttrType, FeatureSet, ParamType, ParamValue, GROUPED_OBSERVATIONS_FEATURE};
 use sembla_runtime::core::{
     ColumnData, ColumnInit, ParamEnv, ParamOverride, StateStore, TableInit,
 };
-use sembla_runtime::cpu::{self as executor, ObservationValue, SummaryValue};
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::rng::derive_sweep_replica_seed;

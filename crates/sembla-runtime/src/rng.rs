@@ -111,7 +111,8 @@ fn mantissa_to_open_f64(mantissa: u64) -> f64 {
 /// draw before deciding whether its `ln` is required, without duplicating or
 /// changing the platform-`ln` exemption documented by `DECISIONS.md` §E7.
 #[must_use]
-pub(crate) fn exp_f64_from_uniform(uniform: f64, lambda: f64) -> f64 {
+#[doc(hidden)]
+pub fn exp_f64_from_uniform(uniform: f64, lambda: f64) -> f64 {
     -uniform.ln() / lambda
 }
 

@@ -1,3 +1,5 @@
+//! Source-level guards for CPU effect gathering.
+
 const EVAL_SOURCE: &str = include_str!("../src/eval.rs");
 const EXECUTOR_SOURCE: &str = include_str!("../src/executor.rs");
 

@@ -3,12 +3,19 @@
 ## Dependency direction
 
 ```text
-sembla-ir <- sembla-runtime <- sembla-cuda <- sembla-cli
-     ^              ^               ^             |
-     +--------------+---------------+-------------+
+                     +--- sembla-cpu <---+
+                     |                   |
+sembla-ir <- sembla-runtime              +--- sembla-cli
+     ^               |                   |
+     +---------------+--- sembla-cuda <--+
 ```
 
-`sembla-cli` also depends directly on each lower crate. `scripts/check-rust-architecture.py` checks the exact workspace edge matrix and prevents backend vocabulary or direct reporting from entering core library sources.
+`sembla-cpu` and `sembla-cuda` are sibling implementations over
+`sembla-runtime`. CUDA's only dependency on the CPU crate is a dev-dependency
+for oracle comparisons. `sembla-cli` depends directly on each lower crate.
+`scripts/check-rust-architecture.py` checks the exact workspace edge matrix,
+the CUDA-to-CPU dev-only rule, and prevents backend vocabulary or direct
+reporting from entering library sources.
 
 ## Responsibilities
 
@@ -18,22 +25,40 @@ Owns serialized model/plan types, semantic validation, canonical serialization a
 
 ### `sembla-runtime`
 
-Owns the deterministic CPU oracle:
+Owns backend-neutral execution contracts and deterministic primitives:
 
-- `eval.rs` — expression interpretation and `ParamEnv`;
-- `executor.rs` — tick execution, conflict resolution and observation reports;
 - `state.rs` — double-buffered columnar state;
+- `params.rs` / `observation.rs` — resolved parameters and observation data;
 - `rng.rs` / `prior.rs` — coordinate-addressed Philox and prior sampling;
 - `state_artifact.rs` — portable state serialization; and
 - `population.rs` — deterministic synthetic population tooling.
 
-Device-observation eligibility lives beside the oracle because eligibility means preserving the oracle's exact observation contract. It returns plain capability data; the runtime does not select or depend on a backend.
+The hidden `engine` API exposes the small set of resolved-state primitives
+required by implementation crates. Application code uses `core`; the runtime
+does not select or depend on a backend. Device-observation eligibility is an
+IR-only capability decision here, so CUDA does not reach into CPU evaluation.
+
+### `sembla-cpu`
+
+Owns the deterministic CPU oracle:
+
+- `eval.rs` — snapshot-only expression interpretation;
+- `executor.rs` — tick execution, conflict resolution and observation
+  reduction; and
+- `error.rs` — CPU execution failures.
+
+CPU performance spikes and execution-specific regression tests live with this
+crate, keeping CPU work independent from the runtime core and CUDA backend.
 
 ### `sembla-cuda`
 
 Owns whole-plan CUDA C generation, NVRTC compilation and device execution. Shared plain-data host types live in `types.rs` and compile with or without the `cuda` feature. The feature-off stub reports unavailability and never hides a CPU fallback.
 
-CPU and CUDA are not implementations of a general plugin trait. They are the reference semantics and one production accelerator, held together by per-tick/final-state/result differential tests. Add a third path only when a normalized kernel representation makes it cheaper than another independent semantics implementation.
+CPU and CUDA are not implementations of a general plugin trait. They are
+sibling crates representing the reference semantics and one production
+accelerator, held together by per-tick/final-state/result differential tests.
+Add a third path only when a normalized kernel representation makes it cheaper
+than another independent semantics implementation.
 
 ### `sembla-cli`
 

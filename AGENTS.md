@@ -8,10 +8,13 @@ frontend is maintained in `ianmoran11/sembla-lean`.
 
 - `sembla_runtime::core` is the backend-neutral API for parameters, state,
   observation values, and device-observation eligibility.
-- `sembla_runtime::cpu` is the CPU evaluator and execution API. Its underlying
-  evaluator and executor modules are intentionally private.
+- `sembla-cpu` is the CPU evaluator and execution crate. Its evaluator and
+  executor modules are private behind the crate-root API.
+- `sembla_runtime::engine` contains hidden implementation primitives required
+  by execution backends; application code should use `sembla_runtime::core`.
 - Production CUDA code must depend on `sembla_runtime::core`, not CPU execution
-  internals. CPU imports from CUDA tests are oracle comparisons only.
+  internals. `sembla-cuda` may depend on `sembla-cpu` only as a dev-dependency
+  for oracle comparisons.
 - Keep backend selection and publication policy in `sembla-cli`; neither
   runtime boundary selects a backend.
 

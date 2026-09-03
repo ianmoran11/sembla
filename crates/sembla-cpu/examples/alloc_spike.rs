@@ -18,7 +18,7 @@
 //!
 //! Identical work in both arms; only the allocation lifetime differs.
 //!
-//!   cargo run --release -p sembla-runtime --example alloc_spike -- [rows] [iters]
+//!   cargo run --release -p sembla-cpu --example alloc_spike -- [rows] [iters]
 
 use std::time::Instant;
 

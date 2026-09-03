@@ -29,7 +29,7 @@
 //! partials combine associatively. Real sums would still need the canonical
 //! ascending order and are excluded here, as in the threading spike.
 //!
-//!   cargo run --release -p sembla-runtime --example rowwise_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example rowwise_spike -- [rows] [reps]
 
 // Guard predicates are transcribed verbatim from
 // fixtures/demographic/benchmark/demographic_slots.no-grouped.json so a reader

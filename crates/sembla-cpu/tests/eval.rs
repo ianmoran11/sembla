@@ -1,12 +1,12 @@
+use sembla_cpu::{
+    eval_column, eval_gather, eval_ref_column, eval_typed_ref_column, eval_typed_ref_gather,
+    AggCache, EvalTable, ValueColumn,
+};
 use sembla_ir::{
     AggJoin, AggOp, Aggregate, Attr, AttrType, Box as IrBox, Expr, Model, ParamDecl, ParamType,
     ParamValue, PortDecl, Table,
 };
 use sembla_runtime::core::{ParamEnv, ParamOverride};
-use sembla_runtime::cpu::{
-    eval_column, eval_gather, eval_ref_column, eval_typed_ref_column, eval_typed_ref_gather,
-    AggCache, EvalTable, ValueColumn,
-};
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 fn attr(name: &str, ty: AttrType) -> Attr {

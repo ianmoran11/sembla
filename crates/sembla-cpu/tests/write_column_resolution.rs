@@ -1,3 +1,5 @@
+//! Source-level guards for resolved CPU writes.
+
 const EXECUTOR_SOURCE: &str = include_str!("../src/executor.rs");
 
 fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {

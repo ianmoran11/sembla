@@ -967,6 +967,7 @@ fn fused_publication_stops_at_the_lowest_failed_k() {
 
 #[test]
 fn version_matches_library_versions() {
+    assert_eq!(VERSION, sembla_cpu::VERSION);
     assert_eq!(VERSION, sembla_ir::VERSION);
     assert_eq!(VERSION, sembla_runtime::VERSION);
 }
@@ -1122,7 +1123,7 @@ fn device_generic_enum_counts_preserve_legacy_csv_bytes() {
     let model = load(include_str!("../../../examples/reversible_ctmc.json"));
     let params = ParamEnv::defaults(&model);
     let mut state = initialized(&model, 100);
-    let report = sembla_runtime::cpu::run_tick(&model, &mut state, &params, 55, 0).unwrap();
+    let report = sembla_cpu::run_tick(&model, &mut state, &params, 55, 0).unwrap();
     let snapshot = state.snapshot();
     let values = snapshot.enum_values("chain", "particle", "phase").unwrap();
     let counts = [

@@ -23,7 +23,7 @@
 //! No new dependency: `std::thread::scope` with fixed chunking. Chunk
 //! boundaries are a function of row index, never of scheduling.
 //!
-//!   cargo run --release -p sembla-runtime --example threading_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example threading_spike -- [rows] [reps]
 
 use std::time::Instant;
 

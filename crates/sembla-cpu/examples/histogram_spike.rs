@@ -17,7 +17,7 @@
 //!
 //! Arms are asserted to produce identical counts per band.
 //!
-//!   cargo run --release -p sembla-runtime --example histogram_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example histogram_spike -- [rows] [reps]
 
 use std::time::Instant;
 

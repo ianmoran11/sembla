@@ -23,7 +23,7 @@
 //!
 //! All three arms must agree on whether a duplicate exists.
 //!
-//!   cargo run --release -p sembla-runtime --example dupcheck_spike -- [writes] [rows]
+//!   cargo run --release -p sembla-cpu --example dupcheck_spike -- [writes] [rows]
 
 use std::collections::HashMap;
 use std::time::Instant;

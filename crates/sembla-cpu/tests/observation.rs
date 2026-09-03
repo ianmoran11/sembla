@@ -1,6 +1,6 @@
+use sembla_cpu as executor;
 use sembla_ir::{SummaryDecl, SummaryReduce, ViewDecl, ViewReduce};
 use sembla_runtime::core::{device_observation_eligibility, ObservationValue, ParamEnv};
-use sembla_runtime::cpu as executor;
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 

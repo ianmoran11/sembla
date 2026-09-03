@@ -1,10 +1,9 @@
 //! Deterministic runtime for Sembla simulations.
 
 pub mod core;
-pub mod cpu;
+#[doc(hidden)]
+pub mod engine;
 mod error;
-mod eval;
-mod executor;
 mod observation;
 mod params;
 pub mod population;

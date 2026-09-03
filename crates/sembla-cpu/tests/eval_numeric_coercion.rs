@@ -1,3 +1,5 @@
+//! Source-level guard for CPU numeric coercion.
+
 const EVAL_SOURCE: &str = include_str!("../src/eval.rs");
 
 #[test]

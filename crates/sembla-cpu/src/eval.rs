@@ -167,9 +167,8 @@ use sembla_ir::{
     AggJoin, AggOp, Aggregate, Attr, AttrType, Expr, ParamType, ParamValue, Table, ValidatedModel,
 };
 
-use crate::error::EvalError;
-use crate::params::{parameter_value_matches, ParamEnv};
-use crate::state::{ColumnData, InputTable, Snapshot};
+use sembla_runtime::core::{ColumnData, EvalError, InputTable, ParamEnv, Snapshot};
+use sembla_runtime::engine::parameter_value_matches;
 
 /// A typed expression result in query-row order.
 #[derive(Clone, Debug, PartialEq)]
@@ -1060,17 +1059,6 @@ pub(crate) fn expr_is_gather_eligible(
 ) -> Result<bool, EvalError> {
     infer_root_type(expr, table)?;
     expr_is_row_infallible(expr, table, &table.schema().attrs)
-}
-
-/// Reuses the gather predicate for device observations that additionally need
-/// a positively identified `Int` root. Keeping the row-local decision here
-/// prevents device observation from growing a second expression whitelist.
-pub(crate) fn expr_is_gather_eligible_int(
-    expr: &Expr,
-    table: EvalTable<'_>,
-) -> Result<bool, EvalError> {
-    Ok(infer_root_type(expr, table)? == RuntimeType::Int
-        && expr_is_row_infallible(expr, table, &table.schema().attrs)?)
 }
 
 fn expr_is_row_infallible(
@@ -2694,8 +2682,8 @@ fn find_attr<'a>(attrs: &'a [Attr], name: &str) -> Result<&'a Attr, EvalError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{ColumnInit, StateStore, TableInit};
     use sembla_ir::{validate, Box as ModelBox, Model};
+    use sembla_runtime::core::{ColumnInit, StateStore, TableInit};
 
     #[test]
     fn input_enum_equality_accepts_literal_on_the_left() {

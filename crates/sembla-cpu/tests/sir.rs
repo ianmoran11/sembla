@@ -1,9 +1,9 @@
 use std::path::Path;
 use std::time::Instant;
 
+use sembla_cpu::run_tick;
 use sembla_ir::{ParamValue, ValidatedModel};
 use sembla_runtime::core::{ParamEnv, ParamOverride};
-use sembla_runtime::cpu::run_tick;
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::state::StateStore;
 use sha2::{Digest, Sha256};
@@ -167,9 +167,9 @@ fn million_agent_ten_tick_performance_floor() {
 mod policy_feedback {
     use std::path::Path;
 
+    use sembla_cpu as executor;
     use sembla_ir::ValidatedModel;
     use sembla_runtime::core::ParamEnv;
-    use sembla_runtime::cpu as executor;
     use sembla_runtime::population::SyntheticPopulation;
     use sembla_runtime::state::{ColumnData, StateStore};
 

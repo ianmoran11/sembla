@@ -34,10 +34,10 @@ it removed a provable 8 MB-per-operand copy, the allocator symbols duly dropped
 measured directly, as a hand-written arm asserted to produce identical results
 against the real code.
 
-The spikes live in `crates/sembla-runtime/examples/` and are runnable:
+The spikes live in `crates/sembla-cpu/examples/` and are runnable:
 
 ```sh
-cargo run --release -p sembla-runtime --example fusion_spike
+cargo run --release -p sembla-cpu --example fusion_spike
 ```
 
 ## The evidence

@@ -21,13 +21,13 @@
 //! comparison, a 5-node banded filter (the most common view shape), and an
 //! 11-node guard (the deepest expression in the model).
 //!
-//!   cargo run --release -p sembla-runtime --example fusion_spike -- [rows] [reps]
+//!   cargo run --release -p sembla-cpu --example fusion_spike -- [rows] [reps]
 
 use std::time::Instant;
 
+use sembla_cpu::{eval_column, AggCache, EvalTable, ValueColumn};
 use sembla_ir::{Attr, AttrType, Box as IrBox, Expr, Model, Table};
 use sembla_runtime::core::ParamEnv;
-use sembla_runtime::cpu::{eval_column, AggCache, EvalTable, ValueColumn};
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 fn int(value: i64) -> std::boxed::Box<Expr> {

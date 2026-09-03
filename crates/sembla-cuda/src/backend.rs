@@ -5413,8 +5413,8 @@ mod sweep_capacity_tests {
 #[cfg(test)]
 mod conflict_geometry_hardware {
     use super::{ConflictLaunchGeometry, CudaBackend, HashMode};
+    use sembla_cpu::run_tick;
     use sembla_runtime::core::{ColumnData, ColumnInit, ParamEnv, StateStore, TableInit};
-    use sembla_runtime::cpu::run_tick;
 
     fn contested_model() -> sembla_ir::ValidatedModel {
         // Rules are deliberately ordered B, C, A. Their only enabled rows have

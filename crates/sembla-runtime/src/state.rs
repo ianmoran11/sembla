@@ -167,7 +167,8 @@ pub struct InputTable {
 }
 
 impl InputTable {
-    pub(crate) fn empty(box_name: &str, port_name: &str, schema: &[Attr]) -> Self {
+    #[doc(hidden)]
+    pub fn empty(box_name: &str, port_name: &str, schema: &[Attr]) -> Self {
         Self {
             box_name: box_name.to_owned(),
             port_name: port_name.to_owned(),
@@ -317,7 +318,8 @@ impl StateStore {
     ///
     /// Executors use this to build fallible Moore-machine outputs before making
     /// either state writes or newly delivered inputs observable.
-    pub(crate) fn prepared_snapshot(&self) -> Result<Snapshot<'_>, StateError> {
+    #[doc(hidden)]
+    pub fn prepared_snapshot(&self) -> Result<Snapshot<'_>, StateError> {
         if !self.write_prepared {
             return Err(StateError::new(
                 "cannot snapshot prepared state: no write buffer has been prepared",
@@ -346,7 +348,8 @@ impl StateStore {
         self.snapshot().state_hash()
     }
 
-    pub(crate) fn replace_inputs(&mut self, inputs: Vec<InputTable>) {
+    #[doc(hidden)]
+    pub fn replace_inputs(&mut self, inputs: Vec<InputTable>) {
         self.inputs = inputs;
     }
 
@@ -493,7 +496,8 @@ impl StateStore {
     }
 
     /// Abandons an executor-prepared next buffer after a staged write fails.
-    pub(crate) fn discard_writes(&mut self) {
+    #[doc(hidden)]
+    pub fn discard_writes(&mut self) {
         self.write_prepared = false;
     }
 }
@@ -507,7 +511,8 @@ pub struct Snapshot<'a> {
 
 /// A state column resolved once together with its table for stable diagnostics.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ResolvedColumn<'a> {
+#[doc(hidden)]
+pub struct ResolvedColumn<'a> {
     table: &'a TableState,
     column: &'a ColumnState,
 }
@@ -517,34 +522,39 @@ pub(crate) struct ResolvedColumn<'a> {
 /// State schema and declaration order never change after construction, so the
 /// same table/column indices address both buffers without repeating name scans.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub(crate) struct ResolvedWriteColumn {
+#[doc(hidden)]
+pub struct ResolvedWriteColumn {
     table_index: usize,
     column_index: usize,
 }
 
 impl<'a> ResolvedColumn<'a> {
-    pub(crate) fn real_values(self) -> Result<&'a [f64], StateError> {
+    #[doc(hidden)]
+    pub fn real_values(self) -> Result<&'a [f64], StateError> {
         match self.column {
             ColumnState::Real { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Real")),
         }
     }
 
-    pub(crate) fn int_values(self) -> Result<&'a [i64], StateError> {
+    #[doc(hidden)]
+    pub fn int_values(self) -> Result<&'a [i64], StateError> {
         match self.column {
             ColumnState::Int { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Int")),
         }
     }
 
-    pub(crate) fn enum_values(self) -> Result<&'a [u16], StateError> {
+    #[doc(hidden)]
+    pub fn enum_values(self) -> Result<&'a [u16], StateError> {
         match self.column {
             ColumnState::Enum { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Enum")),
         }
     }
 
-    pub(crate) fn ref_values(self) -> Result<&'a [u32], StateError> {
+    #[doc(hidden)]
+    pub fn ref_values(self) -> Result<&'a [u32], StateError> {
         match self.column {
             ColumnState::Ref { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Ref")),
@@ -554,7 +564,8 @@ impl<'a> ResolvedColumn<'a> {
 
 impl Snapshot<'_> {
     /// Resolves one state column without performing a row lookup.
-    pub(crate) fn resolve_column(
+    #[doc(hidden)]
+    pub fn resolve_column(
         &self,
         box_name: &str,
         table_name: &str,
@@ -565,7 +576,8 @@ impl Snapshot<'_> {
     }
 
     /// Resolves a destination once for later use against the prepared buffer.
-    pub(crate) fn resolve_write_column(
+    #[doc(hidden)]
+    pub fn resolve_write_column(
         &self,
         box_name: &str,
         table_name: &str,
@@ -751,7 +763,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_real(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_real(
+    #[doc(hidden)]
+    pub fn set_resolved_real(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -781,7 +794,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_int(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_int(
+    #[doc(hidden)]
+    pub fn set_resolved_int(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -811,7 +825,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_enum(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_enum(
+    #[doc(hidden)]
+    pub fn set_resolved_enum(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -854,7 +869,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_ref(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_ref(
+    #[doc(hidden)]
+    pub fn set_resolved_ref(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,

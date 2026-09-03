@@ -96,7 +96,8 @@ impl ParamEnv {
             .map(|(name, value)| (name.as_str(), value))
     }
 
-    pub(crate) fn get(&self, name: &str) -> Result<&ParamValue, EvalError> {
+    #[doc(hidden)]
+    pub fn get(&self, name: &str) -> Result<&ParamValue, EvalError> {
         self.values
             .iter()
             .find(|(entry_name, _)| entry_name == name)
@@ -107,7 +108,8 @@ impl ParamEnv {
     }
 }
 
-pub(crate) fn parameter_value_matches(parameter_type: ParamType, value: &ParamValue) -> bool {
+#[doc(hidden)]
+pub fn parameter_value_matches(parameter_type: ParamType, value: &ParamValue) -> bool {
     matches!(
         (parameter_type, value),
         (ParamType::Real, ParamValue::Real { .. }) | (ParamType::Int, ParamValue::Int { .. })
