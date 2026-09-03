@@ -15,6 +15,7 @@ const CUDA_BACKEND: &str = concat!(
     include_str!("../src/backend.rs"),
     include_str!("../src/backend/final_state.rs"),
     include_str!("../src/backend/layout.rs"),
+    include_str!("../src/backend/tick.rs"),
 );
 const CLI_SWEEP: &str = concat!(
     include_str!("../../sembla-cli/src/sweep.rs"),
@@ -92,11 +93,7 @@ fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
     assert!(backend.contains("pub fn run_tick_observed_reused_fused("));
     assert!(!backend.contains("Vec<CudaBackend>"));
 
-    let batch_tick = section(
-        backend,
-        "    fn execute_tick_batch_statuses(",
-        "\n    fn download_fused_state_stores(",
-    );
+    let batch_tick = include_str!("../src/backend/tick.rs");
     let ordinary_error = batch_tick
         .find("if self.fused_batch.is_none()")
         .expect("ordinary error guard exists");
