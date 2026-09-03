@@ -87,6 +87,7 @@ class RustContextReportTests(unittest.TestCase):
                         "max_function_complexity": 10,
                     },
                     "crate_token_limits": {},
+                    "crate_file_line_limits": {},
                 }
             ),
             encoding="utf-8",
@@ -103,6 +104,7 @@ class RustContextReportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
         self.assertEqual(set(report["crates"]), set(REPORT.BACKEND_CRATES))
+        self.assertEqual(report["crates"]["sembla-cpu"]["max_file_code_lines"], 1)
 
 
 if __name__ == "__main__":

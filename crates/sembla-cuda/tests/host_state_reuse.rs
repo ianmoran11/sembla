@@ -11,7 +11,16 @@ fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
 }
 
 const CLI_RUN: &str = include_str!("../../sembla-cli/src/run.rs");
-const CLI_SWEEP: &str = include_str!("../../sembla-cli/src/sweep.rs");
+const CLI_SWEEP: &str = concat!(
+    include_str!("../../sembla-cli/src/sweep.rs"),
+    include_str!("../../sembla-cli/src/sweep/policy.rs"),
+    include_str!("../../sembla-cli/src/sweep/concurrency.rs"),
+    include_str!("../../sembla-cli/src/sweep/backend.rs"),
+    include_str!("../../sembla-cli/src/sweep/timing.rs"),
+    include_str!("../../sembla-cli/src/sweep/options.rs"),
+    include_str!("../../sembla-cli/src/sweep/draw.rs"),
+    include_str!("../../sembla-cli/src/sweep/publication.rs"),
+);
 
 #[test]
 fn cuda_backend_retains_and_refreshes_one_host_state_store() {
@@ -131,7 +140,11 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
 
     // Both CUDA stream modes share the non-blocking constructor; independent
     // mode keeps the default stream.
-    let lane_ctor = section(cli, "    fn new_concurrency_lane(", "\n    fn identity(");
+    let lane_ctor = section(
+        cli,
+        "    pub(super) fn new_concurrency_lane(",
+        "\n    pub(super) fn identity(",
+    );
     assert!(lane_ctor.contains("if mode == SweepConcurrencyMode::IndependentDefaultStreams {"));
     assert!(lane_ctor.contains("CudaBackend::new_nonblocking_stream("));
     assert!(cli.contains("\"cuda-free-nonblocking-streams\""));

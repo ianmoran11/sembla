@@ -263,6 +263,7 @@ def build_report(root: Path) -> dict[str, object]:
             "files": len(crate_files),
             "code_lines": sum(metric.code_lines for metric in crate_files),
             "tokens": sum(metric.tokens for metric in crate_files),
+            "max_file_code_lines": max(metric.code_lines for metric in crate_files),
         }
 
     largest_file = max(files, key=lambda metric: metric.code_lines)
@@ -318,22 +319,37 @@ def check_budget(report: dict[str, object], budget: dict[str, object]) -> list[s
             errors.append(
                 f"{crate} tokens: {crates[crate]['tokens']} exceeds budget {limit}"
             )
+    crate_file_limits = budget.get("crate_file_line_limits", {})
+    if not isinstance(crate_file_limits, dict):
+        raise ValueError("crate_file_line_limits must be an object")
+    for crate, limit in crate_file_limits.items():
+        if crate not in crates:
+            errors.append(f"unknown crate in context budget: {crate}")
+        elif crates[crate]["max_file_code_lines"] > limit:
+            errors.append(
+                f"{crate} max file lines: {crates[crate]['max_file_code_lines']} "
+                f"exceeds budget {limit}"
+            )
     return errors
 
 
 def text_report(report: dict[str, object], top: int) -> str:
     lines = ["Backend Rust context report (production src only)", ""]
-    lines.append(f"{'crate':<18} {'files':>5} {'code lines':>11} {'tokens':>10}")
+    lines.append(
+        f"{'crate':<18} {'files':>5} {'code lines':>11} "
+        f"{'tokens':>10} {'max file':>9}"
+    )
     for crate in BACKEND_CRATES:
         metric = report["crates"][crate]
         lines.append(
             f"{crate:<18} {metric['files']:>5} "
-            f"{metric['code_lines']:>11} {metric['tokens']:>10}"
+            f"{metric['code_lines']:>11} {metric['tokens']:>10} "
+            f"{metric['max_file_code_lines']:>9}"
         )
     totals = report["totals"]
     lines.append(
         f"{'TOTAL':<18} {totals['files']:>5} "
-        f"{totals['code_lines']:>11} {totals['tokens']:>10}"
+        f"{totals['code_lines']:>11} {totals['tokens']:>10} {'-':>9}"
     )
 
     functions = report["functions"]
