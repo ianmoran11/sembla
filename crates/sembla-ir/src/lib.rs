@@ -80,11 +80,5 @@ pub fn to_canonical_json(model: &Model) -> Result<String, serde_json::Error> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::VERSION;
-
-    #[test]
-    fn version_matches_package_version() {
-        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
-    }
-}
+#[path = "lib_tests.rs"]
+mod tests;

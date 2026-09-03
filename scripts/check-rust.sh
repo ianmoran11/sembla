@@ -18,6 +18,9 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 python3 -B scripts/check-rust-architecture.py
+python3 -B scripts/report-rust-context.py \
+    --check scripts/rust-context-budget.json \
+    --top 5
 cargo fmt --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
