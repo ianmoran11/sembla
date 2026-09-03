@@ -7,8 +7,8 @@ use sembla_ir::{
     AggOp, AttrType, ClaimOrdering, Effect, Expr, ParamType, Table, ValidatedModel, ViewReduce,
 };
 #[cfg(any(feature = "cuda", test))]
-use sembla_runtime::executor::GroupedViewValue;
-use sembla_runtime::executor::{device_observation_eligibility, DeviceObservationEligibility};
+use sembla_runtime::core::GroupedViewValue;
+use sembla_runtime::core::{device_observation_eligibility, DeviceObservationEligibility};
 use sha2::{Digest, Sha256};
 
 use crate::CudaError;

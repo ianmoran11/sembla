@@ -1,6 +1,6 @@
 use sembla_ir::{parse_json, validate, AttrType, ParamValue};
-use sembla_runtime::eval::{ParamEnv, ParamOverride};
-use sembla_runtime::executor::run_tick;
+use sembla_runtime::core::{ParamEnv, ParamOverride};
+use sembla_runtime::cpu::run_tick;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 fn load(source: &str) -> sembla_ir::ValidatedModel {

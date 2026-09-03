@@ -20,7 +20,7 @@ fn requesting_cuda_without_a_device_has_the_frozen_diagnostic() {
 fn feature_off_constructor_never_substitutes_the_cpu_oracle() {
     let source = include_str!("../../../examples/two_state.json");
     let model = sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap();
-    let params = sembla_runtime::eval::ParamEnv::defaults(&model);
+    let params = sembla_runtime::core::ParamEnv::defaults(&model);
     let error = CudaBackend::new(
         &model,
         Vec::new(),

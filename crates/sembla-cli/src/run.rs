@@ -1337,7 +1337,7 @@ pub(crate) fn run_results_output_timed_with_features(
 
 #[cfg(feature = "cuda")]
 pub(crate) fn report_cuda_observation_eligibility(
-    eligibility: &sembla_runtime::executor::DeviceObservationEligibility,
+    eligibility: &sembla_runtime::core::DeviceObservationEligibility,
 ) {
     eprintln!(
         "cuda_device_observation eligible={} reason={}",
@@ -1356,8 +1356,8 @@ pub(crate) fn cuda_tick_report(
     tick: u32,
     fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
     deferred_per_resource_table: Vec<(String, usize)>,
-    views: Vec<sembla_runtime::executor::ViewValue>,
-    grouped_views: Vec<sembla_runtime::executor::GroupedViewValue>,
+    views: Vec<sembla_runtime::core::ViewValue>,
+    grouped_views: Vec<sembla_runtime::core::GroupedViewValue>,
 ) -> executor::TickReport {
     let fired = model
         .transitions()

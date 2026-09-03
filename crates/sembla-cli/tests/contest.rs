@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::{run, run_tick, TickError};
+use sembla_runtime::core::ParamEnv;
+use sembla_runtime::cpu::{run, run_tick, TickError};
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sembla_runtime::state_artifact::{read, to_table_inits, write};
 

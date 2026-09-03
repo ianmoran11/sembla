@@ -1,7 +1,7 @@
 #![cfg(feature = "cuda")]
 
 use sembla_cuda::{CudaBackend, HashMode, PhiloxCoordinate};
-use sembla_runtime::eval::ParamEnv;
+use sembla_runtime::core::ParamEnv;
 use sembla_runtime::rng::draw_u32x4;
 use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
 

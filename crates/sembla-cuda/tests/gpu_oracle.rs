@@ -2,8 +2,8 @@
 
 use sembla_cuda::{CudaBackend, HashMode};
 use sembla_ir::ValidatedModel;
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::run_tick;
+use sembla_runtime::core::ParamEnv;
+use sembla_runtime::cpu::run_tick;
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 

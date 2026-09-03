@@ -1,8 +1,8 @@
 use sembla_ir::{
     parse_input, validate, validate_plan, AttrType, Expr, ParsedInput, ValidatedModel,
 };
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::{run_tick, ObservationValue};
+use sembla_runtime::core::{ObservationValue, ParamEnv};
+use sembla_runtime::cpu::run_tick;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 fn load_plan(source: &str) -> sembla_ir::ExecutablePlanV1 {

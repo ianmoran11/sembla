@@ -2,8 +2,8 @@ use sembla_ir::{
     validate, Attr, AttrType, Box as ModelBox, ClaimOrdering, Effect, Expr, Model, ResourceClaim,
     Table, Transition,
 };
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::{run, run_tick, TickError};
+use sembla_runtime::core::ParamEnv;
+use sembla_runtime::cpu::{run, run_tick, TickError};
 use sembla_runtime::rng::exp_f64;
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 

@@ -4,6 +4,17 @@ This repository owns the Rust IR, validator, CPU runtime, CUDA backend, CLI,
 runtime fixtures, and scientific execution workflows. The Lean authoring
 frontend is maintained in `ianmoran11/sembla-lean`.
 
+## Runtime boundaries
+
+- `sembla_runtime::core` is the backend-neutral API for parameters, state,
+  observation values, and device-observation eligibility.
+- `sembla_runtime::cpu` is the CPU evaluator and execution API. Its underlying
+  evaluator and executor modules are intentionally private.
+- Production CUDA code must depend on `sembla_runtime::core`, not CPU execution
+  internals. CPU imports from CUDA tests are oracle comparisons only.
+- Keep backend selection and publication policy in `sembla-cli`; neither
+  runtime boundary selects a backend.
+
 ## Working contract
 
 - Run `./scripts/check-rust.sh` for ordinary Rust changes.

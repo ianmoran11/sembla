@@ -3,21 +3,21 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::error::Error;
-use std::fmt;
 
 use sembla_ir::{
     AggOp, AttrType, ClaimOrdering, Effect, Expr, FeatureSet, OutputBuilder, SummaryReduce,
     ValidatedModel, ViewReduce, GROUPED_OBSERVATIONS_FEATURE,
 };
 
+use crate::error::TickError;
 use crate::eval::{
     eval_column, eval_gather, eval_typed_ref_column, eval_typed_ref_gather,
-    expr_is_gather_eligible, expr_is_gather_eligible_int, prepare_row_expr,
-    tick_tile_rows_for_live_set, tick_tiling_enabled, tick_worker_count, tiled_expr_footprint,
-    AggCache, EvalError, EvalTable, ParamEnv, PreparedColumn, PreparedExpr, PreparedValue,
-    TiledExprFootprint, ValueColumn,
+    expr_is_gather_eligible, prepare_row_expr, tick_tile_rows_for_live_set, tick_tiling_enabled,
+    tick_worker_count, tiled_expr_footprint, AggCache, EvalTable, PreparedColumn, PreparedExpr,
+    PreparedValue, TiledExprFootprint, ValueColumn,
 };
+use crate::observation::{GroupedViewValue, ObservationValue, SummaryValue, ViewValue};
+use crate::params::ParamEnv;
 use crate::rng::{exp_f64, exp_f64_from_uniform, uniform_f64};
 use crate::state::{ColumnData, InputTable, ResolvedWriteColumn, Snapshot, StateError, StateStore};
 
@@ -28,172 +28,6 @@ use crate::state::{ColumnData, InputTable, ResolvedWriteColumn, Snapshot, StateE
 /// rounding steps that form the threshold. Candidates inside the envelope are
 /// still decided by the canonical platform-`ln` racing clock.
 const RACING_CLOCK_FILTER_RELATIVE_MARGIN: f64 = 1e-12;
-
-/// A numeric observation scalar. Real equality is bitwise so report equality
-/// remains an exact determinism check, including signed zero and NaN payloads.
-#[derive(Clone, Copy, Debug)]
-pub enum ObservationValue {
-    Real(f64),
-    Int(i64),
-}
-
-impl PartialEq for ObservationValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Real(left), Self::Real(right)) => left.to_bits() == right.to_bits(),
-            (Self::Int(left), Self::Int(right)) => left == right,
-            _ => false,
-        }
-    }
-}
-
-impl Eq for ObservationValue {}
-
-/// One declaration-ordered view value from a committed post-tick state.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ViewValue {
-    pub box_name: String,
-    pub name: String,
-    pub value: ObservationValue,
-}
-
-/// Conservative IR-only eligibility for one declared observation view.
-///
-/// This is a backend-capability description derived from oracle semantics, not
-/// a device implementation type. It deliberately names no hardware API.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DeviceViewEligibility {
-    pub box_name: String,
-    pub name: String,
-    pub eligible: bool,
-    pub reason: &'static str,
-}
-
-/// Run-wide device-observation decision. State download may be skipped only
-/// when this decision is eligible; one host-bound view forces the complete run
-/// back to host observation. Backends consume this semantic decision; the
-/// runtime neither selects nor depends on a backend.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DeviceObservationEligibility {
-    pub eligible: bool,
-    pub reason: &'static str,
-    pub views: Vec<DeviceViewEligibility>,
-}
-
-/// Decides device-observation eligibility from validated IR.
-///
-/// The policy is hosted beside the CPU oracle because eligibility means
-/// "preserves the oracle's exact observation contract." Pulling it into one
-/// backend would make that implementation independently reproduce semantic
-/// fallback rules. The returned plain data is the complete boundary.
-///
-/// The expression check deliberately reuses the evaluator's gather predicate:
-/// `Expr::Agg`, `Expr::Input`, and row-fallible checked integer arithmetic are
-/// therefore rejected without maintaining another expression whitelist.
-/// Integer `count`, `min`, and `max` are commutative monoids. Grouped views are
-/// count-only and their validated Enum, Ref, and banded Int keys are exactly
-/// boundable at runtime. Sums stay on the host because Real has a canonical
-/// ascending-row order and reassociated Int can overflow differently. Real
-/// min/max also stay on the host because the CPU's total ordering (including
-/// NaNs) is not this integer reduction.
-pub fn device_observation_eligibility(model: &ValidatedModel) -> DeviceObservationEligibility {
-    const ELIGIBLE: &str = "all scalar and grouped views are device-eligible";
-    const FALLBACK: &str = "at least one view requires host observation";
-    const NO_VIEWS: &str = "no declared views; legacy state reporting requires host state";
-    const COUNT: &str = "count with a row-local filter";
-    const INT_MIN_MAX: &str = "Int min/max with row-local filter and value";
-    const GROUPED_COUNT: &str = "grouped count with a row-local filter and exactly boundable keys";
-    const FILTER: &str = "filter is not a row-local infallible expression";
-    const VALUE: &str =
-        "value is not a row-local infallible Int expression; Real extrema retain host NaN ordering";
-    const SUM: &str = "Sum preserves host order for Real and host overflow association for Int";
-
-    let mut views = Vec::new();
-    for model_box in &model.model().boxes {
-        for view in &model_box.views {
-            let table = EvalTable::new(model, &model_box.name, &view.table);
-            let filter_eligible = table.is_ok_and(|table| {
-                view.filter.as_ref().map_or(true, |filter| {
-                    expr_is_gather_eligible(filter, table).unwrap_or(false)
-                })
-            });
-            let (eligible, reason) = if !filter_eligible {
-                (false, FILTER)
-            } else {
-                match view.reduce {
-                    ViewReduce::Count => (true, COUNT),
-                    ViewReduce::Sum => (false, SUM),
-                    ViewReduce::Min | ViewReduce::Max => {
-                        let value_eligible = EvalTable::new(model, &model_box.name, &view.table)
-                            .ok()
-                            .zip(view.value.as_ref())
-                            .is_some_and(|(table, value)| {
-                                expr_is_gather_eligible_int(value, table).unwrap_or(false)
-                            });
-                        if value_eligible {
-                            (true, INT_MIN_MAX)
-                        } else {
-                            (false, VALUE)
-                        }
-                    }
-                }
-            };
-            views.push(DeviceViewEligibility {
-                box_name: model_box.name.clone(),
-                name: view.name.clone(),
-                eligible,
-                reason,
-            });
-        }
-        for view in &model_box.grouped_views {
-            let filter_eligible =
-                EvalTable::new(model, &model_box.name, &view.table).is_ok_and(|table| {
-                    view.filter.as_ref().map_or(true, |filter| {
-                        expr_is_gather_eligible(filter, table).unwrap_or(false)
-                    })
-                });
-            views.push(DeviceViewEligibility {
-                box_name: model_box.name.clone(),
-                name: view.name.clone(),
-                eligible: filter_eligible,
-                reason: if filter_eligible {
-                    GROUPED_COUNT
-                } else {
-                    FILTER
-                },
-            });
-        }
-    }
-    let eligible = !views.is_empty() && views.iter().all(|view| view.eligible);
-    DeviceObservationEligibility {
-        eligible,
-        reason: if eligible {
-            ELIGIBLE
-        } else if views.is_empty() {
-            NO_VIEWS
-        } else {
-            FALLBACK
-        },
-        views,
-    }
-}
-
-/// One non-empty grouped bucket from committed post-tick state.
-/// Keys retain underlying numeric values so callers sort before rendering.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GroupedViewValue {
-    pub box_name: String,
-    pub name: String,
-    pub keys: Vec<i128>,
-    pub count: usize,
-}
-
-/// One model-declaration-ordered summary value folded across a run.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SummaryValue {
-    pub name: String,
-    pub value: ObservationValue,
-}
 
 /// Observable result of one committed tick.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -243,89 +77,6 @@ pub struct RunReport {
     pub ticks: Vec<TickReport>,
     pub summaries: Vec<SummaryValue>,
     pub warnings: Vec<SaturationWarning>,
-}
-
-/// A deterministic tick execution failure.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TickError {
-    UnsupportedBoxCount {
-        found: usize,
-    },
-    Evaluation(String),
-    State(String),
-    InvalidRuntimeType {
-        context: String,
-        found: String,
-    },
-    EntityIdOverflow {
-        rule_id: u32,
-        row: usize,
-    },
-    IncompatibleClaimOrdering {
-        table: String,
-        row: u32,
-    },
-    DoubleWrite {
-        box_name: Box<str>,
-        table: Box<str>,
-        attr: Box<str>,
-        row: usize,
-        first_rule_id: u32,
-        first_transition: Box<str>,
-        second_rule_id: u32,
-        second_transition: Box<str>,
-    },
-}
-
-impl fmt::Display for TickError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnsupportedBoxCount { found } => write!(
-                formatter,
-                "tick executor requires exactly one box, found {found}"
-            ),
-            Self::Evaluation(message) => write!(formatter, "expression evaluation failed: {message}"),
-            Self::State(message) => write!(formatter, "state operation failed: {message}"),
-            Self::InvalidRuntimeType { context, found } => {
-                write!(formatter, "{context} evaluated to {found}")
-            }
-            Self::EntityIdOverflow { rule_id, row } => write!(
-                formatter,
-                "rule {rule_id} row {row} cannot be represented as a u32 entity ID"
-            ),
-            Self::IncompatibleClaimOrdering { table, row } => write!(
-                formatter,
-                "resource '{table}' row {row} has incompatible claim ordering modes or key types"
-            ),
-            Self::DoubleWrite {
-                box_name,
-                table,
-                attr,
-                row,
-                first_rule_id,
-                first_transition,
-                second_rule_id,
-                second_transition,
-            } => write!(
-                formatter,
-                "double write to {box_name}.{table}.{attr}[{row}] by transition '{first_transition}' (rule {first_rule_id}) and transition '{second_transition}' (rule {second_rule_id})"
-            ),
-        }
-    }
-}
-
-impl Error for TickError {}
-
-impl From<EvalError> for TickError {
-    fn from(error: EvalError) -> Self {
-        Self::Evaluation(error.to_string())
-    }
-}
-
-impl From<StateError> for TickError {
-    fn from(error: StateError) -> Self {
-        Self::State(error.to_string())
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

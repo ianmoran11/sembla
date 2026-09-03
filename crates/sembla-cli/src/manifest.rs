@@ -533,7 +533,7 @@ fn validate_bundle_manifest(manifest: &BundleManifestV1) -> Result<(), String> {
     validate_hash_record("bundle_integrity", integrity, BUNDLE_ROOT_DOMAIN)
 }
 
-pub fn resolved_theta(params: &sembla_runtime::eval::ParamEnv) -> BTreeMap<String, ResolvedValue> {
+pub fn resolved_theta(params: &sembla_runtime::core::ParamEnv) -> BTreeMap<String, ResolvedValue> {
     params
         .values()
         .map(|(name, value)| (name.to_owned(), ResolvedValue::from(value)))

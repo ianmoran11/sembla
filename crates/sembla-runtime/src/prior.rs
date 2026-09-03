@@ -16,7 +16,7 @@ use std::fmt;
 
 use sembla_ir::{ParamType, ParamValue, Prior, PriorFamily, ValidatedModel};
 
-use crate::eval::{ParamEnv, ParamOverride};
+use crate::params::{ParamEnv, ParamOverride};
 use crate::rng::uniform_f64;
 
 /// Reserved rule word for parameter/prior draws.

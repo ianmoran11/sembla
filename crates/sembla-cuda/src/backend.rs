@@ -7,11 +7,10 @@ use cudarc::driver::{
 };
 use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::{
-    DeviceObservationEligibility, GroupedViewValue, ObservationValue, ViewValue,
+use sembla_runtime::core::{
+    ColumnData, DeviceObservationEligibility, GroupedViewValue, InputTable, ObservationValue,
+    ParamEnv, StateStore, TableInit, ViewValue,
 };
-use sembla_runtime::state::{ColumnData, InputTable, StateStore, TableInit};
 use sha2::{Digest, Sha256};
 
 use crate::codegen::{
@@ -5003,7 +5002,7 @@ mod probe_tests {
 #[cfg(test)]
 mod diagnostic_equality_hardware {
     use super::{CudaBackend, HashMode, ValidationLaunchGeometry};
-    use sembla_runtime::eval::ParamEnv;
+    use sembla_runtime::core::ParamEnv;
 
     mod cases {
         include!(concat!(
@@ -5119,7 +5118,7 @@ mod sweep_capacity_tests {
         pack_initial_state, write_column, CudaFinalStateReadbackMode,
         FinalStateAllocationInjection, SWEEP_CAPACITY_MIB,
     };
-    use sembla_runtime::state::{ColumnData, ColumnInit, InputTable, StateStore, TableInit};
+    use sembla_runtime::core::{ColumnData, ColumnInit, InputTable, StateStore, TableInit};
 
     fn demographic_shape(scale: usize) -> (sembla_ir::ValidatedModel, Vec<TableInit>) {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -5414,9 +5413,8 @@ mod sweep_capacity_tests {
 #[cfg(test)]
 mod conflict_geometry_hardware {
     use super::{ConflictLaunchGeometry, CudaBackend, HashMode};
-    use sembla_runtime::eval::ParamEnv;
-    use sembla_runtime::executor::run_tick;
-    use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
+    use sembla_runtime::core::{ColumnData, ColumnInit, ParamEnv, StateStore, TableInit};
+    use sembla_runtime::cpu::run_tick;
 
     fn contested_model() -> sembla_ir::ValidatedModel {
         // Rules are deliberately ordered B, C, A. Their only enabled rows have

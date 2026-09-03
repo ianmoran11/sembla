@@ -26,7 +26,8 @@
 use std::time::Instant;
 
 use sembla_ir::{Attr, AttrType, Box as IrBox, Expr, Model, Table};
-use sembla_runtime::eval::{eval_column, AggCache, EvalTable, ParamEnv, ValueColumn};
+use sembla_runtime::core::ParamEnv;
+use sembla_runtime::cpu::{eval_column, AggCache, EvalTable, ValueColumn};
 use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 
 fn int(value: i64) -> std::boxed::Box<Expr> {

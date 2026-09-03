@@ -8,8 +8,8 @@
 mod diagnostic_cases;
 
 use diagnostic_cases::{initial_state, load_model, CaseKind, CASES, FAILING_ROWS, GEOMETRIES};
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::executor::run_tick;
+use sembla_runtime::core::ParamEnv;
+use sembla_runtime::cpu::run_tick;
 use sembla_runtime::state::StateStore;
 
 #[test]

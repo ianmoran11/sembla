@@ -1,6 +1,5 @@
 use sembla_ir::ValidatedModel;
-use sembla_runtime::eval::ParamEnv;
-use sembla_runtime::state::TableInit;
+use sembla_runtime::core::{ParamEnv, TableInit};
 
 use crate::types::{CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
 use crate::{CudaAvailability, CudaError, PhiloxCoordinate};
