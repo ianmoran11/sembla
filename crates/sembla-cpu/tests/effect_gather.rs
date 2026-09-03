@@ -1,7 +1,10 @@
 //! Source-level guards for CPU effect gathering.
 
 const EVAL_SOURCE: &str = include_str!("../src/eval.rs");
-const EXECUTOR_SOURCE: &str = include_str!("../src/executor.rs");
+const EXECUTOR_SOURCE: &str = concat!(
+    include_str!("../src/executor.rs"),
+    include_str!("../src/executor/staging.rs"),
+);
 
 fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     let (_, tail) = source

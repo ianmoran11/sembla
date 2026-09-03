@@ -512,7 +512,7 @@ fn numeric_view_sum_and_effect_state_are_bit_identical_across_workers_and_tiles(
 
 #[test]
 fn tiled_real_view_reduction_keeps_canonical_row_order() {
-    let source = include_str!("executor.rs");
+    let source = include_str!("executor/tiling.rs");
     let reduction = source
         .split_once("// This is the canonical Level A reduction order")
         .expect("tiled Real view reduction must document its canonical order")
@@ -813,10 +813,11 @@ fn threshold_falls_back_and_only_tick_orchestration_can_spawn() {
         assert!(results[0][0].is_none());
     });
 
-    let production_executor = include_str!("executor.rs")
-        .split_once("#[cfg(test)]")
-        .unwrap()
-        .0;
+    let production_executor = concat!(
+        include_str!("executor.rs"),
+        include_str!("executor/tiling.rs"),
+        include_str!("executor/staging.rs"),
+    );
     let production_eval = include_str!("eval.rs")
         .split_once("#[cfg(test)]")
         .unwrap()
@@ -825,8 +826,8 @@ fn threshold_falls_back_and_only_tick_orchestration_can_spawn() {
         production_executor
             .matches("std::thread::scope(|scope|")
             .count(),
-        2,
-        "one fixed-task region stages transitions and one observes committed views"
+        1,
+        "transition and observation tiling must share one fixed-task worker implementation"
     );
     assert!(!production_eval.contains("std::thread::scope(|scope|"));
 }
