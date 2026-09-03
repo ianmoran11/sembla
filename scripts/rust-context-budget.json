@@ -3,16 +3,16 @@
   "metric": "scripts/report-rust-context.py lexical production-source metric",
   "policy": "Limits are ratchets. Lower them after reductions; raise them only with an explicit context-budget justification.",
   "limits": {
-    "total_tokens": 180213,
+    "total_tokens": 179462,
     "max_file_code_lines": 2726,
-    "max_function_lines": 924,
+    "max_function_lines": 558,
     "max_function_complexity": 48
   },
   "crate_token_limits": {
     "sembla-ir": 14657,
     "sembla-runtime": 25214,
     "sembla-cpu": 36429,
-    "sembla-cuda": 51703,
+    "sembla-cuda": 50952,
     "sembla-cli": 52210
   },
   "crate_file_line_limits": {

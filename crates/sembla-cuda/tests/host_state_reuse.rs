@@ -15,6 +15,7 @@ const CUDA_BACKEND: &str = concat!(
     include_str!("../src/backend.rs"),
     include_str!("../src/backend/final_state.rs"),
     include_str!("../src/backend/layout.rs"),
+    include_str!("../src/backend/observation.rs"),
     include_str!("../src/backend/tick.rs"),
 );
 const CLI_SWEEP: &str = concat!(
