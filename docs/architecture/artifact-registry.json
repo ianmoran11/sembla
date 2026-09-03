@@ -164,10 +164,19 @@
       "source_discovery": true
     },
     {
+      "identifier": "sembla.backend-compatibility-pin/v1",
+      "kind": "artifact-schema",
+      "owner": "external:sembla-lean/compat/backend.json",
+      "producers": ["external:sembla-lean/compat/backend.json"],
+      "consumers": ["external:sembla-lean/scripts/check-backend-compat.sh"],
+      "stability": "versioned",
+      "source_discovery": false
+    },
+    {
       "identifier": "sembla.bundle-root/v1",
       "kind": "hash-domain",
       "owner": "crates/sembla-cli/src/manifest.rs",
-      "producers": ["frontend/Sembla/Composition/Bundle.lean"],
+      "producers": ["external:sembla-lean/Sembla/Composition/Bundle.lean"],
       "consumers": ["crates/sembla-cli/src/manifest.rs"],
       "stability": "frozen",
       "source_discovery": true
@@ -176,7 +185,7 @@
       "identifier": "sembla.bundle/v1",
       "kind": "artifact-schema",
       "owner": "crates/sembla-cli/src/manifest.rs",
-      "producers": ["frontend/Sembla/Composition/Bundle.lean"],
+      "producers": ["external:sembla-lean/Sembla/Composition/Bundle.lean"],
       "consumers": ["crates/sembla-cli/src/inspect.rs"],
       "stability": "versioned",
       "source_discovery": true
@@ -185,17 +194,17 @@
       "identifier": "sembla.canonical-json/v1",
       "kind": "encoding",
       "owner": "crates/sembla-ir/src/canonical_json.rs",
-      "producers": ["frontend/Sembla/PlanJson.lean", "crates/sembla-ir/src/canonical_json.rs"],
-      "consumers": ["frontend/Sembla/PlanJson.lean", "crates/sembla-ir/src/canonical_json.rs"],
+      "producers": ["external:sembla-lean/Sembla/PlanJson.lean", "crates/sembla-ir/src/canonical_json.rs"],
+      "consumers": ["external:sembla-lean/Sembla/PlanJson.lean", "crates/sembla-ir/src/canonical_json.rs"],
       "stability": "frozen",
       "source_discovery": true
     },
     {
       "identifier": "sembla.composition-source/v1",
       "kind": "artifact-schema",
-      "owner": "frontend/Sembla/Composition/Source.lean",
-      "producers": ["frontend/Main.lean"],
-      "consumers": ["frontend/Sembla/Composition/Json.lean", "frontend/Sembla/Composition/Link.lean"],
+      "owner": "external:sembla-lean/Sembla/Composition/Source.lean",
+      "producers": ["external:sembla-lean/Main.lean"],
+      "consumers": ["external:sembla-lean/Sembla/Composition/Json.lean", "external:sembla-lean/Sembla/Composition/Link.lean"],
       "stability": "versioned",
       "source_discovery": true
     },
@@ -203,25 +212,34 @@
       "identifier": "sembla.executable-plan/v1",
       "kind": "artifact-schema",
       "owner": "crates/sembla-ir/src/plan.rs",
-      "producers": ["frontend/Sembla/PlanExport.lean", "frontend/Sembla/Composition/Link.lean"],
+      "producers": ["external:sembla-lean/Sembla/PlanExport.lean", "external:sembla-lean/Sembla/Composition/Link.lean"],
       "consumers": ["crates/sembla-cli/src/shared.rs", "crates/sembla-ir/src/plan.rs"],
       "stability": "frozen",
       "source_discovery": true
     },
     {
+      "identifier": "sembla.frontend-compatibility-pin/v1",
+      "kind": "artifact-schema",
+      "owner": "compat/frontend.json",
+      "producers": ["compat/frontend.json"],
+      "consumers": ["docs/architecture/repositories.md", "scripts/check-frontend-compatibility.py"],
+      "stability": "versioned",
+      "source_discovery": false
+    },
+    {
       "identifier": "sembla.identity/legacy-positional-v1",
       "kind": "identity-scheme",
-      "owner": "frontend/Sembla/Plan.lean",
-      "producers": ["frontend/Sembla/Plan.lean"],
-      "consumers": ["frontend/Sembla/PlanJson.lean"],
+      "owner": "external:sembla-lean/Sembla/Plan.lean",
+      "producers": ["external:sembla-lean/Sembla/Plan.lean"],
+      "consumers": ["external:sembla-lean/Sembla/PlanJson.lean"],
       "stability": "legacy",
-      "source_discovery": true
+      "source_discovery": false
     },
     {
       "identifier": "sembla.identity/stable-v1",
       "kind": "identity-scheme",
       "owner": "crates/sembla-ir/src/plan.rs",
-      "producers": ["frontend/Sembla/PlanExport.lean", "frontend/Sembla/Composition/Link.lean"],
+      "producers": ["external:sembla-lean/Sembla/PlanExport.lean", "external:sembla-lean/Sembla/Composition/Link.lean"],
       "consumers": ["crates/sembla-ir/src/plan.rs", "crates/sembla-runtime/src/rng.rs"],
       "stability": "frozen",
       "source_discovery": true
@@ -229,8 +247,8 @@
     {
       "identifier": "sembla.linker/v1",
       "kind": "protocol",
-      "owner": "frontend/Sembla/Composition/Link.lean",
-      "producers": ["frontend/Sembla/Composition/Link.lean"],
+      "owner": "external:sembla-lean/Sembla/Composition/Link.lean",
+      "producers": ["external:sembla-lean/Sembla/Composition/Link.lean"],
       "consumers": ["crates/sembla-ir/src/plan.rs", "crates/sembla-cli/src/manifest.rs"],
       "stability": "frozen",
       "source_discovery": true
@@ -238,18 +256,18 @@
     {
       "identifier": "sembla.parameter-family/v1",
       "kind": "data-contract",
-      "owner": "frontend/Sembla/ParameterTable.lean",
+      "owner": "external:sembla-lean/Sembla/ParameterTable.lean",
       "producers": ["data/abs/rates.py"],
-      "consumers": ["frontend/Sembla/ParameterTable.lean"],
+      "consumers": ["external:sembla-lean/Sembla/ParameterTable.lean"],
       "stability": "legacy",
-      "source_discovery": true
+      "source_discovery": false
     },
     {
       "identifier": "sembla.parameter-family/v2",
       "kind": "data-contract",
-      "owner": "frontend/Sembla/ParameterTable.lean",
+      "owner": "external:sembla-lean/Sembla/ParameterTable.lean",
       "producers": ["data/abs/rates.py"],
-      "consumers": ["frontend/Sembla/ParameterTable.lean"],
+      "consumers": ["external:sembla-lean/Sembla/ParameterTable.lean"],
       "stability": "versioned",
       "source_discovery": true
     },
@@ -275,8 +293,8 @@
       "identifier": "sembla.rule-word/v1",
       "kind": "hash-domain",
       "owner": "crates/sembla-ir/src/identity.rs",
-      "producers": ["crates/sembla-ir/src/identity.rs", "frontend/Sembla/Hash.lean"],
-      "consumers": ["crates/sembla-runtime/src/rng.rs", "frontend/Sembla/PlanExport.lean"],
+      "producers": ["crates/sembla-ir/src/identity.rs", "external:sembla-lean/Sembla/Hash.lean"],
+      "consumers": ["crates/sembla-runtime/src/rng.rs", "external:sembla-lean/Sembla/PlanExport.lean"],
       "stability": "frozen",
       "source_discovery": true
     },
@@ -284,7 +302,7 @@
       "identifier": "sembla.source-artifact/v1",
       "kind": "hash-domain",
       "owner": "crates/sembla-ir/src/plan.rs",
-      "producers": ["frontend/Sembla/Composition/Link.lean"],
+      "producers": ["external:sembla-lean/Sembla/Composition/Link.lean"],
       "consumers": ["crates/sembla-ir/src/plan.rs", "crates/sembla-cli/src/manifest.rs"],
       "stability": "frozen",
       "source_discovery": true
@@ -292,9 +310,9 @@
     {
       "identifier": "sembla.source-map/v1",
       "kind": "artifact-schema",
-      "owner": "frontend/Sembla/Composition/SourceMap.lean",
-      "producers": ["frontend/Sembla/Composition/Link.lean"],
-      "consumers": ["frontend/Sembla/Plan.lean", "crates/sembla-ir/src/plan.rs"],
+      "owner": "external:sembla-lean/Sembla/Composition/SourceMap.lean",
+      "producers": ["external:sembla-lean/Sembla/Composition/Link.lean"],
+      "consumers": ["external:sembla-lean/Sembla/Plan.lean", "crates/sembla-ir/src/plan.rs"],
       "stability": "versioned",
       "source_discovery": true
     },

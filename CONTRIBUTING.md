@@ -1,6 +1,8 @@
 # Contributing to Sembla
 
-Sembla spans Rust, Lean, and a quarantined Python calibration environment. Keep
+This repository contains Sembla's Rust backend and a quarantined Python
+calibration environment. The Lean frontend is maintained independently in
+[`ianmoran11/sembla-lean`](https://github.com/ianmoran11/sembla-lean). Keep
 changes narrow, use the pinned environments, and treat checked-in evidence as
 part of the reproducibility contract. The maintained check matrix is in
 [`docs/contributing/ci.md`](docs/contributing/ci.md).
@@ -11,9 +13,6 @@ part of the reproducibility contract. The maintained check matrix is in
   pins Rust 1.79.0 with `rustfmt` and Clippy. Run Cargo commands from the
   repository root and retain the committed `Cargo.lock`; validation commands
   use `--locked`.
-- **Lean:** install Elan. Commands under `frontend/` use
-  `frontend/lean-toolchain`, which pins Lean 4.13.0 and supplies Lake. Do not
-  substitute a globally selected Lean release.
 - **Python:** the reviewed Linux NPE environment is CPython 3.12.8 with the
   complete hashed lock in `calibration/npe/requirements-ci.lock`. Follow
   [`calibration/npe/README.md`](calibration/npe/README.md); do not replace the
@@ -33,12 +32,11 @@ contract before submitting a repository-wide change:
 
 ```sh
 ./scripts/check-rust.sh       # formatting, Clippy, Rust tests, dependency policy
-./scripts/check.sh            # documentation + strict Rust + Lean + parity
+./scripts/check.sh            # documentation, architecture, and strict Rust
 python3 scripts/check-markdown-links.py
 ./scripts/check-abs-data.sh    # ABS extracts, readers, reconciliation (offline)
 python3 scripts/check-cargo-metadata.py
 ./scripts/check-determinism.sh
-bash frontend/scripts/check-parity.sh
 ```
 
 `./scripts/check-abs-data.sh` runs the ABS pipeline's reader and extract
@@ -48,24 +46,25 @@ uses only the Python standard library and needs no virtual environment.
 
 For Australian population foundation changes, `data/abs/rates.py` is the sole
 generator of the four complete v2 parameter tables and the non-production Lean
-ParamDecl reference under `data/abs/reference/`. `Parameters.lean` is now a
-compatibility projection and must never be overwritten by generation. In tests,
+ParamDecl reference exported by `scripts/export-frontend-data.sh`.
+`Parameters.lean` is a frontend compatibility projection and must never be
+overwritten implicitly by backend generation. In tests,
 redirect `--parameter-tables`, `--lean-parameters`, `--params-dir`, and
 `--report` to temporary paths. The module map, semantic order, 17/360 split,
 seven published-zero exceptions, frozen fixture hashes, and hard failure policy
 are documented in the
-[local maintenance README](frontend/Sembla/Models/AustralianPopulation/README.md).
+[frontend maintenance README](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/README.md).
 
-Indexed parameter-family CSV/JSON inputs are compile-time sources and must have
-a mandatory exact-byte SHA-256 literal in the declaring Lean file. Paths are
-relative to that Lean source. Regenerate the whole complete table
-deterministically and update the file and hash together; never update a pin to
-hide an unexplained data change. Lean 4.13 does not track arbitrary table files
-as Lake dependencies, so direct elaboration of
-`Sembla/IndexedFamilyTests.lean` and
-`Sembla/Models/AustralianPopulation/Validation.lean` is part of the validation
-contract. See the
-[indexed-family guide](docs/guides/indexed-parameter-families.md).
+Export the generated parameter-family tables and structural reference for a
+frontend compatibility change with an explicit destination:
+
+```sh
+./scripts/export-frontend-data.sh /tmp/sembla-frontend-data
+```
+
+Never locate or overwrite a sibling frontend checkout implicitly. The
+frontend repository owns its exact-byte pins and direct Lean elaboration
+checks. See the [indexed-family guide](docs/guides/indexed-parameter-families.md).
 
 The directly runnable Markdown checker uses only the Python standard library.
 It checks relative targets in tracked Markdown, excludes managed `.piprd`
@@ -73,9 +72,12 @@ records, and does not test remote URLs or anchor fragments. The complete check
 runs both its temporary-fixture unit tests and the repository scan.
 
 `./scripts/check.sh` fails when a required pinned tool is unavailable; it does
-not silently skip Python or Lean. The determinism command byte-compares repeated
-CPU run and sweep outputs. The direct parity command byte-compares Lean exports
-and canonical fixtures and verifies their Rust-side contracts.
+not silently skip Python or Rust checks. It also regenerates the frontend data
+projection and verifies frontend-emitted canonical fixtures against
+`compat/frontend.json`, without requiring Lean. The determinism command
+byte-compares repeated CPU run and sweep outputs. Full cross-repository
+compatibility is run by the frontend repository against the backend commit
+recorded in its pin.
 
 For NPE dependency or calibration-path changes, also run the immutable
 Linux/amd64 lock validation and reduced smoke test described in the NPE README:
@@ -105,14 +107,14 @@ size. Review that output first; deletion requires a separate explicit command:
 bash scripts/clean-local.sh --apply
 ```
 
-Cleanup is intentionally limited to the root Rust `target/`, Lean
-`frontend/.lake/`, root `.pytest_cache/`, the NPE `.venv/`, and Python
+Cleanup is intentionally limited to the root Rust `target/`, root
+`.pytest_cache/`, the NPE `.venv/`, and Python
 `__pycache__` directories below `calibration/npe/`. It refuses symlinked or
 out-of-root candidates, protected paths, and any candidate containing tracked
 files; it never delegates to `git clean`.
 
-Applying cleanup trades disk space for rebuild time. Rust and Lean outputs must
-be rebuilt, and removing `calibration/npe/.venv/` requires reinstalling the
+Applying cleanup trades disk space for rebuild time. Rust outputs must be
+rebuilt, and removing `calibration/npe/.venv/` requires reinstalling the
 pinned Python dependencies before running NPE checks. Managed `.piprd` state,
 agent transcripts, fixtures, examples, scientific artifacts and evidence, and
 Terraform material are outside the allowlist and are never cleanup targets.

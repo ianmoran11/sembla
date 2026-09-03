@@ -7,7 +7,7 @@ runtime, proofs, and checked fixtures were unchanged. This document records the
 options and constraints of that earlier command-syntax decision; it is not the
 complete current syntax reference. The public extension guide is
 [Mathematical model surface](../guides/mathematical-model-surface.md), with the
-broader frontend overview in the [frontend README](../../frontend/README.md).
+broader frontend overview in the [frontend README](https://github.com/ianmoran11/sembla-lean/blob/main/README.md).
 
 ---
 
@@ -95,8 +95,8 @@ summaries are never name-sorted.
 
 Every accepted node either elaborates completely or emits a deliberate
 positioned diagnostic. Complete ordered error sets are pinned by
-[`frontend/scripts/test-negative.sh`](../../frontend/scripts/test-negative.sh)
-and the focused `frontend/Negative/` command fixtures.
+[`sembla-lean/scripts/test-negative.sh`](https://github.com/ianmoran11/sembla-lean/blob/main/scripts/test-negative.sh)
+and the focused `sembla-lean/Negative/` command fixtures.
 
 ### Closed relational fragment
 
@@ -243,15 +243,15 @@ only if future programmatic tooling demonstrates a need beyond raw constructors.
 
 ## 9. Evidence and references
 
-- Public syntax and workflow: [`frontend/README.md`](../../frontend/README.md)
-- Canonical command models: [`frontend/Sembla/Models.lean`](../../frontend/Sembla/Models.lean)
-- Full command/legacy and ordering twins: [`frontend/Sembla/CommandFrontendTests.lean`](../../frontend/Sembla/CommandFrontendTests.lean)
-- Binder/name twins: [`frontend/Sembla/SurfaceKernelTests.lean`](../../frontend/Sembla/SurfaceKernelTests.lean)
-- Arrow twins: [`frontend/Sembla/ReactionArrowTests.lean`](../../frontend/Sembla/ReactionArrowTests.lean)
-- Frequency twins: [`frontend/Sembla/FrequencyTests.lean`](../../frontend/Sembla/FrequencyTests.lean)
-- Canonical names/order: [`frontend/Sembla/CanonicalModelsTests.lean`](../../frontend/Sembla/CanonicalModelsTests.lean)
-- Positioned negatives: [`frontend/scripts/test-negative.sh`](../../frontend/scripts/test-negative.sh)
-- Literal canonical/runtime parity: [`frontend/scripts/check-parity.sh`](../../frontend/scripts/check-parity.sh)
+- Public syntax and workflow: [`sembla-lean/README.md`](https://github.com/ianmoran11/sembla-lean/blob/main/README.md)
+- Canonical command models: [`sembla-lean/Sembla/Models.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models.lean)
+- Full command/legacy and ordering twins: [`sembla-lean/Sembla/CommandFrontendTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/CommandFrontendTests.lean)
+- Binder/name twins: [`sembla-lean/Sembla/SurfaceKernelTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/SurfaceKernelTests.lean)
+- Arrow twins: [`sembla-lean/Sembla/ReactionArrowTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/ReactionArrowTests.lean)
+- Frequency twins: [`sembla-lean/Sembla/FrequencyTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/FrequencyTests.lean)
+- Canonical names/order: [`sembla-lean/Sembla/CanonicalModelsTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/CanonicalModelsTests.lean)
+- Positioned negatives: [`sembla-lean/scripts/test-negative.sh`](https://github.com/ianmoran11/sembla-lean/blob/main/scripts/test-negative.sh)
+- Literal canonical/runtime parity: [`sembla-lean/scripts/check-parity.sh`](https://github.com/ianmoran11/sembla-lean/blob/main/scripts/check-parity.sh)
 
 The implementation order and frozen contracts for this historical baseline are
 recorded in

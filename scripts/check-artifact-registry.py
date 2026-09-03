@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -34,6 +35,9 @@ REQUIRED_ENTRY_KEYS = {
     "stability",
     "source_discovery",
 }
+EXTERNAL_PATH_PATTERN = re.compile(
+    r"external:[a-z0-9][a-z0-9_.-]*/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,21 +51,21 @@ def source_files(root: Path) -> list[Path]:
     files: list[Path] = []
     for crate in sorted((root / "crates").glob("*/src")):
         files.extend(sorted(crate.rglob("*.rs")))
-    lean_root = root / "frontend" / "Sembla"
-    if lean_root.is_dir():
-        files.extend(
-            path
-            for path in sorted(lean_root.rglob("*.lean"))
-            if not path.name.endswith("Tests.lean")
-        )
     for python_root in (root / "calibration" / "npe", root / "data" / "abs"):
         if not python_root.is_dir():
             continue
-        for path in sorted(python_root.rglob("*.py")):
-            relative_parts = path.relative_to(python_root).parts
-            if any(part in {"tests", ".venv", "__pycache__"} for part in relative_parts):
-                continue
-            files.append(path)
+        for current, directories, filenames in os.walk(python_root):
+            directories[:] = sorted(
+                directory
+                for directory in directories
+                if directory not in {"tests", ".venv", "__pycache__"}
+            )
+            current_path = Path(current)
+            files.extend(
+                current_path / filename
+                for filename in sorted(filenames)
+                if filename.endswith(".py")
+            )
     return files
 
 
@@ -138,6 +142,16 @@ def validate_registry(root: Path, registry: dict[str, object]) -> list[str]:
             if len(values) != len(set(values)):
                 errors.append(f"{identifier}: {field} contains duplicate paths")
             for value in values:
+                if value.startswith("external:"):
+                    path_segments = value.split("/", 1)[1].split("/") if "/" in value else []
+                    if (
+                        not EXTERNAL_PATH_PATTERN.fullmatch(value)
+                        or any(segment in {".", ".."} for segment in path_segments)
+                    ):
+                        errors.append(
+                            f"{identifier}: {field} has invalid external path: {value}"
+                        )
+                    continue
                 if not (root / value).exists():
                     errors.append(f"{identifier}: {field} path does not exist: {value}")
 

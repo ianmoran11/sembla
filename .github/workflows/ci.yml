@@ -49,11 +49,12 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
       - name: Parse workflow YAML
         run: ruby scripts/check-workflow-yaml.rb
-      - name: Check package metadata and local Markdown links
+      - name: Check metadata, documentation, and pinned frontend compatibility
         run: |
           python3 -B -m unittest discover -s scripts/tests -p 'test_*.py'
           python3 -B scripts/check-markdown-links.py
           python3 -B scripts/check-cargo-metadata.py
+          python3 -B scripts/check-frontend-compatibility.py
       - name: Rust formatting, lint, tests, and dependency policy
         run: ./scripts/check-rust.sh
 
@@ -67,24 +68,6 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
       - name: Double-run byte comparisons
         run: ./scripts/check-determinism.sh
-
-  lean:
-    name: Lean frontend
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Install pinned Rust toolchain and restore Cargo cache
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
-      - name: Install pinned Lean toolchain and restore Lake cache
-        uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
-        with:
-          lake-package-directory: frontend
-          auto-config: false
-      - name: Lean proof hygiene
-        run: bash frontend/scripts/check-proofs.sh
-      - name: Build and test the Lean frontend
-        run: bash frontend/scripts/check-parity.sh
 
   npe-smoke:
     name: NPE smoke

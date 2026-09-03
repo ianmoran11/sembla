@@ -156,7 +156,7 @@ This is the smallest useful state-machine example. It has one box, one table, no
 - The arrows specify canonical CTMC hazards, while the current executor advances them on the fixed `dt` tick grid.
 - Generic CSV output reports counts for `A` and `B` plus firings for both transitions.
 
-Model files: [`frontend/Sembla/Models.lean`](../../frontend/Sembla/Models.lean) · [`examples/reversible_ctmc.json`](../../examples/reversible_ctmc.json)
+Model files: [`Sembla/Models.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models.lean) · [`examples/reversible_ctmc.json`](../../examples/reversible_ctmc.json)
 
 ---
 
@@ -217,7 +217,7 @@ SIS demonstrates the difference between a table reference and a wire. `person.co
 - The positive importation rate makes `I` reachable from homogeneous numeric initialization.
 - With `--population N`, all person references initially point to community row `0`, so the CLI smoke run behaves as one well-mixed community.
 
-Model files: [`frontend/Sembla/Models.lean`](../../frontend/Sembla/Models.lean) · [`examples/sis_importation.json`](../../examples/sis_importation.json)
+Model files: [`Sembla/Models.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models.lean) · [`examples/sis_importation.json`](../../examples/sis_importation.json)
 
 ---
 
@@ -315,7 +315,7 @@ This is the composition example. The population and policy boxes own independent
 - The delay makes feedback causal and deterministic: neither box observes the other box's in-progress tick.
 - At tick zero, input ports are schema-carrying zero-row tables. The population therefore encodes its neutral modifier as `1 + sum(modifier_offset)`.
 
-Model files: [`frontend/Sembla/Models.lean`](../../frontend/Sembla/Models.lean) · [`examples/sir_policy.json`](../../examples/sir_policy.json) · [policy walkthrough](../examples/sir_policy.md)
+Model files: [`Sembla/Models.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models.lean) · [`examples/sir_policy.json`](../../examples/sir_policy.json) · [policy walkthrough](../examples/sir_policy.md)
 
 ---
 

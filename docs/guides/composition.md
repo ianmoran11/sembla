@@ -51,7 +51,7 @@ sembla_composition epidemicPolicyModel
 ```
 
 See
-[`frontend/Sembla/Composition/SurfaceModels.lean`](../../frontend/Sembla/Composition/SurfaceModels.lean)
+[`Sembla/Composition/SurfaceModels.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Composition/SurfaceModels.lean)
 for complete primitive, composite, nested, and root examples.
 
 ## Inspecting compositions
@@ -76,10 +76,10 @@ composition values, so inspection adds no runtime behavior or execution cost.
 Build the authored module, then export its registered source constant:
 
 ```sh
-cd frontend
+cd ../sembla-lean
 lake build Sembla.Composition.SurfaceModels
 lake exe sembla-export --source surface_epidemic_policy \
-  ../build/epidemic_policy.source.json
+  /tmp/epidemic_policy.source.json
 ```
 
 The exported bytes use `sembla.composition-source/v1` and
@@ -92,18 +92,18 @@ Single-file mode writes an independently runnable plan and can also write the
 non-semantic link report:
 
 ```sh
-cd frontend
-lake exe sembla-link ../build/epidemic_policy.source.json \
-  --plan ../build/epidemic_policy.plan.json \
-  --report ../build/epidemic_policy.link-report.json
+cd ../sembla-lean
+lake exe sembla-link /tmp/epidemic_policy.source.json \
+  --plan /tmp/epidemic_policy.plan.json \
+  --report /tmp/epidemic_policy.link-report.json
 ```
 
 Bundle mode creates a new or empty directory and writes the frozen four-file
 layout:
 
 ```sh
-lake exe sembla-link ../build/epidemic_policy.source.json \
-  --bundle ../build/epidemic_policy.bundle
+lake exe sembla-link /tmp/epidemic_policy.source.json \
+  --bundle /tmp/epidemic_policy.bundle
 ```
 
 ```text

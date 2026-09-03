@@ -81,6 +81,23 @@ class ArtifactRegistryCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unregistered source identifier sembla.demo/v1", result.stderr)
 
+    def test_external_repository_paths_are_validated_without_local_lookup(self) -> None:
+        external = self.entry("sembla.external/v1")
+        external["owner"] = "external:sembla-lean/Sembla/IR.lean"
+        external["producers"] = ["external:sembla-lean/Sembla/Json.lean"]
+        external["source_discovery"] = False
+        self.write_registry([self.entry(), external])
+
+        result = self.run_checker()
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        external["owner"] = "external:sembla-lean/../IR.lean"
+        self.write_registry([self.entry(), external])
+        result = self.run_checker()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("owner has invalid external path", result.stderr)
+
     def test_stale_identifier_and_missing_owner_fail(self) -> None:
         entry = self.entry("sembla.stale/v1")
         entry["owner"] = "missing.rs"

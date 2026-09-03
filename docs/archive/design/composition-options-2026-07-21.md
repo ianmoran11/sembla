@@ -73,7 +73,7 @@ code block:
 
 The primary running example is the existing workplace SIR population plus a
 policy controller. Its complete current source is
-[`Step05_PolicyFeedback.lean`](../../../frontend/Sembla/Tutorial/Step05_PolicyFeedback.lean).
+[`Step05_PolicyFeedback.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Tutorial/Step05_PolicyFeedback.lean).
 
 **Current/implemented Sembla syntax (abridged):**
 

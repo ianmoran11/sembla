@@ -7,13 +7,12 @@ Usage: bash scripts/clean-local.sh [--apply]
 
 Preview or remove only these rebuildable local caches:
   target/
-  frontend/.lake/
   .pytest_cache/
   calibration/npe/.venv/
   calibration/npe/**/__pycache__/
 
 The default is a dry run. Pass --apply to delete validated allowlisted paths.
-Applying cleanup means Rust and Lean outputs must be rebuilt and Python
+Applying cleanup means Rust outputs must be rebuilt and Python
 packages may need to be reinstalled from the repository's pinned environment.
 EOF
 }
@@ -97,7 +96,7 @@ fi
 is_allowlisted() {
     local relative="$1"
     case "$relative" in
-        target|frontend/.lake|.pytest_cache|calibration/npe/.venv)
+        target|.pytest_cache|calibration/npe/.venv)
             return 0
             ;;
         calibration/npe/__pycache__|calibration/npe/*/__pycache__)
@@ -215,7 +214,6 @@ validate_existing_candidate() {
 
 candidate_relatives=(
     "target"
-    "frontend/.lake"
     ".pytest_cache"
     "calibration/npe/.venv"
 )
@@ -259,7 +257,7 @@ if [[ "$apply" == false ]]; then
 else
     echo "Apply mode: removing validated rebuildable local caches."
 fi
-echo "Rust and Lean outputs will need rebuilding; Python dependencies may need reinstalling."
+echo "Rust outputs will need rebuilding; Python dependencies may need reinstalling."
 
 for relative in "${candidate_relatives[@]}"; do
     candidate="$repo_root/$relative"

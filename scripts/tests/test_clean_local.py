@@ -49,7 +49,6 @@ class CleanLocalTests(unittest.TestCase):
     def make_cache_tree(self) -> list[Path]:
         sentinels = [
             self.write("target/sentinel"),
-            self.write("frontend/.lake/sentinel"),
             self.write(".pytest_cache/sentinel"),
             self.write("calibration/npe/.venv/sentinel"),
             self.write("calibration/npe/__pycache__/sentinel"),
@@ -99,11 +98,10 @@ class CleanLocalTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Dry run only; nothing will be deleted", result.stdout)
-        self.assertIn("Rust and Lean outputs will need rebuilding", result.stdout)
+        self.assertIn("Rust outputs will need rebuilding", result.stdout)
         self.assertIn("Python dependencies may need reinstalling", result.stdout)
         for relative in (
             "target/",
-            "frontend/.lake/",
             ".pytest_cache/",
             "calibration/npe/.venv/",
             "calibration/npe/__pycache__/",

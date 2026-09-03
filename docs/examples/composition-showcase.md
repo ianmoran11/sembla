@@ -20,9 +20,9 @@ composition mechanics stay visible.
 | `demo_national_network` | How do four regions compose into two regional coordinators and one national view? | Repeated nested composites, four exposure-chain wires, deep occurrence identities, national summaries |
 
 The complete authoring source is
-[`frontend/Sembla/Demos/Composition.lean`](../../frontend/Sembla/Demos/Composition.lean).
+[`Sembla/Demos/Composition.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Demos/Composition.lean).
 Compile-time link and identity guards are in
-[`CompositionTests.lean`](../../frontend/Sembla/Demos/CompositionTests.lean).
+[`CompositionTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Demos/CompositionTests.lean).
 
 ## 1. Build the tools
 
@@ -30,9 +30,7 @@ From the repository root:
 
 ```sh
 cargo build -p sembla-cli
-cd frontend
-lake build Sembla.Demos.CompositionTests
-cd ..
+(cd ../sembla-lean && lake build Sembla.Demos.CompositionTests)
 ```
 
 ## 2. Inspect or reproduce a bundle
@@ -51,9 +49,9 @@ For example, reproduce the coordinated-regions bundle:
 
 ```sh
 mkdir -p /tmp/sembla-composition-demo
-(cd frontend && lake exe sembla-export --source demo_coordinated_regions \
+(cd ../sembla-lean && lake exe sembla-export --source demo_coordinated_regions \
   /tmp/sembla-composition-demo/source.json)
-(cd frontend && lake exe sembla-link \
+(cd ../sembla-lean && lake exe sembla-link \
   /tmp/sembla-composition-demo/source.json \
   --bundle /tmp/sembla-composition-demo/coordinated.bundle)
 target/debug/sembla bundle-verify \
@@ -62,8 +60,8 @@ target/debug/sembla bundle-verify \
 
 `bundle-verify` checks the canonical manifest, source and plan hashes, report-
 sensitive bundle integrity, plan validation/canonicality, and embedded linked
-provenance. `bash frontend/scripts/check-parity.sh` reproduces and byte-compares
-all four showcase bundles.
+provenance. `scripts/check-backend-compat.sh` in `sembla-lean` reproduces and
+byte-compares all four showcase bundles against an explicit backend checkout.
 
 ## 3. Create one deterministic seeded population
 

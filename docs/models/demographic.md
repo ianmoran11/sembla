@@ -3,7 +3,7 @@
 `demographic_slots` is Sembla's test-scale aggregate birth, death, overseas-
 migration, and internal-migration model. It is an executable accounting and
 calibration fixture, not a calibrated population projection. Its Lean source is
-`frontend/Sembla/Models/DemographicSlots.lean`; canonical model and
+[`Sembla/Models/DemographicSlots.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/DemographicSlots.lean); canonical model and
 direct-stable plan exports live under `fixtures/demographic/`.
 
 ## Slot architecture and initial state

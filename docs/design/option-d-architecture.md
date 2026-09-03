@@ -1543,19 +1543,19 @@ The file names below are illustrative and should be finalized in PRDs.
 ### Lean
 
 ```text
-frontend/Sembla/Composition/Source.lean       CompositionSourceV1 types
-frontend/Sembla/Composition/Json.lean         canonical source encoding
-frontend/Sembla/Composition/Semantics.lean    source denotation
-frontend/Sembla/Composition/Link.lean         canonical linker
-frontend/Sembla/Composition/Errors.lean       stable error codes
-frontend/Sembla/Composition/SourceMap.lean    source/identity maps
-frontend/Sembla/Plan.lean                     versioned plan envelope
-frontend/Sembla/PlanSemantics.lean            flat plan denotation
-frontend/Sembla/PlanJson.lean                 canonical plan encoding
-frontend/Sembla/LinkMain.lean                 standalone linker executable
+sembla-lean/Sembla/Composition/Source.lean       CompositionSourceV1 types
+sembla-lean/Sembla/Composition/Json.lean         canonical source encoding
+sembla-lean/Sembla/Composition/Semantics.lean    source denotation
+sembla-lean/Sembla/Composition/Link.lean         canonical linker
+sembla-lean/Sembla/Composition/Errors.lean       stable error codes
+sembla-lean/Sembla/Composition/SourceMap.lean    source/identity maps
+sembla-lean/Sembla/Plan.lean                     versioned plan envelope
+sembla-lean/Sembla/PlanSemantics.lean            flat plan denotation
+sembla-lean/Sembla/PlanJson.lean                 canonical plan encoding
+sembla-lean/Sembla/LinkMain.lean                 standalone linker executable
 ```
 
-Existing `frontend/Sembla/IR.lean` primitive types SHOULD be reused where they
+Existing `sembla-lean/Sembla/IR.lean` primitive types SHOULD be reused where they
 already express leaf semantics. Reuse must not confuse component definitions
 with concrete flat instances.
 
@@ -1574,9 +1574,9 @@ Rust does not initially need a `CompositionSourceV1` linker implementation.
 ### Tests and fixtures
 
 ```text
-frontend/Sembla/CompositionTests.lean
-frontend/Sembla/CompositionProofs.lean
-frontend/fixtures/composition-source/*.json
+sembla-lean/Sembla/CompositionTests.lean
+sembla-lean/Sembla/CompositionProofs.lean
+sembla-lean/fixtures/composition-source/*.json
 examples/plans/*.json
 crates/sembla-ir/tests/plan_validation.rs
 crates/sembla-runtime/tests/linked_composition.rs

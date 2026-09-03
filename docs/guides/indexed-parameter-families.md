@@ -178,7 +178,7 @@ external-table test module directly.
 Run:
 
 ```sh
-cd frontend
+cd ../sembla-lean
 lake env lean Sembla/ParameterTableTests.lean
 lake env lean Sembla/IndexedFamilyTests.lean
 bash scripts/test-negative.sh
@@ -188,7 +188,7 @@ bash scripts/test-negative.sh
 
 The Australian population model now uses the named-domain mathematical surface
 in
-[`Surface.lean`](../../frontend/Sembla/Models/AustralianPopulation/Surface.lean)
+[`Surface.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/Surface.lean)
 and four source-relative, SHA-pinned JSON v2 tables under
 `AustralianPopulation/Data/`. Those tables provide 8 birth, 336 mortality, 8
 arrival, and 8 emigration cells; the mortality table mixes seven centred
@@ -199,7 +199,8 @@ transitions.
 `Surface.lean` plus those four pinned v2 tables is production authority.
 `Parameters.lean` and `Transitions.lean` are compatibility projections. The
 generated
-`data/abs/reference/AustralianPopulationParameters.lean` is reproducible
+`Sembla/TestData/AustralianPopulation/AustralianPopulationParameters.lean` in
+`sembla-lean` is reproducible
 377-parameter structural evidence only, while large generated state artifacts
 remain ignored under `data/abs/generated/`.
 

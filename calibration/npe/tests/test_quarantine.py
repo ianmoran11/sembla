@@ -15,7 +15,6 @@ FRAMEWORK_PATH_PREFIXES = (
     "crates/",
     "examples/",
     "fixtures/",
-    "frontend/",
     "target/release/",
 )
 
@@ -29,13 +28,10 @@ def test_estimation_has_no_cargo_or_production_source_coupling() -> None:
             assert marker not in content, (manifest, marker)
 
     production_sources = [
-        *(
-            source
-            for crate in sorted((repo / "crates").iterdir())
-            if crate.is_dir()
-            for source in (crate / "src").rglob("*.rs")
-        ),
-        *(repo / "frontend").rglob("*.lean"),
+        source
+        for crate in sorted((repo / "crates").iterdir())
+        if crate.is_dir()
+        for source in (crate / "src").rglob("*.rs")
     ]
     for source in production_sources:
         content = source.read_text(encoding="utf-8")

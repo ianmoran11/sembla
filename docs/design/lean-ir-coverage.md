@@ -14,10 +14,10 @@ semantics.
 The inventory boundary is exactly the public structures, their fields and the
 inductive constructors declared in:
 
-- [`Sembla.IR`](../../frontend/Sembla/IR.lean);
-- [`Sembla.Composition.Source`](../../frontend/Sembla/Composition/Source.lean);
-- [`Sembla.Composition.SourceMap`](../../frontend/Sembla/Composition/SourceMap.lean);
-- [`Sembla.Plan`](../../frontend/Sembla/Plan.lean).
+- [`Sembla.IR`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/IR.lean);
+- [`Sembla.Composition.Source`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Composition/Source.lean);
+- [`Sembla.Composition.SourceMap`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Composition/SourceMap.lean);
+- [`Sembla.Plan`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Plan.lean).
 
 There are **55 inductive constructors and 163 structure fields (218 items)**.
 Every item below has **PRD 0002** as its raw inventory owner. The separate
@@ -142,7 +142,7 @@ checking is not confused with later denotation:
 | Wires | No static discharge in PRD 0006; preserve structurally exactly and in source order | `WiresWellFormed` and plan structure PRD 0019 |
 
 Executable evidence now lives in
-[`CheckModelTests.lean`](../../frontend/Sembla/Semantics/CheckModelTests.lean):
+[`CheckModelTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/CheckModelTests.lean):
 
 | Checked family | Executable evidence |
 | --- | --- |
@@ -254,7 +254,7 @@ these theorems. Accepted raw classifier metadata remains unchanged.
 
 ## PRD 0007 pure core-builder discharge
 
-[`Sembla.Frontend.Builders.Core`](../../frontend/Sembla/Frontend/Builders/Core.lean)
+[`Sembla.Frontend.Builders.Core`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Frontend/Builders/Core.lean)
 defines syntax-independent `CoreBuilderError`, `CoreBoxShell` and
 `CoreModelShell` APIs. Builders decide the existing PRD 0005 predicates
 without normalization, sorting, deduplication or incremental reference
@@ -264,8 +264,8 @@ resolution. The public soundness/completeness/failure theorem families are
 `buildModelShell_declaration_acceptance` and
 `buildModelShell_model_acceptance_and_erasure` connect successful shells to the
 PRD 0005/0006 checkers and exact checked erasure. Executable evidence is in
-[`CoreTests.lean`](../../frontend/Sembla/Frontend/Builders/CoreTests.lean), with
-actual command-frontend parity guarded in [`Sembla.lean`](../../frontend/Sembla.lean).
+[`CoreTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Frontend/Builders/CoreTests.lean), with
+actual command-frontend parity guarded in [`Sembla.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla.lean).
 
 | Owned positive form | Literal executable evidence |
 | --- | --- |
@@ -297,7 +297,7 @@ actual command-frontend parity guarded in [`Sembla.lean`](../../frontend/Sembla.
 
 ## PRD 0008 pure transition-builder discharge
 
-[`Sembla.Frontend.Builders.Transition`](../../frontend/Sembla/Frontend/Builders/Transition.lean)
+[`Sembla.Frontend.Builders.Transition`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Frontend/Builders/Transition.lean)
 consumes the accepted core shells and PRD 0005/0006 contexts/checkers directly.
 `TransitionRaw` retains every raw argument exactly. `buildSynthExpr`,
 `buildExpectedExpr`, `buildEffect`, `buildClaim` and `buildTransition` are
@@ -318,9 +318,9 @@ declaration, term and model failures are retained; only
 `unsupportedSurfaceKeyOrdering` is frontend-owned.
 
 Executable evidence is in
-[`TransitionTests.lean`](../../frontend/Sembla/Frontend/Builders/TransitionTests.lean).
+[`TransitionTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Frontend/Builders/TransitionTests.lean).
 Actual command-frontend parity is guarded in
-[`Sembla.lean`](../../frontend/Sembla.lean) by an independent `TransitionRaw`
+[`Sembla.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla.lean) by an independent `TransitionRaw`
 construction compared against `Sembla.ContestTests.contestTwin`, including both
 claims in its multiple-claim contest.
 
@@ -503,9 +503,9 @@ change.
 ## PRD 0009 observation and final-model builder discharge
 
 The pure implementation is
-[`Frontend/Builders/Observation.lean`](../../frontend/Sembla/Frontend/Builders/Observation.lean),
+[`Frontend/Builders/Observation.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Frontend/Builders/Observation.lean),
 with literal fixtures in
-[`ObservationTests.lean`](../../frontend/Sembla/Frontend/Builders/ObservationTests.lean).
+[`ObservationTests.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Frontend/Builders/ObservationTests.lean).
 `ObservationRaw.input_exact`, `outputField_exact`,
 `output_fields_preserve_supplied_order`, `view_exact`, `groupKey_exact`,
 `groupedView_exact` and `summary_exact` establish constructor fidelity.
@@ -589,12 +589,12 @@ is still checker-owned. `MathematicalExprFunctionMissingCell`,
 `MathematicalExprFunctionWrongResult` pin the expansion rules and the narrowly
 sanctioned unused-cell compatibility diagnostic.
 
-[raw-classifiers]: ../../frontend/Sembla/Semantics/Raw.lean
-[raw-fixtures]: ../../frontend/Sembla/Semantics/RawTests.lean
-[checked-types]: ../../frontend/Sembla/Semantics/Types.lean
-[checked-state]: ../../frontend/Sembla/Semantics/State.lean
-[checked-fixtures]: ../../frontend/Sembla/Semantics/TypesTests.lean
-[typed-syntax]: ../../frontend/Sembla/Semantics/Syntax.lean
-[typed-syntax-fixtures]: ../../frontend/Sembla/Semantics/SyntaxTests.lean
-[declaration-checker]: ../../frontend/Sembla/Semantics/CheckDeclarations.lean
-[declaration-fixtures]: ../../frontend/Sembla/Semantics/CheckDeclarationsTests.lean
+[raw-classifiers]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/Raw.lean
+[raw-fixtures]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/RawTests.lean
+[checked-types]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/Types.lean
+[checked-state]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/State.lean
+[checked-fixtures]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/TypesTests.lean
+[typed-syntax]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/Syntax.lean
+[typed-syntax-fixtures]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/SyntaxTests.lean
+[declaration-checker]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/CheckDeclarations.lean
+[declaration-fixtures]: https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Semantics/CheckDeclarationsTests.lean

@@ -318,7 +318,7 @@ checks and lower to the same ordered `ViewDecl`, `GroupedViewDecl`, and
 ## Production lowering and the Australian model
 
 The production authority for the Australian population model is
-[`Surface.lean`](../../frontend/Sembla/Models/AustralianPopulation/Surface.lean)
+[`Surface.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Models/AustralianPopulation/Surface.lean)
 plus its four pinned JSON v2 tables. It demonstrates eight-state domains, a
 21-cell projected monthly-age partition, mixed `Normal`/`LogNormal` mortality
 priors, finite push/pull functions, aliases, filtered origin/destination
@@ -341,11 +341,12 @@ relation move (origin : Area, destination : Area) on PersonSlot
 Lean lowers the complete source to the established 377 scalar parameters and
 418 scalar transitions. `Parameters.lean` and `Transitions.lean` are
 compatibility projections of that authority. The generated
-`data/abs/reference/AustralianPopulationParameters.lean` is reproducible
+`Sembla/TestData/AustralianPopulation/AustralianPopulationParameters.lean` in
+`sembla-lean` is reproducible
 377-parameter structural evidence only, never a production import; large state
 artifacts remain ignored under `data/abs/generated/`.
 
 For a checked compact example, see
-[`Step09_MathematicalSurface.lean`](../../frontend/Sembla/Tutorial/Step09_MathematicalSurface.lean).
+[`Step09_MathematicalSurface.lean`](https://github.com/ianmoran11/sembla-lean/blob/main/Sembla/Tutorial/Step09_MathematicalSurface.lean).
 For external-table details and the legacy indexed spellings, see
 [indexed parameter families](indexed-parameter-families.md).
