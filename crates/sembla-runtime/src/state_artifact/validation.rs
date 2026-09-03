@@ -286,7 +286,7 @@ pub(super) fn validate_column(
             actual: actual_type.name().to_owned(),
         });
     }
-    let actual_len = column_data_len(data);
+    let actual_len = data.len();
     if actual_len != row_count {
         return Err(StateArtifactError::ColumnLengthMismatch {
             box_name: box_name.to_owned(),
@@ -385,14 +385,5 @@ fn column_data_type(data: &ColumnData) -> ColumnType {
         ColumnData::Int(_) => ColumnType::Int,
         ColumnData::Enum(_) => ColumnType::Enum,
         ColumnData::Ref(_) => ColumnType::Ref,
-    }
-}
-
-fn column_data_len(data: &ColumnData) -> usize {
-    match data {
-        ColumnData::Real(values) => values.len(),
-        ColumnData::Int(values) => values.len(),
-        ColumnData::Enum(values) => values.len(),
-        ColumnData::Ref(values) => values.len(),
     }
 }
