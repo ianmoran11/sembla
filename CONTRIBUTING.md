@@ -72,9 +72,12 @@ records, and does not test remote URLs or anchor fragments. The complete check
 runs both its temporary-fixture unit tests and the repository scan.
 
 `./scripts/check.sh` fails when a required pinned tool is unavailable; it does
-not silently skip Python or Rust checks. The determinism command byte-compares
-repeated CPU run and sweep outputs. Cross-repository compatibility is run by
-the frontend repository against the backend commit recorded in its pin.
+not silently skip Python or Rust checks. It also regenerates the frontend data
+projection and verifies frontend-emitted canonical fixtures against
+`compat/frontend.json`, without requiring Lean. The determinism command
+byte-compares repeated CPU run and sweep outputs. Full cross-repository
+compatibility is run by the frontend repository against the backend commit
+recorded in its pin.
 
 For NPE dependency or calibration-path changes, also run the immutable
 Linux/amd64 lock validation and reduced smoke test described in the NPE README:

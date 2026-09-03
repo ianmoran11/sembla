@@ -26,8 +26,9 @@ Run the strict complete backend repository contract:
 ./scripts/check.sh
 ```
 
-The complete command requires Cargo, Git, and Python. Frontend checks run in
-the `sembla-lean` repository; its compatibility workflow checks out the pinned
+The complete command requires Cargo, Git, and Python and verifies the pinned
+frontend fixture/data surface without Lean. Full frontend checks run in the
+`sembla-lean` repository; its compatibility workflow checks out the pinned
 backend revision explicitly. The canonical
 [check matrix](docs/contributing/ci.md#local-check-contract) also lists
 the determinism check, reduced NPE smoke test, and manual GPU evidence command

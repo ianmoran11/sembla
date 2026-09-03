@@ -9,6 +9,9 @@ frontend is maintained in `ianmoran11/sembla-lean`.
 - Run `./scripts/check-rust.sh` for ordinary Rust changes.
 - Run `./scripts/check-determinism.sh` when execution or serialization changes.
 - Run `./scripts/check-abs-data.sh` for Australian population data changes.
+- Run `python3 -B scripts/check-frontend-compatibility.py` when changing
+  frontend-emitted fixtures, canonical bytes, compatibility pins, or exported
+  Australian population data.
 - Do not require Lean or Lake from backend build, test, or release paths.
 - Treat checked-in examples, fixtures, evidence, schema strings, hash domains,
   and canonical bytes as frozen unless a contract change explicitly authorizes

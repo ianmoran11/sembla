@@ -222,7 +222,7 @@
       "kind": "artifact-schema",
       "owner": "compat/frontend.json",
       "producers": ["compat/frontend.json"],
-      "consumers": ["docs/architecture/repositories.md"],
+      "consumers": ["docs/architecture/repositories.md", "scripts/check-frontend-compatibility.py"],
       "stability": "versioned",
       "source_discovery": false
     },

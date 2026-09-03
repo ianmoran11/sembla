@@ -21,6 +21,7 @@ python3 -B scripts/check-markdown-links.py
 python3 -B scripts/check-cargo-metadata.py
 python3 -B scripts/check-artifact-registry.py
 python3 -B scripts/check-architecture-canvases.py
+python3 -B scripts/check-frontend-compatibility.py
 ./scripts/check-rust.sh
 
 if ! git diff --exit-code HEAD -- Cargo.lock; then
