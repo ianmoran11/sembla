@@ -26,8 +26,14 @@ mod layout;
 mod observation;
 mod tick;
 
-use final_state::*;
-use layout::*;
+use final_state::{
+    checked_arena_len, estimate_isolated_sweep_capacity, final_state_component_bytes,
+    FinalStateAllocationInjection, PinnedFinalStateBuffers,
+};
+use layout::{
+    build_layout, downloaded_state_bytes, global_table, hash_state, pack_initial_state,
+    pack_params, unpack_inputs, unpack_state_into,
+};
 
 /// Hidden final-state readback routes used by CUDA sweeps. The CLI selects its
 /// production default explicitly; this diagnostic API retains its legacy

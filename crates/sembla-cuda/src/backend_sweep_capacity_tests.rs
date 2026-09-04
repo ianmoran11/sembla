@@ -1,9 +1,10 @@
-use super::{
-    allocate_cacheable_staging, build_layout, checked_final_state_component_bytes,
-    estimate_isolated_sweep_capacity, final_state_component_bytes, generate, hash_state,
-    pack_initial_state, write_column, CudaFinalStateReadbackMode, FinalStateAllocationInjection,
+use super::final_state::{
+    allocate_cacheable_staging, checked_final_state_component_bytes,
+    estimate_isolated_sweep_capacity, final_state_component_bytes, FinalStateAllocationInjection,
     SWEEP_CAPACITY_MIB,
 };
+use super::layout::{build_layout, hash_state, pack_initial_state, write_column};
+use super::{generate, CudaFinalStateReadbackMode};
 use sembla_runtime::core::{ColumnData, ColumnInit, InputTable, StateStore, TableInit};
 
 fn demographic_shape(scale: usize) -> (sembla_ir::ValidatedModel, Vec<TableInit>) {

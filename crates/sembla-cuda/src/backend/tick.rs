@@ -1,6 +1,10 @@
 //! Ordered CUDA tick launch pipeline and device-status commit.
 
-use super::*;
+use super::{
+    control_count_launch_config, device_status, driver_error, finish_validation_reduction_pass,
+    fused_launch_builder, global_table, mem, CudaBackend, CudaError, LaunchConfig,
+    VALIDATION_REDUCTION_PASSES,
+};
 
 impl CudaBackend {
     fn validation_launch_config(&self, rows: u32, one: LaunchConfig) -> LaunchConfig {

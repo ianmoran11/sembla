@@ -26,6 +26,7 @@ CORE_SOURCE_DIRS = (
 )
 CUDA_VOCABULARY = re.compile(r"\b(?:cuda|nvrtc|cudarc)\b", re.IGNORECASE)
 REPORTING_MACRO = re.compile(r"\b(?:print|println|eprint|eprintln)!\s*\(")
+WILDCARD_IMPORT = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?use\s+[^;]*::\*\s*;")
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,6 +150,22 @@ def validate_source_boundaries(root: Path) -> list[str]:
     return errors
 
 
+def validate_explicit_backend_imports(root: Path) -> list[str]:
+    candidates = list((root / "crates/sembla-cuda/src").rglob("*.rs"))
+    candidates.append(root / "crates/sembla-cli/src/sweep/finalize.rs")
+    errors: list[str] = []
+    for path in sorted(path for path in candidates if path.is_file()):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if WILDCARD_IMPORT.search(line):
+                errors.append(
+                    f"{path.relative_to(root)}:{line_number}: wildcard imports are "
+                    f"forbidden at explicit backend boundaries: {line.strip()}"
+                )
+    return errors
+
+
 def main() -> int:
     args = parse_args()
     root = args.root.resolve()
@@ -156,6 +173,7 @@ def main() -> int:
         metadata = load_metadata(root, args.metadata_file)
         errors = validate_dependency_edges(metadata)
         errors.extend(validate_source_boundaries(root))
+        errors.extend(validate_explicit_backend_imports(root))
     except (OSError, subprocess.CalledProcessError, ValueError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

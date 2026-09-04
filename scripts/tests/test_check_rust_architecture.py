@@ -137,6 +137,19 @@ class RustArchitectureCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sembla-cpu is permitted only as a dev-dependency", result.stderr)
 
+    def test_cuda_backend_wildcard_import_is_rejected(self) -> None:
+        source = self.root / "crates" / "sembla-cuda" / "src" / "lib.rs"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("use crate::backend::*;\n", encoding="utf-8")
+
+        result = self.run_checker(self.metadata())
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "wildcard imports are forbidden at explicit backend boundaries",
+            result.stderr,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

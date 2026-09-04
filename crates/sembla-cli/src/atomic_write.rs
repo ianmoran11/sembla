@@ -1,6 +1,9 @@
 //! Same-directory atomic publication for CLI text artifacts.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn write_atomic(path: impl AsRef<Path>, bytes: &[u8]) -> Result<(), String> {
     let path = path.as_ref();
@@ -8,7 +11,11 @@ pub(crate) fn write_atomic(path: impl AsRef<Path>, bytes: &[u8]) -> Result<(), S
         .file_name()
         .ok_or_else(|| format!("{}: output path has no file name", path.display()))?
         .to_string_lossy();
-    let temporary = path.with_file_name(format!(".{name}.sembla-tmp-{}", std::process::id()));
+    let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temporary = path.with_file_name(format!(
+        ".{name}.sembla-tmp-{}-{sequence}",
+        std::process::id()
+    ));
     let result = (|| -> std::io::Result<()> {
         std::fs::write(&temporary, bytes)?;
         std::fs::File::open(&temporary)?.sync_all()?;
