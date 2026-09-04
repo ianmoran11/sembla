@@ -6,103 +6,18 @@
 //! Aggregate sums make one sequential target-table pass in ascending row order;
 //! that order is the canonical Level A CPU reduction order (`DESIGN.md` §5.2).
 
-use std::borrow::Cow;
-use std::sync::OnceLock;
-
-/// Fixed model-independent cache budget used to derive a model-dependent tile.
-/// PRD 0001 measured against a 32 KiB L1 data cache. Keeping that assumption
-/// fixed makes partitioning comparable between hosts; runtime cache detection
-/// would make the row partition depend on the machine rather than the model.
-pub(crate) const TICK_TILE_CACHE_BUDGET_BYTES: usize = 32_768;
-pub(crate) const TICK_TILE_MIN_ROWS: usize = 64;
-pub(crate) const TICK_TILE_MAX_ROWS: usize = 4_096;
-/// `threading_spike` put its roughly seven-node guard crossover between 131,072
-/// and 262,144 rows (about 0.9M and 1.8M node-rows). This conservative point in
-/// that measured interval replaces the benchmark-specific one-million-row gate.
-pub(crate) const TICK_TILE_WORK_THRESHOLD: usize = 1_500_000;
 #[cfg(test)]
-const TEST_DEFAULT_TILE_ROWS: usize = 1_024;
-const EVALUATOR_THREADS_ENV: &str = "SEMBLA_EVAL_THREADS";
-const EVALUATOR_TILE_ROWS_ENV: &str = "SEMBLA_EVAL_TILE_ROWS";
-const EVALUATOR_TILE_THRESHOLD_ENV: &str = "SEMBLA_EVAL_TILE_THRESHOLD";
+pub(crate) use crate::config::with_test_tick_tiles;
 
-static TICK_WORKERS: OnceLock<usize> = OnceLock::new();
-static CONFIGURED_TILE_ROWS: OnceLock<Option<usize>> = OnceLock::new();
-static CONFIGURED_TILE_WORK_THRESHOLD: OnceLock<usize> = OnceLock::new();
-
-#[inline]
-pub(crate) fn tick_worker_count() -> usize {
-    #[cfg(test)]
-    if let Some(workers) = TEST_TICK_WORKERS.with(std::cell::Cell::get) {
-        return workers;
-    }
-
-    *TICK_WORKERS.get_or_init(|| {
-        std::env::var(EVALUATOR_THREADS_ENV)
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .filter(|workers| *workers > 0)
-            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, usize::from))
-    })
-}
-
-#[inline]
-fn configured_tick_tile_rows() -> Option<usize> {
-    #[cfg(test)]
-    if let Some(rows) = TEST_TICK_TILE_ROWS.with(std::cell::Cell::get) {
-        return Some(rows);
-    }
-
-    *CONFIGURED_TILE_ROWS.get_or_init(|| {
-        std::env::var(EVALUATOR_TILE_ROWS_ENV)
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .filter(|rows| *rows > 0)
-    })
-}
-
-/// Derives a cache-fitting row tile from the model's conservative live set.
-/// Rounding down to a multiple of 64 avoids the 992 -> 512 collapse that a
-/// power-of-two floor would cause for the known-good demographic shape.
-#[inline]
-pub(crate) fn tick_tile_rows_for_live_set(live_set_bytes_per_row: usize) -> usize {
-    if let Some(rows) = configured_tick_tile_rows() {
-        return rows;
-    }
-    let raw = TICK_TILE_CACHE_BUDGET_BYTES / live_set_bytes_per_row.max(1);
-    let clamped = raw.clamp(TICK_TILE_MIN_ROWS, TICK_TILE_MAX_ROWS);
-    (clamped / 64 * 64).max(TICK_TILE_MIN_ROWS)
-}
-
-/// Retained for the unchanged PRD 0001 determinism tests, whose explicit tile
-/// override is the partition under test rather than the model-derived default.
 #[cfg(test)]
-#[inline]
 pub(crate) fn tick_tile_rows() -> usize {
-    configured_tick_tile_rows().unwrap_or(TEST_DEFAULT_TILE_ROWS)
+    tick_tile_rows_for_live_set(&crate::CpuExecutionConfig::default(), 32)
 }
-
-#[inline]
-fn tick_tile_work_threshold() -> usize {
-    *CONFIGURED_TILE_WORK_THRESHOLD.get_or_init(|| {
-        std::env::var(EVALUATOR_TILE_THRESHOLD_ENV)
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .unwrap_or(TICK_TILE_WORK_THRESHOLD)
-    })
-}
-
-#[inline]
-pub(crate) fn tick_tiling_enabled(row_count: usize, tiled_node_count: usize) -> bool {
-    // Existing determinism tests use this scoped row threshold to force the
-    // tiled and fallback paths. Production uses model-work units below.
-    #[cfg(test)]
-    if let Some(rows) = TEST_TICK_TILE_THRESHOLD.with(std::cell::Cell::get) {
-        return row_count >= rows;
-    }
-
-    row_count.saturating_mul(tiled_node_count) >= tick_tile_work_threshold()
-}
+pub(crate) use crate::config::{
+    tile_rows as tick_tile_rows_for_live_set, tiling_enabled as tick_tiling_enabled,
+    worker_count as tick_worker_count,
+};
+use std::borrow::Cow;
 
 /// Legacy whole-column maps are deliberately serial. PRD 0001 moved the only
 /// execution parallel region above expression evaluation, where a complete row
@@ -131,36 +46,6 @@ where
     F: Fn(usize) -> T,
 {
     (0..row_count).map(map).collect()
-}
-
-#[cfg(test)]
-thread_local! {
-    static TEST_TICK_WORKERS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
-    static TEST_TICK_TILE_ROWS: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
-    static TEST_TICK_TILE_THRESHOLD: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
-}
-
-#[cfg(test)]
-pub(crate) fn with_test_tick_tiles<R>(
-    workers: usize,
-    tile_rows: usize,
-    threshold: usize,
-    run: impl FnOnce() -> R,
-) -> R {
-    TEST_TICK_WORKERS.with(|worker_slot| {
-        TEST_TICK_TILE_ROWS.with(|tile_slot| {
-            TEST_TICK_TILE_THRESHOLD.with(|threshold_slot| {
-                let previous_workers = worker_slot.replace(Some(workers.max(1)));
-                let previous_tile = tile_slot.replace(Some(tile_rows.max(1)));
-                let previous_threshold = threshold_slot.replace(Some(threshold));
-                let result = run();
-                threshold_slot.set(previous_threshold);
-                tile_slot.set(previous_tile);
-                worker_slot.set(previous_workers);
-                result
-            })
-        })
-    })
 }
 
 use sembla_ir::{

@@ -147,9 +147,10 @@ fn build_tile_tasks<T>(
 
 fn evaluate_tile_tasks<O: Send>(
     tasks: &[TileTask],
+    worker_count: usize,
     evaluate: impl Fn(&TileTask) -> O + Sync,
 ) -> Vec<O> {
-    let worker_count = tick_worker_count().max(1).min(tasks.len().max(1));
+    let worker_count = worker_count.max(1).min(tasks.len().max(1));
     if worker_count == 1 {
         return tasks.iter().map(evaluate).collect();
     }
@@ -480,6 +481,7 @@ pub(super) fn prepare_tiled_candidates(
     params: &ParamEnv,
     seed: u64,
     tick: u32,
+    config: &CpuExecutionConfig,
 ) -> TiledCandidateResults {
     let mut results = model
         .model()
@@ -536,8 +538,9 @@ pub(super) fn prepare_tiled_candidates(
             .map(|index| candidates[*index].profile.live_set_bytes_per_row())
             .max()
             .unwrap_or(1);
-        let tile_rows = tick_tile_rows_for_live_set(live_set_bytes_per_row);
-        if !tick_tiling_enabled(group.row_count, node_count) || group.row_count <= tile_rows {
+        let tile_rows = tick_tile_rows_for_live_set(config, live_set_bytes_per_row);
+        if !tick_tiling_enabled(config, group.row_count, node_count) || group.row_count <= tile_rows
+        {
             continue;
         }
         for candidate_index in group.indices {
@@ -570,7 +573,7 @@ pub(super) fn prepare_tiled_candidates(
             plan.row_count,
         )
     });
-    let task_outputs = evaluate_tile_tasks(&tasks, |task| {
+    let task_outputs = evaluate_tile_tasks(&tasks, tick_worker_count(config), |task| {
         evaluate_tile_task(task, &plans, seed, tick, model.model().dt)
     });
     for outputs in task_outputs {
@@ -832,6 +835,7 @@ fn prepare_view_tiling_plans<'state>(
     params: &ParamEnv,
     candidates: &[ViewTilingCandidate],
     results: &mut TiledViewResults,
+    config: &CpuExecutionConfig,
 ) -> Vec<PreparedView<'state>> {
     let mut plans = Vec::new();
     for group in group_candidates(candidates, |candidate| {
@@ -859,8 +863,9 @@ fn prepare_view_tiling_plans<'state>(
                     .saturating_add(candidate.profile.retained_root_bytes_per_row);
             }
         }
-        let tile_rows = tick_tile_rows_for_live_set(live_set_bytes_per_row);
-        if !tick_tiling_enabled(group.row_count, node_count) || group.row_count <= tile_rows {
+        let tile_rows = tick_tile_rows_for_live_set(config, live_set_bytes_per_row);
+        if !tick_tiling_enabled(config, group.row_count, node_count) || group.row_count <= tile_rows
+        {
             continue;
         }
         for candidate_index in group.indices {
@@ -1000,6 +1005,7 @@ pub(super) fn prepare_tiled_views(
     model: &ValidatedModel,
     snapshot: &Snapshot<'_>,
     params: &ParamEnv,
+    config: &CpuExecutionConfig,
 ) -> Vec<Option<Result<ObservationValue, TickError>>> {
     let view_count = model
         .model()
@@ -1011,7 +1017,8 @@ pub(super) fn prepare_tiled_views(
         .take(view_count)
         .collect::<TiledViewResults>();
     let candidates = collect_view_tiling_candidates(model, snapshot, &mut results);
-    let plans = prepare_view_tiling_plans(model, snapshot, params, &candidates, &mut results);
+    let plans =
+        prepare_view_tiling_plans(model, snapshot, params, &candidates, &mut results, config);
     if plans.is_empty() {
         return results;
     }
@@ -1023,7 +1030,9 @@ pub(super) fn prepare_tiled_views(
             plan.row_count,
         )
     });
-    let task_outputs = evaluate_tile_tasks(&tasks, |task| evaluate_view_tile_task(task, &plans));
+    let task_outputs = evaluate_tile_tasks(&tasks, tick_worker_count(config), |task| {
+        evaluate_view_tile_task(task, &plans)
+    });
     reduce_view_task_outputs(model, &plans, task_outputs, &mut results);
     results
 }

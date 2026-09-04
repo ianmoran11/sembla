@@ -229,7 +229,8 @@ fn benchmark_shapes_derive_hand_checked_tiles_and_work_decisions() {
         .max()
         .unwrap();
     assert_eq!(mixed_live_set, 37);
-    assert_eq!(tick_tile_rows_for_live_set(mixed_live_set), 832);
+    let config = CpuExecutionConfig::default();
+    assert_eq!(tick_tile_rows_for_live_set(&config, mixed_live_set), 832);
 
     let demographic = validate(
         parse_json(include_str!(
@@ -259,8 +260,11 @@ fn benchmark_shapes_derive_hand_checked_tiles_and_work_decisions() {
         .unwrap();
     assert_eq!(transition_nodes, 65);
     assert_eq!(transition_live_set, 33);
-    assert_eq!(tick_tile_rows_for_live_set(transition_live_set), 960);
-    assert!(tick_tiling_enabled(1_000_000, transition_nodes));
+    assert_eq!(
+        tick_tile_rows_for_live_set(&config, transition_live_set),
+        960
+    );
+    assert!(tick_tiling_enabled(&config, 1_000_000, transition_nodes));
 
     let demographic_views = static_view_profiles(&demographic, 0, "person_slot");
     let demographic_view_nodes = demographic_views
@@ -275,10 +279,14 @@ fn benchmark_shapes_derive_hand_checked_tiles_and_work_decisions() {
     assert_eq!(demographic_view_nodes, 67);
     assert_eq!(demographic_view_live_set, 20);
     assert_eq!(
-        tick_tile_rows_for_live_set(demographic_view_live_set),
+        tick_tile_rows_for_live_set(&config, demographic_view_live_set),
         1_600
     );
-    assert!(tick_tiling_enabled(1_000_000, demographic_view_nodes));
+    assert!(tick_tiling_enabled(
+        &config,
+        1_000_000,
+        demographic_view_nodes
+    ));
 
     let canary = validate(
         parse_json(include_str!(
@@ -299,8 +307,11 @@ fn benchmark_shapes_derive_hand_checked_tiles_and_work_decisions() {
         .unwrap();
     assert_eq!(canary_view_nodes, 680);
     assert_eq!(canary_view_live_set, 41);
-    assert_eq!(tick_tile_rows_for_live_set(canary_view_live_set), 768);
-    assert!(tick_tiling_enabled(262_144, canary_view_nodes));
+    assert_eq!(
+        tick_tile_rows_for_live_set(&config, canary_view_live_set),
+        768
+    );
+    assert!(tick_tiling_enabled(&config, 262_144, canary_view_nodes));
 }
 
 fn parameter_type_fixture(
@@ -365,7 +376,8 @@ fn tiled_race_fingerprint(
     with_test_tick_tiles(workers, tile_rows, 0, || {
         let params = ParamEnv::defaults(model);
         let snapshot = state.snapshot();
-        let mut results = prepare_tiled_candidates(model, &snapshot, &params, 0xC0FFEE, 7);
+        let config = CpuExecutionConfig::default();
+        let mut results = prepare_tiled_candidates(model, &snapshot, &params, 0xC0FFEE, 7, &config);
         results[0][0]
             .take()
             .expect("transition should clear the tiling threshold")
@@ -399,7 +411,8 @@ fn tiled_key_fingerprint(
     with_test_tick_tiles(workers, tile_rows, 0, || {
         let params = ParamEnv::defaults(model);
         let snapshot = state.snapshot();
-        let mut results = prepare_tiled_candidates(model, &snapshot, &params, 0xC0FFEE, 7);
+        let config = CpuExecutionConfig::default();
+        let mut results = prepare_tiled_candidates(model, &snapshot, &params, 0xC0FFEE, 7, &config);
         results[0][1]
             .take()
             .expect("key transition should clear the tiling threshold")
@@ -809,7 +822,8 @@ fn threshold_falls_back_and_only_tick_orchestration_can_spawn() {
     with_test_tick_tiles(4, 257, row_count + 1, || {
         let params = ParamEnv::defaults(&model);
         let snapshot = state.snapshot();
-        let results = prepare_tiled_candidates(&model, &snapshot, &params, 1, 0);
+        let config = CpuExecutionConfig::default();
+        let results = prepare_tiled_candidates(&model, &snapshot, &params, 1, 0, &config);
         assert!(results[0][0].is_none());
     });
 

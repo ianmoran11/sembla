@@ -1,4 +1,5 @@
 use super::*;
+use crate::CpuExecutionConfig;
 use sembla_ir::{validate, Box as ModelBox, Model};
 use sembla_runtime::core::{ColumnInit, StateStore, TableInit};
 
@@ -307,13 +308,15 @@ fn tiled_expression_footprints_follow_evaluator_liveness_not_node_width() {
 
 #[test]
 fn cache_budget_derives_hand_checked_tiles_for_three_model_shapes() {
-    assert_eq!(tick_tile_rows_for_live_set(8), 4_096);
-    assert_eq!(tick_tile_rows_for_live_set(33), 960);
-    assert_eq!(tick_tile_rows_for_live_set(64), 512);
+    let config = CpuExecutionConfig::default();
+    assert_eq!(tick_tile_rows_for_live_set(&config, 8), 4_096);
+    assert_eq!(tick_tile_rows_for_live_set(&config, 33), 960);
+    assert_eq!(tick_tile_rows_for_live_set(&config, 64), 512);
 }
 
 #[test]
 fn work_threshold_tracks_the_threading_spike_crossover() {
-    assert!(!tick_tiling_enabled(131_072, 7));
-    assert!(tick_tiling_enabled(262_144, 7));
+    let config = CpuExecutionConfig::new(1, None, 1_500_000);
+    assert!(!tick_tiling_enabled(&config, 131_072, 7));
+    assert!(tick_tiling_enabled(&config, 262_144, 7));
 }

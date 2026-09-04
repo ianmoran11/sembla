@@ -8,6 +8,7 @@ use sembla_ir::{
     ValidatedModel, ViewReduce, GROUPED_OBSERVATIONS_FEATURE,
 };
 
+use crate::config::CpuExecutionConfig;
 use crate::error::TickError;
 use crate::eval::{
     eval_column, eval_gather, eval_typed_ref_column, eval_typed_ref_gather,
@@ -372,6 +373,106 @@ struct Resolution {
     fired_per_resource_table: Vec<usize>,
 }
 
+/// Reusable CPU execution policy with no process-global tuning state.
+#[derive(Clone, Debug, Default)]
+pub struct CpuExecutor {
+    config: CpuExecutionConfig,
+}
+
+impl CpuExecutor {
+    pub fn new(config: CpuExecutionConfig) -> Self {
+        Self { config }
+    }
+
+    pub fn config(&self) -> &CpuExecutionConfig {
+        &self.config
+    }
+
+    pub fn run_tick(
+        &self,
+        model: &ValidatedModel,
+        state: &mut StateStore,
+        params: &ParamEnv,
+        seed: u64,
+        tick: u32,
+    ) -> Result<TickReport, TickError> {
+        self.run_tick_with_features(model, state, params, seed, tick, &FeatureSet::new())
+    }
+
+    pub fn run_tick_with_features(
+        &self,
+        model: &ValidatedModel,
+        state: &mut StateStore,
+        params: &ParamEnv,
+        seed: u64,
+        tick: u32,
+        enabled_features: &FeatureSet,
+    ) -> Result<TickReport, TickError> {
+        require_grouped_observations_feature(model, enabled_features)?;
+        Ok(execute_tick(model, state, params, seed, tick, &self.config)?.report)
+    }
+
+    pub fn run_tick_with_features_timed(
+        &self,
+        model: &ValidatedModel,
+        state: &mut StateStore,
+        params: &ParamEnv,
+        seed: u64,
+        tick: u32,
+        enabled_features: &FeatureSet,
+    ) -> Result<TimedTickReport, TickError> {
+        run_tick_timed_configured(
+            model,
+            state,
+            params,
+            seed,
+            tick,
+            enabled_features,
+            &self.config,
+        )
+    }
+
+    pub fn run(
+        &self,
+        model: &ValidatedModel,
+        state: &mut StateStore,
+        params: &ParamEnv,
+        seed: u64,
+        n_ticks: u32,
+    ) -> Result<RunReport, TickError> {
+        self.run_with_features(model, state, params, seed, n_ticks, &FeatureSet::new())
+    }
+
+    pub fn run_with_features(
+        &self,
+        model: &ValidatedModel,
+        state: &mut StateStore,
+        params: &ParamEnv,
+        seed: u64,
+        n_ticks: u32,
+        enabled_features: &FeatureSet,
+    ) -> Result<RunReport, TickError> {
+        run_configured(
+            model,
+            state,
+            params,
+            seed,
+            n_ticks,
+            enabled_features,
+            &self.config,
+        )
+    }
+
+    pub fn observe_views(
+        &self,
+        model: &ValidatedModel,
+        state: &StateStore,
+        params: &ParamEnv,
+    ) -> Result<Vec<ViewValue>, TickError> {
+        observe_views_configured(model, state, params, &self.config)
+    }
+}
+
 /// Executes and commits one deterministic, snapshot-isolated tick.
 pub fn run_tick(
     model: &ValidatedModel,
@@ -380,7 +481,7 @@ pub fn run_tick(
     seed: u64,
     tick: u32,
 ) -> Result<TickReport, TickError> {
-    run_tick_with_features(model, state, params, seed, tick, &FeatureSet::new())
+    CpuExecutor::default().run_tick(model, state, params, seed, tick)
 }
 
 pub fn run_tick_with_features(
@@ -391,8 +492,14 @@ pub fn run_tick_with_features(
     tick: u32,
     enabled_features: &FeatureSet,
 ) -> Result<TickReport, TickError> {
-    require_grouped_observations_feature(model, enabled_features)?;
-    Ok(execute_tick(model, state, params, seed, tick)?.report)
+    CpuExecutor::default().run_tick_with_features(
+        model,
+        state,
+        params,
+        seed,
+        tick,
+        enabled_features,
+    )
 }
 
 /// Executes one CPU tick while measuring only the named per-tick phase
@@ -406,14 +513,33 @@ pub fn run_tick_with_features_timed(
     tick: u32,
     enabled_features: &FeatureSet,
 ) -> Result<TimedTickReport, TickError> {
+    CpuExecutor::default().run_tick_with_features_timed(
+        model,
+        state,
+        params,
+        seed,
+        tick,
+        enabled_features,
+    )
+}
+
+fn run_tick_timed_configured(
+    model: &ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    tick: u32,
+    enabled_features: &FeatureSet,
+    config: &CpuExecutionConfig,
+) -> Result<TimedTickReport, TickError> {
     require_grouped_observations_feature(model, enabled_features)?;
 
     let started = std::time::Instant::now();
-    let box_outcomes = execute_tick_state(model, state, params, seed, tick)?;
+    let box_outcomes = execute_tick_state(model, state, params, seed, tick, config)?;
     let execute_tick = started.elapsed();
 
     let started = std::time::Instant::now();
-    let (views, grouped_views) = observe_tick(model, state, params)?;
+    let (views, grouped_views) = observe_tick(model, state, params, config)?;
     let observe_views = started.elapsed();
 
     let started = std::time::Instant::now();
@@ -438,7 +564,7 @@ pub fn run(
     seed: u64,
     n_ticks: u32,
 ) -> Result<RunReport, TickError> {
-    run_with_features(model, state, params, seed, n_ticks, &FeatureSet::new())
+    CpuExecutor::default().run(model, state, params, seed, n_ticks)
 }
 
 pub fn run_with_features(
@@ -449,11 +575,23 @@ pub fn run_with_features(
     n_ticks: u32,
     enabled_features: &FeatureSet,
 ) -> Result<RunReport, TickError> {
+    CpuExecutor::default().run_with_features(model, state, params, seed, n_ticks, enabled_features)
+}
+
+fn run_configured(
+    model: &ValidatedModel,
+    state: &mut StateStore,
+    params: &ParamEnv,
+    seed: u64,
+    n_ticks: u32,
+    enabled_features: &FeatureSet,
+    config: &CpuExecutionConfig,
+) -> Result<RunReport, TickError> {
     require_grouped_observations_feature(model, enabled_features)?;
     let mut ticks = Vec::with_capacity(n_ticks as usize);
     let mut warnings = Vec::new();
     for tick in 0..n_ticks {
-        let outcome = execute_tick(model, state, params, seed, tick)?;
+        let outcome = execute_tick(model, state, params, seed, tick, config)?;
         for (table, deferred_count) in &outcome.report.deferred_per_resource_table {
             let fired_count = outcome
                 .fired_per_resource_table
@@ -507,9 +645,10 @@ fn execute_tick(
     params: &ParamEnv,
     seed: u64,
     tick: u32,
+    config: &CpuExecutionConfig,
 ) -> Result<TickOutcome, TickError> {
-    let box_outcomes = execute_tick_state(model, state, params, seed, tick)?;
-    let (views, grouped_views) = observe_tick(model, state, params)?;
+    let box_outcomes = execute_tick_state(model, state, params, seed, tick, config)?;
+    let (views, grouped_views) = observe_tick(model, state, params, config)?;
     Ok(finish_tick(model, tick, box_outcomes, views, grouped_views))
 }
 
@@ -519,9 +658,11 @@ fn execute_tick_state(
     params: &ParamEnv,
     seed: u64,
     tick: u32,
+    config: &CpuExecutionConfig,
 ) -> Result<Vec<BoxOutcome>, TickError> {
     let snapshot = state.snapshot();
-    let mut tiled_candidates = prepare_tiled_candidates(model, &snapshot, params, seed, tick);
+    let mut tiled_candidates =
+        prepare_tiled_candidates(model, &snapshot, params, seed, tick, config);
     let mut box_outcomes = Vec::with_capacity(model.model().boxes.len());
     for (box_index, candidates) in tiled_candidates.iter_mut().enumerate() {
         box_outcomes.push(stage_box(
@@ -595,12 +736,13 @@ fn observe_tick(
     model: &ValidatedModel,
     state: &StateStore,
     params: &ParamEnv,
+    config: &CpuExecutionConfig,
 ) -> Result<(Vec<ViewValue>, Vec<GroupedViewValue>), TickError> {
     // Observation is deliberately evaluated only after commit and receives an
     // immutable store. It cannot consume RNG coordinates, stage writes, or
     // influence conflict resolution or scheduling.
     Ok((
-        observe_views(model, state, params)?,
+        observe_views_configured(model, state, params, config)?,
         observe_grouped_views(model, state, params)?,
     ))
 }
@@ -662,8 +804,17 @@ pub fn observe_views(
     state: &StateStore,
     params: &ParamEnv,
 ) -> Result<Vec<ViewValue>, TickError> {
+    observe_views_configured(model, state, params, &CpuExecutionConfig::default())
+}
+
+fn observe_views_configured(
+    model: &ValidatedModel,
+    state: &StateStore,
+    params: &ParamEnv,
+    config: &CpuExecutionConfig,
+) -> Result<Vec<ViewValue>, TickError> {
     let snapshot = state.snapshot();
-    let mut tiled_values = prepare_tiled_views(model, &snapshot, params);
+    let mut tiled_values = prepare_tiled_views(model, &snapshot, params, config);
     let mut cache = AggCache::new(model, &snapshot, params);
     let mut observations = Vec::new();
     let mut view_ordinal = 0;
