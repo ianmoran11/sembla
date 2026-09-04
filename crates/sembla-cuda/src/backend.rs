@@ -1450,70 +1450,16 @@ impl CudaBackend {
                 let allocation =
                     self.ensure_pinned_final_state_buffers(FinalStateAllocationInjection::None)?;
                 let total_started = Instant::now();
-                let stream = std::sync::Arc::clone(&self.stream);
                 let enqueue_started = Instant::now();
-                {
-                    let buffers = self
-                        .pinned_final_state
-                        .as_mut()
-                        .expect("packed-pinned allocation installed its owner");
-                    if let Some(destination) = &mut buffers.state {
-                        let source =
-                            self.state
-                                .try_slice(0..downloaded_bytes.state)
-                                .ok_or_else(|| {
-                                    CudaError::DeviceExecution(
-                                        "packed-pinned logical state view exceeds device slice"
-                                            .to_owned(),
-                                    )
-                                })?;
-                        stream
-                            .memcpy_dtoh(&source, &mut destination.pinned)
-                            .map_err(|error| {
-                                CudaError::Driver(format!(
-                                    "packed-pinned state D2H enqueue failed for {} bytes: {error}",
-                                    downloaded_bytes.state
-                                ))
-                            })?;
-                    }
-                    if let Some(destination) = &mut buffers.inputs {
-                        let source = self
-                            .inputs
-                            .try_slice(0..downloaded_bytes.inputs)
-                            .ok_or_else(|| {
-                                CudaError::DeviceExecution(
-                                    "packed-pinned logical input view exceeds device slice"
-                                        .to_owned(),
-                                )
-                            })?;
-                        stream
-                            .memcpy_dtoh(&source, &mut destination.pinned)
-                            .map_err(|error| {
-                                CudaError::Driver(format!(
-                                    "packed-pinned input D2H enqueue failed for {} bytes: {error}",
-                                    downloaded_bytes.inputs
-                                ))
-                            })?;
-                    }
-                    if let Some(destination) = &mut buffers.input_counts {
-                        let count_len = downloaded_bytes.input_counts / mem::size_of::<u64>();
-                        let source =
-                            self.input_counts.try_slice(0..count_len).ok_or_else(|| {
-                                CudaError::DeviceExecution(
-                                    "packed-pinned logical input-count view exceeds device slice"
-                                        .to_owned(),
-                                )
-                            })?;
-                        stream
-                            .memcpy_dtoh(&source, &mut destination.pinned)
-                            .map_err(|error| {
-                                CudaError::Driver(format!(
-                                    "packed-pinned input-count D2H enqueue failed for {} bytes: {error}",
-                                    downloaded_bytes.input_counts
-                                ))
-                            })?;
-                    }
-                }
+                self.pinned_final_state
+                    .as_mut()
+                    .expect("packed-pinned allocation installed its owner")
+                    .enqueue_downloads(
+                        &self.state,
+                        &self.inputs,
+                        &self.input_counts,
+                        downloaded_bytes,
+                    )?;
                 let pinned_dtoh_enqueue_api = enqueue_started.elapsed();
 
                 let wait_started = Instant::now();
@@ -1543,7 +1489,7 @@ impl CudaBackend {
                     buffers.input_counts(),
                 );
                 let cpu_sha256 = hash_started.elapsed();
-                let buffer_accounting = buffers.accounting;
+                let buffer_accounting = buffers.accounting();
                 Ok(CudaFinalStateReadback {
                     digest,
                     mode,

@@ -682,6 +682,7 @@ impl CudaBackend {
         // Moore outputs observe prospective state, so rebuild only aggregates
         // reachable from wired output expressions against next_state.
         let require_active = 0_u8;
+        let aggregate_error_count = (self.layout.aggregate_max_groups + 2) as u64;
         for &aggregate_slot in &self.generated.output_aggregate_indices {
             let group_table = self.generated.aggregate_group_tables[aggregate_slot];
             let aggregate_index = u32::try_from(aggregate_slot)

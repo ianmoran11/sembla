@@ -239,6 +239,62 @@ impl PinnedFinalStateBuffers {
         })
     }
 
+    pub(super) fn enqueue_downloads(
+        &mut self,
+        state: &CudaSlice<u8>,
+        inputs: &CudaSlice<u8>,
+        input_counts: &CudaSlice<u64>,
+        bytes: CudaFinalStateDownloadedBytes,
+    ) -> Result<(), CudaError> {
+        if let Some(destination) = &mut self.state {
+            let source = state.try_slice(0..bytes.state).ok_or_else(|| {
+                CudaError::DeviceExecution(
+                    "packed-pinned logical state view exceeds device slice".to_owned(),
+                )
+            })?;
+            self.stream
+                .memcpy_dtoh(&source, &mut destination.pinned)
+                .map_err(|error| {
+                    CudaError::Driver(format!(
+                        "packed-pinned state D2H enqueue failed for {} bytes: {error}",
+                        bytes.state
+                    ))
+                })?;
+        }
+        if let Some(destination) = &mut self.inputs {
+            let source = inputs.try_slice(0..bytes.inputs).ok_or_else(|| {
+                CudaError::DeviceExecution(
+                    "packed-pinned logical input view exceeds device slice".to_owned(),
+                )
+            })?;
+            self.stream
+                .memcpy_dtoh(&source, &mut destination.pinned)
+                .map_err(|error| {
+                    CudaError::Driver(format!(
+                        "packed-pinned input D2H enqueue failed for {} bytes: {error}",
+                        bytes.inputs
+                    ))
+                })?;
+        }
+        if let Some(destination) = &mut self.input_counts {
+            let count_len = bytes.input_counts / mem::size_of::<u64>();
+            let source = input_counts.try_slice(0..count_len).ok_or_else(|| {
+                CudaError::DeviceExecution(
+                    "packed-pinned logical input-count view exceeds device slice".to_owned(),
+                )
+            })?;
+            self.stream
+                .memcpy_dtoh(&source, &mut destination.pinned)
+                .map_err(|error| {
+                    CudaError::Driver(format!(
+                        "packed-pinned input-count D2H enqueue failed for {} bytes: {error}",
+                        bytes.input_counts
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
     pub(super) fn wait_until_readable(&self) -> Result<(), CudaError> {
         self.stream.synchronize().map_err(|error| {
             CudaError::Driver(format!(
@@ -286,6 +342,10 @@ impl PinnedFinalStateBuffers {
         self.input_counts
             .as_ref()
             .map_or(&[], |component| component.cacheable.as_slice())
+    }
+
+    pub(super) fn accounting(&self) -> CudaFinalStateBufferAccounting {
+        self.accounting
     }
 }
 
