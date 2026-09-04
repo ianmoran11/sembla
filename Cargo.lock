@@ -166,6 +166,8 @@ version = "0.3.0"
 dependencies = [
  "libm",
  "sembla-ir",
+ "serde",
+ "serde_json",
  "sha2",
 ]
 

@@ -8,6 +8,7 @@ use std::io::{BufWriter, Write as _};
 use std::path::{Path, PathBuf};
 
 use sembla_ir::{domain_digest, to_canonical_string, AttrType, HashRecordV1, ValidatedModel};
+use serde::{Deserialize, Serialize};
 
 use crate::state::{ColumnData, ColumnInit, StateError, StateStore, TableInit};
 
@@ -222,29 +223,37 @@ impl fmt::Display for StateArtifactError {
 
 impl Error for StateArtifactError {}
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Header {
     schema_version: String,
     tables: Vec<TableHeader>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct TableHeader {
+    #[serde(rename = "box")]
     box_name: String,
     table: String,
     row_count: u64,
     columns: Vec<ColumnHeader>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ColumnHeader {
     name: String,
+    #[serde(rename = "type")]
     column_type: ColumnType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     variant_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ref_target: Option<RefTarget>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum ColumnType {
     Real,
     Int,
@@ -271,8 +280,10 @@ impl ColumnType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RefTarget {
+    #[serde(rename = "box")]
     box_name: String,
     table: String,
 }

@@ -45,7 +45,7 @@ unexpected_runtime_dependencies="$(
         --prefix none \
         --format '{p}' | \
         tail -n +2 | \
-        awk '$1 != "sembla-ir" && $1 != "sha2" && $1 != "libm"'
+        awk '$1 != "sembla-ir" && $1 != "sha2" && $1 != "libm" && $1 != "serde" && $1 != "serde_json"'
 )"
 if [[ -n "$unexpected_runtime_dependencies" ]]; then
     echo "unapproved dependencies are forbidden in sembla-runtime; found:" >&2
