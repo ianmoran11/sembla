@@ -237,10 +237,8 @@ fn checked_parameter_value<'params>(
     name: &str,
 ) -> Result<&'params ParamValue, EvalError> {
     let declaration = model
-        .model()
-        .params
-        .iter()
-        .find(|param| param.name == name)
+        .param_index(name)
+        .map(|index| &model.model().params[index])
         .ok_or_else(|| EvalError::new(format!("unresolved parameter '{name}'")))?;
     let value = params.get(name)?;
     if parameter_value_matches(declaration.ty, value) {
@@ -271,20 +269,13 @@ impl<'model> EvalTable<'model> {
         table_name: &str,
     ) -> Result<Self, EvalError> {
         let box_index = model
-            .model()
-            .boxes
-            .iter()
-            .position(|model_box| model_box.name == box_name)
+            .box_index(box_name)
             .ok_or_else(|| EvalError::new(format!("unknown box '{box_name}'")))?;
-        let table_index = model.model().boxes[box_index]
-            .tables
-            .iter()
-            .position(|table| table.name == table_name)
-            .ok_or_else(|| {
-                EvalError::new(format!(
-                    "box '{box_name}' has no table named '{table_name}'"
-                ))
-            })?;
+        let table_index = model.table_index(box_index, table_name).ok_or_else(|| {
+            EvalError::new(format!(
+                "box '{box_name}' has no table named '{table_name}'"
+            ))
+        })?;
         Ok(Self {
             model,
             box_index,
@@ -2504,10 +2495,8 @@ fn infer_expr_type(
         Expr::Param { name } => {
             let declaration = table
                 .model
-                .model()
-                .params
-                .iter()
-                .find(|param| param.name == *name)
+                .param_index(name)
+                .map(|index| &table.model.model().params[index])
                 .ok_or_else(|| EvalError::new(format!("unresolved parameter '{name}'")))?;
             Ok(match declaration.ty {
                 ParamType::Real => RuntimeType::Real,

@@ -222,17 +222,9 @@ fn prepare_tiled_transition<'state>(
     let model_box = &model.model().boxes[box_index];
     let transition = &model_box.transitions[transition_index];
     let validated = model
-        .transitions()
-        .iter()
-        .find(|candidate| {
-            candidate.box_index == box_index && candidate.transition_index == transition_index
-        })
+        .transition_at(box_index, transition_index)
         .expect("validated transition disappeared");
-    let table_index = model_box
-        .tables
-        .iter()
-        .position(|table| table.name == transition.table)
-        .expect("validated transition table disappeared");
+    let table_index = validated.table_index;
     let row_count = snapshot.row_count(&model_box.name, &transition.table)?;
     let table = EvalTable::new(model, &model_box.name, &transition.table)?;
     let Some(guard) = prepare_row_expr(&transition.guard, table, snapshot, params)? else {
@@ -502,10 +494,9 @@ pub(super) fn prepare_tiled_candidates(
     let mut candidates = Vec::new();
     for (box_index, model_box) in model.model().boxes.iter().enumerate() {
         for (transition_index, transition) in model_box.transitions.iter().enumerate() {
-            let table_index = model_box
-                .tables
-                .iter()
-                .position(|table| table.name == transition.table)
+            let table_index = model
+                .transition_at(box_index, transition_index)
+                .map(|validated| validated.table_index)
                 .expect("validated transition table disappeared");
             let row_count = match snapshot.row_count(&model_box.name, &transition.table) {
                 Ok(row_count) => row_count,
@@ -765,10 +756,8 @@ fn collect_view_tiling_candidates(
     let mut ordinal = 0;
     for (box_index, model_box) in model.model().boxes.iter().enumerate() {
         for (view_index, view) in model_box.views.iter().enumerate() {
-            let table_index = model_box
-                .tables
-                .iter()
-                .position(|table| table.name == view.table)
+            let table_index = model
+                .table_index(box_index, &view.table)
                 .expect("validated view table disappeared");
             let row_count = match snapshot.row_count(&model_box.name, &view.table) {
                 Ok(row_count) => row_count,

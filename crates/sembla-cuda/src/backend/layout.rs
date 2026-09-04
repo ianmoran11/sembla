@@ -297,12 +297,7 @@ pub(super) fn build_layout(
         claim_instance_offsets.push(claim_instance_count as u64);
         let declaration =
             &model.model().boxes[transition.box_index].transitions[transition.transition_index];
-        let table_index = model.model().boxes[transition.box_index]
-            .tables
-            .iter()
-            .position(|table| table.name == declaration.table)
-            .expect("validated transition table");
-        let global = global_table(model, transition.box_index, table_index);
+        let global = global_table(model, transition.box_index, transition.table_index);
         let rows = usize::try_from(row_counts[global])
             .map_err(|_| CudaError::InvalidInput("candidate row count exceeds usize".to_owned()))?;
         candidate_count = candidate_count

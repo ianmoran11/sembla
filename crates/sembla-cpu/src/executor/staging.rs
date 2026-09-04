@@ -25,11 +25,7 @@ pub(super) fn stage_box(
             continue;
         }
         let transition = &model_box.transitions[validated.transition_index];
-        let table_index = model_box
-            .tables
-            .iter()
-            .position(|table| table.name == transition.table)
-            .expect("validated transition table disappeared");
+        let table_index = validated.table_index;
         let table = EvalTable::new(model, &model_box.name, &transition.table)?;
         let guards = match eval_column(&transition.guard, table, snapshot, params, &mut cache)? {
             ValueColumn::Bool(values) => values,
@@ -43,10 +39,8 @@ pub(super) fn stage_box(
         for claim in &transition.contests {
             let resources =
                 eval_typed_ref_column(&claim.resource, table, snapshot, params, &mut cache)?;
-            let resource_table_index = model_box
-                .tables
-                .iter()
-                .position(|schema| schema.name == resources.target_table)
+            let resource_table_index = model
+                .table_index(box_index, &resources.target_table)
                 .expect("validated Ref target table disappeared");
             let ordering = match &claim.ordering {
                 ClaimOrdering::RaceTime => None,
@@ -556,9 +550,7 @@ fn double_write_error(
 
 fn transition_name(model: &ValidatedModel, rule_id: u32) -> &str {
     let validated = model
-        .transitions()
-        .iter()
-        .find(|transition| transition.rule_id == rule_id)
+        .transition(rule_id)
         .expect("pending write has a validated transition");
     &model.model().boxes[validated.box_index].transitions[validated.transition_index].name
 }

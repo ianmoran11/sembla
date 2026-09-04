@@ -20,7 +20,7 @@ pub use model::*;
 pub use plan::*;
 pub use validate::{
     validate, validate_with_features, FeatureSet, ValidatedModel, ValidatedTransition,
-    GROUPED_OBSERVATIONS_FEATURE, KNOWN_FEATURES,
+    ValidatedWire, GROUPED_OBSERVATIONS_FEATURE, KNOWN_FEATURES,
 };
 
 /// The version of the Sembla IR crate.

@@ -989,23 +989,14 @@ fn build_next_inputs(
                 .map(|input| InputTable::empty(&model_box.name, &input.name, &input.schema))
         })
         .collect::<Vec<_>>();
-    for wire in &model.model().wires {
-        let source_box = model
-            .model()
-            .boxes
-            .iter()
-            .find(|model_box| model_box.name == wire.from.r#box)
-            .expect("validated wire source box disappeared");
-        let output = source_box
-            .outputs
-            .iter()
-            .find(|output| output.name == wire.from.port)
-            .expect("validated wire source port disappeared");
+    for wire in model.wires() {
+        let source_box = &model.model().boxes[wire.from_box_index];
+        let output = &source_box.outputs[wire.output_index];
         let built = build_output(model, snapshot, params, source_box, output)?;
-        let destination = inputs
-            .iter_mut()
-            .find(|input| input.box_name == wire.to.r#box && input.port_name == wire.to.port)
+        let destination_index = model
+            .global_input_index(wire.to_box_index, wire.input_index)
             .expect("validated wire destination disappeared");
+        let destination = &mut inputs[destination_index];
         destination.row_count = built.row_count;
         destination.columns = built.columns;
     }

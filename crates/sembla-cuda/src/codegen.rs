@@ -1,5 +1,4 @@
 use std::cell::Cell;
-use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
@@ -491,7 +490,6 @@ struct Generator<'a> {
     columns: Vec<(usize, usize, usize)>,
     ports: Vec<(usize, usize)>,
     input_fields: Vec<(usize, usize, usize)>,
-    params: BTreeMap<String, usize>,
     aggs: Vec<AggSpec>,
     inputs: Vec<InputSpec>,
     observation_eligibility: DeviceObservationEligibility,
@@ -533,13 +531,6 @@ impl<'a> Generator<'a> {
                 }
             }
         }
-        let params = model
-            .model()
-            .params
-            .iter()
-            .enumerate()
-            .map(|(index, parameter)| (parameter.name.clone(), index))
-            .collect();
         let observation_eligibility = device_observation_eligibility(model);
         let mut observation_views = Vec::new();
         let mut grouped_observation_views = Vec::new();
@@ -549,10 +540,8 @@ impl<'a> Generator<'a> {
         if observation_eligibility.eligible {
             for (box_index, model_box) in model.model().boxes.iter().enumerate() {
                 for view in &model_box.views {
-                    let table_index = model_box
-                        .tables
-                        .iter()
-                        .position(|table| table.name == view.table)
+                    let table_index = model
+                        .table_index(box_index, &view.table)
                         .expect("validated observation table is indexed");
                     observation_views.push(ObservationSpec {
                         box_index,
@@ -563,10 +552,8 @@ impl<'a> Generator<'a> {
                     });
                 }
                 for view in &model_box.grouped_views {
-                    let table_index = model_box
-                        .tables
-                        .iter()
-                        .position(|table| table.name == view.table)
+                    let table_index = model
+                        .table_index(box_index, &view.table)
                         .expect("validated grouped observation table is indexed");
                     let table = &model_box.tables[table_index];
                     let keys = view
@@ -587,10 +574,8 @@ impl<'a> Generator<'a> {
                                     }
                                 }
                                 (AttrType::Ref { table }, None) => {
-                                    let target_table_index = model_box
-                                        .tables
-                                        .iter()
-                                        .position(|candidate| candidate.name == *table)
+                                    let target_table_index = model
+                                        .table_index(box_index, table)
                                         .expect("validated grouped Ref target is indexed");
                                     GroupedObservationKeySpec::Ref {
                                         attr_index,
@@ -649,7 +634,6 @@ impl<'a> Generator<'a> {
             columns,
             ports,
             input_fields,
-            params,
             aggs: Vec::new(),
             inputs: Vec::new(),
             observation_eligibility,
@@ -669,7 +653,7 @@ impl<'a> Generator<'a> {
             let box_index = validated.box_index;
             let transition =
                 &self.model.model().boxes[box_index].transitions[validated.transition_index];
-            let table_index = self.table_index(box_index, &transition.table)?;
+            let table_index = validated.table_index;
             self.collect_expr(
                 box_index,
                 table_index,
@@ -710,20 +694,10 @@ impl<'a> Generator<'a> {
         }
 
         // Only wired outputs are observable and evaluated by the CPU oracle.
-        for wire in &self.model.model().wires {
-            let box_index = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|model_box| model_box.name == wire.from.r#box)
-                .expect("validated output box is indexed");
+        for wire in self.model.wires() {
+            let box_index = wire.from_box_index;
             let model_box = &self.model.model().boxes[box_index];
-            let output = model_box
-                .outputs
-                .iter()
-                .find(|output| output.name == wire.from.port)
-                .expect("validated output is indexed");
+            let output = &model_box.outputs[wire.output_index];
             let sembla_ir::OutputBuilder::PerTable { table, fields } = &output.builder;
             let table_index = self.table_index(box_index, table)?;
             for field in fields {
@@ -881,10 +855,8 @@ impl<'a> Generator<'a> {
     }
 
     fn table_index(&self, box_index: usize, name: &str) -> Result<usize, CudaError> {
-        self.model.model().boxes[box_index]
-            .tables
-            .iter()
-            .position(|table| table.name == name)
+        self.model
+            .table_index(box_index, name)
             .ok_or_else(|| codegen(format!("unknown table '{name}'")))
     }
 
@@ -903,10 +875,8 @@ impl<'a> Generator<'a> {
     }
 
     fn port_index(&self, box_index: usize, name: &str) -> Result<usize, CudaError> {
-        self.model.model().boxes[box_index]
-            .inputs
-            .iter()
-            .position(|port| port.name == name)
+        self.model
+            .input_index(box_index, name)
             .ok_or_else(|| codegen(format!("unknown input port '{name}'")))
     }
 
@@ -939,11 +909,8 @@ impl<'a> Generator<'a> {
             },
             Expr::Param { name } => self
                 .model
-                .model()
-                .params
-                .iter()
-                .find(|parameter| parameter.name == *name)
-                .map(|parameter| match parameter.ty {
+                .param_index(name)
+                .map(|index| match self.model.model().params[index].ty {
                     ParamType::Real => Ty::Real,
                     ParamType::Int => Ty::Int,
                 })
@@ -1277,9 +1244,9 @@ impl<'a> Generator<'a> {
                 (format!("{index}U"), Ty::Enum(variants.clone()))
             }
             Expr::Param { name } => {
-                let index = *self
-                    .params
-                    .get(name)
+                let index = self
+                    .model
+                    .param_index(name)
                     .ok_or_else(|| codegen(format!("unknown parameter '{name}'")))?;
                 let ty = self.infer(expr, rows, expected)?;
                 (
@@ -1686,13 +1653,9 @@ impl<'a> Generator<'a> {
             for rule_id in &spec.effect_rules {
                 let validated = self
                     .model
-                    .transitions()
-                    .iter()
-                    .find(|transition| transition.rule_id == *rule_id)
+                    .transition(*rule_id)
                     .expect("aggregate effect rule is validated");
-                let transition = &self.model.model().boxes[validated.box_index].transitions
-                    [validated.transition_index];
-                let table_index = self.table_index(validated.box_index, &transition.table)?;
+                let table_index = validated.table_index;
                 let global_table = self.global_table(validated.box_index, table_index);
                 writeln!(out, "  if (!active[{index}]) for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) if (wins[candidate_offsets[{rule_id}] + row]) {{ active[{index}] = 1U; break; }}").unwrap();
             }
@@ -1970,7 +1933,7 @@ impl<'a> Generator<'a> {
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let global_table = self.global_table(validated.box_index, table_index);
             let rows = Rows::State {
                 box_index: validated.box_index,
@@ -2039,7 +2002,7 @@ impl<'a> Generator<'a> {
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let global_table = self.global_table(validated.box_index, table_index);
             let name = format!("sembla_transition_{:08x}", validated.rule_id);
             names.push(name.clone());
@@ -2103,7 +2066,7 @@ impl<'a> Generator<'a> {
             if transition.contests.is_empty() {
                 continue;
             }
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let table_global = self.global_table(validated.box_index, table_index);
             let rows = Rows::State {
                 box_index: validated.box_index,
@@ -2137,7 +2100,7 @@ impl<'a> Generator<'a> {
         for (left_transition_position, left) in transitions.iter().enumerate() {
             let left_transition =
                 &self.model.model().boxes[left.box_index].transitions[left.transition_index];
-            let left_table_index = self.table_index(left.box_index, &left_transition.table)?;
+            let left_table_index = left.table_index;
             let left_global = self.global_table(left.box_index, left_table_index);
             let left_rows = Rows::State {
                 box_index: left.box_index,
@@ -2158,8 +2121,7 @@ impl<'a> Generator<'a> {
                     }
                     let right_transition = &self.model.model().boxes[right.box_index].transitions
                         [right.transition_index];
-                    let right_table_index =
-                        self.table_index(right.box_index, &right_transition.table)?;
+                    let right_table_index = right.table_index;
                     let right_global = self.global_table(right.box_index, right_table_index);
                     let right_rows = Rows::State {
                         box_index: right.box_index,
@@ -2217,7 +2179,7 @@ impl<'a> Generator<'a> {
             if transition.contests.is_empty() {
                 continue;
             }
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let table_global = self.global_table(validated.box_index, table_index);
             let rows = Rows::State {
                 box_index: validated.box_index,
@@ -2268,7 +2230,7 @@ impl<'a> Generator<'a> {
             if transition.contests.is_empty() {
                 continue;
             }
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let table_global = self.global_table(validated.box_index, table_index);
             writeln!(out, "    if (self_candidate >= candidate_offsets[{}] && self_candidate < candidate_offsets[{}] + row_counts[{table_global}]) {{ unsigned long long row = self_candidate - candidate_offsets[{}];", validated.rule_id, validated.rule_id, validated.rule_id).unwrap();
             for (claim_index, claim) in transition.contests.iter().enumerate() {
@@ -2311,7 +2273,7 @@ impl<'a> Generator<'a> {
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let table = &self.model.model().boxes[validated.box_index].tables[table_index];
             let global_table = self.global_table(validated.box_index, table_index);
             let rows = Rows::State {
@@ -2369,7 +2331,7 @@ impl<'a> Generator<'a> {
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
-            let table_index = self.table_index(validated.box_index, &transition.table)?;
+            let table_index = validated.table_index;
             let table = &self.model.model().boxes[validated.box_index].tables[table_index];
             let global_table = self.global_table(validated.box_index, table_index);
             let rows = Rows::State {
@@ -2442,27 +2404,11 @@ impl<'a> Generator<'a> {
 
     fn emit_output_kernel(&self, out: &mut String) -> Result<(), CudaError> {
         out.push_str("\nextern \"C\" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
-        for wire in &self.model.model().wires {
-            let from_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.from.r#box)
-                .ok_or_else(|| codegen("wire source box disappeared"))?;
-            let to_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.to.r#box)
-                .ok_or_else(|| codegen("wire target box disappeared"))?;
-            let output = self.model.model().boxes[from_box]
-                .outputs
-                .iter()
-                .find(|entry| entry.name == wire.from.port)
-                .ok_or_else(|| codegen("wire output disappeared"))?;
-            let to_port_index = self.port_index(to_box, &wire.to.port)?;
+        for wire in self.model.wires() {
+            let from_box = wire.from_box_index;
+            let to_box = wire.to_box_index;
+            let output = &self.model.model().boxes[from_box].outputs[wire.output_index];
+            let to_port_index = wire.input_index;
             let sembla_ir::OutputBuilder::PerTable { table, fields } = &output.builder;
             let table_index = self.table_index(from_box, table)?;
             let global_table = self.global_table(from_box, table_index);
@@ -2525,41 +2471,19 @@ impl<'a> Generator<'a> {
         out.push_str("}\n");
 
         out.push_str("\nextern \"C\" __global__ void sembla_prepare_outputs(unsigned long long* next_input_counts, unsigned long long port_count, unsigned char* output_errors, unsigned long long error_count) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  for (unsigned long long i = 0; i < port_count; ++i) next_input_counts[i] = 0ULL;\n  for (unsigned long long i = 0; i < error_count; ++i) output_errors[i] = 0U;\n");
-        for wire in &self.model.model().wires {
-            let to_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.to.r#box)
-                .ok_or_else(|| codegen("wire target box disappeared"))?;
-            let to_port_index = self.port_index(to_box, &wire.to.port)?;
+        for wire in self.model.wires() {
+            let to_box = wire.to_box_index;
+            let to_port_index = wire.input_index;
             let to_port = self.port(to_box, to_port_index);
             writeln!(out, "  next_input_counts[{to_port}] = 1ULL;").unwrap();
         }
         out.push_str("}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_build_output_partials(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, unsigned long long* output_partials, unsigned char* output_errors, const unsigned long long* status) {\n  unsigned long long field = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (status[0] != 0ULL) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
-        for wire in &self.model.model().wires {
-            let from_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.from.r#box)
-                .ok_or_else(|| codegen("wire source box disappeared"))?;
-            let to_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.to.r#box)
-                .ok_or_else(|| codegen("wire target box disappeared"))?;
-            let output = self.model.model().boxes[from_box]
-                .outputs
-                .iter()
-                .find(|entry| entry.name == wire.from.port)
-                .ok_or_else(|| codegen("wire output disappeared"))?;
-            let to_port_index = self.port_index(to_box, &wire.to.port)?;
+        for wire in self.model.wires() {
+            let from_box = wire.from_box_index;
+            let to_box = wire.to_box_index;
+            let output = &self.model.model().boxes[from_box].outputs[wire.output_index];
+            let to_port_index = wire.input_index;
             let sembla_ir::OutputBuilder::PerTable { table, fields } = &output.builder;
             let table_index = self.table_index(from_box, table)?;
             let global_table = self.global_table(from_box, table_index);
@@ -2620,27 +2544,11 @@ impl<'a> Generator<'a> {
         }
         out.push_str("}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_finish_outputs(const unsigned long long* output_partials, unsigned long long field_count, unsigned char* next_inputs, const unsigned long long* next_input_offsets, unsigned char* output_errors) {\n  unsigned long long field = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (field >= field_count) return;\n");
-        for wire in &self.model.model().wires {
-            let to_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.to.r#box)
-                .ok_or_else(|| codegen("wire target box disappeared"))?;
-            let from_box = self
-                .model
-                .model()
-                .boxes
-                .iter()
-                .position(|entry| entry.name == wire.from.r#box)
-                .ok_or_else(|| codegen("wire source box disappeared"))?;
-            let output = self.model.model().boxes[from_box]
-                .outputs
-                .iter()
-                .find(|entry| entry.name == wire.from.port)
-                .ok_or_else(|| codegen("wire output disappeared"))?;
-            let to_port_index = self.port_index(to_box, &wire.to.port)?;
+        for wire in self.model.wires() {
+            let to_box = wire.to_box_index;
+            let from_box = wire.from_box_index;
+            let output = &self.model.model().boxes[from_box].outputs[wire.output_index];
+            let to_port_index = wire.input_index;
             let to_port = self.port(to_box, to_port_index);
             let sembla_ir::OutputBuilder::PerTable { fields, .. } = &output.builder;
             for (field_index, _) in fields.iter().enumerate() {

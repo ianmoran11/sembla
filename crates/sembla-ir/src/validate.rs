@@ -1,6 +1,6 @@
 use crate::model::*;
 use crate::ValidationError;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 mod expression;
 
@@ -15,10 +15,104 @@ pub type FeatureSet = BTreeSet<String>;
 pub struct ValidatedTransition {
     pub box_index: usize,
     pub transition_index: usize,
+    /// Index of the transition's source table within its box.
+    pub table_index: usize,
     /// Dense declaration-order ordinal used for indexing and diagnostics.
     pub rule_id: u32,
     /// Philox coordinate word and deterministic conflict tie-break key.
     pub rule_word: u32,
+}
+
+/// Dense indices for one validated wire's endpoints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ValidatedWire {
+    pub wire_index: usize,
+    pub from_box_index: usize,
+    pub output_index: usize,
+    pub to_box_index: usize,
+    pub input_index: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ResolvedModel {
+    params: BTreeMap<String, usize>,
+    boxes: BTreeMap<String, usize>,
+    tables: Vec<BTreeMap<String, usize>>,
+    inputs: Vec<BTreeMap<String, usize>>,
+    outputs: Vec<BTreeMap<String, usize>>,
+    transition_offsets: Vec<usize>,
+    input_offsets: Vec<usize>,
+    wires: Vec<ValidatedWire>,
+}
+
+impl ResolvedModel {
+    fn new(model: &Model) -> Self {
+        let params = named_indices(&model.params, |param| &param.name);
+        let boxes = named_indices(&model.boxes, |model_box| &model_box.name);
+        let tables: Vec<BTreeMap<String, usize>> = model
+            .boxes
+            .iter()
+            .map(|model_box| named_indices(&model_box.tables, |table| &table.name))
+            .collect();
+        let inputs: Vec<BTreeMap<String, usize>> = model
+            .boxes
+            .iter()
+            .map(|model_box| named_indices(&model_box.inputs, |input| &input.name))
+            .collect();
+        let outputs: Vec<BTreeMap<String, usize>> = model
+            .boxes
+            .iter()
+            .map(|model_box| named_indices(&model_box.outputs, |output| &output.name))
+            .collect();
+        let mut transition_offsets = Vec::with_capacity(model.boxes.len() + 1);
+        let mut offset = 0;
+        for model_box in &model.boxes {
+            transition_offsets.push(offset);
+            offset += model_box.transitions.len();
+        }
+        transition_offsets.push(offset);
+        let mut input_offsets = Vec::with_capacity(model.boxes.len() + 1);
+        let mut input_offset = 0;
+        for model_box in &model.boxes {
+            input_offsets.push(input_offset);
+            input_offset += model_box.inputs.len();
+        }
+        input_offsets.push(input_offset);
+        let wires = model
+            .wires
+            .iter()
+            .enumerate()
+            .map(|(wire_index, wire)| {
+                let from_box_index = boxes[&wire.from.r#box];
+                let to_box_index = boxes[&wire.to.r#box];
+                ValidatedWire {
+                    wire_index,
+                    from_box_index,
+                    output_index: outputs[from_box_index][&wire.from.port],
+                    to_box_index,
+                    input_index: inputs[to_box_index][&wire.to.port],
+                }
+            })
+            .collect();
+        Self {
+            params,
+            boxes,
+            tables,
+            inputs,
+            outputs,
+            transition_offsets,
+            input_offsets,
+            wires,
+        }
+    }
+}
+
+fn named_indices<T>(items: &[T], name: impl Fn(&T) -> &String) -> BTreeMap<String, usize> {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (name(item).clone(), index))
+        .collect()
 }
 
 /// A semantically valid model plus metadata derived during validation.
@@ -26,6 +120,7 @@ pub struct ValidatedTransition {
 pub struct ValidatedModel {
     model: Model,
     transitions: Vec<ValidatedTransition>,
+    resolved: ResolvedModel,
 }
 
 impl ValidatedModel {
@@ -41,11 +136,55 @@ impl ValidatedModel {
         &self.transitions
     }
 
-    pub fn rule_id(&self, box_index: usize, transition_index: usize) -> Option<u32> {
+    pub fn transition(&self, rule_id: u32) -> Option<&ValidatedTransition> {
         self.transitions
-            .iter()
-            .find(|rule| rule.box_index == box_index && rule.transition_index == transition_index)
-            .map(|rule| rule.rule_id)
+            .get(rule_id as usize)
+            .filter(|transition| transition.rule_id == rule_id)
+    }
+
+    pub fn transition_at(
+        &self,
+        box_index: usize,
+        transition_index: usize,
+    ) -> Option<&ValidatedTransition> {
+        self.rule_id(box_index, transition_index)
+            .and_then(|rule_id| self.transition(rule_id))
+    }
+
+    pub fn rule_id(&self, box_index: usize, transition_index: usize) -> Option<u32> {
+        let start = *self.resolved.transition_offsets.get(box_index)?;
+        let end = *self.resolved.transition_offsets.get(box_index + 1)?;
+        (transition_index < end - start).then(|| self.transitions[start + transition_index].rule_id)
+    }
+
+    pub fn param_index(&self, name: &str) -> Option<usize> {
+        self.resolved.params.get(name).copied()
+    }
+
+    pub fn box_index(&self, name: &str) -> Option<usize> {
+        self.resolved.boxes.get(name).copied()
+    }
+
+    pub fn table_index(&self, box_index: usize, name: &str) -> Option<usize> {
+        self.resolved.tables.get(box_index)?.get(name).copied()
+    }
+
+    pub fn input_index(&self, box_index: usize, name: &str) -> Option<usize> {
+        self.resolved.inputs.get(box_index)?.get(name).copied()
+    }
+
+    pub fn output_index(&self, box_index: usize, name: &str) -> Option<usize> {
+        self.resolved.outputs.get(box_index)?.get(name).copied()
+    }
+
+    pub fn global_input_index(&self, box_index: usize, input_index: usize) -> Option<usize> {
+        let start = *self.resolved.input_offsets.get(box_index)?;
+        let end = *self.resolved.input_offsets.get(box_index + 1)?;
+        (input_index < end - start).then_some(start + input_index)
+    }
+
+    pub fn wires(&self) -> &[ValidatedWire] {
+        &self.resolved.wires
     }
 
     pub(crate) fn with_rule_words(mut self, words: &[u32]) -> Self {
@@ -74,6 +213,7 @@ pub fn validate_with_features(
     enabled_features: &FeatureSet,
 ) -> Result<ValidatedModel, ValidationError> {
     validate_model(&model, enabled_features)?;
+    let resolved = ResolvedModel::new(&model);
 
     let mut transitions = Vec::new();
     for (box_index, model_box) in model.boxes.iter().enumerate() {
@@ -93,6 +233,8 @@ pub fn validate_with_features(
             transitions.push(ValidatedTransition {
                 box_index,
                 transition_index,
+                table_index: resolved.tables[box_index]
+                    [&model_box.transitions[transition_index].table],
                 rule_id,
                 // Legacy models retain the exact positional RNG/tie-break identity.
                 rule_word: rule_id,
@@ -100,7 +242,11 @@ pub fn validate_with_features(
         }
     }
 
-    Ok(ValidatedModel { model, transitions })
+    Ok(ValidatedModel {
+        model,
+        transitions,
+        resolved,
+    })
 }
 
 fn validate_model(model: &Model, enabled_features: &FeatureSet) -> Result<(), ValidationError> {

@@ -150,13 +150,7 @@ impl CudaBackend {
 
             for (index, transition) in &transition_positions {
                 let rule_id = transition.rule_id;
-                let model_transition = &self.model.model().boxes[transition.box_index].transitions
-                    [transition.transition_index];
-                let table_index = self.model.model().boxes[transition.box_index]
-                    .tables
-                    .iter()
-                    .position(|table| table.name == model_transition.table)
-                    .expect("validated transition table");
+                let table_index = transition.table_index;
                 let global_table = global_table(&self.model, transition.box_index, table_index);
                 let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
                     CudaError::InvalidInput(format!(
@@ -331,11 +325,7 @@ impl CudaBackend {
                 for (_, transition) in &transition_positions {
                     let model_transition = &self.model.model().boxes[transition.box_index]
                         .transitions[transition.transition_index];
-                    let table_index = self.model.model().boxes[transition.box_index]
-                        .tables
-                        .iter()
-                        .position(|table| table.name == model_transition.table)
-                        .expect("validated transition table");
+                    let table_index = transition.table_index;
                     let global_table = global_table(&self.model, transition.box_index, table_index);
                     let rows = self.layout.row_counts[global_table];
                     candidate_count = candidate_count.checked_add(rows).ok_or_else(|| {
@@ -510,11 +500,7 @@ impl CudaBackend {
             for (_, transition) in &transition_positions {
                 let model_transition = &self.model.model().boxes[transition.box_index].transitions
                     [transition.transition_index];
-                let table_index = self.model.model().boxes[transition.box_index]
-                    .tables
-                    .iter()
-                    .position(|table| table.name == model_transition.table)
-                    .expect("validated transition table");
+                let table_index = transition.table_index;
                 let global_table = global_table(&self.model, transition.box_index, table_index);
                 let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
                     CudaError::InvalidInput(format!(
@@ -607,11 +593,7 @@ impl CudaBackend {
             if model_transition.effects.is_empty() {
                 continue;
             }
-            let table_index = self.model.model().boxes[transition.box_index]
-                .tables
-                .iter()
-                .position(|table| table.name == model_transition.table)
-                .expect("validated transition table");
+            let table_index = transition.table_index;
             let global_table = global_table(&self.model, transition.box_index, table_index);
             let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
                 CudaError::InvalidInput(format!(
@@ -746,29 +728,13 @@ impl CudaBackend {
             // input/aggregate checks still get one worker when no wired
             // table has rows.
             let mut output_rows = 0_u32;
-            for wire in &self.model.model().wires {
-                let from_box = self
-                    .model
-                    .model()
-                    .boxes
-                    .iter()
-                    .position(|entry| entry.name == wire.from.r#box)
-                    .ok_or_else(|| CudaError::InvalidInput("wire source box missing".to_owned()))?;
-                let output = self.model.model().boxes[from_box]
-                    .outputs
-                    .iter()
-                    .find(|entry| entry.name == wire.from.port)
-                    .ok_or_else(|| {
-                        CudaError::InvalidInput("wire source output missing".to_owned())
-                    })?;
+            for wire in self.model.wires() {
+                let from_box = wire.from_box_index;
+                let output = &self.model.model().boxes[from_box].outputs[wire.output_index];
                 let sembla_ir::OutputBuilder::PerTable { table, .. } = &output.builder;
-                let table_index = self.model.model().boxes[from_box]
-                    .tables
-                    .iter()
-                    .position(|entry| entry.name == *table)
-                    .ok_or_else(|| {
-                        CudaError::InvalidInput("wire source table missing".to_owned())
-                    })?;
+                let table_index = self.model.table_index(from_box, table).ok_or_else(|| {
+                    CudaError::InvalidInput("wire source table missing".to_owned())
+                })?;
                 let global = global_table(&self.model, from_box, table_index);
                 let rows = u32::try_from(self.layout.row_counts[global]).map_err(|_| {
                     CudaError::InvalidInput(

@@ -240,6 +240,11 @@ fn rule_ids_follow_global_declaration_order() {
     assert_eq!(validated.rule_id(0, 1), Some(1));
     assert_eq!(validated.rule_id(1, 0), Some(2));
     assert_eq!(validated.rule_id(1, 1), None);
+    assert_eq!(validated.box_index("second"), Some(1));
+    assert_eq!(validated.table_index(1, "Person"), Some(0));
+    assert_eq!(validated.transition(2).unwrap().table_index, 0);
+    assert_eq!(validated.transition_at(0, 1).unwrap().rule_id, 1);
+    assert!(validated.transition(u32::MAX).is_none());
 }
 
 #[test]
