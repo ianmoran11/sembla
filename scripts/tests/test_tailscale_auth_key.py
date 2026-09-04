@@ -152,6 +152,48 @@ class TailscaleAuthKeyTest(unittest.TestCase):
         self.assertEqual(opener.requests[1][0].method, "DELETE")
         self.assertEqual(opener.requests[2][0].method, "GET")
 
+    def test_delete_is_verified_by_revoked_tombstone(self):
+        opener = SequenceOpener(
+            Response({"access_token": "access", "token_type": "Bearer", "scope": "auth_keys"}),
+            Response(raw=b"", status=204),
+            Response(
+                {
+                    "id": "key123",
+                    "revoked": "2026-09-04T12:34:56Z",
+                    "invalid": True,
+                }
+            ),
+        )
+        MODULE.delete_auth_key(
+            "client",
+            "tskey-client-secret",
+            key_id="key123",
+            urlopen=opener,
+        )
+        self.assertEqual(opener.requests[2][0].method, "GET")
+
+    def test_delete_rejects_live_key_metadata(self):
+        opener = SequenceOpener(
+            Response({"access_token": "access", "token_type": "Bearer", "scope": "auth_keys"}),
+            Response(raw=b"", status=204),
+            Response(
+                {
+                    "id": "key123",
+                    "revoked": "0001-01-01T00:00:00Z",
+                    "invalid": False,
+                }
+            ),
+        )
+        with self.assertRaisesRegex(
+            MODULE.TailscaleCredentialError, "still exists after deletion"
+        ):
+            MODULE.delete_auth_key(
+                "client",
+                "tskey-client-secret",
+                key_id="key123",
+                urlopen=opener,
+            )
+
     def test_creation_transport_failure_is_ambiguous_and_redacted(self):
         opener = SequenceOpener(
             Response({"access_token": "access", "token_type": "Bearer", "scope": "auth_keys"}),

@@ -191,7 +191,7 @@ fn supported_free_stream_sweep_is_draw_independent_and_publishes_in_k_order() {
                 serde_json::from_slice(&std::fs::read(&timing).unwrap()).unwrap();
             assert_eq!(
                 document["schema"],
-                "sembla-sweep-concurrency-spike-timing-v1"
+                "sembla-sweep-concurrency-spike-timing-v3"
             );
             assert_eq!(document["execution_mode"], "cuda-free-nonblocking-streams");
             assert_eq!(document["requested_draw_workers"], 2);
