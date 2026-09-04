@@ -350,7 +350,7 @@ impl CudaBackend {
         );
         init.arg(&mut self.observation_values)
             .arg(&scalar_count_u32);
-        unsafe { init.launch(LaunchConfig::for_num_elems(scalar_count_u32)) }
+        init.launch_generated(LaunchConfig::for_num_elems(scalar_count_u32))
             .map_err(driver_error)?;
 
         for (view_index, table) in self
@@ -381,7 +381,7 @@ impl CudaBackend {
                 .arg(&self.params)
                 .arg(&mut self.observation_values)
                 .arg(&view_index);
-            unsafe { observe.launch(config) }.map_err(driver_error)?;
+            observe.launch_generated(config).map_err(driver_error)?;
         }
         Ok(scalar_count)
     }
@@ -504,7 +504,7 @@ impl CudaBackend {
             self.fused_batch.as_ref(),
         );
         init.arg(&mut self.grouped_extrema).arg(&band_count_u32);
-        unsafe { init.launch(LaunchConfig::for_num_elems(band_count_u32)) }
+        init.launch_generated(LaunchConfig::for_num_elems(band_count_u32))
             .map_err(driver_error)?;
         for (view_index, view) in grouped_specs.iter().enumerate() {
             if !view.axes.iter().any(|axis| {
@@ -537,7 +537,7 @@ impl CudaBackend {
                 .arg(&self.row_counts)
                 .arg(&mut self.grouped_extrema)
                 .arg(&view_index);
-            unsafe { bound.launch(config) }.map_err(driver_error)?;
+            bound.launch_generated(config).map_err(driver_error)?;
         }
         Ok(band_count)
     }
@@ -694,7 +694,8 @@ impl CudaBackend {
             self.fused_batch.as_ref(),
         );
         init.arg(&mut self.grouped_histogram).arg(&key_space_u64);
-        unsafe { init.launch(LaunchConfig::for_num_elems(key_space)) }.map_err(driver_error)?;
+        init.launch_generated(LaunchConfig::for_num_elems(key_space))
+            .map_err(driver_error)?;
 
         let rows = u32::try_from(self.layout.row_counts[view.table]).map_err(|_| {
             CudaError::InvalidInput("grouped observation row count exceeds u32".to_owned())
@@ -720,7 +721,7 @@ impl CudaBackend {
             .arg(&self.grouped_axis_cardinalities)
             .arg(&mut self.grouped_histogram)
             .arg(&view_index);
-        unsafe { observe.launch(config) }.map_err(driver_error)?;
+        observe.launch_generated(config).map_err(driver_error)?;
         Ok(())
     }
 
@@ -800,7 +801,8 @@ impl CudaBackend {
             self.fused_batch.as_ref(),
         );
         init.arg(&mut self.generic_enum_counts).arg(&count_u64);
-        unsafe { init.launch(LaunchConfig::for_num_elems(count_u32)) }.map_err(driver_error)?;
+        init.launch_generated(LaunchConfig::for_num_elems(count_u32))
+            .map_err(driver_error)?;
 
         let observations = self.generated.generic_enum_observations.clone();
         for (index, observation) in observations.iter().enumerate() {
@@ -826,7 +828,7 @@ impl CudaBackend {
                 .arg(&self.row_counts)
                 .arg(&mut self.generic_enum_counts)
                 .arg(&index);
-            unsafe { observe.launch(config) }.map_err(driver_error)?;
+            observe.launch_generated(config).map_err(driver_error)?;
         }
         Ok(generic_count)
     }

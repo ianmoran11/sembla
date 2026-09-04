@@ -2,9 +2,9 @@
   "version": 1,
   "metric": "scripts/report-rust-context.py lexical production-source metric",
   "policy": "Limits are ratchets. Lower them after reductions; raise them only with an explicit context-budget justification.",
-  "adjustment_justification": "Validated lookup indices now live in the schema-of-record IR and explicit per-executor tuning now lives in sembla-cpu. The new sweep-finalization boundary adds 303 lexical tokens but cuts the largest coordinator from 555/47 lines/complexity to 430/39. After the serde parser rewrite and lookup simplifications, the backend remains 1,887 tokens below the original 178,920-token ratchet; the function, complexity, file, IR, and CUDA limits are lowered here.",
+  "adjustment_justification": "Validated lookup indices now live in the schema-of-record IR and explicit per-executor tuning now lives in sembla-cpu. The sweep-finalization boundary adds 303 lexical tokens but cuts the largest coordinator from 555/47 lines/complexity to 430/39. The generated-kernel launch boundary then removes 42 scattered unsafe blocks and 86 tokens. After the serde parser rewrite and lookup simplifications, the backend remains 1,973 tokens below the original 178,920-token ratchet; the function, complexity, file, IR, CUDA, and total limits are lowered here.",
   "limits": {
-    "total_tokens": 177033,
+    "total_tokens": 176947,
     "max_file_code_lines": 2631,
     "max_function_lines": 523,
     "max_function_complexity": 39
@@ -13,7 +13,7 @@
     "sembla-ir": 15550,
     "sembla-runtime": 22172,
     "sembla-cpu": 36842,
-    "sembla-cuda": 49994,
+    "sembla-cuda": 49908,
     "sembla-cli": 52475
   },
   "crate_file_line_limits": {

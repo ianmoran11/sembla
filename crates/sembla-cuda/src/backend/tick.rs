@@ -55,7 +55,7 @@ impl CudaBackend {
             args.arg(&mut self.status)
                 .arg(&mut self.aggregate_errors)
                 .arg(&aggregate_error_count);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
         }
         {
             let rule_count = self.layout.candidate_offsets.len() as u64;
@@ -67,7 +67,7 @@ impl CudaBackend {
             args.arg(&mut self.status)
                 .arg(&mut self.effect_active)
                 .arg(&rule_count);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
         }
         // Build all tick-start aggregates without committing errors. Each
         // aggregate leaves a device error fact which the ordered validators
@@ -97,7 +97,7 @@ impl CudaBackend {
                 .arg(&mut self.aggregate_partials)
                 .arg(&self.aggregate_offsets)
                 .arg(&mut self.aggregate_errors);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
             let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
                 CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
             })?;
@@ -115,7 +115,7 @@ impl CudaBackend {
                     .arg(&mut self.aggregates)
                     .arg(&self.aggregate_offsets)
                     .arg(&mut self.aggregate_errors);
-                unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
+                args.launch_generated(LaunchConfig::for_num_elems(groups))
                     .map_err(driver_error)?;
             }
             let aggregate_identity = u64::from(aggregate_index);
@@ -128,7 +128,7 @@ impl CudaBackend {
                 .arg(&aggregate_error_count)
                 .arg(&aggregate_identity)
                 .arg(&mut self.aggregate_facts);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
         }
 
         Ok(())
@@ -182,7 +182,8 @@ impl CudaBackend {
                             .arg(&self.candidate_offsets)
                             .arg(&rule_id)
                             .arg(&mut self.status);
-                        unsafe { args.launch(validation_config) }.map_err(driver_error)?;
+                        args.launch_generated(validation_config)
+                            .map_err(driver_error)?;
                     }
                     finish_validation_reduction_pass(
                         &self.stream,
@@ -222,7 +223,8 @@ impl CudaBackend {
                     .arg(&mut self.times)
                     .arg(&mut self.candidate_errors)
                     .arg(&self.status);
-                unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+                args.launch_generated(LaunchConfig::for_num_elems(rows))
+                    .map_err(driver_error)?;
 
                 let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
                     CudaError::InvalidInput("rule id exceeds host index width".to_owned())
@@ -240,7 +242,8 @@ impl CudaBackend {
                             .arg(&candidate_begin)
                             .arg(&candidate_count)
                             .arg(&mut self.status);
-                        unsafe { args.launch(validation_config) }.map_err(driver_error)?;
+                        args.launch_generated(validation_config)
+                            .map_err(driver_error)?;
                     }
                     finish_validation_reduction_pass(
                         &self.stream,
@@ -274,7 +277,7 @@ impl CudaBackend {
                             .arg(&rule_id)
                             .arg(&self.enabled)
                             .arg(&mut self.status);
-                        unsafe { args.launch(claims_config) }.map_err(driver_error)?;
+                        args.launch_generated(claims_config).map_err(driver_error)?;
                     }
                     finish_validation_reduction_pass(
                         &self.stream,
@@ -309,7 +312,7 @@ impl CudaBackend {
                     .arg(&self.enabled)
                     .arg(&box_index_u32)
                     .arg(&mut self.status);
-                unsafe { args.launch(one) }.map_err(driver_error)?;
+                args.launch_generated(one).map_err(driver_error)?;
             }
 
             let mut candidate_begin = 0_u64;
@@ -381,7 +384,8 @@ impl CudaBackend {
                         .arg(&mut self.winner_rules)
                         .arg(&mut self.winner_entities)
                         .arg(&mut self.winner_instances);
-                    unsafe { args.launch(resource_config) }.map_err(driver_error)?;
+                    args.launch_generated(resource_config)
+                        .map_err(driver_error)?;
 
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -409,7 +413,8 @@ impl CudaBackend {
                         .arg(&mut self.instance_rules)
                         .arg(&mut self.instance_entities)
                         .arg(&self.status);
-                    unsafe { args.launch(candidate_config) }.map_err(driver_error)?;
+                    args.launch_generated(candidate_config)
+                        .map_err(driver_error)?;
 
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -421,7 +426,8 @@ impl CudaBackend {
                         .arg(&self.instance_resources)
                         .arg(&self.instance_keys)
                         .arg(&mut self.winner_keys);
-                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+                    args.launch_generated(instance_config)
+                        .map_err(driver_error)?;
 
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -435,7 +441,8 @@ impl CudaBackend {
                         .arg(&self.instance_rules)
                         .arg(&self.winner_keys)
                         .arg(&mut self.winner_rules);
-                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+                    args.launch_generated(instance_config)
+                        .map_err(driver_error)?;
 
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -451,7 +458,8 @@ impl CudaBackend {
                         .arg(&self.winner_keys)
                         .arg(&self.winner_rules)
                         .arg(&mut self.winner_entities);
-                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+                    args.launch_generated(instance_config)
+                        .map_err(driver_error)?;
 
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -468,7 +476,8 @@ impl CudaBackend {
                         .arg(&self.winner_rules)
                         .arg(&self.winner_entities)
                         .arg(&mut self.winner_instances);
-                    unsafe { args.launch(instance_config) }.map_err(driver_error)?;
+                    args.launch_generated(instance_config)
+                        .map_err(driver_error)?;
                 }
 
                 let mut args = fused_launch_builder(
@@ -489,7 +498,8 @@ impl CudaBackend {
                     .arg(&mut self.wins)
                     .arg(&mut self.deferred)
                     .arg(&self.status);
-                unsafe { args.launch(candidate_config) }.map_err(driver_error)?;
+                args.launch_generated(candidate_config)
+                    .map_err(driver_error)?;
             }
 
             // Reduce each effect-bearing rule's winners into a stable
@@ -528,7 +538,8 @@ impl CudaBackend {
                     .arg(&candidate_count)
                     .arg(&rule_id)
                     .arg(&mut self.effect_active);
-                unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }.map_err(driver_error)?;
+                args.launch_generated(LaunchConfig::for_num_elems(rows))
+                    .map_err(driver_error)?;
             }
             let effects_config = self.validation_launch_config(effects_rows, one);
             for phase in 0..VALIDATION_REDUCTION_PASSES {
@@ -553,7 +564,8 @@ impl CudaBackend {
                         .arg(&self.effect_active)
                         .arg(&box_index_u32)
                         .arg(&mut self.status);
-                    unsafe { args.launch(effects_config) }.map_err(driver_error)?;
+                    args.launch_generated(effects_config)
+                        .map_err(driver_error)?;
                 }
                 finish_validation_reduction_pass(
                     &self.stream,
@@ -584,7 +596,7 @@ impl CudaBackend {
                 self.fused_batch.as_ref(),
             );
             args.arg(&mut self.owners).arg(&owner_count);
-            unsafe { args.launch(LaunchConfig::for_num_elems(owner_launch_count)) }
+            args.launch_generated(LaunchConfig::for_num_elems(owner_launch_count))
                 .map_err(driver_error)?;
         }
         for transition in self.model.transitions() {
@@ -628,7 +640,7 @@ impl CudaBackend {
                         .arg(&mut self.owner_values)
                         .arg(&rule_id)
                         .arg(&mut self.status);
-                    unsafe { args.launch(LaunchConfig::for_num_elems(rows)) }
+                    args.launch_generated(LaunchConfig::for_num_elems(rows))
                         .map_err(driver_error)?;
                 }
                 finish_validation_reduction_pass(
@@ -654,7 +666,7 @@ impl CudaBackend {
                 .arg(&self.owner_values)
                 .arg(&owner_count)
                 .arg(&self.status);
-            unsafe { args.launch(LaunchConfig::for_num_elems(launch_count)) }
+            args.launch_generated(LaunchConfig::for_num_elems(launch_count))
                 .map_err(driver_error)?;
         }
         Ok(())
@@ -689,7 +701,8 @@ impl CudaBackend {
                 .arg(&mut self.aggregate_partials)
                 .arg(&self.aggregate_offsets)
                 .arg(&mut self.aggregate_errors);
-            unsafe { args.launch(LaunchConfig::for_num_elems(1)) }.map_err(driver_error)?;
+            args.launch_generated(LaunchConfig::for_num_elems(1))
+                .map_err(driver_error)?;
             let groups = u32::try_from(self.layout.row_counts[group_table]).map_err(|_| {
                 CudaError::InvalidInput("aggregate group count exceeds u32".to_owned())
             })?;
@@ -707,7 +720,7 @@ impl CudaBackend {
                     .arg(&mut self.aggregates)
                     .arg(&self.aggregate_offsets)
                     .arg(&mut self.aggregate_errors);
-                unsafe { args.launch(LaunchConfig::for_num_elems(groups)) }
+                args.launch_generated(LaunchConfig::for_num_elems(groups))
                     .map_err(driver_error)?;
             }
             let aggregate_identity = u64::from(aggregate_index);
@@ -720,7 +733,7 @@ impl CudaBackend {
                 .arg(&aggregate_error_count)
                 .arg(&aggregate_identity)
                 .arg(&mut self.aggregate_facts);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
         }
         {
             // The validator grid-strides each wired output's source table, so
@@ -762,7 +775,7 @@ impl CudaBackend {
                         .arg(&self.aggregate_facts)
                         .arg(&self.aggregate_offsets)
                         .arg(&mut self.status);
-                    unsafe { args.launch(output_config) }.map_err(driver_error)?;
+                    args.launch_generated(output_config).map_err(driver_error)?;
                 }
                 finish_validation_reduction_pass(
                     &self.stream,
@@ -788,7 +801,7 @@ impl CudaBackend {
                 .arg(&port_count)
                 .arg(&mut self.output_errors)
                 .arg(&error_count);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
         }
         if !self.layout.input_offsets.is_empty() {
             let field_count = u32::try_from(self.layout.input_offsets.len()).map_err(|_| {
@@ -813,7 +826,7 @@ impl CudaBackend {
                 .arg(&mut self.output_partials)
                 .arg(&mut self.output_errors)
                 .arg(&self.status);
-            unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
+            args.launch_generated(LaunchConfig::for_num_elems(field_count))
                 .map_err(driver_error)?;
             let field_count_u64 = u64::from(field_count);
             let mut args = fused_launch_builder(
@@ -826,7 +839,7 @@ impl CudaBackend {
                 .arg(&mut self.next_inputs)
                 .arg(&self.input_offsets)
                 .arg(&mut self.output_errors);
-            unsafe { args.launch(LaunchConfig::for_num_elems(field_count)) }
+            args.launch_generated(LaunchConfig::for_num_elems(field_count))
                 .map_err(driver_error)?;
             let mut args = fused_launch_builder(
                 &self.stream,
@@ -836,7 +849,7 @@ impl CudaBackend {
             args.arg(&self.output_errors)
                 .arg(&field_count_u64)
                 .arg(&mut self.status);
-            unsafe { args.launch(one) }.map_err(driver_error)?;
+            args.launch_generated(one).map_err(driver_error)?;
         }
         Ok(())
     }
@@ -861,7 +874,7 @@ impl CudaBackend {
                 .arg(&rule_count)
                 .arg(&mut self.deferred_counts)
                 .arg(&table_count);
-            unsafe { args.launch(control_count_launch_config(rule_count.max(table_count))) }
+            args.launch_generated(control_count_launch_config(rule_count.max(table_count)))
                 .map_err(driver_error)?;
         }
         for rule_index in 0..self.layout.candidate_offsets.len() {
@@ -885,7 +898,7 @@ impl CudaBackend {
                 .arg(&rule_count)
                 .arg(&rule)
                 .arg(&mut self.fired_counts);
-            unsafe { args.launch(control_count_launch_config(end - begin)) }
+            args.launch_generated(control_count_launch_config(end - begin))
                 .map_err(driver_error)?;
         }
         if candidate_count != 0 {
@@ -901,7 +914,7 @@ impl CudaBackend {
                     .arg(&table_count)
                     .arg(&table)
                     .arg(&mut self.deferred_counts);
-                unsafe { args.launch(config) }.map_err(driver_error)?;
+                args.launch_generated(config).map_err(driver_error)?;
             }
         }
 
