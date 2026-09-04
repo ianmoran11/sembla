@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::atomic_write::write_atomic;
+
 pub const HASH_ALGORITHM: &str = "sha256";
 pub const DETERMINISM_LEVEL: &str = "A";
 const MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -594,7 +596,7 @@ pub fn write_pairs_metadata(path: &Path, metadata: &PairsMetadata) -> Result<(),
         ));
     }
     let bytes = serialize_canonical(metadata)?;
-    std::fs::write(path, bytes.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))
+    write_atomic(path, bytes.as_bytes())
 }
 
 pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
@@ -607,7 +609,7 @@ pub fn write(path: &Path, manifest: &RunManifest) -> Result<(), String> {
     validate_state_artifact_tuple_values(manifest)?;
     validate_algorithms(manifest)?;
     let bytes = to_canonical_json(manifest)?;
-    std::fs::write(path, bytes.as_bytes()).map_err(|error| format!("{}: {error}", path.display()))
+    write_atomic(path, bytes.as_bytes())
 }
 
 pub fn read(path: &Path) -> Result<RunManifest, String> {

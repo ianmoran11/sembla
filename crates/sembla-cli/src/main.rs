@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use sembla_cpu::{self as executor, ObservationValue, SummaryValue};
+#[cfg(feature = "cuda")]
+use sembla_cuda::CudaDeviceObservations;
 use sembla_cuda::{CudaBackend, HashMode};
 use sembla_ir::{AttrType, FeatureSet, ParamType, ParamValue, GROUPED_OBSERVATIONS_FEATURE};
 use sembla_runtime::core::{
@@ -17,6 +19,7 @@ use sembla_runtime::state_artifact::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+mod atomic_write;
 mod compare;
 mod diff_backends;
 mod inspect;
@@ -27,6 +30,7 @@ mod sweep;
 mod synth;
 mod verify;
 
+use atomic_write::write_atomic;
 use compare::*;
 use diff_backends::*;
 use inspect::*;

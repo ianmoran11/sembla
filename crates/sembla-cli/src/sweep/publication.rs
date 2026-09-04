@@ -102,17 +102,14 @@ impl<'a> SweepPublication<'a> {
                 grouped_outputs,
             });
         let draw_path = self.out.join(format!("draw_{draw}.csv"));
-        std::fs::write(&draw_path, output.csv.as_bytes())
-            .map_err(|error| format!("{}: {error}", draw_path.display()))?;
+        write_atomic(&draw_path, output.csv.as_bytes())?;
         for grouped in &output.grouped {
             let path = grouped_output_path(&draw_path, &grouped.view);
-            std::fs::write(&path, grouped.csv.as_bytes())
-                .map_err(|error| format!("{}: {error}", path.display()))?;
+            write_atomic(&path, grouped.csv.as_bytes())?;
         }
         if self.export_pairs {
             let draw_summaries = PathBuf::from(format!("{}.summaries.csv", draw_path.display()));
-            std::fs::write(&draw_summaries, output.summaries_csv.as_bytes())
-                .map_err(|error| format!("{}: {error}", draw_summaries.display()))?;
+            write_atomic(draw_summaries, output.summaries_csv.as_bytes())?;
         }
         self.all_series.push(output.series.rows);
         Ok(())

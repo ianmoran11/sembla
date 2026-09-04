@@ -439,17 +439,14 @@ pub(crate) fn sweep_file_result_with_runtime<R: SweepRuntime>(
     )?;
     let manifest_path = out.join("manifest.csv");
     let summary_path = out.join("summary.csv");
-    std::fs::write(&manifest_path, csv_manifest.as_bytes())
-        .map_err(|error| format!("{}: {error}", manifest_path.display()))?;
-    std::fs::write(&summary_path, summary.as_bytes())
-        .map_err(|error| format!("{}: {error}", summary_path.display()))?;
+    write_atomic(manifest_path, csv_manifest.as_bytes())?;
+    write_atomic(summary_path, summary.as_bytes())?;
     manifest::write(&out.join("run-manifest.json"), &publication.run_manifest)?;
     if let (Some(export_path), Some(pairs_csv)) = (
         options.export_pairs.as_deref().map(Path::new),
         publication.pairs_csv,
     ) {
-        std::fs::write(export_path, pairs_csv.as_bytes())
-            .map_err(|error| format!("{}: {error}", export_path.display()))?;
+        write_atomic(export_path, pairs_csv.as_bytes())?;
         let pairs_sha256 = hex(&Sha256::digest(pairs_csv.as_bytes()));
         let metadata = manifest::PairsMetadata::for_sweep(
             &publication.run_manifest,
@@ -565,7 +562,7 @@ pub(crate) fn sweep_file_result_with_runtime<R: SweepRuntime>(
         }
         .map_err(|error| format!("could not serialize sweep timing JSON: {error}"))?;
         json.push('\n');
-        std::fs::write(path, json).map_err(|error| format!("{path}: {error}"))?;
+        write_atomic(path, json.as_bytes())?;
     }
     let manifest_hash = hex(&Sha256::digest(csv_manifest.as_bytes()));
     let summary_hash = hex(&Sha256::digest(summary.as_bytes()));

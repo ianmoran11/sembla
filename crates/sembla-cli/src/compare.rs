@@ -329,8 +329,7 @@ pub(crate) fn compare_result(options: CompareOptions) -> Result<(), String> {
         }
     }
 
-    std::fs::write(&options.out, csv.as_bytes())
-        .map_err(|error| format!("{}: {error}", options.out))?;
+    write_atomic(&options.out, csv.as_bytes())?;
     let compare_sha256 = hex(&Sha256::digest(csv.as_bytes()));
     let (population_source, population_sha256) =
         manifest::population_identity(&options.population)?;
