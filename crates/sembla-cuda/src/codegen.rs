@@ -486,7 +486,6 @@ struct EnumObservationSpec {
 
 struct Generator<'a> {
     model: &'a ValidatedModel,
-    global_tables: Vec<(usize, usize)>,
     columns: Vec<(usize, usize, usize)>,
     ports: Vec<(usize, usize)>,
     input_fields: Vec<(usize, usize, usize)>,
@@ -513,13 +512,11 @@ enum ValidationTarget<'a> {
 
 impl<'a> Generator<'a> {
     fn new(model: &'a ValidatedModel) -> Result<Self, CudaError> {
-        let mut global_tables = Vec::new();
         let mut columns = Vec::new();
         let mut ports = Vec::new();
         let mut input_fields = Vec::new();
         for (box_index, model_box) in model.model().boxes.iter().enumerate() {
             for (table_index, table) in model_box.tables.iter().enumerate() {
-                global_tables.push((box_index, table_index));
                 for attr_index in 0..table.attrs.len() {
                     columns.push((box_index, table_index, attr_index));
                 }
@@ -630,7 +627,6 @@ impl<'a> Generator<'a> {
         }
         let mut this = Self {
             model,
-            global_tables,
             columns,
             ports,
             input_fields,
@@ -861,10 +857,11 @@ impl<'a> Generator<'a> {
     }
 
     fn global_table(&self, box_index: usize, table_index: usize) -> usize {
-        self.global_tables
+        self.model.model().boxes[..box_index]
             .iter()
-            .position(|entry| *entry == (box_index, table_index))
-            .expect("validated table is indexed")
+            .map(|model_box| model_box.tables.len())
+            .sum::<usize>()
+            + table_index
     }
 
     fn column(&self, box_index: usize, table_index: usize, attr_index: usize) -> usize {

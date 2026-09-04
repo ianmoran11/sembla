@@ -173,10 +173,6 @@ impl ValidatedModel {
         self.resolved.inputs.get(box_index)?.get(name).copied()
     }
 
-    pub fn output_index(&self, box_index: usize, name: &str) -> Option<usize> {
-        self.resolved.outputs.get(box_index)?.get(name).copied()
-    }
-
     pub fn global_input_index(&self, box_index: usize, input_index: usize) -> Option<usize> {
         let start = *self.resolved.input_offsets.get(box_index)?;
         let end = *self.resolved.input_offsets.get(box_index + 1)?;
