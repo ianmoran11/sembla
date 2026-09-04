@@ -1007,7 +1007,7 @@ impl<'a> Generator<'a> {
                 out.push_str("      aggregate_errors[0] = 2U; return;\n");
             }
             ValidationTarget::Status { code, identity } => {
-                writeln!(out, "      sembla_record_validation_failure(status, {code}ULL, (unsigned long long)({identity}), {scan}ULL, {branch}ULL);{control}").unwrap();
+                writeln!(out, "      sembla_record_validation_failure(status, validation_phase, {code}ULL, (unsigned long long)({identity}), {scan}ULL, {branch}ULL);{control}").unwrap();
             }
         }
     }
@@ -1052,7 +1052,7 @@ impl<'a> Generator<'a> {
                 .unwrap();
             }
             ValidationTarget::Status { .. } => {
-                writeln!(out, "      sembla_record_validation_failure(status, (unsigned long long)aggregate_facts[{aggregate_index}], {aggregate_index}ULL, {scan}ULL, 0ULL);").unwrap();
+                writeln!(out, "      sembla_record_validation_failure(status, validation_phase, (unsigned long long)aggregate_facts[{aggregate_index}], {aggregate_index}ULL, {scan}ULL, 0ULL);").unwrap();
             }
         }
         Ok(())
@@ -1465,7 +1465,6 @@ impl<'a> Generator<'a> {
         self.emit_input_helpers(&mut out)?;
         self.emit_aggregate_kernel(&mut out)?;
         let transition_kernels = self.emit_transition_kernels(&mut out)?;
-        self.emit_error_check_kernel(&mut out);
         self.emit_validation_status_kernels(&mut out);
         self.emit_resolve_kernel(&mut out)?;
         self.emit_apply_kernel(&mut out)?;
@@ -1926,7 +1925,7 @@ impl<'a> Generator<'a> {
     }
 
     fn emit_transition_kernels(&self, out: &mut String) -> Result<Vec<String>, CudaError> {
-        out.push_str("\nextern \"C\" __global__ void sembla_validate_transition(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_transition(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, unsigned long long* status, unsigned long long validation_phase) {\n  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -2003,7 +2002,7 @@ impl<'a> Generator<'a> {
             let global_table = self.global_table(validated.box_index, table_index);
             let name = format!("sembla_transition_{:08x}", validated.rule_id);
             names.push(name.clone());
-            writeln!(out, "\nextern \"C\" __global__ void {name}(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors, const unsigned long long* status) {{").unwrap();
+            writeln!(out, "\nextern \"C\" __global__ void {name}(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, const unsigned long long* status) {{").unwrap();
             out.push_str("  unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (status[0] != 0ULL) return;\n");
             writeln!(out, "  if (row >= row_counts[{global_table}]) return;\n  unsigned long long candidate = candidate_offsets[{}] + row;\n  unsigned char local_error = 0; unsigned char* error = &local_error;", validated.rule_id).unwrap();
             let rows = Rows::State {
@@ -2016,12 +2015,12 @@ impl<'a> Generator<'a> {
             let hazard = self
                 .render(&transition.hazard, rows, Some(&Ty::Real), "state", "row")?
                 .0;
-            writeln!(out, "  int guard = {guard};\n  errors[candidate * 2ULL] = local_error;\n  local_error = 0;\n  double lambda = (double)({hazard});\n  errors[candidate * 2ULL + 1ULL] = local_error;\n  double time = sembla_exp(seed, tick, {}U, (unsigned int)row, 0U, lambda);\n  times[candidate] = time;\n  enabled[candidate] = (unsigned char)(errors[candidate * 2ULL] == 0U && errors[candidate * 2ULL + 1ULL] == 0U && guard && lambda > 0.0 && time < dt);\n}}", validated.rule_word).unwrap();
+            writeln!(out, "  enabled[candidate] = 0U;\n  int guard = {guard};\n  if (local_error || !guard) return;\n  local_error = 0U;\n  double lambda = (double)({hazard});\n  if (local_error || !(lambda > 0.0)) return;\n  double time = sembla_exp(seed, tick, {}U, (unsigned int)row, 0U, lambda);\n  if (time < dt) {{ times[candidate] = time; enabled[candidate] = 1U; }}\n}}", validated.rule_word).unwrap();
         }
         Ok(names)
     }
 
-    /// Emits the four status-protocol helper kernels used by the parallel
+    /// Emits the status-protocol helper kernels used by the parallel
     /// validation kernels. Stream-ordered kernel boundaries separate the four
     /// lock-free reduction passes, so results are independent of launch
     /// geometry without requiring a device-wide critical section.
@@ -2030,10 +2029,6 @@ impl<'a> Generator<'a> {
         // reduction scratch slots and clears the per-rule effect activity
         // flags that sembla_mark_effect_active repopulates each tick.
         out.push_str("\nextern \"C\" __global__ void sembla_init_validation_scratch(unsigned long long* status, unsigned int* effect_active, unsigned long long rule_count) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  status[4] = 0ULL;\n  status[5] = 0xffffffffffffffffULL;\n  status[6] = 0xffffffffffffffffULL;\n  status[7] = 0ULL;\n  status[8] = 0xffffffffffffffffULL;\n  status[9] = 0ULL;\n  status[10] = 0ULL;\n  status[11] = 0ULL;\n  for (unsigned long long i = 0; i < rule_count; ++i) effect_active[i] = 0U;\n}\n");
-        // Advances from scan to identity to branch to payload recovery. The
-        // stream boundary before this single-thread kernel is the global
-        // synchronization point between pure atomicMin passes.
-        out.push_str("\nextern \"C\" __global__ void sembla_advance_validation_phase(unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0) return;\n  ++status[4];\n}\n");
         // Runs on the stream after the payload-recovery pass. Publishes the
         // winning payload when this logical launch failed, then resets scratch
         // for the next validator. The payload is written before the code; the
@@ -2047,52 +2042,15 @@ impl<'a> Generator<'a> {
         out.push_str("\nextern \"C\" __global__ void sembla_mark_effect_active(const unsigned char* wins, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned int rule_id, unsigned int* effect_active) {\n  unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (row >= candidate_count) return;\n  if (wins[candidate_begin + row] != 0U) atomicOr(effect_active + rule_id, 1U);\n}\n");
     }
 
-    fn emit_error_check_kernel(&self, out: &mut String) {
-        let guard_scan = self.validation_scan();
-        let hazard_scan = self.validation_scan();
-        out.push_str("\nextern \"C\" __global__ void sembla_check_candidate_errors(const unsigned char* errors, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n");
-        writeln!(out, "  for (unsigned long long row = worker; row < candidate_count; row += stride) {{ unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL]) sembla_record_validation_failure(status, 3ULL, candidate, {guard_scan}ULL, 0ULL); }}").unwrap();
-        writeln!(out, "  for (unsigned long long row = worker; row < candidate_count; row += stride) {{ unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL + 1ULL]) sembla_record_validation_failure(status, 3ULL, candidate, {hazard_scan}ULL, 0ULL); }}\n}}").unwrap();
-    }
-
     fn emit_resolve_kernel(&self, out: &mut String) -> Result<(), CudaError> {
-        out.push_str("\nextern \"C\" __global__ void sembla_validate_claims(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, const unsigned char* enabled, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
-        for validated in self.model.transitions() {
-            let transition = &self.model.model().boxes[validated.box_index].transitions
-                [validated.transition_index];
-            if transition.contests.is_empty() {
-                continue;
-            }
-            let table_index = validated.table_index;
-            let table_global = self.global_table(validated.box_index, table_index);
-            let rows = Rows::State {
-                box_index: validated.box_index,
-                table_index,
-            };
-            writeln!(out, "  if (rule_id == {}U) {{", validated.rule_id).unwrap();
-            for claim in &transition.contests {
-                let resource_ty = self.infer(&claim.resource, rows, None)?;
-                let resource = self
-                    .render(&claim.resource, rows, Some(&resource_ty), "state", "row")?
-                    .0;
-                let scan = self.validation_scan();
-                writeln!(out, "    for (unsigned long long row = validation_worker; row < row_counts[{table_global}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ unsigned long long candidate = candidate_offsets[{}] + row; local_error = 0; (void)({resource}); if (local_error) {{ sembla_record_validation_failure(status, 10ULL, candidate, {scan}ULL, 0ULL); }} }}", validated.rule_id).unwrap();
-                if let ClaimOrdering::Key { expr } = &claim.ordering {
-                    let key = self.render(expr, rows, None, "state", "row")?.0;
-                    let scan = self.validation_scan();
-                    writeln!(out, "    for (unsigned long long row = validation_worker; row < row_counts[{table_global}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ unsigned long long candidate = candidate_offsets[{}] + row; local_error = 0; (void)({key}); if (local_error) {{ sembla_record_validation_failure(status, 10ULL, candidate, {scan}ULL, 0ULL); }} }}", validated.rule_id).unwrap();
-                }
-            }
-            out.push_str("    return;\n  }\n");
-        }
-        out.push_str("}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned int box_index, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
 
-        // Claim expressions are evaluated eagerly above, before compatibility
-        // is considered. Emit each statically incompatible claim pair once in
-        // canonical transition/claim order, then inspect only enabled runtime
-        // candidates in this single-thread kernel. This preserves CPU error
-        // precedence without a result-bearing race in the parallel resolver.
+        // Claim expressions are evaluated eagerly by the ordered transition
+        // validator before compatibility is considered. Emit each statically
+        // incompatible claim pair once in canonical transition/claim order,
+        // then inspect only enabled runtime candidates in this single-thread
+        // kernel. This preserves CPU error precedence without a result-bearing
+        // race in the parallel resolver.
         let transitions = self.model.transitions();
         for (left_transition_position, left) in transitions.iter().enumerate() {
             let left_transition =
@@ -2165,10 +2123,10 @@ impl<'a> Generator<'a> {
         // The CPU oracle flattens (candidate, claim) instances, groups them by
         // resource identity, and takes a lexicographic argmin under
         // compare_instances: ordering key, rule_word, entity_id. Materialize
-        // that same list at stable (rule, row, claim) indices. A final instance
-        // index component orders otherwise identical duplicate claims without
-        // changing the winning candidate.
-        out.push_str("\nextern \"C\" __global__ void sembla_init_conflict_winners(unsigned long long resource_count, unsigned long long* winner_keys, unsigned int* winner_rules, unsigned int* winner_entities, unsigned long long* winner_instances) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long resource = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; resource < resource_count; resource += stride) {\n    winner_keys[resource] = 0xffffffffffffffffULL;\n    winner_rules[resource] = 0xffffffffU;\n    winner_entities[resource] = 0xffffffffU;\n    winner_instances[resource] = 0xffffffffffffffffULL;\n  }\n}\n");
+        // that same list at stable (rule, row, claim) indices. Otherwise
+        // identical duplicate claims already select the same winning candidate,
+        // so their physical instance index is not part of the consumed result.
+        out.push_str("\nextern \"C\" __global__ void sembla_init_conflict_winners(unsigned long long resource_count, unsigned long long* winner_keys, unsigned int* winner_rules, unsigned int* winner_entities) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long resource = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; resource < resource_count; resource += stride) {\n    winner_keys[resource] = 0xffffffffffffffffULL;\n    winner_rules[resource] = 0xffffffffU;\n    winner_entities[resource] = 0xffffffffU;\n  }\n}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_build_claim_instances(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned long long* claim_instance_offsets, const unsigned long long* resource_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, const unsigned char* enabled, const double* times, unsigned long long* instance_resources, unsigned long long* instance_keys, unsigned int* instance_rules, unsigned int* instance_entities, const unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local_candidate < candidate_count; local_candidate += stride) {\n    unsigned long long self_candidate = candidate_begin + local_candidate;\n    unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
@@ -2218,8 +2176,6 @@ impl<'a> Generator<'a> {
         out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_keys(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, unsigned long long* winner_keys) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL) atomicMin(winner_keys + resource, instance_keys[instance]); }\n}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_rules(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned long long* winner_keys, unsigned int* winner_rules) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource]) atomicMin(winner_rules + resource, instance_rules[instance]); }\n}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_entities(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned int* instance_entities, const unsigned long long* winner_keys, const unsigned int* winner_rules, unsigned int* winner_entities) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource]) atomicMin(winner_entities + resource, instance_entities[instance]); }\n}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_instances(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned int* instance_entities, const unsigned long long* winner_keys, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned long long* winner_instances) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource] && instance_entities[instance] == winner_entities[resource]) atomicMin(winner_instances + resource, instance); }\n}\n");
-
         out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned long long* row_counts, const unsigned long long* candidate_offsets, const unsigned long long* claim_instance_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const unsigned long long* instance_resources, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local_candidate < candidate_count; local_candidate += stride) {\n    unsigned long long self_candidate = candidate_begin + local_candidate;\n    for (unsigned long long table = 0; table < resource_table_count; ++table) deferred[self_candidate * resource_table_count + table] = 0U;\n    wins[self_candidate] = enabled[self_candidate];\n    if (!enabled[self_candidate]) continue;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
@@ -2266,7 +2222,7 @@ impl<'a> Generator<'a> {
     }
 
     fn emit_apply_kernel(&self, out: &mut String) -> Result<(), CudaError> {
-        out.push_str("\nextern \"C\" __global__ void sembla_validate_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned int* effect_active, unsigned int box_index, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned int* effect_active, unsigned int box_index, unsigned long long* status, unsigned long long validation_phase) {\n  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -2308,13 +2264,13 @@ impl<'a> Generator<'a> {
                 match &ty {
                     Ty::Enum(variants) => {
                         let scan = self.validation_scan();
-                        writeln!(out, "    for (unsigned long long row = validation_worker; row < row_counts[{global_table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ local_error = 0U; unsigned long long value = (unsigned long long)({rendered}); if (local_error) {{ sembla_record_validation_failure(status, 5ULL, candidate_offsets[{}] + row, {scan}ULL, 0ULL); continue; }} if (value >= {}ULL) {{ sembla_record_validation_failure(status, 6ULL, candidate_offsets[{}] + row, {scan}ULL, 1ULL); }} }}", validated.rule_id, variants.len(), validated.rule_id).unwrap()
+                        writeln!(out, "    for (unsigned long long row = validation_worker; row < row_counts[{global_table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ local_error = 0U; unsigned long long value = (unsigned long long)({rendered}); if (local_error) {{ sembla_record_validation_failure(status, validation_phase, 5ULL, candidate_offsets[{}] + row, {scan}ULL, 0ULL); continue; }} if (value >= {}ULL) {{ sembla_record_validation_failure(status, validation_phase, 6ULL, candidate_offsets[{}] + row, {scan}ULL, 1ULL); }} }}", validated.rule_id, variants.len(), validated.rule_id).unwrap()
                     }
                     Ty::Ref(target) => {
                         let target_index = self.table_index(validated.box_index, target)?;
                         let target_global = self.global_table(validated.box_index, target_index);
                         let scan = self.validation_scan();
-                        writeln!(out, "    for (unsigned long long row = validation_worker; row < row_counts[{global_table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ local_error = 0U; unsigned long long value = (unsigned long long)({rendered}); if (local_error) {{ sembla_record_validation_failure(status, 5ULL, candidate_offsets[{}] + row, {scan}ULL, 0ULL); continue; }} if (value >= row_counts[{target_global}]) {{ sembla_record_validation_failure(status, 7ULL, candidate_offsets[{}] + row, {scan}ULL, 1ULL); }} }}", validated.rule_id, validated.rule_id).unwrap();
+                        writeln!(out, "    for (unsigned long long row = validation_worker; row < row_counts[{global_table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{ local_error = 0U; unsigned long long value = (unsigned long long)({rendered}); if (local_error) {{ sembla_record_validation_failure(status, validation_phase, 5ULL, candidate_offsets[{}] + row, {scan}ULL, 0ULL); continue; }} if (value >= row_counts[{target_global}]) {{ sembla_record_validation_failure(status, validation_phase, 7ULL, candidate_offsets[{}] + row, {scan}ULL, 1ULL); }} }}", validated.rule_id, validated.rule_id).unwrap();
                     }
                     _ => {}
                 }
@@ -2324,7 +2280,7 @@ impl<'a> Generator<'a> {
         out.push_str("}\n");
 
         out.push_str("\nextern \"C\" __global__ void sembla_init_effect_owners(int* owners, unsigned long long owner_count) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long owner = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; owner < owner_count; owner += stride) owners[owner] = -1;\n}\n");
-        out.push_str("\nextern \"C\" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned int rule_id, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long validation_phase = status[4];\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned int rule_id, unsigned long long* status, unsigned long long validation_phase) {\n  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;\n  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
                 [validated.transition_index];
@@ -2356,25 +2312,25 @@ impl<'a> Generator<'a> {
                     ty.cuda()
                 )
                 .unwrap();
-                writeln!(out, "      if (local_error) {{ sembla_record_validation_failure(status, 5ULL, candidate, {scan}ULL, {branch}ULL, candidate, 0ULL, 0ULL); }} else {{").unwrap();
+                writeln!(out, "      if (local_error) {{ sembla_record_validation_failure(status, validation_phase, 5ULL, candidate, {scan}ULL, {branch}ULL, candidate, 0ULL, 0ULL); }} else {{").unwrap();
                 match &ty {
-                    Ty::Enum(variants) => writeln!(out, "        if ((unsigned long long)value >= {}ULL) {{ sembla_record_validation_failure(status, 6ULL, candidate, {scan}ULL, {}ULL, candidate, 0ULL, 0ULL); }} else", variants.len(), branch + 1).unwrap(),
+                    Ty::Enum(variants) => writeln!(out, "        if ((unsigned long long)value >= {}ULL) {{ sembla_record_validation_failure(status, validation_phase, 6ULL, candidate, {scan}ULL, {}ULL, candidate, 0ULL, 0ULL); }} else", variants.len(), branch + 1).unwrap(),
                     Ty::Ref(target) => {
                         let target_index = self.table_index(validated.box_index, target)?;
                         let target_global = self.global_table(validated.box_index, target_index);
-                        writeln!(out, "        if ((unsigned long long)value >= row_counts[{target_global}]) {{ sembla_record_validation_failure(status, 7ULL, candidate, {scan}ULL, {}ULL, candidate, 0ULL, 0ULL); }} else", branch + 1).unwrap();
+                        writeln!(out, "        if ((unsigned long long)value >= row_counts[{target_global}]) {{ sembla_record_validation_failure(status, validation_phase, 7ULL, candidate, {scan}ULL, {}ULL, candidate, 0ULL, 0ULL); }} else", branch + 1).unwrap();
                     }
                     _ => out.push_str("       "),
                 }
                 let repeats_attr = transition.effects[..effect_index].iter().any(|earlier| {
                     matches!(earlier, Effect::SetAttr { attr: earlier_attr, .. } if earlier_attr == attr)
                 });
-                writeln!(out, "        {{ unsigned long long owner = write_offsets[{column}] + row; if (validation_phase == 0ULL) {{ if (owners[owner] != -1) {{ sembla_record_validation_failure(status, 8ULL, candidate, {scan}ULL, {}ULL, owner, (unsigned long long)owners[owner], {}ULL); }} else {{ owners[owner] = (int){}U;", branch + 2, validated.rule_id, validated.rule_id).unwrap();
+                writeln!(out, "        {{ unsigned long long owner = write_offsets[{column}] + row; if (validation_phase == 0ULL) {{ if (owners[owner] != -1) {{ sembla_record_validation_failure(status, validation_phase, 8ULL, candidate, {scan}ULL, {}ULL, owner, (unsigned long long)owners[owner], {}ULL); }} else {{ owners[owner] = (int){}U;", branch + 2, validated.rule_id, validated.rule_id).unwrap();
                 match ty {
                     Ty::Real => out.push_str("          owner_values[owner] = (unsigned long long)__double_as_longlong(value);\n"),
                     _ => out.push_str("          owner_values[owner] = (unsigned long long)value;\n"),
                 }
-                writeln!(out, "        }} }} else if (owners[owner] != -1 && (owners[owner] != (int){}U || {})) {{ sembla_record_validation_failure(status, 8ULL, candidate, {scan}ULL, {}ULL, owner, (unsigned long long)owners[owner], {}ULL); }} }}", validated.rule_id, u8::from(repeats_attr), branch + 2, validated.rule_id).unwrap();
+                writeln!(out, "        }} }} else if (owners[owner] != -1 && (owners[owner] != (int){}U || {})) {{ sembla_record_validation_failure(status, validation_phase, 8ULL, candidate, {scan}ULL, {}ULL, owner, (unsigned long long)owners[owner], {}ULL); }} }}", validated.rule_id, u8::from(repeats_attr), branch + 2, validated.rule_id).unwrap();
                 out.push_str("      }\n      }\n");
             }
             out.push_str("    }\n    return;\n  }\n");
@@ -2400,7 +2356,7 @@ impl<'a> Generator<'a> {
     }
 
     fn emit_output_kernel(&self, out: &mut String) -> Result<(), CudaError> {
-        out.push_str("\nextern \"C\" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
+        out.push_str("\nextern \"C\" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status, unsigned long long validation_phase) {\n  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;\n  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  unsigned char local_error = 0U; unsigned char* error = &local_error;\n");
         for wire in self.model.wires() {
             let from_box = wire.from_box_index;
             let to_box = wire.to_box_index;
@@ -2461,7 +2417,7 @@ impl<'a> Generator<'a> {
                     // exception to grid-striding every row loop); the
                     // independent per-row checks above run across the device.
                     let scan = self.validation_scan();
-                    writeln!(out, "    {{ long long result = 0LL; if (validation_worker == 0ULL) for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ local_error = 0U; int selected = {selected}; long long value = (long long)({value}); if (local_error) {{ sembla_record_validation_failure(status, 9ULL, {target_field}ULL, {scan}ULL, 0ULL); break; }} if (selected) {{ result = sembla_add_i64(result, value, error); if (local_error) {{ sembla_record_validation_failure(status, 9ULL, {target_field}ULL, {scan}ULL, 1ULL); break; }} }} }} }}").unwrap();
+                    writeln!(out, "    {{ long long result = 0LL; if (validation_worker == 0ULL) for (unsigned long long row = 0; row < row_counts[{global_table}]; ++row) {{ local_error = 0U; int selected = {selected}; long long value = (long long)({value}); if (local_error) {{ sembla_record_validation_failure(status, validation_phase, 9ULL, {target_field}ULL, {scan}ULL, 0ULL); break; }} if (selected) {{ result = sembla_add_i64(result, value, error); if (local_error) {{ sembla_record_validation_failure(status, validation_phase, 9ULL, {target_field}ULL, {scan}ULL, 1ULL); break; }} }} }} }}").unwrap();
                 }
             }
         }
@@ -2659,7 +2615,6 @@ pub(crate) enum FusedBuffer {
     AggregateActive,
     Enabled,
     Times,
-    CandidateErrors,
     Wins,
     Deferred,
     FiredCounts,
@@ -2671,7 +2626,6 @@ pub(crate) enum FusedBuffer {
     WinnerKeys,
     WinnerRules,
     WinnerEntities,
-    WinnerInstances,
     Owners,
     OwnerValues,
     OutputPartials,
@@ -2717,7 +2671,6 @@ fn fused_pointer_buffer(kernel: &str, name: &str) -> Option<FusedBuffer> {
         "winner_keys" => B::WinnerKeys,
         "winner_rules" => B::WinnerRules,
         "winner_entities" => B::WinnerEntities,
-        "winner_instances" => B::WinnerInstances,
         "owners" => B::Owners,
         "owner_values" => B::OwnerValues,
         "output_partials" => B::OutputPartials,
@@ -2730,9 +2683,7 @@ fn fused_pointer_buffer(kernel: &str, name: &str) -> Option<FusedBuffer> {
         "status" => B::Status,
         "values" => B::ObservationValues,
         "errors" if kernel == "sembla_record_aggregate_errors" => B::AggregateErrors,
-        "errors" if kernel == "sembla_check_candidate_errors" => B::CandidateErrors,
         "errors" if kernel == "sembla_check_output_errors" => B::OutputErrors,
-        "errors" => B::CandidateErrors,
         "counts" if kernel.contains("grouped") => B::GroupedHistogram,
         "counts" => B::GenericEnumCounts,
         // Immutable layout metadata and the Philox test-kernel pointers are
@@ -2834,9 +2785,9 @@ const PRELUDE: &str = r#"
 // every pass is order-independent and only sees the prefix selected earlier.
 // Other simulation results are staged in generated rule/effect/row order, then
 // scattered by ascending destination cell. Validation *diagnostics* are reduced
-// with atomics under a short lock so the reported failure is independent of
-// launch geometry; the committed status is written only by the single-thread
-// commit kernel.
+// through stream-ordered atomic-min passes so the reported failure is
+// independent of launch geometry; the committed status is written only by the
+// single-thread commit kernel.
 __device__ __forceinline__ double sembla_f64(unsigned long long bits) {
   return __longlong_as_double((long long)bits);
 }
@@ -2886,20 +2837,19 @@ __device__ __forceinline__ unsigned long long sembla_f64_order_key(double value)
 // Records one validation failure into scratch slots status[4..=11] without
 // touching the committed diagnostic status[0..=3]. Full-width scan, identity,
 // and branch components cannot be packed into one 64-bit key without changing
-// their order, so the host replays each validation launch in four stream-ordered
-// passes. The first three passes mirror conflict resolution's segmented argmin:
+// their order, so the host replays each validation launch with four scalar phase
+// values in stream order. The first three passes mirror conflict resolution's segmented argmin:
 // each pure atomicMin considers only failures matching the winning prefix. The
 // fourth pass recovers payload only from the exact winning key. Duplicate
 // observations of one exact key are the same logical check and carry identical
 // payload, so concurrent payload stores cannot create a mixed diagnostic.
-// status[4]: phase, status[5]: scan, status[6]: order identity, status[7]: code,
+// status[4]: reserved, status[5]: scan, status[6]: order identity, status[7]: code,
 // status[8]: branch, status[9]: reported identity, status[10..=11]: details.
 __device__ __forceinline__ void sembla_record_validation_failure(
-    unsigned long long* status, unsigned long long code,
+    unsigned long long* status, unsigned long long phase, unsigned long long code,
     unsigned long long order_identity, unsigned long long scan,
     unsigned long long branch, unsigned long long reported_identity,
     unsigned long long detail_2, unsigned long long detail_3) {
-  unsigned long long phase = status[4];
   if (phase == 0ULL) {
     atomicMin(status + 5, scan);
   } else if (phase == 1ULL) {
@@ -2916,11 +2866,11 @@ __device__ __forceinline__ void sembla_record_validation_failure(
   }
 }
 __device__ __forceinline__ void sembla_record_validation_failure(
-    unsigned long long* status, unsigned long long code,
+    unsigned long long* status, unsigned long long phase, unsigned long long code,
     unsigned long long candidate, unsigned long long scan,
     unsigned long long branch) {
   sembla_record_validation_failure(
-      status, code, candidate, scan, branch, candidate, 0ULL, 0ULL);
+      status, phase, code, candidate, scan, branch, candidate, 0ULL, 0ULL);
 }
 __device__ __forceinline__ long long sembla_add_i64(long long a, long long b, unsigned char* error) {
   if ((b > 0 && a > 0x7fffffffffffffffLL - b) ||

@@ -1,7 +1,7 @@
 //! Ordered CUDA tick launch pipeline and device-status commit.
 
 use super::{
-    control_count_launch_config, device_status, driver_error, finish_validation_reduction_pass,
+    commit_validation_reduction, control_count_launch_config, device_status, driver_error,
     fused_launch_builder, global_table, mem, CudaBackend, CudaError, LaunchConfig,
     VALIDATION_REDUCTION_PASSES,
 };
@@ -166,7 +166,7 @@ impl CudaBackend {
                 // one worker when the table is empty, so zero rows keeps a
                 // single-thread launch instead of a zero-block one.
                 let validation_config = self.validation_launch_config(rows, one);
-                for phase in 0..VALIDATION_REDUCTION_PASSES {
+                for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
                     {
                         let mut args = fused_launch_builder(
                             &self.stream,
@@ -185,20 +185,19 @@ impl CudaBackend {
                             .arg(&self.aggregate_offsets)
                             .arg(&self.candidate_offsets)
                             .arg(&rule_id)
-                            .arg(&mut self.status);
+                            .arg(&mut self.status)
+                            .arg(&validation_phase);
                         args.launch_generated(validation_config)
                             .map_err(driver_error)?;
                     }
-                    finish_validation_reduction_pass(
-                        &self.stream,
-                        &self.advance_validation_phase,
-                        &self.commit_validation_status,
-                        &mut self.status,
-                        phase,
-                        one,
-                        self.fused_batch.as_ref(),
-                    )?;
                 }
+                commit_validation_reduction(
+                    &self.stream,
+                    &self.commit_validation_status,
+                    &mut self.status,
+                    one,
+                    self.fused_batch.as_ref(),
+                )?;
 
                 if rows == 0 {
                     continue;
@@ -225,74 +224,9 @@ impl CudaBackend {
                     .arg(&dt)
                     .arg(&mut self.enabled)
                     .arg(&mut self.times)
-                    .arg(&mut self.candidate_errors)
                     .arg(&self.status);
                 args.launch_generated(LaunchConfig::for_num_elems(rows))
                     .map_err(driver_error)?;
-
-                let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
-                    CudaError::InvalidInput("rule id exceeds host index width".to_owned())
-                })?;
-                let candidate_begin = self.layout.candidate_offsets[rule_index];
-                let candidate_count = u64::from(rows);
-                for phase in 0..VALIDATION_REDUCTION_PASSES {
-                    {
-                        let mut args = fused_launch_builder(
-                            &self.stream,
-                            &self.check_errors,
-                            self.fused_batch.as_ref(),
-                        );
-                        args.arg(&self.candidate_errors)
-                            .arg(&candidate_begin)
-                            .arg(&candidate_count)
-                            .arg(&mut self.status);
-                        args.launch_generated(validation_config)
-                            .map_err(driver_error)?;
-                    }
-                    finish_validation_reduction_pass(
-                        &self.stream,
-                        &self.advance_validation_phase,
-                        &self.commit_validation_status,
-                        &mut self.status,
-                        phase,
-                        one,
-                        self.fused_batch.as_ref(),
-                    )?;
-                }
-
-                let claims_config = self.validation_launch_config(rows, one);
-                for phase in 0..VALIDATION_REDUCTION_PASSES {
-                    {
-                        let mut args = fused_launch_builder(
-                            &self.stream,
-                            &self.validate_claims,
-                            self.fused_batch.as_ref(),
-                        );
-                        args.arg(&self.state)
-                            .arg(&self.column_offsets)
-                            .arg(&self.row_counts)
-                            .arg(&self.inputs)
-                            .arg(&self.input_offsets)
-                            .arg(&self.input_counts)
-                            .arg(&self.params)
-                            .arg(&self.aggregates)
-                            .arg(&self.aggregate_offsets)
-                            .arg(&self.candidate_offsets)
-                            .arg(&rule_id)
-                            .arg(&self.enabled)
-                            .arg(&mut self.status);
-                        args.launch_generated(claims_config).map_err(driver_error)?;
-                    }
-                    finish_validation_reduction_pass(
-                        &self.stream,
-                        &self.advance_validation_phase,
-                        &self.commit_validation_status,
-                        &mut self.status,
-                        phase,
-                        one,
-                        self.fused_batch.as_ref(),
-                    )?;
-                }
             }
 
             let box_index_u32 = u32::try_from(box_index)
@@ -386,8 +320,7 @@ impl CudaBackend {
                     args.arg(&resource_count)
                         .arg(&mut self.winner_keys)
                         .arg(&mut self.winner_rules)
-                        .arg(&mut self.winner_entities)
-                        .arg(&mut self.winner_instances);
+                        .arg(&mut self.winner_entities);
                     args.launch_generated(resource_config)
                         .map_err(driver_error)?;
 
@@ -464,24 +397,6 @@ impl CudaBackend {
                         .arg(&mut self.winner_entities);
                     args.launch_generated(instance_config)
                         .map_err(driver_error)?;
-
-                    let mut args = fused_launch_builder(
-                        &self.stream,
-                        &self.reduce_claim_instances,
-                        self.fused_batch.as_ref(),
-                    );
-                    args.arg(&claim_instance_begin)
-                        .arg(&claim_instance_count)
-                        .arg(&self.instance_resources)
-                        .arg(&self.instance_keys)
-                        .arg(&self.instance_rules)
-                        .arg(&self.instance_entities)
-                        .arg(&self.winner_keys)
-                        .arg(&self.winner_rules)
-                        .arg(&self.winner_entities)
-                        .arg(&mut self.winner_instances);
-                    args.launch_generated(instance_config)
-                        .map_err(driver_error)?;
                 }
 
                 let mut args = fused_launch_builder(
@@ -546,7 +461,7 @@ impl CudaBackend {
                     .map_err(driver_error)?;
             }
             let effects_config = self.validation_launch_config(effects_rows, one);
-            for phase in 0..VALIDATION_REDUCTION_PASSES {
+            for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -567,20 +482,19 @@ impl CudaBackend {
                         .arg(&self.wins)
                         .arg(&self.effect_active)
                         .arg(&box_index_u32)
-                        .arg(&mut self.status);
+                        .arg(&mut self.status)
+                        .arg(&validation_phase);
                     args.launch_generated(effects_config)
                         .map_err(driver_error)?;
                 }
-                finish_validation_reduction_pass(
-                    &self.stream,
-                    &self.advance_validation_phase,
-                    &self.commit_validation_status,
-                    &mut self.status,
-                    phase,
-                    one,
-                    self.fused_batch.as_ref(),
-                )?;
             }
+            commit_validation_reduction(
+                &self.stream,
+                &self.commit_validation_status,
+                &mut self.status,
+                one,
+                self.fused_batch.as_ref(),
+            )?;
         }
         Ok(())
     }
@@ -621,7 +535,7 @@ impl CudaBackend {
                 continue;
             }
             let rule_id = transition.rule_id;
-            for phase in 0..VALIDATION_REDUCTION_PASSES {
+            for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -643,20 +557,19 @@ impl CudaBackend {
                         .arg(&mut self.owners)
                         .arg(&mut self.owner_values)
                         .arg(&rule_id)
-                        .arg(&mut self.status);
+                        .arg(&mut self.status)
+                        .arg(&validation_phase);
                     args.launch_generated(LaunchConfig::for_num_elems(rows))
                         .map_err(driver_error)?;
                 }
-                finish_validation_reduction_pass(
-                    &self.stream,
-                    &self.advance_validation_phase,
-                    &self.commit_validation_status,
-                    &mut self.status,
-                    phase,
-                    one,
-                    self.fused_batch.as_ref(),
-                )?;
             }
+            commit_validation_reduction(
+                &self.stream,
+                &self.commit_validation_status,
+                &mut self.status,
+                one,
+                self.fused_batch.as_ref(),
+            )?;
         }
         if self.layout.owner_count != 0 {
             let launch_count = owner_launch_count;
@@ -677,6 +590,9 @@ impl CudaBackend {
     }
 
     fn prepare_outputs(&mut self, one: LaunchConfig) -> Result<(), CudaError> {
+        if self.layout.ports.is_empty() {
+            return Ok(());
+        }
         // Moore outputs observe prospective state, so rebuild only aggregates
         // reachable from wired output expressions against next_state.
         let require_active = 0_u8;
@@ -761,7 +677,7 @@ impl CudaBackend {
                 output_rows = output_rows.max(rows);
             }
             let output_config = self.validation_launch_config(output_rows, one);
-            for phase in 0..VALIDATION_REDUCTION_PASSES {
+            for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -778,19 +694,18 @@ impl CudaBackend {
                         .arg(&self.aggregates)
                         .arg(&self.aggregate_facts)
                         .arg(&self.aggregate_offsets)
-                        .arg(&mut self.status);
+                        .arg(&mut self.status)
+                        .arg(&validation_phase);
                     args.launch_generated(output_config).map_err(driver_error)?;
                 }
-                finish_validation_reduction_pass(
-                    &self.stream,
-                    &self.advance_validation_phase,
-                    &self.commit_validation_status,
-                    &mut self.status,
-                    phase,
-                    one,
-                    self.fused_batch.as_ref(),
-                )?;
             }
+            commit_validation_reduction(
+                &self.stream,
+                &self.commit_validation_status,
+                &mut self.status,
+                one,
+                self.fused_batch.as_ref(),
+            )?;
         }
         {
             let port_count = self.layout.ports.len() as u64;

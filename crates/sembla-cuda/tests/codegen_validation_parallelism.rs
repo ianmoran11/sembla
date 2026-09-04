@@ -1,6 +1,6 @@
 //! GPU-less acceptance tests for PRD 0002 and PRD 0007 parallel kernels.
 //!
-//! The four per-row validation kernels must execute across the device and
+//! The ordered per-row validation kernels must execute across the device and
 //! report the minimum failing candidate index for every launch geometry.
 //! These tests assert on the emitted CUDA source and exercise a host-side
 //! mirror of the device reduction protocol; no GPU is required.
@@ -13,7 +13,7 @@ mod diagnostic_cases;
 
 /// One model exercising every parallelised validation path: a checked guard
 /// (transition), a contested resource with a checked key (claims), checked
-/// and enum/ref-typed effects (effects), and a wired Int output with a
+/// and enum/ref-typed effects, and a wired Int output with a
 /// checked value (outputs plus the ordered fold).
 fn parallel_validation_model() -> sembla_ir::ValidatedModel {
     let source = r#"{"name":"parallel_validation","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Person","size_hint":2,"attrs":[{"name":"state","ty":{"kind":"enum","variants":["Off","On"]}},{"name":"x","ty":{"kind":"int"}},{"name":"priority","ty":{"kind":"int"}},{"name":"mate","ty":{"kind":"ref","table":"Person"}}]}],"transitions":[{"name":"act","table":"Person","guard":{"kind":"gt","lhs":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}},"rhs":{"kind":"int","value":0}},"hazard":{"kind":"real","value":1.0},"effects":[{"kind":"set_attr","attr":"x","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":2}}},{"kind":"set_attr","attr":"state","value":{"kind":"enum","variant":"On"}},{"kind":"set_attr","attr":"mate","value":{"kind":"self_attr","name":"mate"}}],"contests":[{"resource":{"kind":"self_attr","name":"mate"},"ordering":{"kind":"key","expr":{"kind":"mul","lhs":{"kind":"self_attr","name":"priority"},"rhs":{"kind":"int","value":2}}}}]}],"inputs":[],"outputs":[{"name":"totals","schema":[{"name":"total","ty":{"kind":"int"}}],"builder":{"kind":"per_table","table":"Person","fields":[{"name":"total","op":{"kind":"sum","value":{"kind":"mul","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":3}}},"filter":{"kind":"gt","lhs":{"kind":"self_attr","name":"x"},"rhs":{"kind":"int","value":0}}}]}}],"views":[]},{"name":"sink","tables":[],"transitions":[],"inputs":[{"name":"totals","schema":[{"name":"total","ty":{"kind":"int"}}]}],"outputs":[],"views":[]}],"wires":[{"from":{"box":"world","port":"totals"},"to":{"box":"sink","port":"totals"}}],"summaries":[]}"#;
@@ -49,16 +49,14 @@ fn kernel_body<'a>(source: &'a str, name: &str) -> &'a str {
     &rest[..end]
 }
 
-const PARALLEL_KERNELS: [&str; 4] = [
-    "sembla_validate_claims",
+const PARALLEL_KERNELS: [&str; 3] = [
     "sembla_validate_transition",
     "sembla_validate_effects",
     "sembla_validate_outputs",
 ];
 
-/// The remaining deliberately single-threaded kernels. PRD 0007 removes
-/// `sembla_check_candidate_errors` and `sembla_prepare_effects` from this list.
-const SERIAL_KERNELS: [&str; 9] = [
+/// The remaining deliberately single-threaded kernels.
+const SERIAL_KERNELS: [&str; 8] = [
     "sembla_reset_status",
     "sembla_record_aggregate_errors",
     "sembla_check_output_errors",
@@ -66,7 +64,6 @@ const SERIAL_KERNELS: [&str; 9] = [
     "sembla_prepare_outputs",
     "sembla_validate_claim_compatibility",
     "sembla_init_validation_scratch",
-    "sembla_advance_validation_phase",
     "sembla_commit_validation_status",
 ];
 
@@ -84,8 +81,10 @@ fn parallel_validation_kernels_drop_the_single_thread_guard_and_grid_stride() {
             "{kernel} must grid-stride its row loop with gridDim.x * blockDim.x"
         );
         assert!(
-            body.contains("if (status[0] != 0ULL) return;"),
-            "{kernel} keeps only the cross-launch short-circuit guard"
+            body.contains(
+                "if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;"
+            ),
+            "{kernel} must stop after a committed error or a clean first pass"
         );
     }
 }
@@ -136,7 +135,8 @@ fn generated_validation_argmin_contains_no_mutex_or_retry_loop() {
     assert!(!generated.source.contains("atomicCAS(status + 4"));
     assert!(!prelude.contains("spin lock"));
     assert!(!prelude.contains("Requires independent thread scheduling"));
-    assert!(prelude.contains("unsigned long long phase = status[4];"));
+    assert!(prelude.contains("unsigned long long* status, unsigned long long phase,"));
+    assert!(!prelude.contains("unsigned long long phase = status[4];"));
     assert!(prelude.contains("phase == 0ULL"));
     assert!(prelude.contains("phase == 1ULL"));
     assert!(prelude.contains("phase == 2ULL"));
@@ -156,20 +156,10 @@ fn generated_validation_argmin_contains_no_mutex_or_retry_loop() {
 }
 
 #[test]
-fn candidate_errors_and_effect_preparation_are_grid_strided_reductions() {
+fn effect_preparation_is_grid_strided_and_candidate_errors_are_not_rechecked() {
     let generated = generate(&parallel_validation_model()).unwrap();
-    let candidates = kernel_body(&generated.source, "sembla_check_candidate_errors");
-    assert!(!candidates.contains("blockIdx.x != 0"));
-    assert_eq!(
-        candidates
-            .matches("row < candidate_count; row += stride")
-            .count(),
-        2,
-        "guard and hazard candidate arrays must both be grid-strided"
-    );
-    assert!(candidates.contains("sembla_record_validation_failure(status, 3ULL"));
-    assert!(!candidates.contains("status[0] ="));
-    assert!(!candidates.contains("status[1] ="));
+    assert!(!generated.source.contains("sembla_check_candidate_errors"));
+    assert!(!generated.source.contains("sembla_validate_claims"));
 
     let owners = kernel_body(&generated.source, "sembla_init_effect_owners");
     assert!(!owners.contains("blockIdx.x != 0"));
@@ -180,7 +170,8 @@ fn candidate_errors_and_effect_preparation_are_grid_strided_reductions() {
     assert!(effects.contains("row < row_counts["));
     assert!(effects.contains("row += stride"));
     assert!(effects.contains("sembla_record_validation_failure(status,"));
-    assert!(effects.contains("unsigned long long validation_phase = status[4];"));
+    assert!(effects.contains("unsigned long long validation_phase)"));
+    assert!(effects.contains("validation_phase != 0ULL && status[5]"));
     assert!(effects.contains("if (validation_phase == 0ULL)"));
     assert!(effects.contains("else if (owners[owner] != -1"));
     assert!(!effects.contains("status[0] ="));

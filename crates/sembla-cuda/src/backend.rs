@@ -247,21 +247,14 @@ fn control_reports_from_counts(
     Ok((fired_per_box, deferred_per_resource_table))
 }
 
-fn finish_validation_reduction_pass(
+fn commit_validation_reduction(
     stream: &std::sync::Arc<cudarc::driver::CudaStream>,
-    advance: &CudaFunction,
     commit: &CudaFunction,
     status: &mut CudaSlice<u64>,
-    phase: u64,
     one: LaunchConfig,
     batch: Option<&FusedBatchMeta>,
 ) -> Result<(), CudaError> {
-    let function = if phase + 1 < VALIDATION_REDUCTION_PASSES {
-        advance
-    } else {
-        commit
-    };
-    let mut args = fused_launch_builder(stream, function, batch);
+    let mut args = fused_launch_builder(stream, commit, batch);
     args.arg(status);
     args.launch_generated(one).map(|_| ()).map_err(driver_error)
 }
@@ -420,15 +413,12 @@ pub struct CudaBackend {
     finish_aggregates: CudaFunction,
     record_aggregate_errors: CudaFunction,
     validate_transition: CudaFunction,
-    check_errors: CudaFunction,
-    validate_claims: CudaFunction,
     validate_claim_compatibility: CudaFunction,
     init_conflict_winners: CudaFunction,
     build_claim_instances: CudaFunction,
     reduce_claim_keys: CudaFunction,
     reduce_claim_rules: CudaFunction,
     reduce_claim_entities: CudaFunction,
-    reduce_claim_instances: CudaFunction,
     resolve_conflicts: CudaFunction,
     validate_effects: CudaFunction,
     init_effect_owners: CudaFunction,
@@ -452,7 +442,6 @@ pub struct CudaBackend {
     count_deferred: CudaFunction,
     philox_vectors_kernel: CudaFunction,
     init_validation_scratch: CudaFunction,
-    advance_validation_phase: CudaFunction,
     commit_validation_status: CudaFunction,
     mark_effect_active: CudaFunction,
     state: CudaSlice<u8>,
@@ -477,7 +466,6 @@ pub struct CudaBackend {
     claim_instance_offsets: CudaSlice<u64>,
     enabled: CudaSlice<u8>,
     times: CudaSlice<f64>,
-    candidate_errors: CudaSlice<u8>,
     wins: CudaSlice<u8>,
     deferred: CudaSlice<u8>,
     fired_counts: CudaSlice<u64>,
@@ -489,7 +477,6 @@ pub struct CudaBackend {
     winner_keys: CudaSlice<u64>,
     winner_rules: CudaSlice<u32>,
     winner_entities: CudaSlice<u32>,
-    winner_instances: CudaSlice<u64>,
     write_offsets: CudaSlice<u64>,
     owners: CudaSlice<i32>,
     owner_values: CudaSlice<u64>,
@@ -720,15 +707,12 @@ impl CudaBackend {
         let finish_aggregates = load("sembla_finish_aggregates")?;
         let record_aggregate_errors = load("sembla_record_aggregate_errors")?;
         let validate_transition = load("sembla_validate_transition")?;
-        let check_errors = load("sembla_check_candidate_errors")?;
-        let validate_claims = load("sembla_validate_claims")?;
         let validate_claim_compatibility = load("sembla_validate_claim_compatibility")?;
         let init_conflict_winners = load("sembla_init_conflict_winners")?;
         let build_claim_instances = load("sembla_build_claim_instances")?;
         let reduce_claim_keys = load("sembla_reduce_claim_keys")?;
         let reduce_claim_rules = load("sembla_reduce_claim_rules")?;
         let reduce_claim_entities = load("sembla_reduce_claim_entities")?;
-        let reduce_claim_instances = load("sembla_reduce_claim_instances")?;
         let resolve_conflicts = load("sembla_resolve_conflicts")?;
         let validate_effects = load("sembla_validate_effects")?;
         let init_effect_owners = load("sembla_init_effect_owners")?;
@@ -752,7 +736,6 @@ impl CudaBackend {
         let count_deferred = load("sembla_count_deferred")?;
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
         let init_validation_scratch = load("sembla_init_validation_scratch")?;
-        let advance_validation_phase = load("sembla_advance_validation_phase")?;
         let commit_validation_status = load("sembla_commit_validation_status")?;
         let mark_effect_active = load("sembla_mark_effect_active")?;
 
@@ -840,12 +823,6 @@ impl CudaBackend {
         let times = stream
             .alloc_zeros::<f64>(arena_len(candidate_len, "candidate times")?)
             .map_err(driver_error)?;
-        let candidate_error_len = candidate_len.checked_mul(2).ok_or_else(|| {
-            CudaError::InvalidInput("candidate error buffer size overflow".to_owned())
-        })?;
-        let candidate_errors = stream
-            .alloc_zeros::<u8>(arena_len(candidate_error_len, "candidate errors")?)
-            .map_err(driver_error)?;
         let wins = stream
             .alloc_zeros::<u8>(arena_len(candidate_len, "candidate wins")?)
             .map_err(driver_error)?;
@@ -887,9 +864,6 @@ impl CudaBackend {
             .map_err(driver_error)?;
         let winner_entities = stream
             .alloc_zeros::<u32>(resource_arena_len)
-            .map_err(driver_error)?;
-        let winner_instances = stream
-            .alloc_zeros::<u64>(resource_arena_len)
             .map_err(driver_error)?;
         let write_offsets = stream
             .memcpy_stod(&nonempty(&layout.write_offsets))
@@ -954,8 +928,8 @@ impl CudaBackend {
             .alloc_zeros::<u64>(arena_len(generic_enum_stride, "generic enum counts")?)
             .map_err(driver_error)?;
         // status[0..=3] is the committed diagnostic; status[4..=11] is the
-        // per-launch validation-reduction scratch (phase, scan, ordering
-        // identity, code, branch, and selected payload).
+        // per-launch validation-reduction scratch. The phase is passed as a
+        // kernel scalar, while these slots retain the winning key and payload.
         let status = stream
             .alloc_zeros::<u64>(arena_len(12, "validation status")?)
             .map_err(driver_error)?;
@@ -990,7 +964,6 @@ impl CudaBackend {
             stride!(AggregateActive, aggregate_meta_stride);
             stride!(Enabled, candidate_len);
             stride!(Times, candidate_len);
-            stride!(CandidateErrors, candidate_error_len);
             stride!(Wins, candidate_len);
             stride!(Deferred, deferred_len);
             stride!(FiredCounts, fired_counts_stride);
@@ -1002,7 +975,6 @@ impl CudaBackend {
             stride!(WinnerKeys, resource_len);
             stride!(WinnerRules, resource_len);
             stride!(WinnerEntities, resource_len);
-            stride!(WinnerInstances, resource_len);
             stride!(Owners, owner_stride);
             stride!(OwnerValues, owner_stride);
             stride!(OutputPartials, output_partials_stride);
@@ -1054,15 +1026,12 @@ impl CudaBackend {
             finish_aggregates,
             record_aggregate_errors,
             validate_transition,
-            check_errors,
-            validate_claims,
             validate_claim_compatibility,
             init_conflict_winners,
             build_claim_instances,
             reduce_claim_keys,
             reduce_claim_rules,
             reduce_claim_entities,
-            reduce_claim_instances,
             resolve_conflicts,
             validate_effects,
             init_effect_owners,
@@ -1086,7 +1055,6 @@ impl CudaBackend {
             count_deferred,
             philox_vectors_kernel,
             init_validation_scratch,
-            advance_validation_phase,
             commit_validation_status,
             mark_effect_active,
             state,
@@ -1111,7 +1079,6 @@ impl CudaBackend {
             claim_instance_offsets,
             enabled,
             times,
-            candidate_errors,
             wins,
             deferred,
             fired_counts,
@@ -1123,7 +1090,6 @@ impl CudaBackend {
             winner_keys,
             winner_rules,
             winner_entities,
-            winner_instances,
             write_offsets,
             owners,
             owner_values,
@@ -1196,7 +1162,6 @@ impl CudaBackend {
             aggregate_active,
             enabled,
             times,
-            candidate_errors,
             wins,
             deferred,
             fired_counts,
@@ -1208,7 +1173,6 @@ impl CudaBackend {
             winner_keys,
             winner_rules,
             winner_entities,
-            winner_instances,
             owners,
             owner_values,
             output_partials,
@@ -1285,7 +1249,6 @@ impl CudaBackend {
             aggregate_active,
             enabled,
             times,
-            candidate_errors,
             wins,
             deferred,
             fired_counts,
@@ -1297,7 +1260,6 @@ impl CudaBackend {
             winner_keys,
             winner_rules,
             winner_entities,
-            winner_instances,
             owners,
             owner_values,
             output_partials,

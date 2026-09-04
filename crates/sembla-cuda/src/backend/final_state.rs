@@ -524,13 +524,6 @@ fn isolated_lane_device_buffer_bytes(
     let candidates = layout.candidate_count.max(1);
     add(candidates, 1, "enabled candidates")?;
     add(candidates, 8, "candidate times")?;
-    add(
-        candidates
-            .checked_mul(2)
-            .ok_or_else(|| CudaError::InvalidInput("candidate error size overflow".to_owned()))?,
-        1,
-        "candidate errors",
-    )?;
     add(candidates, 1, "candidate wins")?;
     add(
         candidates
@@ -550,7 +543,6 @@ fn isolated_lane_device_buffer_bytes(
     add(resources, 8, "winner keys")?;
     add(resources, 4, "winner rules")?;
     add(resources, 4, "winner entities")?;
-    add(resources, 8, "winner instances")?;
     add(nonempty_len(layout.write_offsets.len()), 8, "write offsets")?;
     let owners = layout.owner_count.max(1);
     add(owners, 4, "effect owners")?;

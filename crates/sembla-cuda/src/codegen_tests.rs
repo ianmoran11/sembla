@@ -264,7 +264,8 @@ fn generation_is_deterministic_and_has_one_kernel_per_transition() {
     );
     assert!(first.source.contains("sembla_build_aggregate_partials"));
     assert!(first.source.contains("sembla_finish_aggregates"));
-    assert!(first.source.contains("sembla_validate_claims"));
+    assert!(!first.source.contains("sembla_validate_claims"));
+    assert!(!first.source.contains("sembla_check_candidate_errors"));
     assert!(first.source.contains("sembla_resolve_conflicts"));
     assert!(first.source.contains("sembla_prepare_effects"));
     assert!(first.source.contains("sembla_apply_effects"));
@@ -576,12 +577,13 @@ fn unwired_output_aggregates_are_not_collected() {
 }
 
 #[test]
-fn contested_source_eagerly_checks_claims_and_uses_candidate_parallel_argmin() {
+fn contested_source_checks_claims_once_and_uses_candidate_parallel_argmin() {
     let generated = generate(&contested_model()).unwrap();
-    assert!(generated.source.contains("sembla_validate_claims"));
+    assert!(!generated.source.contains("sembla_validate_claims"));
+    assert!(!generated.source.contains("sembla_check_candidate_errors"));
     assert!(generated
         .source
-        .contains("sembla_record_validation_failure(status, 10ULL, candidate,"));
+        .contains("sembla_record_validation_failure(status, validation_phase, 10ULL,"));
     assert!(generated
         .source
         .contains("self_candidate = candidate_begin + local_candidate"));
@@ -620,6 +622,29 @@ fn stable_rule_words_key_philox_and_conflict_ordering_while_ordinals_index() {
 }
 
 #[test]
+fn transition_candidates_skip_hazard_and_rng_when_the_guard_is_false() {
+    let generated = generate(&contested_model()).unwrap();
+    let transition = kernel_body(&generated.source, &generated.transition_kernels[0]);
+
+    let guard = transition.find("int guard =").unwrap();
+    let guard_exit = transition
+        .find("if (local_error || !guard) return;")
+        .unwrap();
+    let hazard = transition.find("double lambda =").unwrap();
+    let hazard_exit = transition
+        .find("if (local_error || !(lambda > 0.0)) return;")
+        .unwrap();
+    let draw = transition.find("double time = sembla_exp(").unwrap();
+
+    assert!(transition.contains("enabled[candidate] = 0U;"));
+    assert!(guard < guard_exit);
+    assert!(guard_exit < hazard);
+    assert!(hazard < hazard_exit);
+    assert!(hazard_exit < draw);
+    assert!(!transition.contains("errors[candidate]"));
+}
+
+#[test]
 fn incompatible_claims_are_checked_serially_before_parallel_argmin() {
     let generated = generate(&incompatible_claim_model()).unwrap();
     let (before_resolve, resolver_and_after) = generated
@@ -652,7 +677,6 @@ fn segmented_argmin_has_no_cross_table_row_scan_and_prefixes_every_pass() {
         "sembla_reduce_claim_keys",
         "sembla_reduce_claim_rules",
         "sembla_reduce_claim_entities",
-        "sembla_reduce_claim_instances",
         "sembla_resolve_conflicts",
     ] {
         let body = kernel_body(&generated.source, kernel);
@@ -667,10 +691,8 @@ fn segmented_argmin_has_no_cross_table_row_scan_and_prefixes_every_pass() {
     let entities = kernel_body(&generated.source, "sembla_reduce_claim_entities");
     assert!(entities.contains("instance_keys[instance] == winner_keys[resource]"));
     assert!(entities.contains("instance_rules[instance] == winner_rules[resource]"));
-    let instances = kernel_body(&generated.source, "sembla_reduce_claim_instances");
-    assert!(instances.contains("instance_keys[instance] == winner_keys[resource]"));
-    assert!(instances.contains("instance_rules[instance] == winner_rules[resource]"));
-    assert!(instances.contains("instance_entities[instance] == winner_entities[resource]"));
+    assert!(!generated.source.contains("sembla_reduce_claim_instances"));
+    assert!(!generated.source.contains("winner_instances"));
 }
 
 #[test]
@@ -861,59 +883,10 @@ fn policy_source_contains_prospective_output_and_parallel_result_stages() {
 }
 
 #[test]
-fn sir_simulation_source_matches_unchanged_checked_in_golden() {
-    fn remove_between(source: &mut String, begin: &str, end: &str) {
-        let begin = source.find(begin).unwrap();
-        let end = source[begin..]
-            .find(end)
-            .map(|offset| begin + offset)
-            .unwrap();
-        source.replace_range(begin..end, "");
-    }
-
+fn sir_simulation_source_matches_checked_in_golden() {
     let generated = generate(&sir_model()).unwrap();
-    let mut simulation = generated.source;
-    let mut golden = include_str!("../tests/fixtures/sir.generated.cu").to_owned();
-
-    // PRD 0008 replaces these regions with focused lock-free protocol
-    // assertions. Excluding them from both sides keeps the pre-existing
-    // broad source golden byte-identical rather than blessing unrelated
-    // generated-source churn while updating a correctness protocol.
-    for source in [&mut simulation, &mut golden] {
-        remove_between(
-            source,
-            "// Records one validation failure into scratch slots",
-            "__device__ __forceinline__ long long sembla_add_i64",
-        );
-        remove_between(
-            source,
-            "\nextern \"C\" __global__ void sembla_init_validation_scratch",
-            "\nextern \"C\" __global__ void sembla_mark_effect_active",
-        );
-        remove_between(
-            source,
-            "\nextern \"C\" __global__ void sembla_prepare_effects",
-            "\nextern \"C\" __global__ void sembla_apply_effects",
-        );
-    }
-
-    let helpers_begin = simulation
-        .find("__device__ __forceinline__ void sembla_atomic_min_i64")
-        .unwrap();
-    let helpers_end = simulation[helpers_begin..]
-        .find("__device__ __forceinline__ unsigned long long sembla_f64_order_key")
-        .map(|offset| helpers_begin + offset)
-        .unwrap();
-    simulation.replace_range(helpers_begin..helpers_end, "");
-    let observation_begin = simulation
-        .find("\nextern \"C\" __global__ void sembla_init_observations")
-        .unwrap();
-    let observation_end = simulation[observation_begin..]
-        .find("\nextern \"C\" __global__ void sembla_philox_vectors")
-        .map(|offset| observation_begin + offset)
-        .unwrap();
-    simulation.replace_range(observation_begin..observation_end, "");
-    assert_eq!(simulation, golden);
+    let golden = include_str!("../tests/fixtures/sir.generated.cu");
+    assert_eq!(generated.source, golden);
 }
 
 #[test]
