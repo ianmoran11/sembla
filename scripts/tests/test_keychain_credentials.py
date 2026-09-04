@@ -148,7 +148,7 @@ class KeychainCredentialsTest(unittest.TestCase):
         )
         self.assertLess(
             prepare.index("unset HYPERSTACK_API_KEY"),
-            prepare.index('read_item "$HYPERSTACK_SERVICE"'),
+            prepare.index('read_item_with_interactive_unlock "$HYPERSTACK_SERVICE"'),
         )
         self.assertLess(
             prepare.index("unset HYPERSTACK_API_KEY"),
@@ -166,6 +166,8 @@ class KeychainCredentialsTest(unittest.TestCase):
             )
         self.assertNotIn("export TAILSCALE_OAUTH", source)
         self.assertNotIn("launchctl setenv HYPERSTACK_API_KEY", source)
+        self.assertIn('security unlock-keychain "$login_keychain" < /dev/tty', source)
+        self.assertNotIn('security unlock-keychain -p', source)
         self.assertLess(source.index("set +x"), source.index("set -Eeuo pipefail"))
 
     def test_terraform_accepts_only_disposable_auth_keys_and_requires_one_paid(self):
