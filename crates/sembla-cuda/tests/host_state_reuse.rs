@@ -27,6 +27,7 @@ const CLI_SWEEP: &str = concat!(
     include_str!("../../sembla-cli/src/sweep/options.rs"),
     include_str!("../../sembla-cli/src/sweep/draw.rs"),
     include_str!("../../sembla-cli/src/sweep/publication.rs"),
+    include_str!("../../sembla-cli/src/sweep/finalize.rs"),
 );
 
 #[test]
