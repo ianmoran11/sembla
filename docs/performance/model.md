@@ -140,7 +140,7 @@ Each was measured as a hand-written arm asserted to produce identical results
 against the real code. Spikes are runnable:
 
 ```sh
-cargo run --release -p sembla-runtime --example threading_spike
+cargo run --release -p sembla-cpu --example threading_spike
 ```
 
 | lever | measured | spike |

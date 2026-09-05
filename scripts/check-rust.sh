@@ -18,8 +18,12 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 python3 -B scripts/check-rust-architecture.py
+python3 -B scripts/report-rust-context.py \
+    --check scripts/rust-context-budget.json \
+    --top 5
 cargo fmt --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 cargo test --locked --workspace
 
 if ! grep -Eq '^libm[[:space:]]*=[[:space:]]*"=[0-9]+\.[0-9]+\.[0-9]+"[[:space:]]*$' \
@@ -41,7 +45,7 @@ unexpected_runtime_dependencies="$(
         --prefix none \
         --format '{p}' | \
         tail -n +2 | \
-        awk '$1 != "sembla-ir" && $1 != "sha2" && $1 != "libm"'
+        awk '$1 != "sembla-ir" && $1 != "sha2" && $1 != "libm" && $1 != "serde" && $1 != "serde_json"'
 )"
 if [[ -n "$unexpected_runtime_dependencies" ]]; then
     echo "unapproved dependencies are forbidden in sembla-runtime; found:" >&2

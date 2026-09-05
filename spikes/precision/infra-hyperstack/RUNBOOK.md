@@ -72,6 +72,14 @@ Each item below has failed at least once in practice.
       key, console hash, host key, and optional evidence deploy key from
       launchctl. Plan, apply, watchdog and collector must remain in that shell.
       Long-lived OAuth credentials are never imported.
+- [ ] **Keep one macOS bootstrap context for the whole session.** `launchctl`
+      values are scoped to the caller's bootstrap namespace. A background agent
+      can therefore see an empty namespace while Terminal still holds an older
+      paid session. Prepare, plan, apply, collect, and run `cleanup-session` from
+      the same Terminal/tmux context. Shell `unset` does not clear `launchctl`.
+      When retiring a paid tmux environment, terminate its whole server with
+      `tmux -L <socket-name> kill-server`; killing one session can leave a server
+      process carrying stale environment.
 - [ ] **`umask 077` before `terraform plan`.** The plan file embeds the console
       password hash — and the evidence deploy key, if set — inside user-data;
       `review-paid-plan.py` refuses a `0644` plan, and it is right to.
@@ -843,4 +851,3 @@ an overnight run would have billed until the machine next woke.
 
 Even so, prefer to run when you are awake. Every session so far has produced
 at least one surprise needing a decision.
-

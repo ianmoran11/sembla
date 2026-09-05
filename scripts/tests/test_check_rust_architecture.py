@@ -11,12 +11,19 @@ import unittest
 
 
 CHECKER = Path(__file__).resolve().parents[1] / "check-rust-architecture.py"
-PACKAGE_NAMES = ("sembla-ir", "sembla-runtime", "sembla-cuda", "sembla-cli")
+PACKAGE_NAMES = (
+    "sembla-ir",
+    "sembla-runtime",
+    "sembla-cpu",
+    "sembla-cuda",
+    "sembla-cli",
+)
 EXPECTED_EDGES = {
     "sembla-ir": [],
     "sembla-runtime": ["sembla-ir"],
-    "sembla-cuda": ["sembla-ir", "sembla-runtime"],
-    "sembla-cli": ["sembla-cuda", "sembla-ir", "sembla-runtime"],
+    "sembla-cpu": ["sembla-ir", "sembla-runtime"],
+    "sembla-cuda": ["sembla-cpu", "sembla-ir", "sembla-runtime"],
+    "sembla-cli": ["sembla-cpu", "sembla-cuda", "sembla-ir", "sembla-runtime"],
 }
 
 
@@ -24,7 +31,7 @@ class RustArchitectureCheckerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
-        for crate in ("sembla-ir", "sembla-runtime"):
+        for crate in ("sembla-ir", "sembla-runtime", "sembla-cpu"):
             source = self.root / "crates" / crate / "src" / "lib.rs"
             source.parent.mkdir(parents=True, exist_ok=True)
             source.write_text("pub fn pure() -> bool { true }\n", encoding="utf-8")
@@ -41,7 +48,15 @@ class RustArchitectureCheckerTests(unittest.TestCase):
                     "id": f"path+file:///{name}#0.3.0",
                     "name": name,
                     "dependencies": [
-                        {"name": dependency} for dependency in selected[name]
+                        {
+                            "name": dependency,
+                            "kind": (
+                                "dev"
+                                if (name, dependency) == ("sembla-cuda", "sembla-cpu")
+                                else None
+                            ),
+                        }
+                        for dependency in selected[name]
                     ],
                 }
             )
@@ -102,6 +117,38 @@ class RustArchitectureCheckerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("backend-specific CUDA vocabulary is forbidden", result.stderr)
         self.assertIn("direct stdout/stderr reporting is forbidden", result.stderr)
+
+    def test_cuda_cpu_dependency_is_dev_only(self) -> None:
+        metadata = json.loads(self.metadata().read_text(encoding="utf-8"))
+        cuda = next(
+            package for package in metadata["packages"] if package["name"] == "sembla-cuda"
+        )
+        cpu = next(
+            dependency
+            for dependency in cuda["dependencies"]
+            if dependency["name"] == "sembla-cpu"
+        )
+        cpu["kind"] = None
+        path = self.root / "metadata.json"
+        path.write_text(json.dumps(metadata), encoding="utf-8")
+
+        result = self.run_checker(path)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sembla-cpu is permitted only as a dev-dependency", result.stderr)
+
+    def test_cuda_backend_wildcard_import_is_rejected(self) -> None:
+        source = self.root / "crates" / "sembla-cuda" / "src" / "lib.rs"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("use crate::backend::*;\n", encoding="utf-8")
+
+        result = self.run_checker(self.metadata())
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "wildcard imports are forbidden at explicit backend boundaries",
+            result.stderr,
+        )
 
 
 if __name__ == "__main__":

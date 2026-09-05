@@ -1,0 +1,19 @@
+[package]
+name = "sembla-cpu"
+description = "Deterministic CPU evaluator and executor for Sembla simulation plans."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+sembla-ir = { path = "../sembla-ir" }
+sembla-runtime = { path = "../sembla-runtime" }
+
+[dev-dependencies]
+sha2 = "0.10"

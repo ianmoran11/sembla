@@ -1,6 +1,6 @@
 [package]
 name = "sembla-runtime"
-description = "Deterministic CPU runtime for executing Sembla simulation plans."
+description = "Backend-neutral state, parameters, observations, and deterministic primitives for Sembla."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,5 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 libm = "=0.2.16"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
 sembla-ir = { path = "../sembla-ir" }
 sha2 = "0.10"

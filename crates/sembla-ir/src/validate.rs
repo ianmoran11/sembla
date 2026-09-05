@@ -1,69 +1,118 @@
 use crate::model::*;
 use crate::ValidationError;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+mod expression;
+
+use expression::*;
 
 pub const GROUPED_OBSERVATIONS_FEATURE: &str = "grouped-observations";
 pub const KNOWN_FEATURES: [&str; 1] = [GROUPED_OBSERVATIONS_FEATURE];
 pub type FeatureSet = BTreeSet<String>;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ValueType {
-    Real,
-    Int,
-    Bool,
-    Enum(Vec<String>),
-    Ref(String),
-}
-
-impl ValueType {
-    fn name(&self) -> &'static str {
-        match self {
-            Self::Real => "Real",
-            Self::Int => "Int",
-            Self::Bool => "Bool",
-            Self::Enum(_) => "Enum",
-            Self::Ref(_) => "Ref",
-        }
-    }
-
-    fn is_numeric(&self) -> bool {
-        matches!(self, Self::Real | Self::Int)
-    }
-
-    fn is_orderable(&self) -> bool {
-        matches!(self, Self::Real | Self::Int | Self::Enum(_))
-    }
-}
-
-impl From<&AttrType> for ValueType {
-    fn from(value: &AttrType) -> Self {
-        match value {
-            AttrType::Real => Self::Real,
-            AttrType::Int => Self::Int,
-            AttrType::Enum { variants } => Self::Enum(variants.clone()),
-            AttrType::Ref { table } => Self::Ref(table.clone()),
-        }
-    }
-}
-
-impl From<ParamType> for ValueType {
-    fn from(value: ParamType) -> Self {
-        match value {
-            ParamType::Real => Self::Real,
-            ParamType::Int => Self::Int,
-        }
-    }
-}
 
 /// A transition annotated with its dense ordinal and runtime identity word.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedTransition {
     pub box_index: usize,
     pub transition_index: usize,
+    /// Index of the transition's source table within its box.
+    pub table_index: usize,
     /// Dense declaration-order ordinal used for indexing and diagnostics.
     pub rule_id: u32,
     /// Philox coordinate word and deterministic conflict tie-break key.
     pub rule_word: u32,
+}
+
+/// Dense indices for one validated wire's endpoints.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ValidatedWire {
+    pub wire_index: usize,
+    pub from_box_index: usize,
+    pub output_index: usize,
+    pub to_box_index: usize,
+    pub input_index: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ResolvedModel {
+    params: BTreeMap<String, usize>,
+    boxes: BTreeMap<String, usize>,
+    tables: Vec<BTreeMap<String, usize>>,
+    inputs: Vec<BTreeMap<String, usize>>,
+    outputs: Vec<BTreeMap<String, usize>>,
+    transition_offsets: Vec<usize>,
+    input_offsets: Vec<usize>,
+    wires: Vec<ValidatedWire>,
+}
+
+impl ResolvedModel {
+    fn new(model: &Model) -> Self {
+        let params = named_indices(&model.params, |param| &param.name);
+        let boxes = named_indices(&model.boxes, |model_box| &model_box.name);
+        let tables: Vec<BTreeMap<String, usize>> = model
+            .boxes
+            .iter()
+            .map(|model_box| named_indices(&model_box.tables, |table| &table.name))
+            .collect();
+        let inputs: Vec<BTreeMap<String, usize>> = model
+            .boxes
+            .iter()
+            .map(|model_box| named_indices(&model_box.inputs, |input| &input.name))
+            .collect();
+        let outputs: Vec<BTreeMap<String, usize>> = model
+            .boxes
+            .iter()
+            .map(|model_box| named_indices(&model_box.outputs, |output| &output.name))
+            .collect();
+        let mut transition_offsets = Vec::with_capacity(model.boxes.len() + 1);
+        let mut offset = 0;
+        for model_box in &model.boxes {
+            transition_offsets.push(offset);
+            offset += model_box.transitions.len();
+        }
+        transition_offsets.push(offset);
+        let mut input_offsets = Vec::with_capacity(model.boxes.len() + 1);
+        let mut input_offset = 0;
+        for model_box in &model.boxes {
+            input_offsets.push(input_offset);
+            input_offset += model_box.inputs.len();
+        }
+        input_offsets.push(input_offset);
+        let wires = model
+            .wires
+            .iter()
+            .enumerate()
+            .map(|(wire_index, wire)| {
+                let from_box_index = boxes[&wire.from.r#box];
+                let to_box_index = boxes[&wire.to.r#box];
+                ValidatedWire {
+                    wire_index,
+                    from_box_index,
+                    output_index: outputs[from_box_index][&wire.from.port],
+                    to_box_index,
+                    input_index: inputs[to_box_index][&wire.to.port],
+                }
+            })
+            .collect();
+        Self {
+            params,
+            boxes,
+            tables,
+            inputs,
+            outputs,
+            transition_offsets,
+            input_offsets,
+            wires,
+        }
+    }
+}
+
+fn named_indices<T>(items: &[T], name: impl Fn(&T) -> &String) -> BTreeMap<String, usize> {
+    items
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (name(item).clone(), index))
+        .collect()
 }
 
 /// A semantically valid model plus metadata derived during validation.
@@ -71,6 +120,7 @@ pub struct ValidatedTransition {
 pub struct ValidatedModel {
     model: Model,
     transitions: Vec<ValidatedTransition>,
+    resolved: ResolvedModel,
 }
 
 impl ValidatedModel {
@@ -86,11 +136,51 @@ impl ValidatedModel {
         &self.transitions
     }
 
-    pub fn rule_id(&self, box_index: usize, transition_index: usize) -> Option<u32> {
+    pub fn transition(&self, rule_id: u32) -> Option<&ValidatedTransition> {
         self.transitions
-            .iter()
-            .find(|rule| rule.box_index == box_index && rule.transition_index == transition_index)
-            .map(|rule| rule.rule_id)
+            .get(rule_id as usize)
+            .filter(|transition| transition.rule_id == rule_id)
+    }
+
+    pub fn transition_at(
+        &self,
+        box_index: usize,
+        transition_index: usize,
+    ) -> Option<&ValidatedTransition> {
+        self.rule_id(box_index, transition_index)
+            .and_then(|rule_id| self.transition(rule_id))
+    }
+
+    pub fn rule_id(&self, box_index: usize, transition_index: usize) -> Option<u32> {
+        let start = *self.resolved.transition_offsets.get(box_index)?;
+        let end = *self.resolved.transition_offsets.get(box_index + 1)?;
+        (transition_index < end - start).then(|| self.transitions[start + transition_index].rule_id)
+    }
+
+    pub fn param_index(&self, name: &str) -> Option<usize> {
+        self.resolved.params.get(name).copied()
+    }
+
+    pub fn box_index(&self, name: &str) -> Option<usize> {
+        self.resolved.boxes.get(name).copied()
+    }
+
+    pub fn table_index(&self, box_index: usize, name: &str) -> Option<usize> {
+        self.resolved.tables.get(box_index)?.get(name).copied()
+    }
+
+    pub fn input_index(&self, box_index: usize, name: &str) -> Option<usize> {
+        self.resolved.inputs.get(box_index)?.get(name).copied()
+    }
+
+    pub fn global_input_index(&self, box_index: usize, input_index: usize) -> Option<usize> {
+        let start = *self.resolved.input_offsets.get(box_index)?;
+        let end = *self.resolved.input_offsets.get(box_index + 1)?;
+        (input_index < end - start).then_some(start + input_index)
+    }
+
+    pub fn wires(&self) -> &[ValidatedWire] {
+        &self.resolved.wires
     }
 
     pub(crate) fn with_rule_words(mut self, words: &[u32]) -> Self {
@@ -119,6 +209,7 @@ pub fn validate_with_features(
     enabled_features: &FeatureSet,
 ) -> Result<ValidatedModel, ValidationError> {
     validate_model(&model, enabled_features)?;
+    let resolved = ResolvedModel::new(&model);
 
     let mut transitions = Vec::new();
     for (box_index, model_box) in model.boxes.iter().enumerate() {
@@ -138,6 +229,8 @@ pub fn validate_with_features(
             transitions.push(ValidatedTransition {
                 box_index,
                 transition_index,
+                table_index: resolved.tables[box_index]
+                    [&model_box.transitions[transition_index].table],
                 rule_id,
                 // Legacy models retain the exact positional RNG/tie-break identity.
                 rule_word: rule_id,
@@ -145,7 +238,11 @@ pub fn validate_with_features(
         }
     }
 
-    Ok(ValidatedModel { model, transitions })
+    Ok(ValidatedModel {
+        model,
+        transitions,
+        resolved,
+    })
 }
 
 fn validate_model(model: &Model, enabled_features: &FeatureSet) -> Result<(), ValidationError> {
@@ -434,15 +531,14 @@ fn validate_grouped_view(
     }
     if let Some(filter) = &view.filter {
         validate_grouped_filter_expr(filter, &format!("{path}.filter"))?;
-        let filter_type = infer_expr(
+        require_expr_type(
             filter,
             model,
             model_box,
             &table.attrs,
             &format!("{path}.filter"),
-            Some(&ValueType::Bool),
+            &ValueType::Bool,
         )?;
-        require_type(&filter_type, &ValueType::Bool, &format!("{path}.filter"))?;
     }
     Ok(())
 }
@@ -496,15 +592,14 @@ fn validate_view(
     })?;
 
     if let Some(filter) = &view.filter {
-        let filter_type = infer_expr(
+        require_expr_type(
             filter,
             model,
             model_box,
             &table.attrs,
             &format!("{path}.filter"),
-            Some(&ValueType::Bool),
+            &ValueType::Bool,
         )?;
-        require_type(&filter_type, &ValueType::Bool, &format!("{path}.filter"))?;
     }
 
     match (&view.reduce, &view.value) {
@@ -626,25 +721,23 @@ fn validate_transition(
         )
     })?;
 
-    let guard_type = infer_expr(
+    require_expr_type(
         &transition.guard,
         model,
         model_box,
         &table.attrs,
         &format!("{path}.guard"),
-        Some(&ValueType::Bool),
+        &ValueType::Bool,
     )?;
-    require_type(&guard_type, &ValueType::Bool, &format!("{path}.guard"))?;
 
-    let hazard_type = infer_expr(
+    require_expr_type(
         &transition.hazard,
         model,
         model_box,
         &table.attrs,
         &format!("{path}.hazard"),
-        Some(&ValueType::Real),
+        &ValueType::Real,
     )?;
-    require_type(&hazard_type, &ValueType::Real, &format!("{path}.hazard"))?;
     if matches!(&transition.hazard, Expr::Real { value } if *value < 0.0) {
         return Err(error(
             format!("{path}.hazard.value"),
@@ -662,18 +755,13 @@ fn validate_transition(
                     )
                 })?;
                 let expected = ValueType::from(&destination.ty);
-                let actual = infer_expr(
+                require_expr_type(
                     value,
                     model,
                     model_box,
                     &table.attrs,
                     &format!("{path}.effects[{index}].value"),
-                    Some(&expected),
-                )?;
-                require_type(
-                    &actual,
                     &expected,
-                    &format!("{path}.effects[{index}].value"),
                 )?;
             }
         }
@@ -794,18 +882,13 @@ fn validate_output(
                     ));
                 }
                 if let Some(filter) = &field.filter {
-                    let filter_type = infer_expr(
+                    require_expr_type(
                         filter,
                         model,
                         model_box,
                         &source.attrs,
                         &format!("{path}.builder.fields[{index}].filter"),
-                        Some(&ValueType::Bool),
-                    )?;
-                    require_type(
-                        &filter_type,
                         &ValueType::Bool,
-                        &format!("{path}.builder.fields[{index}].filter"),
                     )?;
                 }
                 let field_type = infer_agg_op(
@@ -876,406 +959,6 @@ fn validate_wire(model: &Model, wire: &Wire, index: usize) -> Result<(), Validat
         ));
     }
     Ok(())
-}
-
-fn validate_input_row_expr(expr: &Expr, path: &str) -> Result<(), ValidationError> {
-    match expr {
-        Expr::Input { .. } | Expr::Agg { .. } => Err(error(
-            path,
-            "nested aggregates are not supported inside input table aggregates",
-        )),
-        Expr::Add { lhs, rhs }
-        | Expr::Sub { lhs, rhs }
-        | Expr::Mul { lhs, rhs }
-        | Expr::Div { lhs, rhs }
-        | Expr::Eq { lhs, rhs }
-        | Expr::Ne { lhs, rhs }
-        | Expr::Lt { lhs, rhs }
-        | Expr::Le { lhs, rhs }
-        | Expr::Gt { lhs, rhs }
-        | Expr::Ge { lhs, rhs }
-        | Expr::And { lhs, rhs }
-        | Expr::Or { lhs, rhs } => {
-            validate_input_row_expr(lhs, &format!("{path}.lhs"))?;
-            validate_input_row_expr(rhs, &format!("{path}.rhs"))
-        }
-        Expr::Not { expr } => validate_input_row_expr(expr, &format!("{path}.expr")),
-        Expr::Real { .. }
-        | Expr::Int { .. }
-        | Expr::Bool { .. }
-        | Expr::Enum { .. }
-        | Expr::Param { .. }
-        | Expr::SelfAttr { .. }
-        | Expr::EnumIs { .. } => Ok(()),
-    }
-}
-
-fn infer_expr(
-    expr: &Expr,
-    model: &Model,
-    model_box: &Box,
-    row_attrs: &[Attr],
-    path: &str,
-    expected: Option<&ValueType>,
-) -> Result<ValueType, ValidationError> {
-    match expr {
-        Expr::Real { value } => {
-            if !value.is_finite() {
-                Err(error(
-                    format!("{path}.value"),
-                    "real literal must be finite",
-                ))
-            } else {
-                Ok(ValueType::Real)
-            }
-        }
-        Expr::Int { .. } => Ok(ValueType::Int),
-        Expr::Bool { .. } => Ok(ValueType::Bool),
-        Expr::Enum { variant } => match expected {
-            Some(ValueType::Enum(variants)) => {
-                if variants.contains(variant) {
-                    Ok(ValueType::Enum(variants.clone()))
-                } else {
-                    Err(error(
-                        format!("{path}.variant"),
-                        format!("unknown enum variant '{variant}'"),
-                    ))
-                }
-            }
-            _ => Err(error(
-                path,
-                format!("enum literal '{variant}' requires an Enum-typed context"),
-            )),
-        },
-        Expr::Param { name } => model
-            .params
-            .iter()
-            .find(|param| param.name == *name)
-            .map(|param| ValueType::from(param.ty))
-            .ok_or_else(|| {
-                error(
-                    format!("{path}.name"),
-                    format!("unresolved parameter '{name}'"),
-                )
-            }),
-        Expr::SelfAttr { name } => find_attr(row_attrs, name)
-            .map(|attr| ValueType::from(&attr.ty))
-            .ok_or_else(|| {
-                error(
-                    format!("{path}.name"),
-                    format!("unresolved self attribute '{name}'"),
-                )
-            }),
-        Expr::Add { lhs, rhs } | Expr::Sub { lhs, rhs } | Expr::Mul { lhs, rhs } => {
-            infer_numeric_binary(lhs, rhs, model, model_box, row_attrs, path, false)
-        }
-        Expr::Div { lhs, rhs } => {
-            infer_numeric_binary(lhs, rhs, model, model_box, row_attrs, path, true)
-        }
-        Expr::Eq { lhs, rhs } | Expr::Ne { lhs, rhs } => {
-            infer_equality(lhs, rhs, model, model_box, row_attrs, path)
-        }
-        Expr::Lt { lhs, rhs }
-        | Expr::Le { lhs, rhs }
-        | Expr::Gt { lhs, rhs }
-        | Expr::Ge { lhs, rhs } => {
-            let lhs_type = infer_expr(
-                lhs,
-                model,
-                model_box,
-                row_attrs,
-                &format!("{path}.lhs"),
-                None,
-            )?;
-            let rhs_type = infer_expr(
-                rhs,
-                model,
-                model_box,
-                row_attrs,
-                &format!("{path}.rhs"),
-                Some(&lhs_type),
-            )?;
-            if !(lhs_type.is_numeric() && rhs_type.is_numeric()) {
-                return Err(error(path, "ordered comparison operands must be numeric"));
-            }
-            Ok(ValueType::Bool)
-        }
-        Expr::And { lhs, rhs } | Expr::Or { lhs, rhs } => {
-            let lhs_type = infer_expr(
-                lhs,
-                model,
-                model_box,
-                row_attrs,
-                &format!("{path}.lhs"),
-                Some(&ValueType::Bool),
-            )?;
-            require_type(&lhs_type, &ValueType::Bool, &format!("{path}.lhs"))?;
-            let rhs_type = infer_expr(
-                rhs,
-                model,
-                model_box,
-                row_attrs,
-                &format!("{path}.rhs"),
-                Some(&ValueType::Bool),
-            )?;
-            require_type(&rhs_type, &ValueType::Bool, &format!("{path}.rhs"))?;
-            Ok(ValueType::Bool)
-        }
-        Expr::Not { expr } => {
-            let actual = infer_expr(
-                expr,
-                model,
-                model_box,
-                row_attrs,
-                &format!("{path}.expr"),
-                Some(&ValueType::Bool),
-            )?;
-            require_type(&actual, &ValueType::Bool, &format!("{path}.expr"))?;
-            Ok(ValueType::Bool)
-        }
-        Expr::EnumIs { attr, variant } => {
-            let declaration = find_attr(row_attrs, attr).ok_or_else(|| {
-                error(
-                    format!("{path}.attr"),
-                    format!("EnumIs refers to unknown attribute '{attr}'"),
-                )
-            })?;
-            match &declaration.ty {
-                AttrType::Enum { variants } if variants.contains(variant) => Ok(ValueType::Bool),
-                AttrType::Enum { .. } => Err(error(
-                    format!("{path}.variant"),
-                    format!("unknown variant '{variant}' for enum attribute '{attr}'"),
-                )),
-                _ => Err(error(
-                    format!("{path}.attr"),
-                    format!("EnumIs attribute '{attr}' is not Enum-typed"),
-                )),
-            }
-        }
-        Expr::Input { port, agg } => {
-            let input = model_box
-                .inputs
-                .iter()
-                .find(|input| input.name == *port)
-                .ok_or_else(|| {
-                    error(
-                        format!("{path}.port"),
-                        format!("unresolved input port '{port}'"),
-                    )
-                })?;
-            if let Some(filter) = &agg.filter {
-                validate_input_row_expr(filter, &format!("{path}.agg.filter"))?;
-                let filter_type = infer_expr(
-                    filter,
-                    model,
-                    model_box,
-                    &input.schema,
-                    &format!("{path}.agg.filter"),
-                    Some(&ValueType::Bool),
-                )?;
-                require_type(
-                    &filter_type,
-                    &ValueType::Bool,
-                    &format!("{path}.agg.filter"),
-                )?;
-            }
-            if let AggOp::Sum { value } = &agg.op {
-                validate_input_row_expr(value, &format!("{path}.agg.op.value"))?;
-            }
-            infer_agg_op(
-                &agg.op,
-                model,
-                model_box,
-                &input.schema,
-                &format!("{path}.agg.op"),
-            )
-        }
-        Expr::Agg {
-            op,
-            table,
-            on,
-            filter,
-        } => {
-            let target = find_table(model_box, table).ok_or_else(|| {
-                error(
-                    format!("{path}.table"),
-                    format!("aggregate refers to unknown table '{table}'"),
-                )
-            })?;
-            let target_fk = find_attr(&target.attrs, &on.fk_attr).ok_or_else(|| {
-                error(
-                    format!("{path}.on.fk_attr"),
-                    format!(
-                        "aggregate table '{}' has no attribute '{}'",
-                        target.name, on.fk_attr
-                    ),
-                )
-            })?;
-            let self_fk = find_attr(row_attrs, &on.self_fk_attr).ok_or_else(|| {
-                error(
-                    format!("{path}.on.self_fk_attr"),
-                    format!("current row has no attribute '{}'", on.self_fk_attr),
-                )
-            })?;
-            match (&target_fk.ty, &self_fk.ty) {
-                (AttrType::Ref { table: target_ref }, AttrType::Ref { table: self_ref })
-                    if target_ref == self_ref => {}
-                _ => {
-                    return Err(error(
-                        format!("{path}.on"),
-                        "aggregate join attributes must both be Ref attributes to the same table",
-                    ));
-                }
-            }
-            let filter_type = infer_expr(
-                filter,
-                model,
-                model_box,
-                &target.attrs,
-                &format!("{path}.filter"),
-                Some(&ValueType::Bool),
-            )?;
-            require_type(&filter_type, &ValueType::Bool, &format!("{path}.filter"))?;
-            infer_agg_op(op, model, model_box, &target.attrs, &format!("{path}.op"))
-        }
-    }
-}
-
-fn infer_agg_op(
-    op: &AggOp,
-    model: &Model,
-    model_box: &Box,
-    row_attrs: &[Attr],
-    path: &str,
-) -> Result<ValueType, ValidationError> {
-    match op {
-        AggOp::Count => Ok(ValueType::Int),
-        AggOp::Sum { value } => {
-            let value_type = infer_expr(
-                value,
-                model,
-                model_box,
-                row_attrs,
-                &format!("{path}.value"),
-                None,
-            )?;
-            if !value_type.is_numeric() {
-                return Err(error(
-                    format!("{path}.value"),
-                    format!("Sum value must be numeric, found {}", value_type.name()),
-                ));
-            }
-            Ok(value_type)
-        }
-    }
-}
-
-fn infer_numeric_binary(
-    lhs: &Expr,
-    rhs: &Expr,
-    model: &Model,
-    model_box: &Box,
-    row_attrs: &[Attr],
-    path: &str,
-    division: bool,
-) -> Result<ValueType, ValidationError> {
-    let lhs_type = infer_expr(
-        lhs,
-        model,
-        model_box,
-        row_attrs,
-        &format!("{path}.lhs"),
-        None,
-    )?;
-    let rhs_type = infer_expr(
-        rhs,
-        model,
-        model_box,
-        row_attrs,
-        &format!("{path}.rhs"),
-        None,
-    )?;
-    if !(lhs_type.is_numeric() && rhs_type.is_numeric()) {
-        return Err(error(path, "arithmetic operands must be Real or Int"));
-    }
-    if division || lhs_type == ValueType::Real || rhs_type == ValueType::Real {
-        Ok(ValueType::Real)
-    } else {
-        Ok(ValueType::Int)
-    }
-}
-
-fn infer_equality(
-    lhs: &Expr,
-    rhs: &Expr,
-    model: &Model,
-    model_box: &Box,
-    row_attrs: &[Attr],
-    path: &str,
-) -> Result<ValueType, ValidationError> {
-    let (lhs_type, rhs_type) = if matches!(lhs, Expr::Enum { .. }) {
-        let rhs_type = infer_expr(
-            rhs,
-            model,
-            model_box,
-            row_attrs,
-            &format!("{path}.rhs"),
-            None,
-        )?;
-        let lhs_type = infer_expr(
-            lhs,
-            model,
-            model_box,
-            row_attrs,
-            &format!("{path}.lhs"),
-            Some(&rhs_type),
-        )?;
-        (lhs_type, rhs_type)
-    } else {
-        let lhs_type = infer_expr(
-            lhs,
-            model,
-            model_box,
-            row_attrs,
-            &format!("{path}.lhs"),
-            None,
-        )?;
-        let rhs_type = infer_expr(
-            rhs,
-            model,
-            model_box,
-            row_attrs,
-            &format!("{path}.rhs"),
-            Some(&lhs_type),
-        )?;
-        (lhs_type, rhs_type)
-    };
-    if lhs_type != rhs_type && !(lhs_type.is_numeric() && rhs_type.is_numeric()) {
-        return Err(error(
-            path,
-            format!(
-                "equality operands have incompatible types {} and {}",
-                lhs_type.name(),
-                rhs_type.name()
-            ),
-        ));
-    }
-    Ok(ValueType::Bool)
-}
-
-fn require_type(
-    actual: &ValueType,
-    expected: &ValueType,
-    path: &str,
-) -> Result<(), ValidationError> {
-    if actual == expected {
-        Ok(())
-    } else {
-        Err(error(
-            path,
-            format!("expected {}, found {}", expected.name(), actual.name()),
-        ))
-    }
 }
 
 fn unique_names<'a>(

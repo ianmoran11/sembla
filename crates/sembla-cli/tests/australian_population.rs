@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use sembla_cpu::run_tick_with_features;
 use sembla_ir::{
     Expr, FeatureSet, ParamValue, PriorFamily, ValidatedModel, GROUPED_OBSERVATIONS_FEATURE,
 };
-use sembla_runtime::eval::{ParamEnv, ParamOverride};
-use sembla_runtime::executor::run_tick_with_features;
+use sembla_runtime::core::{ParamEnv, ParamOverride};
 use sembla_runtime::state::{ColumnData, StateStore, TableInit};
 use sembla_runtime::state_artifact::{read, state_artifact_hash, to_table_inits};
 use sha2::{Digest, Sha256};

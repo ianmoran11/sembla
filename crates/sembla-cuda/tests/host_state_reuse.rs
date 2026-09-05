@@ -11,11 +11,28 @@ fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
 }
 
 const CLI_RUN: &str = include_str!("../../sembla-cli/src/run.rs");
-const CLI_SWEEP: &str = include_str!("../../sembla-cli/src/sweep.rs");
+const CUDA_BACKEND: &str = concat!(
+    include_str!("../src/backend.rs"),
+    include_str!("../src/backend/final_state.rs"),
+    include_str!("../src/backend/layout.rs"),
+    include_str!("../src/backend/observation.rs"),
+    include_str!("../src/backend/tick.rs"),
+);
+const CLI_SWEEP: &str = concat!(
+    include_str!("../../sembla-cli/src/sweep.rs"),
+    include_str!("../../sembla-cli/src/sweep/policy.rs"),
+    include_str!("../../sembla-cli/src/sweep/concurrency.rs"),
+    include_str!("../../sembla-cli/src/sweep/backend.rs"),
+    include_str!("../../sembla-cli/src/sweep/timing.rs"),
+    include_str!("../../sembla-cli/src/sweep/options.rs"),
+    include_str!("../../sembla-cli/src/sweep/draw.rs"),
+    include_str!("../../sembla-cli/src/sweep/publication.rs"),
+    include_str!("../../sembla-cli/src/sweep/finalize.rs"),
+);
 
 #[test]
 fn cuda_backend_retains_and_refreshes_one_host_state_store() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = CUDA_BACKEND;
     let fields = section(
         backend,
         "pub struct CudaBackend {",
@@ -37,7 +54,11 @@ fn cuda_backend_retains_and_refreshes_one_host_state_store() {
     assert!(reconstruction.contains("refresh_backend_snapshot"));
     assert!(!reconstruction.contains("StateStore::new"));
 
-    let unpack = section(backend, "fn unpack_state_into(", "\nfn unpack_inputs(");
+    let unpack = section(
+        backend,
+        "fn unpack_state_into(",
+        "\npub(super) fn unpack_inputs(",
+    );
     assert!(unpack.contains("read_column_into("));
     let read_into = section(backend, "fn read_column_into(", "\nfn read_column(");
     assert!(read_into.contains("values.clear();"));
@@ -46,7 +67,7 @@ fn cuda_backend_retains_and_refreshes_one_host_state_store() {
 
 #[test]
 fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = CUDA_BACKEND;
     let constructor = section(backend, "    pub fn new(", "\n    pub fn generated(&self)");
     assert!(constructor.contains("Self::new_with_stream_mode("));
     assert!(constructor.contains("hash_mode, false"));
@@ -64,7 +85,7 @@ fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
 
 #[test]
 fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = CUDA_BACKEND;
     assert!(backend.contains("pub fn new_fused_batch("));
     assert!(backend.contains("generate_fused_batch(model)?"));
     assert!(backend.contains("context.default_stream()"));
@@ -74,11 +95,7 @@ fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
     assert!(backend.contains("pub fn run_tick_observed_reused_fused("));
     assert!(!backend.contains("Vec<CudaBackend>"));
 
-    let batch_tick = section(
-        backend,
-        "    fn execute_tick_batch_statuses(",
-        "\n    fn download_fused_state_stores(",
-    );
+    let batch_tick = include_str!("../src/backend/tick.rs");
     let ordinary_error = batch_tick
         .find("if self.fused_batch.is_none()")
         .expect("ordinary error guard exists");
@@ -131,7 +148,11 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
 
     // Both CUDA stream modes share the non-blocking constructor; independent
     // mode keeps the default stream.
-    let lane_ctor = section(cli, "    fn new_concurrency_lane(", "\n    fn identity(");
+    let lane_ctor = section(
+        cli,
+        "    pub(super) fn new_concurrency_lane(",
+        "\n    pub(super) fn identity(",
+    );
     assert!(lane_ctor.contains("if mode == SweepConcurrencyMode::IndependentDefaultStreams {"));
     assert!(lane_ctor.contains("CudaBackend::new_nonblocking_stream("));
     assert!(cli.contains("\"cuda-free-nonblocking-streams\""));
@@ -141,7 +162,7 @@ fn free_stream_spike_uses_nonblocking_streams_without_tick_barriers() {
 
 #[test]
 fn final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffers() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = CUDA_BACKEND;
     let method = section(
         backend,
         "    pub fn final_state_readback(",
@@ -175,7 +196,7 @@ fn final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffer
     let owner = section(
         backend,
         "struct PinnedFinalStateBuffers {",
-        "\nfn checked_final_state_component_bytes(",
+        "\npub(super) fn checked_final_state_component_bytes(",
     );
     assert!(owner.contains("stream: std::sync::Arc<CudaStream>"));
     assert!(owner.contains("self.stream.synchronize()"));
@@ -183,7 +204,7 @@ fn final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffer
     let constructor = section(
         backend,
         "impl<T> PinnedFinalStateComponent<T>",
-        "\n#[derive(Debug)]\nstruct PinnedFinalStateBuffers",
+        "\n#[derive(Debug)]\npub(super) struct PinnedFinalStateBuffers",
     );
     assert_eq!(constructor.matches("alloc_pinned::<T>").count(), 1);
     assert!(constructor.contains("if len == 0"));
@@ -198,7 +219,7 @@ fn final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffer
 
 #[test]
 fn host_ineligible_view_forces_state_download_while_device_views_skip_it() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = CUDA_BACKEND;
     let reused = section(
         backend,
         "    pub fn run_tick_observed_reused(&mut self)",

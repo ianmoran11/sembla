@@ -465,6 +465,46 @@ fn strict_header_shape_errors_are_distinct_and_deterministic() {
 }
 
 #[test]
+fn mutated_header_corpus_is_total_and_deterministic() {
+    let base = parse_parts(&write_bytes(&refs_model(), &refs_tables()));
+    let directory = temp_dir("header-mutations");
+    let path = directory.join("mutated.state");
+    let assert_deterministic = |bytes: &[u8], label: &str| {
+        std::fs::write(&path, bytes).unwrap();
+        let first = format!("{:?}", read(&path));
+        let second = format!("{:?}", read(&path));
+        assert_eq!(first, second, "nondeterministic read for {label}");
+    };
+
+    for index in 0..base.header.len() {
+        for replacement in [0, b'"', b'{', b'}', b'[', b']', b'\\', 0x7f, 0xff] {
+            if base.header.as_bytes()[index] == replacement {
+                continue;
+            }
+            let mut header = base.header.as_bytes().to_vec();
+            header[index] = replacement;
+            assert_deterministic(
+                &assemble_with_header(&header, &base.columns),
+                &format!("byte-{index}-{replacement}"),
+            );
+        }
+    }
+    for length in 0..base.header.len() {
+        assert_deterministic(
+            &assemble_with_header(&base.header.as_bytes()[..length], &base.columns),
+            &format!("truncated-{length}"),
+        );
+    }
+    let valid = assemble(&base);
+    for claimed_length in [0, 1, base.header.len() as u32 - 1, u32::MAX] {
+        let mut bytes = valid.clone();
+        bytes[12..16].copy_from_slice(&claimed_length.to_le_bytes());
+        assert_deterministic(&bytes, &format!("length-{claimed_length}"));
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
 fn declaration_order_extra_column_and_ref_target_are_enforced() {
     let base = parse_parts(&write_bytes(&refs_model(), &refs_tables()));
 

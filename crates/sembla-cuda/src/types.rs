@@ -6,7 +6,7 @@
 //! copies. Behavioural types (NVRTC compilation, device execution) remain
 //! feature-gated; only the data contracts live here.
 
-use sembla_runtime::state::StateStore;
+use sembla_runtime::core::StateStore;
 
 /// Which state hashes a CUDA run records.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

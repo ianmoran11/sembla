@@ -5,9 +5,9 @@
 // every pass is order-independent and only sees the prefix selected earlier.
 // Other simulation results are staged in generated rule/effect/row order, then
 // scattered by ascending destination cell. Validation *diagnostics* are reduced
-// with atomics under a short lock so the reported failure is independent of
-// launch geometry; the committed status is written only by the single-thread
-// commit kernel.
+// through stream-ordered atomic-min passes so the reported failure is
+// independent of launch geometry; the committed status is written only by the
+// single-thread commit kernel.
 __device__ __forceinline__ double sembla_f64(unsigned long long bits) {
   return __longlong_as_double((long long)bits);
 }
@@ -28,54 +28,69 @@ __device__ __forceinline__ int sembla_total_equal(double left, double right) {
 __device__ __forceinline__ unsigned long long sembla_i64_order_key(long long value) {
   return ((unsigned long long)value) ^ 0x8000000000000000ULL;
 }
+__device__ __forceinline__ void sembla_atomic_min_i64(long long* address, long long value) {
+  unsigned long long* bits = (unsigned long long*)address;
+  unsigned long long observed = *bits;
+  while (value < (long long)observed) {
+    unsigned long long prior = atomicCAS(bits, observed, (unsigned long long)value);
+    if (prior == observed) return;
+    observed = prior;
+  }
+}
+__device__ __forceinline__ void sembla_atomic_max_i64(long long* address, long long value) {
+  unsigned long long* bits = (unsigned long long*)address;
+  unsigned long long observed = *bits;
+  while (value > (long long)observed) {
+    unsigned long long prior = atomicCAS(bits, observed, (unsigned long long)value);
+    if (prior == observed) return;
+    observed = prior;
+  }
+}
+__device__ __forceinline__ long long sembla_div_euclid_i64_u64(long long value, unsigned long long width) {
+  if (value >= 0LL) return (long long)((unsigned long long)value / width);
+  unsigned long long magnitude_minus_one = (unsigned long long)(-(value + 1LL));
+  return -1LL - (long long)(magnitude_minus_one / width);
+}
 __device__ __forceinline__ unsigned long long sembla_f64_order_key(double value) {
   return ((unsigned long long)sembla_total_key(value)) ^ 0x8000000000000000ULL;
 }
 // Records one validation failure into scratch slots status[4..=11] without
-// touching the committed diagnostic status[0..=3]. The scratch holds the
-// lexicographically smallest (scan, order_identity, branch) triple seen so
-// far. Most diagnostics report order_identity itself; the extended overload
-// also keeps a distinct reported identity and two details paired with the
-// selected failure for diagnostics such as deterministic double writes.
-// Failures are rare, so a short spin lock keeps every selected field paired;
-// order_identity itself is reduced with atomicMin.
-// status[4]: lock, status[5]: scan, status[6]: order identity, status[7]: code,
+// touching the committed diagnostic status[0..=3]. Full-width scan, identity,
+// and branch components cannot be packed into one 64-bit key without changing
+// their order, so the host replays each validation launch with four scalar phase
+// values in stream order. The first three passes mirror conflict resolution's segmented argmin:
+// each pure atomicMin considers only failures matching the winning prefix. The
+// fourth pass recovers payload only from the exact winning key. Duplicate
+// observations of one exact key are the same logical check and carry identical
+// payload, so concurrent payload stores cannot create a mixed diagnostic.
+// status[4]: reserved, status[5]: scan, status[6]: order identity, status[7]: code,
 // status[8]: branch, status[9]: reported identity, status[10..=11]: details.
-// Requires independent thread scheduling (sm_70+), which every supported
-// device has.
 __device__ __forceinline__ void sembla_record_validation_failure(
-    unsigned long long* status, unsigned long long code,
+    unsigned long long* status, unsigned long long phase, unsigned long long code,
     unsigned long long order_identity, unsigned long long scan,
     unsigned long long branch, unsigned long long reported_identity,
     unsigned long long detail_2, unsigned long long detail_3) {
-  while (atomicCAS(status + 4, 0ULL, 1ULL) != 0ULL) { }
-  __threadfence();
-  int selected = 0;
-  if (scan < status[5]) {
-    status[5] = scan;
-    atomicExch(status + 6, order_identity);
-    selected = 1;
-  } else if (scan == status[5]) {
-    unsigned long long previous = atomicMin(status + 6, order_identity);
-    selected = order_identity < previous ||
-               (order_identity == previous && branch < status[8]);
-  }
-  if (selected) {
+  if (phase == 0ULL) {
+    atomicMin(status + 5, scan);
+  } else if (phase == 1ULL) {
+    if (scan == status[5]) atomicMin(status + 6, order_identity);
+  } else if (phase == 2ULL) {
+    if (scan == status[5] && order_identity == status[6])
+      atomicMin(status + 8, branch);
+  } else if (scan == status[5] && order_identity == status[6] &&
+             branch == status[8]) {
     status[7] = code;
-    status[8] = branch;
     status[9] = reported_identity;
     status[10] = detail_2;
     status[11] = detail_3;
   }
-  __threadfence();
-  atomicExch(status + 4, 0ULL);
 }
 __device__ __forceinline__ void sembla_record_validation_failure(
-    unsigned long long* status, unsigned long long code,
+    unsigned long long* status, unsigned long long phase, unsigned long long code,
     unsigned long long candidate, unsigned long long scan,
     unsigned long long branch) {
   sembla_record_validation_failure(
-      status, code, candidate, scan, branch, candidate, 0ULL, 0ULL);
+      status, phase, code, candidate, scan, branch, candidate, 0ULL, 0ULL);
 }
 __device__ __forceinline__ long long sembla_add_i64(long long a, long long b, unsigned char* error) {
   if ((b > 0 && a > 0x7fffffffffffffffLL - b) ||
@@ -177,16 +192,16 @@ extern "C" __global__ void sembla_record_aggregate_errors(unsigned char* errors,
   aggregate_facts[aggregate_index] = code;
 }
 
-extern "C" __global__ void sembla_validate_transition(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, unsigned long long* status) {
-  if (status[0] != 0ULL) return;
+extern "C" __global__ void sembla_validate_transition(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, unsigned long long* status, unsigned long long validation_phase) {
+  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;
   unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   unsigned char local_error = 0U; unsigned char* error = &local_error;
   if (rule_id == 0U) {
     if (validation_worker == 0ULL && aggregate_facts[0] != 0U) {
-      sembla_record_validation_failure(status, (unsigned long long)aggregate_facts[0], 0ULL, 0ULL, 0ULL);
+      sembla_record_validation_failure(status, validation_phase, (unsigned long long)aggregate_facts[0], 0ULL, 0ULL, 0ULL);
     }
     if (validation_worker == 0ULL && aggregate_facts[1] != 0U) {
-      sembla_record_validation_failure(status, (unsigned long long)aggregate_facts[1], 1ULL, 1ULL, 0ULL);
+      sembla_record_validation_failure(status, validation_phase, (unsigned long long)aggregate_facts[1], 1ULL, 1ULL, 0ULL);
     }
     return;
   }
@@ -195,44 +210,36 @@ extern "C" __global__ void sembla_validate_transition(const unsigned char* state
   }
 }
 
-extern "C" __global__ void sembla_transition_00000000(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors, const unsigned long long* status) {
+extern "C" __global__ void sembla_transition_00000000(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, const unsigned long long* status) {
   unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   if (status[0] != 0ULL) return;
   if (row >= row_counts[0]) return;
   unsigned long long candidate = candidate_offsets[0] + row;
   unsigned char local_error = 0; unsigned char* error = &local_error;
+  enabled[candidate] = 0U;
   int guard = (((*((const unsigned short*)(state + column_offsets[0]) + (unsigned long long)(row)))) == 0U);
-  errors[candidate * 2ULL] = local_error;
-  local_error = 0;
+  if (local_error || !guard) return;
+  local_error = 0U;
   double lambda = (double)(([&]() { double sembla_left = (double)((*((const double*)(params + 0ULL)))); if (*error) return 0.0; double sembla_right = (double)(([&]() { double sembla_left = (double)((*((const long long*)(aggs + agg_offsets[0]) + (unsigned long long)((*((const unsigned int*)(state + column_offsets[1]) + (unsigned long long)(row))))))); if (*error) return 0.0; double sembla_right = (double)((*((const long long*)(aggs + agg_offsets[1]) + (unsigned long long)((*((const unsigned int*)(state + column_offsets[1]) + (unsigned long long)(row))))))); if (*error) return 0.0; return sembla_left / sembla_right; }())); if (*error) return 0.0; return sembla_left * sembla_right; }()));
-  errors[candidate * 2ULL + 1ULL] = local_error;
+  if (local_error || !(lambda > 0.0)) return;
   double time = sembla_exp(seed, tick, 0U, (unsigned int)row, 0U, lambda);
-  times[candidate] = time;
-  enabled[candidate] = (unsigned char)(errors[candidate * 2ULL] == 0U && errors[candidate * 2ULL + 1ULL] == 0U && guard && lambda > 0.0 && time < dt);
+  if (time < dt) { times[candidate] = time; enabled[candidate] = 1U; }
 }
 
-extern "C" __global__ void sembla_transition_00000001(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, unsigned char* errors, const unsigned long long* status) {
+extern "C" __global__ void sembla_transition_00000001(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned long long seed, unsigned int tick, double dt, unsigned char* enabled, double* times, const unsigned long long* status) {
   unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   if (status[0] != 0ULL) return;
   if (row >= row_counts[0]) return;
   unsigned long long candidate = candidate_offsets[1] + row;
   unsigned char local_error = 0; unsigned char* error = &local_error;
+  enabled[candidate] = 0U;
   int guard = (((*((const unsigned short*)(state + column_offsets[0]) + (unsigned long long)(row)))) == 1U);
-  errors[candidate * 2ULL] = local_error;
-  local_error = 0;
+  if (local_error || !guard) return;
+  local_error = 0U;
   double lambda = (double)((*((const double*)(params + 8ULL))));
-  errors[candidate * 2ULL + 1ULL] = local_error;
+  if (local_error || !(lambda > 0.0)) return;
   double time = sembla_exp(seed, tick, 1U, (unsigned int)row, 0U, lambda);
-  times[candidate] = time;
-  enabled[candidate] = (unsigned char)(errors[candidate * 2ULL] == 0U && errors[candidate * 2ULL + 1ULL] == 0U && guard && lambda > 0.0 && time < dt);
-}
-
-extern "C" __global__ void sembla_check_candidate_errors(const unsigned char* errors, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long* status) {
-  if (status[0] != 0ULL) return;
-  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
-  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
-  for (unsigned long long row = worker; row < candidate_count; row += stride) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL]) sembla_record_validation_failure(status, 3ULL, candidate, 2ULL, 0ULL); }
-  for (unsigned long long row = worker; row < candidate_count; row += stride) { unsigned long long candidate = candidate_begin + row; if (errors[candidate * 2ULL + 1ULL]) sembla_record_validation_failure(status, 3ULL, candidate, 3ULL, 0ULL); }
+  if (time < dt) { times[candidate] = time; enabled[candidate] = 1U; }
 }
 
 extern "C" __global__ void sembla_init_validation_scratch(unsigned long long* status, unsigned int* effect_active, unsigned long long rule_count) {
@@ -250,12 +257,21 @@ extern "C" __global__ void sembla_init_validation_scratch(unsigned long long* st
 
 extern "C" __global__ void sembla_commit_validation_status(unsigned long long* status) {
   if (blockIdx.x != 0 || threadIdx.x != 0) return;
-  if (status[0] != 0ULL || status[5] == 0xffffffffffffffffULL) return;
-  status[1] = status[9];
-  status[2] = status[10];
-  status[3] = status[11];
-  __threadfence();
-  status[0] = status[7];
+  if (status[0] == 0ULL && status[5] != 0xffffffffffffffffULL) {
+    status[1] = status[9];
+    status[2] = status[10];
+    status[3] = status[11];
+    __threadfence();
+    status[0] = status[7];
+  }
+  status[4] = 0ULL;
+  status[5] = 0xffffffffffffffffULL;
+  status[6] = 0xffffffffffffffffULL;
+  status[7] = 0ULL;
+  status[8] = 0xffffffffffffffffULL;
+  status[9] = 0ULL;
+  status[10] = 0ULL;
+  status[11] = 0ULL;
 }
 
 extern "C" __global__ void sembla_mark_effect_active(const unsigned char* wins, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned int rule_id, unsigned int* effect_active) {
@@ -264,24 +280,17 @@ extern "C" __global__ void sembla_mark_effect_active(const unsigned char* wins, 
   if (wins[candidate_begin + row] != 0U) atomicOr(effect_active + rule_id, 1U);
 }
 
-extern "C" __global__ void sembla_validate_claims(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, unsigned int rule_id, const unsigned char* enabled, unsigned long long* status) {
-  if (status[0] != 0ULL) return;
-  unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
-  unsigned char local_error = 0; unsigned char* error = &local_error;
-}
-
 extern "C" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned int box_index, unsigned long long* status) {
   if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;
   unsigned char local_error = 0; unsigned char* error = &local_error;
 }
 
-extern "C" __global__ void sembla_init_conflict_winners(unsigned long long resource_count, unsigned long long* winner_keys, unsigned int* winner_rules, unsigned int* winner_entities, unsigned long long* winner_instances) {
+extern "C" __global__ void sembla_init_conflict_winners(unsigned long long resource_count, unsigned long long* winner_keys, unsigned int* winner_rules, unsigned int* winner_entities) {
   unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
   for (unsigned long long resource = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; resource < resource_count; resource += stride) {
     winner_keys[resource] = 0xffffffffffffffffULL;
     winner_rules[resource] = 0xffffffffU;
     winner_entities[resource] = 0xffffffffU;
-    winner_instances[resource] = 0xffffffffffffffffULL;
   }
 }
 
@@ -309,11 +318,6 @@ extern "C" __global__ void sembla_reduce_claim_entities(unsigned long long insta
   for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource]) atomicMin(winner_entities + resource, instance_entities[instance]); }
 }
 
-extern "C" __global__ void sembla_reduce_claim_instances(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned int* instance_entities, const unsigned long long* winner_keys, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned long long* winner_instances) {
-  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
-  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource] && instance_entities[instance] == winner_entities[resource]) atomicMin(winner_instances + resource, instance); }
-}
-
 extern "C" __global__ void sembla_resolve_conflicts(const unsigned long long* row_counts, const unsigned long long* candidate_offsets, const unsigned long long* claim_instance_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const unsigned long long* instance_resources, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {
   if (status[0] != 0ULL) return;
   unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
@@ -325,15 +329,15 @@ extern "C" __global__ void sembla_resolve_conflicts(const unsigned long long* ro
   }
 }
 
-extern "C" __global__ void sembla_validate_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned int* effect_active, unsigned int box_index, unsigned long long* status) {
-  if (status[0] != 0ULL) return;
+extern "C" __global__ void sembla_validate_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned int* effect_active, unsigned int box_index, unsigned long long* status, unsigned long long validation_phase) {
+  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;
   unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   unsigned char local_error = 0U; unsigned char* error = &local_error;
   if (box_index == 0U) { if (effect_active[0] != 0U) {
-    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(1U); if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate_offsets[0] + row, 4ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate_offsets[0] + row, 4ULL, 1ULL); } }
+    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(1U); if (local_error) { sembla_record_validation_failure(status, validation_phase, 5ULL, candidate_offsets[0] + row, 2ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, validation_phase, 6ULL, candidate_offsets[0] + row, 2ULL, 1ULL); } }
   } }
   if (box_index == 0U) { if (effect_active[1] != 0U) {
-    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(2U); if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate_offsets[1] + row, 5ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate_offsets[1] + row, 5ULL, 1ULL); } }
+    for (unsigned long long row = validation_worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) { local_error = 0U; unsigned long long value = (unsigned long long)(2U); if (local_error) { sembla_record_validation_failure(status, validation_phase, 5ULL, candidate_offsets[1] + row, 3ULL, 0ULL); continue; } if (value >= 3ULL) { sembla_record_validation_failure(status, validation_phase, 6ULL, candidate_offsets[1] + row, 3ULL, 1ULL); } }
   } }
 }
 
@@ -342,8 +346,8 @@ extern "C" __global__ void sembla_init_effect_owners(int* owners, unsigned long 
   for (unsigned long long owner = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; owner < owner_count; owner += stride) owners[owner] = -1;
 }
 
-extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned int rule_id, unsigned long long* status) {
-  if (status[0] != 0ULL) return;
+extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* wins, const unsigned long long* write_offsets, int* owners, unsigned long long* owner_values, unsigned int rule_id, unsigned long long* status, unsigned long long validation_phase) {
+  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;
   unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
   unsigned char local_error = 0; unsigned char* error = &local_error;
@@ -351,11 +355,11 @@ extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, co
     for (unsigned long long row = worker; row < row_counts[0]; row += stride) { unsigned long long candidate = candidate_offsets[0] + row; if (!wins[candidate]) continue;
       {
       local_error = 0U; unsigned short value = (unsigned short)(1U);
-      if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate, 6ULL, 0ULL, candidate, 0ULL, 0ULL); } else {
-        if ((unsigned long long)value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate, 6ULL, 1ULL, candidate, 0ULL, 0ULL); } else
-        { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { sembla_record_validation_failure(status, 8ULL, candidate, 6ULL, 2ULL, owner, (unsigned long long)owners[owner], 0ULL); } else { owners[owner] = (int)0U;
+      if (local_error) { sembla_record_validation_failure(status, validation_phase, 5ULL, candidate, 4ULL, 0ULL, candidate, 0ULL, 0ULL); } else {
+        if ((unsigned long long)value >= 3ULL) { sembla_record_validation_failure(status, validation_phase, 6ULL, candidate, 4ULL, 1ULL, candidate, 0ULL, 0ULL); } else
+        { unsigned long long owner = write_offsets[0] + row; if (validation_phase == 0ULL) { if (owners[owner] != -1) { sembla_record_validation_failure(status, validation_phase, 8ULL, candidate, 4ULL, 2ULL, owner, (unsigned long long)owners[owner], 0ULL); } else { owners[owner] = (int)0U;
           owner_values[owner] = (unsigned long long)value;
-        } }
+        } } else if (owners[owner] != -1 && (owners[owner] != (int)0U || 0)) { sembla_record_validation_failure(status, validation_phase, 8ULL, candidate, 4ULL, 2ULL, owner, (unsigned long long)owners[owner], 0ULL); } }
       }
       }
     }
@@ -365,11 +369,11 @@ extern "C" __global__ void sembla_prepare_effects(const unsigned char* state, co
     for (unsigned long long row = worker; row < row_counts[0]; row += stride) { unsigned long long candidate = candidate_offsets[1] + row; if (!wins[candidate]) continue;
       {
       local_error = 0U; unsigned short value = (unsigned short)(2U);
-      if (local_error) { sembla_record_validation_failure(status, 5ULL, candidate, 7ULL, 0ULL, candidate, 0ULL, 0ULL); } else {
-        if ((unsigned long long)value >= 3ULL) { sembla_record_validation_failure(status, 6ULL, candidate, 7ULL, 1ULL, candidate, 0ULL, 0ULL); } else
-        { unsigned long long owner = write_offsets[0] + row; if (owners[owner] != -1) { sembla_record_validation_failure(status, 8ULL, candidate, 7ULL, 2ULL, owner, (unsigned long long)owners[owner], 1ULL); } else { owners[owner] = (int)1U;
+      if (local_error) { sembla_record_validation_failure(status, validation_phase, 5ULL, candidate, 5ULL, 0ULL, candidate, 0ULL, 0ULL); } else {
+        if ((unsigned long long)value >= 3ULL) { sembla_record_validation_failure(status, validation_phase, 6ULL, candidate, 5ULL, 1ULL, candidate, 0ULL, 0ULL); } else
+        { unsigned long long owner = write_offsets[0] + row; if (validation_phase == 0ULL) { if (owners[owner] != -1) { sembla_record_validation_failure(status, validation_phase, 8ULL, candidate, 5ULL, 2ULL, owner, (unsigned long long)owners[owner], 1ULL); } else { owners[owner] = (int)1U;
           owner_values[owner] = (unsigned long long)value;
-        } }
+        } } else if (owners[owner] != -1 && (owners[owner] != (int)1U || 0)) { sembla_record_validation_failure(status, validation_phase, 8ULL, candidate, 5ULL, 2ULL, owner, (unsigned long long)owners[owner], 1ULL); } }
       }
       }
     }
@@ -386,8 +390,8 @@ extern "C" __global__ void sembla_apply_effects(unsigned char* next_state, const
     *((unsigned int*)(next_state + column_offsets[1]) + row) = (unsigned int)owner_values[owner]; return; }
 }
 
-extern "C" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status) {
-  if (status[0] != 0ULL) return;
+extern "C" __global__ void sembla_validate_outputs(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned char* aggregate_facts, const unsigned long long* agg_offsets, unsigned long long* status, unsigned long long validation_phase) {
+  if (status[0] != 0ULL || (validation_phase != 0ULL && status[5] == 0xffffffffffffffffULL)) return;
   unsigned long long validation_worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
   unsigned char local_error = 0U; unsigned char* error = &local_error;
 }
@@ -414,6 +418,144 @@ extern "C" __global__ void sembla_check_output_errors(const unsigned char* error
   for (unsigned long long field = 0; field < field_count; ++field) {
     if (errors[field]) { status[0] = 9ULL; status[1] = field; return; }
   }
+}
+
+extern "C" __global__ void sembla_init_observations(long long* values, unsigned int count) {
+  unsigned int view = blockIdx.x * blockDim.x + threadIdx.x;
+  if (view >= count) return;
+  if (view == 0U) values[0] = 0LL;
+  if (view == 1U) values[1] = 0LL;
+  if (view == 2U) values[2] = 0LL;
+}
+
+extern "C" __global__ void sembla_observe_view(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* params, long long* values, unsigned int view_index) {
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  extern __shared__ long long partials[];
+  unsigned char local_error = 0U; unsigned char* error = &local_error;
+  if (view_index == 0U) {
+    long long local = 0LL;
+    for (unsigned long long row = worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) {
+      int selected = (((*((const unsigned short*)(state + column_offsets[0]) + (unsigned long long)(row)))) == 0U);
+      if (selected) local += 1LL;
+    }
+    partials[threadIdx.x] = local;
+    __syncthreads();
+    for (unsigned int stride = (blockDim.x + 1U) / 2U; stride != 0U; stride = (stride + 1U) / 2U) {
+      if (threadIdx.x < stride && threadIdx.x + stride < blockDim.x) {
+        partials[threadIdx.x] += partials[threadIdx.x + stride];
+      }
+      __syncthreads();
+      if (stride == 1U) break;
+    }
+    if (threadIdx.x == 0U) {
+      atomicAdd((unsigned long long*)(values + 0), (unsigned long long)partials[0]);
+    }
+  }
+  if (view_index == 1U) {
+    long long local = 0LL;
+    for (unsigned long long row = worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) {
+      int selected = (((*((const unsigned short*)(state + column_offsets[0]) + (unsigned long long)(row)))) == 1U);
+      if (selected) local += 1LL;
+    }
+    partials[threadIdx.x] = local;
+    __syncthreads();
+    for (unsigned int stride = (blockDim.x + 1U) / 2U; stride != 0U; stride = (stride + 1U) / 2U) {
+      if (threadIdx.x < stride && threadIdx.x + stride < blockDim.x) {
+        partials[threadIdx.x] += partials[threadIdx.x + stride];
+      }
+      __syncthreads();
+      if (stride == 1U) break;
+    }
+    if (threadIdx.x == 0U) {
+      atomicAdd((unsigned long long*)(values + 1), (unsigned long long)partials[0]);
+    }
+  }
+  if (view_index == 2U) {
+    long long local = 0LL;
+    for (unsigned long long row = worker; row < row_counts[0]; row += (unsigned long long)gridDim.x * blockDim.x) {
+      int selected = (((*((const unsigned short*)(state + column_offsets[0]) + (unsigned long long)(row)))) == 2U);
+      if (selected) local += 1LL;
+    }
+    partials[threadIdx.x] = local;
+    __syncthreads();
+    for (unsigned int stride = (blockDim.x + 1U) / 2U; stride != 0U; stride = (stride + 1U) / 2U) {
+      if (threadIdx.x < stride && threadIdx.x + stride < blockDim.x) {
+        partials[threadIdx.x] += partials[threadIdx.x + stride];
+      }
+      __syncthreads();
+      if (stride == 1U) break;
+    }
+    if (threadIdx.x == 0U) {
+      atomicAdd((unsigned long long*)(values + 2), (unsigned long long)partials[0]);
+    }
+  }
+}
+
+extern "C" __global__ void sembla_init_grouped_extrema(long long* extrema, unsigned int count) {
+  unsigned int axis = blockIdx.x * blockDim.x + threadIdx.x;
+  if (axis >= count) return;
+  extrema[(unsigned long long)axis * 2ULL] = 0x7fffffffffffffffLL;
+  extrema[(unsigned long long)axis * 2ULL + 1ULL] = (-0x7fffffffffffffffLL - 1LL);
+}
+
+extern "C" __global__ void sembla_bound_grouped_view(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, long long* extrema, unsigned int view_index) {
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+}
+
+extern "C" __global__ void sembla_init_grouped_histogram(unsigned long long* counts, unsigned long long count) {
+  unsigned long long index = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < count) counts[index] = 0ULL;
+}
+
+extern "C" __global__ void sembla_observe_grouped_view(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* params, const long long* axis_mins, const unsigned long long* axis_cardinalities, unsigned long long* counts, unsigned int view_index) {
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned char local_error = 0U; unsigned char* error = &local_error;
+}
+
+extern "C" __global__ void sembla_init_generic_enum_counts(unsigned long long* counts, unsigned long long count) {
+  unsigned long long index = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < count) counts[index] = 0ULL;
+}
+
+extern "C" __global__ void sembla_observe_generic_enum(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, unsigned long long* counts, unsigned int observation_index) {
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+}
+
+extern "C" __global__ void sembla_init_control_counts(unsigned long long* fired_counts, unsigned long long rule_count, unsigned long long* deferred_counts, unsigned long long table_count) {
+  unsigned long long index = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;
+  for (unsigned long long rule = index; rule < rule_count; rule += stride) fired_counts[rule] = 0ULL;
+  for (unsigned long long table = index; table < table_count; table += stride) deferred_counts[table] = 0ULL;
+}
+
+extern "C" __global__ void sembla_count_fired(const unsigned char* wins, const unsigned long long* candidate_offsets, unsigned long long candidate_count, unsigned long long rule_count, unsigned long long rule, unsigned long long* fired_counts) {
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned long long begin = candidate_offsets[rule];
+  unsigned long long end = rule + 1ULL < rule_count ? candidate_offsets[rule + 1ULL] : candidate_count;
+  unsigned long long local = 0ULL;
+  for (unsigned long long candidate = begin + worker; candidate < end; candidate += (unsigned long long)gridDim.x * blockDim.x) local += wins[candidate] != 0U;
+  extern __shared__ unsigned long long fired_partials[];
+  fired_partials[threadIdx.x] = local;
+  __syncthreads();
+  for (unsigned int stride = blockDim.x / 2U; stride != 0U; stride /= 2U) {
+    if (threadIdx.x < stride) fired_partials[threadIdx.x] += fired_partials[threadIdx.x + stride];
+    __syncthreads();
+  }
+  if (threadIdx.x == 0U) atomicAdd(fired_counts + rule, fired_partials[0]);
+}
+
+extern "C" __global__ void sembla_count_deferred(const unsigned char* deferred, unsigned long long candidate_count, unsigned long long table_count, unsigned long long table, unsigned long long* deferred_counts) {
+  unsigned long long worker = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned long long local = 0ULL;
+  for (unsigned long long candidate = worker; candidate < candidate_count; candidate += (unsigned long long)gridDim.x * blockDim.x) local += deferred[candidate * table_count + table] != 0U;
+  extern __shared__ unsigned long long deferred_partials[];
+  deferred_partials[threadIdx.x] = local;
+  __syncthreads();
+  for (unsigned int stride = blockDim.x / 2U; stride != 0U; stride /= 2U) {
+    if (threadIdx.x < stride) deferred_partials[threadIdx.x] += deferred_partials[threadIdx.x + stride];
+    __syncthreads();
+  }
+  if (threadIdx.x == 0U) atomicAdd(deferred_counts + table, deferred_partials[0]);
 }
 
 extern "C" __global__ void sembla_philox_vectors(const unsigned long long* seeds,

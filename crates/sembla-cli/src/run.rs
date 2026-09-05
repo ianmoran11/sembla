@@ -248,15 +248,12 @@ pub(crate) fn run_file_result(path: &str, options: RunOptions) -> Result<(), Str
         .transpose()?;
 
     if let Some(out) = options.out.as_deref() {
-        std::fs::write(out, execution.output.csv.as_bytes())
-            .map_err(|error| format!("{out}: {error}"))?;
+        write_atomic(out, execution.output.csv.as_bytes())?;
         let summaries = summaries_path(out);
-        std::fs::write(&summaries, execution.output.summaries_csv.as_bytes())
-            .map_err(|error| format!("{}: {error}", summaries.display()))?;
+        write_atomic(summaries, execution.output.summaries_csv.as_bytes())?;
         for grouped in &execution.output.grouped {
             let path = grouped_output_path(Path::new(out), &grouped.view);
-            std::fs::write(&path, grouped.csv.as_bytes())
-                .map_err(|error| format!("{}: {error}", path.display()))?;
+            write_atomic(&path, grouped.csv.as_bytes())?;
         }
         let hashes = execution_hashes(&execution.output, &execution.state);
         println!(
@@ -751,7 +748,7 @@ pub(crate) fn write_timing_document(path: &str, timing: &TimingDocument) -> Resu
     let mut json = serde_json::to_string_pretty(timing)
         .map_err(|error| format!("could not serialize timing JSON: {error}"))?;
     json.push('\n');
-    std::fs::write(path, json).map_err(|error| format!("{path}: {error}"))
+    write_atomic(path, json.as_bytes())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1337,7 +1334,7 @@ pub(crate) fn run_results_output_timed_with_features(
 
 #[cfg(feature = "cuda")]
 pub(crate) fn report_cuda_observation_eligibility(
-    eligibility: &sembla_runtime::executor::DeviceObservationEligibility,
+    eligibility: &sembla_runtime::core::DeviceObservationEligibility,
 ) {
     eprintln!(
         "cuda_device_observation eligible={} reason={}",
@@ -1351,13 +1348,32 @@ pub(crate) fn report_cuda_observation_eligibility(
     }
 }
 
+#[cfg(feature = "cuda")]
+fn cuda_observations(
+    model: &sembla_ir::ValidatedModel,
+    state: &StateStore,
+    params: &ParamEnv,
+    device: Option<CudaDeviceObservations>,
+) -> Result<CudaDeviceObservations, String> {
+    match device {
+        Some(observation) => Ok(observation),
+        None => Ok(CudaDeviceObservations {
+            views: executor::observe_views(model, state, params)
+                .map_err(|error| error.to_string())?,
+            grouped_views: executor::observe_grouped_views(model, state, params)
+                .map_err(|error| error.to_string())?,
+            generic_enum_counts: None,
+        }),
+    }
+}
+
 pub(crate) fn cuda_tick_report(
     model: &sembla_ir::ValidatedModel,
     tick: u32,
     fired_per_box: Vec<(String, Vec<(u32, usize)>)>,
     deferred_per_resource_table: Vec<(String, usize)>,
-    views: Vec<sembla_runtime::executor::ViewValue>,
-    grouped_views: Vec<sembla_runtime::executor::GroupedViewValue>,
+    views: Vec<sembla_runtime::core::ViewValue>,
+    grouped_views: Vec<sembla_runtime::core::GroupedViewValue>,
 ) -> executor::TickReport {
     let fired = model
         .transitions()
@@ -1466,34 +1482,21 @@ pub(crate) fn run_results_output_cuda(
                     .map_err(|error| format!("tick {tick}: {error}"))?,
             );
         }
-        let (views, grouped_views, generic_enum_counts) = match device_views {
-            Some(observation) => (
-                observation.views,
-                observation.grouped_views,
-                observation.generic_enum_counts,
-            ),
-            None => {
-                let views = executor::observe_views(model, backend.observed_state(), params)
-                    .map_err(|error| format!("tick {tick}: {error}"))?;
-                let grouped_views =
-                    executor::observe_grouped_views(model, backend.observed_state(), params)
-                        .map_err(|error| format!("tick {tick}: {error}"))?;
-                (views, grouped_views, None)
-            }
-        };
+        let observations = cuda_observations(model, backend.observed_state(), params, device_views)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
         let report = cuda_tick_report(
             model,
             tick,
             fired_per_box,
             deferred_per_resource_table,
-            views,
-            grouped_views,
+            observations.views,
+            observations.grouped_views,
         );
         output.push_tick_with_enum_counts(
             backend.observed_state(),
             tick,
             report,
-            generic_enum_counts.as_deref(),
+            observations.generic_enum_counts.as_deref(),
         )?;
     }
     let output = output.finish(model, hashes.clone())?;
@@ -1556,21 +1559,8 @@ pub(crate) fn run_results_output_cuda_timed(
         };
 
         let phase_started = Instant::now();
-        let (views, grouped_views, generic_enum_counts) = match device_views {
-            Some(observation) => (
-                observation.views,
-                observation.grouped_views,
-                observation.generic_enum_counts,
-            ),
-            None => {
-                let views = executor::observe_views(model, backend.observed_state(), params)
-                    .map_err(|error| format!("tick {tick}: {error}"))?;
-                let grouped_views =
-                    executor::observe_grouped_views(model, backend.observed_state(), params)
-                        .map_err(|error| format!("tick {tick}: {error}"))?;
-                (views, grouped_views, None)
-            }
-        };
+        let observations = cuda_observations(model, backend.observed_state(), params, device_views)
+            .map_err(|error| format!("tick {tick}: {error}"))?;
         let observe_views = phase_started.elapsed();
 
         let phase_started = Instant::now();
@@ -1579,14 +1569,14 @@ pub(crate) fn run_results_output_cuda_timed(
             tick,
             fired_per_box,
             deferred_per_resource_table,
-            views,
-            grouped_views,
+            observations.views,
+            observations.grouped_views,
         );
         output.push_tick_with_enum_counts(
             backend.observed_state(),
             tick,
             report,
-            generic_enum_counts.as_deref(),
+            observations.generic_enum_counts.as_deref(),
         )?;
         let report = backend_phases[4] + phase_started.elapsed();
 

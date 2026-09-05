@@ -27,7 +27,7 @@ const EXEMPTIONS: &[Exemption] = &[
         reason: "unchanged §E7 racing-clock transform extracted for PRD 0002",
     },
     Exemption {
-        path: "crates/sembla-runtime/src/executor.rs",
+        path: "crates/sembla-cpu/src/executor.rs",
         method: "exp",
         source: "let threshold = (-(lambda * dt)).exp();",
         reason: "PRD 0002 conservative reject-only bound; canonical ln still decides every boundary candidate",
@@ -100,6 +100,7 @@ fn result_sources_use_only_documented_platform_transcendentals() {
         .expect("workspace root must exist");
     let mut files = Vec::new();
     rust_sources(&workspace.join("crates/sembla-runtime/src"), &mut files);
+    rust_sources(&workspace.join("crates/sembla-cpu/src"), &mut files);
     rust_sources(&workspace.join("crates/sembla-cli/src"), &mut files);
     files.sort();
 

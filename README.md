@@ -108,7 +108,9 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
   backend for native-`f64` CPU/GPU differential testing.
 - `crates/sembla-ir`: versioned simulation and plan types, stable identities,
   canonical serialization, and semantic validation.
-- `crates/sembla-runtime`: deterministic CPU simulation, synthetic population,
-  prior-sampling, and local Philox RNG implementation.
+- `crates/sembla-runtime`: backend-neutral state, parameters, observations,
+  synthetic population, prior sampling, and local Philox implementation.
+- `crates/sembla-cpu`: deterministic CPU expression evaluation and tick
+  execution.
 - [`ianmoran11/sembla-lean`](https://github.com/ianmoran11/sembla-lean): Lean
   DSL, IR exporter, composition linker, checked semantics, and proofs.

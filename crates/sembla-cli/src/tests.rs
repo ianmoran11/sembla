@@ -14,10 +14,7 @@ use super::{
     SWEEP_CONCURRENCY_SPIKE_WORKERS_ENV, SWEEP_CUDA_FINAL_STATE_MODE_ENV,
     SWEEP_CUDA_FUSED_DRAWS_ENV, VERSION,
 };
-use sembla_runtime::{
-    eval::ParamEnv,
-    state::{ColumnData, ColumnInit, StateStore, TableInit},
-};
+use sembla_runtime::core::{ColumnData, ColumnInit, ParamEnv, StateStore, TableInit};
 
 #[cfg(feature = "cuda")]
 use super::{preflight_cuda_sweep_capacity_with_memory, SWEEP_TEST_CUDA_FREE_MEMORY_ENV};
@@ -970,6 +967,7 @@ fn fused_publication_stops_at_the_lowest_failed_k() {
 
 #[test]
 fn version_matches_library_versions() {
+    assert_eq!(VERSION, sembla_cpu::VERSION);
     assert_eq!(VERSION, sembla_ir::VERSION);
     assert_eq!(VERSION, sembla_runtime::VERSION);
 }
@@ -1125,7 +1123,7 @@ fn device_generic_enum_counts_preserve_legacy_csv_bytes() {
     let model = load(include_str!("../../../examples/reversible_ctmc.json"));
     let params = ParamEnv::defaults(&model);
     let mut state = initialized(&model, 100);
-    let report = sembla_runtime::executor::run_tick(&model, &mut state, &params, 55, 0).unwrap();
+    let report = sembla_cpu::run_tick(&model, &mut state, &params, 55, 0).unwrap();
     let snapshot = state.snapshot();
     let values = snapshot.enum_values("chain", "particle", "phase").unwrap();
     let counts = [

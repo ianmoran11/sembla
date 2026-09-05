@@ -212,9 +212,27 @@ def _delete_with_token(
         with urlopen(verify, timeout=30) as response:
             status = getattr(response, "status", 200)
             if 200 <= status < 300:
-                raise TailscaleCredentialError(
-                    "Tailscale auth key still exists after deletion"
-                )
+                # Tailscale retains revoked-key metadata, so a successful GET
+                # can be the expected tombstone rather than a live key.  Accept
+                # it only when it identifies the requested key and carries a
+                # real, timezone-aware revocation timestamp.
+                metadata = _read_json(response, "auth-key deletion verification")
+                revoked = metadata.get("revoked")
+                if metadata.get("id") != key_id or not isinstance(revoked, str):
+                    raise TailscaleCredentialError(
+                        "Tailscale auth-key deletion returned an invalid tombstone"
+                    )
+                try:
+                    revoked_at = datetime.fromisoformat(revoked.replace("Z", "+00:00"))
+                except ValueError:
+                    raise TailscaleCredentialError(
+                        "Tailscale auth-key deletion returned an invalid tombstone"
+                    ) from None
+                if revoked_at.tzinfo is None or revoked_at.year <= 1:
+                    raise TailscaleCredentialError(
+                        "Tailscale auth key still exists after deletion"
+                    )
+                return
             raise TailscaleCredentialError(
                 f"Tailscale auth-key deletion verification returned HTTP {status}"
             )

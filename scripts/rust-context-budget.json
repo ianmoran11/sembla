@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "metric": "scripts/report-rust-context.py lexical production-source metric",
+  "policy": "Limits are ratchets. Lower them after reductions; raise them only with an explicit context-budget justification.",
+  "adjustment_justification": "Validated lookup indices now live in the schema-of-record IR and explicit per-executor tuning now lives in sembla-cpu. Sweep finalization cuts the largest coordinator from 555/47 lines/complexity to 430/39, the serde rewrite removes the custom parser, and generated CUDA launches have one reviewed unsafe boundary. Collision-safe atomic publication plus compiler-derived explicit imports add 301 tokens over the preceding stage, but the imports remove hidden namespace coupling across every CUDA module and sweep finalization and are architecture-enforced. The backend remains 1,672 tokens below the original 178,920-token ratchet; function, complexity, file, and IR limits remain lowered.",
+  "limits": {
+    "total_tokens": 177248,
+    "max_file_code_lines": 2631,
+    "max_function_lines": 523,
+    "max_function_complexity": 39
+  },
+  "crate_token_limits": {
+    "sembla-ir": 15550,
+    "sembla-runtime": 22172,
+    "sembla-cpu": 36842,
+    "sembla-cuda": 50064,
+    "sembla-cli": 52620
+  },
+  "crate_file_line_limits": {
+    "sembla-ir": 928,
+    "sembla-runtime": 1051,
+    "sembla-cpu": 2382,
+    "sembla-cuda": 2631,
+    "sembla-cli": 1540
+  }
+}

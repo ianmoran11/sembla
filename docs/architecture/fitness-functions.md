@@ -5,7 +5,7 @@ These checks are intentionally small. They prevent high-cost dependency drift wi
 | Rule | Enforcement |
 | --- | --- |
 | Workspace layering is exactly `ir <- runtime <- cuda <- cli` | `scripts/check-rust-architecture.py` over Cargo metadata |
-| `sembla-ir` and `sembla-runtime` contain no CUDA implementation vocabulary | `scripts/check-rust-architecture.py` source scan |
+| `sembla-ir`, `sembla-runtime`, and `sembla-cpu` contain no CUDA implementation vocabulary | `scripts/check-rust-architecture.py` source scan |
 | Core libraries do not print directly | `scripts/check-rust-architecture.py`; data/errors return to the CLI |
 | Runtime dependencies remain allowlisted and Philox remains local | `scripts/check-rust.sh` using `cargo tree` |
 | Production Rust/Cargo cannot depend on estimation implementations | `calibration/npe/tests/test_quarantine.py` |

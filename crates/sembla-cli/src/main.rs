@@ -1,14 +1,17 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use sembla_cpu::{self as executor, ObservationValue, SummaryValue};
+#[cfg(feature = "cuda")]
+use sembla_cuda::CudaDeviceObservations;
 use sembla_cuda::{CudaBackend, HashMode};
 use sembla_ir::{AttrType, FeatureSet, ParamType, ParamValue, GROUPED_OBSERVATIONS_FEATURE};
-use sembla_runtime::eval::{ParamEnv, ParamOverride};
-use sembla_runtime::executor::{self, ObservationValue, SummaryValue};
+use sembla_runtime::core::{
+    ColumnData, ColumnInit, ParamEnv, ParamOverride, StateStore, TableInit,
+};
 use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::rng::derive_sweep_replica_seed;
-use sembla_runtime::state::{ColumnData, ColumnInit, StateStore, TableInit};
 use sembla_runtime::state_artifact::{
     committed_table_inits, read as read_state_artifact, sniff_magic, state_artifact_hash,
     to_table_inits, write_new as write_new_state_artifact, StateKind, STATE_ARTIFACT_SCHEMA,
@@ -16,6 +19,7 @@ use sembla_runtime::state_artifact::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+mod atomic_write;
 mod compare;
 mod diff_backends;
 mod inspect;
@@ -26,6 +30,7 @@ mod sweep;
 mod synth;
 mod verify;
 
+use atomic_write::write_atomic;
 use compare::*;
 use diff_backends::*;
 use inspect::*;

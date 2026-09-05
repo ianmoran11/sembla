@@ -77,25 +77,21 @@ fn generated_control_counts_use_resident_segmented_and_strided_reductions() {
 
 #[test]
 fn tick_path_downloads_only_compact_counts_and_reuses_resident_offsets() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = concat!(
+        include_str!("../src/backend.rs"),
+        include_str!("../src/backend/observation.rs"),
+        include_str!("../src/backend/tick.rs"),
+    );
     assert!(!backend.contains("memcpy_dtov(&self.wins)"));
     assert!(!backend.contains("memcpy_dtov(&self.deferred)"));
 
-    let readback = section(
-        backend,
-        "    fn readback_control(&self)",
-        "\n    /// Evaluates checked coordinate Philox vectors",
-    );
+    let readback = section(backend, "    fn readback_control(&self)", "\n}\n");
     assert!(readback.contains("memcpy_dtov(&self.fired_counts)"));
     assert!(readback.contains("memcpy_dtov(&self.deferred_counts)"));
     assert!(!readback.contains("self.wins"));
     assert!(!readback.contains("self.deferred)"));
 
-    let tick = section(
-        backend,
-        "    fn execute_tick(&mut self)",
-        "\n    fn download_fused_state_stores(&mut self)",
-    );
+    let tick = include_str!("../src/backend/tick.rs");
     assert!(tick.contains("&self.count_fired,"));
     assert!(tick.contains("&self.count_deferred,"));
     assert!(tick.contains(".arg(&self.candidate_offsets)"));
@@ -110,7 +106,7 @@ fn tick_path_downloads_only_compact_counts_and_reuses_resident_offsets() {
 
 #[test]
 fn timed_and_untimed_paths_share_compact_readback_and_report_conversion() {
-    let backend = include_str!("../src/backend.rs");
+    let backend = include_str!("../src/backend/observation.rs");
     let untimed = section(
         backend,
         "    pub fn run_tick_observed_reused(&mut self)",

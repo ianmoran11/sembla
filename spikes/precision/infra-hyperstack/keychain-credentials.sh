@@ -43,9 +43,10 @@ store
 
 prepare-shell
   Asks prepare-paid-session.sh to mint a one-off Tailscale key from Keychain,
-  then loads the Hyperstack key, imports the resulting per-session launchctl
-  values, and opens a login shell. Preparation helpers never inherit the
-  billing-capable Hyperstack key.
+  unlocking the macOS login Keychain interactively when needed, then loads the
+  Hyperstack key, imports the resulting per-session launchctl values, and opens
+  a login shell. Preparation helpers never inherit the billing-capable
+  Hyperstack key.
 
 shell
   Opens a credentialed login shell for an already prepared session.
@@ -77,6 +78,35 @@ read_item() {
   fi
   [[ -n "$value" ]] || { echo "Keychain item is empty: $service" >&2; return 1; }
   printf '%s' "$value"
+}
+
+read_item_with_interactive_unlock() {
+  local service="$1" value='' login_keychain=''
+  if value="$(security find-generic-password \
+      -a "$KEYCHAIN_ACCOUNT" -s "$service" -w 2>/dev/null)"; then
+    [[ -n "$value" ]] \
+      || { echo "Keychain item is empty: $service" >&2; return 1; }
+    printf '%s' "$value"
+    return 0
+  fi
+
+  [[ -r /dev/tty && -w /dev/tty ]] \
+    || { echo "Keychain item unavailable: $service" >&2; return 1; }
+  if [[ -n "${SEMBLA_LOGIN_KEYCHAIN_PATH:-}" ]]; then
+    login_keychain="$SEMBLA_LOGIN_KEYCHAIN_PATH"
+  elif [[ -n "${HOME:-}" ]]; then
+    login_keychain="$HOME/Library/Keychains/login.keychain-db"
+  else
+    echo 'could not locate the macOS login Keychain' >&2
+    return 1
+  fi
+  cat >&2 <<EOF
+The macOS login Keychain appears locked.
+Enter your Mac login password at the secure prompt to unlock:
+  $login_keychain
+EOF
+  security unlock-keychain "$login_keychain" < /dev/tty
+  read_item "$service"
 }
 
 validate_items() {
@@ -152,7 +182,7 @@ prepare_shell() {
   # Read and validate before minting so a missing/locked provider credential
   # cannot strand a prepared session. Keep it unexported while preparation
   # invokes GitHub, Keychain, and local key helpers.
-  hyperstack_value="$(read_item "$HYPERSTACK_SERVICE")"
+  hyperstack_value="$(read_item_with_interactive_unlock "$HYPERSTACK_SERVICE")"
   [[ "$hyperstack_value" == "${hyperstack_value//[[:space:]]/}" ]] \
     || { echo 'stored Hyperstack API key contains whitespace' >&2; return 1; }
   (

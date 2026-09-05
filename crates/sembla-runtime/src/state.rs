@@ -6,6 +6,12 @@ use std::fmt;
 use sembla_ir::{Attr, AttrType, ValidatedModel};
 use sha2::{Digest, Sha256};
 
+mod hash;
+mod initialization;
+
+use hash::*;
+use initialization::*;
+
 /// Initial values for one typed attribute column.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColumnData {
@@ -16,7 +22,7 @@ pub enum ColumnData {
 }
 
 impl ColumnData {
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         match self {
             Self::Real(values) => values.len(),
             Self::Int(values) => values.len(),
@@ -167,7 +173,8 @@ pub struct InputTable {
 }
 
 impl InputTable {
-    pub(crate) fn empty(box_name: &str, port_name: &str, schema: &[Attr]) -> Self {
+    #[doc(hidden)]
+    pub fn empty(box_name: &str, port_name: &str, schema: &[Attr]) -> Self {
         Self {
             box_name: box_name.to_owned(),
             port_name: port_name.to_owned(),
@@ -317,7 +324,8 @@ impl StateStore {
     ///
     /// Executors use this to build fallible Moore-machine outputs before making
     /// either state writes or newly delivered inputs observable.
-    pub(crate) fn prepared_snapshot(&self) -> Result<Snapshot<'_>, StateError> {
+    #[doc(hidden)]
+    pub fn prepared_snapshot(&self) -> Result<Snapshot<'_>, StateError> {
         if !self.write_prepared {
             return Err(StateError::new(
                 "cannot snapshot prepared state: no write buffer has been prepared",
@@ -346,7 +354,8 @@ impl StateStore {
         self.snapshot().state_hash()
     }
 
-    pub(crate) fn replace_inputs(&mut self, inputs: Vec<InputTable>) {
+    #[doc(hidden)]
+    pub fn replace_inputs(&mut self, inputs: Vec<InputTable>) {
         self.inputs = inputs;
     }
 
@@ -493,7 +502,8 @@ impl StateStore {
     }
 
     /// Abandons an executor-prepared next buffer after a staged write fails.
-    pub(crate) fn discard_writes(&mut self) {
+    #[doc(hidden)]
+    pub fn discard_writes(&mut self) {
         self.write_prepared = false;
     }
 }
@@ -507,7 +517,8 @@ pub struct Snapshot<'a> {
 
 /// A state column resolved once together with its table for stable diagnostics.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ResolvedColumn<'a> {
+#[doc(hidden)]
+pub struct ResolvedColumn<'a> {
     table: &'a TableState,
     column: &'a ColumnState,
 }
@@ -517,34 +528,39 @@ pub(crate) struct ResolvedColumn<'a> {
 /// State schema and declaration order never change after construction, so the
 /// same table/column indices address both buffers without repeating name scans.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub(crate) struct ResolvedWriteColumn {
+#[doc(hidden)]
+pub struct ResolvedWriteColumn {
     table_index: usize,
     column_index: usize,
 }
 
 impl<'a> ResolvedColumn<'a> {
-    pub(crate) fn real_values(self) -> Result<&'a [f64], StateError> {
+    #[doc(hidden)]
+    pub fn real_values(self) -> Result<&'a [f64], StateError> {
         match self.column {
             ColumnState::Real { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Real")),
         }
     }
 
-    pub(crate) fn int_values(self) -> Result<&'a [i64], StateError> {
+    #[doc(hidden)]
+    pub fn int_values(self) -> Result<&'a [i64], StateError> {
         match self.column {
             ColumnState::Int { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Int")),
         }
     }
 
-    pub(crate) fn enum_values(self) -> Result<&'a [u16], StateError> {
+    #[doc(hidden)]
+    pub fn enum_values(self) -> Result<&'a [u16], StateError> {
         match self.column {
             ColumnState::Enum { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Enum")),
         }
     }
 
-    pub(crate) fn ref_values(self) -> Result<&'a [u32], StateError> {
+    #[doc(hidden)]
+    pub fn ref_values(self) -> Result<&'a [u32], StateError> {
         match self.column {
             ColumnState::Ref { values, .. } => Ok(values),
             _ => Err(wrong_column_type(self.table, self.column, "Ref")),
@@ -554,7 +570,8 @@ impl<'a> ResolvedColumn<'a> {
 
 impl Snapshot<'_> {
     /// Resolves one state column without performing a row lookup.
-    pub(crate) fn resolve_column(
+    #[doc(hidden)]
+    pub fn resolve_column(
         &self,
         box_name: &str,
         table_name: &str,
@@ -565,7 +582,8 @@ impl Snapshot<'_> {
     }
 
     /// Resolves a destination once for later use against the prepared buffer.
-    pub(crate) fn resolve_write_column(
+    #[doc(hidden)]
+    pub fn resolve_write_column(
         &self,
         box_name: &str,
         table_name: &str,
@@ -751,7 +769,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_real(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_real(
+    #[doc(hidden)]
+    pub fn set_resolved_real(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -781,7 +800,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_int(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_int(
+    #[doc(hidden)]
+    pub fn set_resolved_int(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -811,7 +831,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_enum(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_enum(
+    #[doc(hidden)]
+    pub fn set_resolved_enum(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -854,7 +875,8 @@ impl WriteBuffer<'_> {
         self.set_resolved_ref(destination, row, value)
     }
 
-    pub(crate) fn set_resolved_ref(
+    #[doc(hidden)]
+    pub fn set_resolved_ref(
         &mut self,
         destination: ResolvedWriteColumn,
         row: usize,
@@ -887,233 +909,6 @@ impl WriteBuffer<'_> {
         } else {
             unreachable!("column type checked before mutable access")
         }
-    }
-}
-
-fn validate_state_initializers(
-    model: &ValidatedModel,
-    initial_tables: &[TableInit],
-) -> Result<(), StateError> {
-    validate_table_initializers(model, initial_tables)?;
-    for model_box in &model.model().boxes {
-        for table in &model_box.tables {
-            let initial = find_table_init(initial_tables, &model_box.name, &table.name)
-                .ok_or_else(|| {
-                    StateError::new(format!(
-                        "box '{}', table '{}': missing initial data",
-                        model_box.name, table.name
-                    ))
-                })?;
-            for attr in &table.attrs {
-                let column = find_column_init(&initial.columns, &attr.name).ok_or_else(|| {
-                    StateError::new(format!(
-                        "box '{}', table '{}', column '{}': missing initial data",
-                        model_box.name, table.name, attr.name
-                    ))
-                })?;
-                validate_column_initializer_value(
-                    model,
-                    initial_tables,
-                    &model_box.name,
-                    &table.name,
-                    attr,
-                    column,
-                )?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_table_initializers(
-    model: &ValidatedModel,
-    initial_tables: &[TableInit],
-) -> Result<(), StateError> {
-    for (index, initial) in initial_tables.iter().enumerate() {
-        if initial_tables[..index].iter().any(|previous| {
-            previous.box_name == initial.box_name && previous.table_name == initial.table_name
-        }) {
-            return Err(StateError::new(format!(
-                "box '{}', table '{}': duplicate initial data",
-                initial.box_name, initial.table_name
-            )));
-        }
-        let schema_table = model
-            .model()
-            .boxes
-            .iter()
-            .find(|model_box| model_box.name == initial.box_name)
-            .and_then(|model_box| {
-                model_box
-                    .tables
-                    .iter()
-                    .find(|table| table.name == initial.table_name)
-            })
-            .ok_or_else(|| {
-                StateError::new(format!(
-                    "box '{}', table '{}': no such table in model",
-                    initial.box_name, initial.table_name
-                ))
-            })?;
-        validate_column_initializers(initial)?;
-        for column in &initial.columns {
-            if !schema_table
-                .attrs
-                .iter()
-                .any(|attr| attr.name == column.name)
-            {
-                return Err(StateError::new(format!(
-                    "box '{}', table '{}', column '{}': no such column in model",
-                    initial.box_name, initial.table_name, column.name
-                )));
-            }
-        }
-    }
-
-    for model_box in &model.model().boxes {
-        for table in &model_box.tables {
-            if find_table_init(initial_tables, &model_box.name, &table.name).is_none() {
-                return Err(StateError::new(format!(
-                    "box '{}', table '{}': missing initial data",
-                    model_box.name, table.name
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_column_initializers(initial: &TableInit) -> Result<(), StateError> {
-    for (index, column) in initial.columns.iter().enumerate() {
-        if initial.columns[..index]
-            .iter()
-            .any(|previous| previous.name == column.name)
-        {
-            return Err(StateError::new(format!(
-                "box '{}', table '{}', column '{}': duplicate initial data",
-                initial.box_name, initial.table_name, column.name
-            )));
-        }
-        if column.data.len() != initial.row_count {
-            return Err(StateError::new(format!(
-                "box '{}', table '{}', column '{}': expected {} rows, found {}",
-                initial.box_name,
-                initial.table_name,
-                column.name,
-                initial.row_count,
-                column.data.len()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_column_initializer_value(
-    model: &ValidatedModel,
-    initial_tables: &[TableInit],
-    box_name: &str,
-    table_name: &str,
-    attr: &sembla_ir::Attr,
-    initial: &ColumnInit,
-) -> Result<(), StateError> {
-    let type_error = || {
-        StateError::new(format!(
-            "box '{box_name}', table '{table_name}', column '{}': expected {}, found {}",
-            attr.name,
-            attr_type_name(&attr.ty),
-            initial.data.kind_name()
-        ))
-    };
-
-    match (&attr.ty, &initial.data) {
-        (AttrType::Real, ColumnData::Real(_)) | (AttrType::Int, ColumnData::Int(_)) => Ok(()),
-        (AttrType::Enum { variants }, ColumnData::Enum(values)) => {
-            for (row, value) in values.iter().copied().enumerate() {
-                if usize::from(value) >= variants.len() {
-                    return Err(StateError::new(format!(
-                        "box '{box_name}', table '{table_name}', column '{}', row {row}: enum index {value} is out of bounds for {} variants",
-                        attr.name,
-                        variants.len()
-                    )));
-                }
-            }
-            Ok(())
-        }
-        (AttrType::Ref { table: target }, ColumnData::Ref(values)) => {
-            let model_box = model
-                .model()
-                .boxes
-                .iter()
-                .find(|model_box| model_box.name == box_name)
-                .ok_or_else(|| {
-                    StateError::new(format!("box '{box_name}': no such box in model"))
-                })?;
-            if !model_box.tables.iter().any(|table| table.name == *target) {
-                return Err(StateError::new(format!(
-                    "box '{box_name}', table '{table_name}', column '{}': unknown target table '{target}'",
-                    attr.name
-                )));
-            }
-            let target_initial =
-                find_table_init(initial_tables, box_name, target).ok_or_else(|| {
-                    StateError::new(format!(
-                        "box '{box_name}', table '{target}': missing initial data"
-                    ))
-                })?;
-            for (row, value) in values.iter().copied().enumerate() {
-                if value as usize >= target_initial.row_count {
-                    return Err(StateError::new(format!(
-                        "box '{box_name}', table '{table_name}', column '{}', row {row}: reference index {value} is out of bounds for target table '{target}' with {} rows",
-                        attr.name, target_initial.row_count
-                    )));
-                }
-            }
-            Ok(())
-        }
-        _ => Err(type_error()),
-    }
-}
-
-fn build_validated_column(
-    model: &ValidatedModel,
-    box_table_base: usize,
-    box_name: &str,
-    attr: &sembla_ir::Attr,
-    initial: &ColumnInit,
-) -> ColumnState {
-    match (&attr.ty, &initial.data) {
-        (AttrType::Real, ColumnData::Real(values)) => ColumnState::Real {
-            name: attr.name.clone(),
-            values: values.clone(),
-        },
-        (AttrType::Int, ColumnData::Int(values)) => ColumnState::Int {
-            name: attr.name.clone(),
-            values: values.clone(),
-        },
-        (AttrType::Enum { variants }, ColumnData::Enum(values)) => ColumnState::Enum {
-            name: attr.name.clone(),
-            variant_count: variants.len(),
-            values: values.clone(),
-        },
-        (AttrType::Ref { table: target }, ColumnData::Ref(values)) => {
-            let model_box = model
-                .model()
-                .boxes
-                .iter()
-                .find(|model_box| model_box.name == box_name)
-                .expect("validated state box disappeared");
-            let target_offset = model_box
-                .tables
-                .iter()
-                .position(|table| table.name == *target)
-                .expect("validated reference target disappeared");
-            ColumnState::Ref {
-                name: attr.name.clone(),
-                target_table: box_table_base + target_offset,
-                values: values.clone(),
-            }
-        }
-        _ => unreachable!("validated state column type changed"),
     }
 }
 
@@ -1432,311 +1227,6 @@ fn attr_type_name(attr_type: &AttrType) -> &'static str {
     }
 }
 
-fn update_state_tables(hash: &mut Sha256, tables: &[TableState], include_box: bool) {
-    update_u64(hash, tables.len());
-    for table in tables {
-        if include_box {
-            update_string(hash, &table.box_name);
-        }
-        update_string(hash, &table.name);
-        update_u64(hash, table.row_count);
-        update_u64(hash, table.columns.len());
-        for column in &table.columns {
-            update_state_column(hash, column);
-        }
-    }
-}
-
-fn update_state_column(hash: &mut Sha256, column: &ColumnState) {
-    update_string(hash, column.name());
-    match column {
-        ColumnState::Real { values, .. } => {
-            update_column_data(hash, &ColumnData::Real(values.clone()))
-        }
-        ColumnState::Int { values, .. } => {
-            update_column_data(hash, &ColumnData::Int(values.clone()))
-        }
-        ColumnState::Enum { values, .. } => {
-            update_column_data(hash, &ColumnData::Enum(values.clone()))
-        }
-        ColumnState::Ref { values, .. } => {
-            update_column_data(hash, &ColumnData::Ref(values.clone()))
-        }
-    }
-}
-
-fn update_column_data(hash: &mut Sha256, column: &ColumnData) {
-    match column {
-        ColumnData::Real(values) => {
-            hash.update([0]);
-            update_u64(hash, values.len());
-            for value in values {
-                hash.update(value.to_bits().to_le_bytes());
-            }
-        }
-        ColumnData::Int(values) => {
-            hash.update([1]);
-            update_u64(hash, values.len());
-            for value in values {
-                hash.update(value.to_le_bytes());
-            }
-        }
-        ColumnData::Enum(values) => {
-            hash.update([2]);
-            update_u64(hash, values.len());
-            for value in values {
-                hash.update(value.to_le_bytes());
-            }
-        }
-        ColumnData::Ref(values) => {
-            hash.update([3]);
-            update_u64(hash, values.len());
-            for value in values {
-                hash.update(value.to_le_bytes());
-            }
-        }
-    }
-}
-
-fn update_u64(hash: &mut Sha256, value: usize) {
-    hash.update((value as u64).to_le_bytes());
-}
-
-fn update_string(hash: &mut Sha256, value: &str) {
-    update_u64(hash, value.len());
-    hash.update(value.as_bytes());
-}
-
 #[cfg(test)]
-mod resolved_write_tests {
-    use super::*;
-
-    fn state_data() -> StateData {
-        StateData {
-            tables: vec![
-                TableState {
-                    box_name: "world".to_owned(),
-                    name: "Node".to_owned(),
-                    row_count: 2,
-                    columns: vec![ColumnState::Enum {
-                        name: "color".to_owned(),
-                        variant_count: 2,
-                        values: vec![0, 1],
-                    }],
-                },
-                TableState {
-                    box_name: "world".to_owned(),
-                    name: "Edge".to_owned(),
-                    row_count: 1,
-                    columns: vec![ColumnState::Ref {
-                        name: "to".to_owned(),
-                        target_table: 0,
-                        values: vec![0],
-                    }],
-                },
-            ],
-        }
-    }
-
-    #[test]
-    fn resolved_writes_preserve_row_enum_and_ref_validation() {
-        let mut state = state_data();
-        let (color, target) = {
-            let snapshot = Snapshot {
-                state: &state,
-                inputs: &[],
-            };
-            (
-                snapshot
-                    .resolve_write_column("world", "Node", "color")
-                    .unwrap(),
-                snapshot
-                    .resolve_write_column("world", "Edge", "to")
-                    .unwrap(),
-            )
-        };
-        let mut writes = WriteBuffer { state: &mut state };
-
-        assert_eq!(
-            writes
-                .set_resolved_real(color, 2, 0.0)
-                .unwrap_err()
-                .to_string(),
-            "box 'world', table 'Node', column 'color', row 2: row index is out of bounds for 2 rows"
-        );
-        assert_eq!(
-            writes
-                .set_resolved_enum(color, 1, 2)
-                .unwrap_err()
-                .to_string(),
-            "box 'world', table 'Node', column 'color', row 1: enum index 2 is out of bounds for 2 variants"
-        );
-        assert_eq!(
-            writes
-                .set_resolved_ref(target, 0, 2)
-                .unwrap_err()
-                .to_string(),
-            "box 'world', table 'Edge', column 'to', row 0: reference index 2 is out of bounds for target table 'Node' with 2 rows"
-        );
-    }
-
-    fn refresh_model() -> ValidatedModel {
-        let source = r#"
-        {
-          "name": "refresh",
-          "dt": 1.0,
-          "params": [],
-          "boxes": [{
-            "name": "world",
-            "tables": [
-              {"name": "Node", "size_hint": 3, "attrs": [
-                {"name": "real", "ty": {"kind": "real"}},
-                {"name": "int", "ty": {"kind": "int"}},
-                {"name": "enum", "ty": {"kind": "enum", "variants": ["a", "b"]}}
-              ]},
-              {"name": "Edge", "size_hint": 2, "attrs": [
-                {"name": "to", "ty": {"kind": "ref", "table": "Node"}}
-              ]}
-            ],
-            "transitions": [],
-            "inputs": [{
-              "name": "incoming",
-              "schema": [{"name": "value", "ty": {"kind": "int"}}]
-            }],
-            "outputs": []
-          }],
-          "wires": []
-        }
-        "#;
-        sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap()
-    }
-
-    fn refresh_initial(offset: i64) -> Vec<TableInit> {
-        vec![
-            TableInit::new(
-                "world",
-                "Node",
-                3,
-                vec![
-                    ColumnInit::new("real", ColumnData::Real(vec![offset as f64, 1.0, 2.0])),
-                    ColumnInit::new("int", ColumnData::Int(vec![offset, offset + 1, offset + 2])),
-                    ColumnInit::new("enum", ColumnData::Enum(vec![0, 1, 0])),
-                ],
-            ),
-            TableInit::new(
-                "world",
-                "Edge",
-                2,
-                vec![ColumnInit::new("to", ColumnData::Ref(vec![0, 2]))],
-            ),
-        ]
-    }
-
-    fn allocation_signature(state: &StateData) -> Vec<(usize, usize)> {
-        state
-            .tables
-            .iter()
-            .flat_map(|table| &table.columns)
-            .map(|column| match column {
-                ColumnState::Real { values, .. } => (values.as_ptr() as usize, values.capacity()),
-                ColumnState::Int { values, .. } => (values.as_ptr() as usize, values.capacity()),
-                ColumnState::Enum { values, .. } => (values.as_ptr() as usize, values.capacity()),
-                ColumnState::Ref { values, .. } => (values.as_ptr() as usize, values.capacity()),
-            })
-            .collect()
-    }
-
-    fn input_allocation_signature(inputs: &[InputTable]) -> Vec<(usize, usize)> {
-        inputs
-            .iter()
-            .flat_map(|input| &input.columns)
-            .map(|column| match column {
-                ColumnData::Real(values) => (values.as_ptr() as usize, values.capacity()),
-                ColumnData::Int(values) => (values.as_ptr() as usize, values.capacity()),
-                ColumnData::Enum(values) => (values.as_ptr() as usize, values.capacity()),
-                ColumnData::Ref(values) => (values.as_ptr() as usize, values.capacity()),
-            })
-            .collect()
-    }
-
-    #[test]
-    fn backend_refresh_retains_current_and_next_column_allocations() {
-        let model = refresh_model();
-        let mut store = StateStore::new(&model, refresh_initial(0)).unwrap();
-        let current_before = allocation_signature(&store.current);
-        let next_before = allocation_signature(&store.next);
-
-        store
-            .refresh_backend_state(&model, &refresh_initial(10))
-            .unwrap();
-        assert_eq!(allocation_signature(&store.current), current_before);
-        assert_eq!(allocation_signature(&store.next), next_before);
-        assert_eq!(store.snapshot().int("world", "Node", "int", 2), Ok(12));
-
-        store
-            .refresh_backend_state(&model, &refresh_initial(20))
-            .unwrap();
-        assert_eq!(allocation_signature(&store.current), current_before);
-        assert_eq!(allocation_signature(&store.next), next_before);
-        {
-            let _writes = store.write_buffer().unwrap();
-        }
-        assert_eq!(allocation_signature(&store.next), next_before);
-    }
-
-    #[test]
-    fn draw_reset_restores_both_buffers_and_empty_inputs_without_reallocation() {
-        let model = refresh_model();
-        let initial = refresh_initial(0);
-        let mut store = StateStore::new(&model, initial.clone()).unwrap();
-        let current_before = allocation_signature(&store.current);
-        let next_before = allocation_signature(&store.next);
-
-        store.inputs[0].row_count = 3;
-        store.inputs[0].columns[0] = ColumnData::Int(Vec::with_capacity(8));
-        let ColumnData::Int(values) = &mut store.inputs[0].columns[0] else {
-            unreachable!()
-        };
-        values.extend([4, 5, 6]);
-        let inputs_before = input_allocation_signature(&store.inputs);
-
-        for offset in [10, 20, 0] {
-            store
-                .reset_backend_draw(&model, &refresh_initial(offset))
-                .unwrap();
-            assert_eq!(allocation_signature(&store.current), current_before);
-            assert_eq!(allocation_signature(&store.next), next_before);
-            assert_eq!(input_allocation_signature(&store.inputs), inputs_before);
-            assert_eq!(store.inputs[0].row_count, 0);
-            assert_eq!(store.inputs[0].columns[0].len(), 0);
-            assert_eq!(store.snapshot().int("world", "Node", "int", 0), Ok(offset));
-            assert_eq!(store.current, store.next);
-        }
-        assert_eq!(
-            store.current,
-            StateStore::new(&model, initial).unwrap().current
-        );
-    }
-
-    #[test]
-    fn draw_reset_validation_is_constructor_equivalent_and_atomic() {
-        let model = refresh_model();
-        let mut store = StateStore::new(&model, refresh_initial(7)).unwrap();
-        store.inputs[0].row_count = 1;
-        store.inputs[0].columns[0] = ColumnData::Int(vec![99]);
-        let before = store.clone();
-        let mut malformed = refresh_initial(0);
-        malformed[0].columns[2].data = ColumnData::Enum(vec![0, 2, 0]);
-
-        let reset_error = store
-            .reset_backend_draw(&model, &malformed)
-            .unwrap_err()
-            .to_string();
-        let constructor_error = StateStore::new(&model, malformed).unwrap_err().to_string();
-        assert_eq!(reset_error, constructor_error);
-        assert_eq!(store.current, before.current);
-        assert_eq!(store.next, before.next);
-        assert_eq!(store.inputs, before.inputs);
-        assert_eq!(store.write_prepared, before.write_prepared);
-    }
-}
+#[path = "state_resolved_write_tests.rs"]
+mod resolved_write_tests;

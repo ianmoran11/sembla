@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use sembla_ir::AttrType;
-use sembla_runtime::executor::device_observation_eligibility;
+use sembla_runtime::core::device_observation_eligibility;
 
 #[allow(dead_code)]
 #[path = "support/diagnostic_cases.rs"]
