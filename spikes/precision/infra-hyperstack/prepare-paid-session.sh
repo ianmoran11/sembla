@@ -251,7 +251,8 @@ for name in TF_VAR_tailscale_auth_key TF_VAR_console_password_hash \
   fi
   if [[ -n "$existing_value" ]]; then
     echo "existing session value detected: $name" >&2
-    echo 'Clear/revoke the previous session before preparing a fresh one.' >&2
+    echo 'The value is stored in this launchctl bootstrap context; shell unset is not enough.' >&2
+    echo 'After verified teardown, run keychain-credentials.sh cleanup-session from this same Terminal/tmux context.' >&2
     exit 1
   fi
 done

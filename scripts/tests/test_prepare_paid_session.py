@@ -99,6 +99,9 @@ class PreparePaidSessionTest(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("existing session value detected", result.stderr)
+            self.assertIn("launchctl bootstrap context", result.stderr)
+            self.assertIn("shell unset is not enough", result.stderr)
+            self.assertIn("cleanup-session", result.stderr)
             self.assertFalse(log.exists(), "stale-session detection must not unset values")
 
     def test_launchctl_read_failure_stops_before_mutation(self):
