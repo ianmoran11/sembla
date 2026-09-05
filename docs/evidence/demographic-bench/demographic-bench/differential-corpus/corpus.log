@@ -1,0 +1,35 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running `target/release/sembla diff-backends --all-examples --population 100 --seed 7 --ticks 20`
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/noisy_voter.json verdict=equal cpu_ticks_per_sec=20838.413 cuda_ticks_per_sec=259.362
+cuda_device_observation eligible=false reason=at least one view requires host observation
+cuda_device_observation_view box="population" view="total_value" eligible=false reason=Sum preserves host order for Real and host overflow association for Int
+cuda_device_observation_view box="population" view="active_count" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="minimum_visits" eligible=true reason=Int min/max with row-local filter and value
+cuda_device_observation_view box="population" view="maximum_value" eligible=false reason=value is not a row-local infallible Int expression; Real extrema retain host NaN ordering
+model=examples/observations.json verdict=equal cpu_ticks_per_sec=24844.998 cuda_ticks_per_sec=274.220
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/radioactive_decay_chain.json verdict=equal cpu_ticks_per_sec=24092.931 cuda_ticks_per_sec=269.334
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/reversible_ctmc.json verdict=equal cpu_ticks_per_sec=25250.899 cuda_ticks_per_sec=268.616
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/seirs_waning.json verdict=equal cpu_ticks_per_sec=21916.511 cuda_ticks_per_sec=259.166
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="sir" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="sir" view="R" eligible=true reason=count with a row-local filter
+model=examples/sir.json verdict=equal cpu_ticks_per_sec=23821.349 cuda_ticks_per_sec=256.646
+cuda_device_observation eligible=true reason=all scalar and grouped views are device-eligible
+cuda_device_observation_view box="population" view="S" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="I" eligible=true reason=count with a row-local filter
+cuda_device_observation_view box="population" view="R" eligible=true reason=count with a row-local filter
+model=examples/sir_policy.json verdict=equal cpu_ticks_per_sec=28.383 cuda_ticks_per_sec=2.623
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/sis_importation.json verdict=equal cpu_ticks_per_sec=21885.526 cuda_ticks_per_sec=261.563
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/two_box.json verdict=equal cpu_ticks_per_sec=23793.265 cuda_ticks_per_sec=260.579
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/two_box_merged.json verdict=equal cpu_ticks_per_sec=18449.436 cuda_ticks_per_sec=261.116
+cuda_device_observation eligible=false reason=no declared views; legacy state reporting requires host state
+model=examples/two_state.json verdict=equal cpu_ticks_per_sec=24818.761 cuda_ticks_per_sec=265.641
+corpus_verdict=equal models=11

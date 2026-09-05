@@ -1,0 +1,128 @@
+{
+  "schema": "sembla-sweep-timing-v3",
+  "backend": "cpu",
+  "draws": 20,
+  "ticks_per_draw": 24,
+  "setup_wall_time_ms": 80.779439,
+  "draw_zero_including_setup_wall_time_ms": 7495.788423999999,
+  "final_state_buffer_accounting": {
+    "mode": "packed-pageable",
+    "requested_lane_count": 1,
+    "retained_lane_count": 1,
+    "requested_pinned_bytes_per_lane": 0,
+    "requested_cacheable_staging_bytes_per_lane": 0,
+    "requested_pinned_bytes": 0,
+    "effective_pinned_bytes": 0,
+    "requested_cacheable_staging_bytes": 0,
+    "effective_cacheable_staging_bytes": 0,
+    "requested_buffer_set_count": 0,
+    "buffer_set_count": 0,
+    "requested_underlying_pinned_allocation_count": 0,
+    "underlying_pinned_allocation_count": 0
+  },
+  "draw_timings": [
+    {
+      "k": 0,
+      "wall_time_ms": 7415.008985,
+      "final_state": null
+    },
+    {
+      "k": 1,
+      "wall_time_ms": 7585.125509,
+      "final_state": null
+    },
+    {
+      "k": 2,
+      "wall_time_ms": 7897.763539,
+      "final_state": null
+    },
+    {
+      "k": 3,
+      "wall_time_ms": 7390.704344999999,
+      "final_state": null
+    },
+    {
+      "k": 4,
+      "wall_time_ms": 7491.340327,
+      "final_state": null
+    },
+    {
+      "k": 5,
+      "wall_time_ms": 7664.03204,
+      "final_state": null
+    },
+    {
+      "k": 6,
+      "wall_time_ms": 7855.694934,
+      "final_state": null
+    },
+    {
+      "k": 7,
+      "wall_time_ms": 7371.084653999999,
+      "final_state": null
+    },
+    {
+      "k": 8,
+      "wall_time_ms": 7327.73656,
+      "final_state": null
+    },
+    {
+      "k": 9,
+      "wall_time_ms": 7481.4781889999995,
+      "final_state": null
+    },
+    {
+      "k": 10,
+      "wall_time_ms": 7734.938623,
+      "final_state": null
+    },
+    {
+      "k": 11,
+      "wall_time_ms": 7459.794405000001,
+      "final_state": null
+    },
+    {
+      "k": 12,
+      "wall_time_ms": 7306.352261,
+      "final_state": null
+    },
+    {
+      "k": 13,
+      "wall_time_ms": 7337.585183,
+      "final_state": null
+    },
+    {
+      "k": 14,
+      "wall_time_ms": 7265.848627,
+      "final_state": null
+    },
+    {
+      "k": 15,
+      "wall_time_ms": 7759.517477,
+      "final_state": null
+    },
+    {
+      "k": 16,
+      "wall_time_ms": 7571.796904,
+      "final_state": null
+    },
+    {
+      "k": 17,
+      "wall_time_ms": 7506.388722,
+      "final_state": null
+    },
+    {
+      "k": 18,
+      "wall_time_ms": 7474.451377,
+      "final_state": null
+    },
+    {
+      "k": 19,
+      "wall_time_ms": 7308.943224,
+      "final_state": null
+    }
+  ],
+  "whole_sweep_wall_time_ms": 150640.09574,
+  "repository_commit": "4458a9de2f7477b34d0bb5b7585685185e65ea63",
+  "binary_sha256": "600b25321628166d6535f3064d9611a73c7df7667ef72468300568e00d8e80fa"
+}
