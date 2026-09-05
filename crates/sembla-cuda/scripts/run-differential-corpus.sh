@@ -76,6 +76,12 @@ cargo test --locked --release -p sembla-cuda --features cuda --lib \
   2>&1 | tee "$out/diagnostic-corpus.log"
 status=${PIPESTATUS[0]}
 if [[ $status -eq 0 ]]; then
+  cargo test --locked --release -p sembla-cuda --features cuda --lib \
+    sparse_resource_reports_match_cpu_across_ticks_and_reset -- --ignored --nocapture \
+    2>&1 | tee "$out/resource-corpus.log"
+  status=${PIPESTATUS[0]}
+fi
+if [[ $status -eq 0 ]]; then
   cargo run --locked --release -p sembla-cli --features cuda -- diff-backends \
     fixtures/demographic/benchmark/demographic_slots.no-grouped.json \
     --population 1000 --seed 7 --ticks 20 \

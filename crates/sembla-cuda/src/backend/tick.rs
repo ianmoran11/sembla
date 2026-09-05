@@ -822,7 +822,10 @@ impl CudaBackend {
         }
         if candidate_count != 0 {
             let config = control_count_launch_config(candidate_count);
-            for table in 0..table_count {
+            // Other table counts retain the zero written by initialization:
+            // no contest can set a deferred flag for those tables.
+            for &table in &self.generated.resource_tables {
+                let table = table as u64;
                 let mut args = fused_launch_builder(
                     &self.stream,
                     &self.count_deferred,

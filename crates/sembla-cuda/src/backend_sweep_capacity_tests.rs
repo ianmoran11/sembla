@@ -38,6 +38,150 @@ fn demographic_shape(scale: usize) -> (sembla_ir::ValidatedModel, Vec<TableInit>
     (model, tables)
 }
 
+fn sparse_resource_model() -> sembla_ir::ValidatedModel {
+    let model_box = |name| {
+        serde_json::json!({
+            "name": name,
+            "tables": [
+                {"name": "unused", "size_hint": 9, "attrs": []},
+                {"name": "first", "size_hint": 2, "attrs": []},
+                {"name": "second", "size_hint": 3, "attrs": []},
+                {"name": "agents", "size_hint": 4, "attrs": [
+                    {"name": "a", "ty": {"kind": "ref", "table": "first"}},
+                    {"name": "b", "ty": {"kind": "ref", "table": "second"}},
+                    {"name": "c", "ty": {"kind": "ref", "table": "first"}}
+                ]}
+            ],
+            "transitions": [{
+                "name": "claim", "table": "agents",
+                "guard": {"kind": "bool", "value": true},
+                "hazard": {"kind": "real", "value": 1e300},
+                "effects": [],
+                "contests": (["a", "b", "c"].map(|attr| serde_json::json!({
+                    "resource": {"kind": "self_attr", "name": attr},
+                    "ordering": {"kind": "race_time"}
+                })))
+            }],
+            "inputs": [], "outputs": [], "views": []
+        })
+    };
+    let source = serde_json::json!({
+        "name": "sparse_resources", "dt": 1.0, "params": [],
+        "boxes": [model_box("left"), model_box("right")],
+        "wires": [], "summaries": []
+    });
+    sembla_ir::validate(sembla_ir::parse_json(&source.to_string()).unwrap()).unwrap()
+}
+
+fn sparse_resource_state() -> Vec<TableInit> {
+    ["left", "right"]
+        .into_iter()
+        .flat_map(|name| {
+            [
+                TableInit::new(name, "unused", 9, vec![]),
+                TableInit::new(name, "first", 2, vec![]),
+                TableInit::new(name, "second", 3, vec![]),
+                TableInit::new(
+                    name,
+                    "agents",
+                    4,
+                    vec![
+                        ColumnInit::new("a", ColumnData::Ref(vec![0, 0, 0, 0])),
+                        ColumnInit::new("b", ColumnData::Ref(vec![0, 1, 2, 0])),
+                        ColumnInit::new("c", ColumnData::Ref(vec![0, 0, 0, 0])),
+                    ],
+                ),
+            ]
+        })
+        .collect()
+}
+
+#[test]
+fn resource_layout_packs_distinct_contest_targets_across_boxes() {
+    let model = sparse_resource_model();
+    let generated = generate(&model).unwrap();
+    assert_eq!(generated.resource_tables, [1, 2, 5, 6]);
+    let mut initial = sparse_resource_state();
+    let layout = build_layout(&model, &initial, &generated).unwrap();
+    assert_eq!(layout.resource_offsets, [0, 0, 2, 5, 5, 5, 7, 10]);
+    assert_eq!(layout.resource_count, 10);
+
+    // Empty targets still occupy their global table position without reserving
+    // winner slots; all later target offsets remain valid.
+    initial[1].row_count = 0;
+    let layout = build_layout(&model, &initial, &generated).unwrap();
+    assert_eq!(layout.resource_offsets, [0, 0, 0, 3, 3, 3, 5, 8]);
+    assert_eq!(layout.resource_count, 8);
+
+    let mut no_claims = model.model().clone();
+    for model_box in &mut no_claims.boxes {
+        model_box.transitions[0].contests.clear();
+    }
+    let no_claims = sembla_ir::validate(no_claims).unwrap();
+    let generated = generate(&no_claims).unwrap();
+    assert!(generated.resource_tables.is_empty());
+    let layout = build_layout(&no_claims, &initial, &generated).unwrap();
+    assert_eq!(layout.resource_count, 0);
+    assert_eq!(layout.resource_offsets, [0; 8]);
+}
+
+#[test]
+#[ignore = "requires a CUDA GPU; compares packed contest targets and deferred reports"]
+fn sparse_resource_reports_match_cpu_across_ticks_and_reset() {
+    use super::{CudaBackend, HashMode};
+    use sembla_runtime::core::ParamEnv;
+
+    let model = sparse_resource_model();
+    let initial = sparse_resource_state();
+    let params = ParamEnv::defaults(&model);
+    let mut backend =
+        CudaBackend::new(&model, initial.clone(), &params, 9009, HashMode::FinalOnly).unwrap();
+    for seed in [9009, 19] {
+        backend.reset_draw(&params, seed).unwrap();
+        let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
+        for tick in 0..3 {
+            let expected = sembla_cpu::run_tick(&model, &mut cpu, &params, seed, tick).unwrap();
+            let (_, fired, deferred, _) = backend.run_tick_observed_reused().unwrap();
+            assert_eq!(fired, expected.fired_per_box);
+            assert_eq!(deferred, expected.deferred_per_resource_table);
+            assert_eq!(
+                backend.ensure_observed_state().unwrap().state_hash(),
+                cpu.state_hash()
+            );
+        }
+    }
+
+    let seeds = [9009, 19];
+    let mut fused = CudaBackend::new_fused_batch(
+        &model,
+        initial.clone(),
+        &params,
+        seeds[0],
+        2,
+        HashMode::FinalOnly,
+    )
+    .unwrap();
+    fused
+        .reset_fused_batch(&[params.clone(), params.clone()], &seeds)
+        .unwrap();
+    let mut cpu_states = seeds.map(|_| StateStore::new(&model, initial.clone()).unwrap());
+    for tick in 0..3 {
+        let observed = fused.run_tick_observed_reused_fused().unwrap();
+        for (slot, observation) in observed.into_iter().enumerate() {
+            let expected =
+                sembla_cpu::run_tick(&model, &mut cpu_states[slot], &params, seeds[slot], tick)
+                    .unwrap();
+            let (_, fired, deferred, _) = observation.unwrap();
+            assert_eq!(fired, expected.fired_per_box);
+            assert_eq!(deferred, expected.deferred_per_resource_table);
+            assert_eq!(
+                fused.fused_observed_state(slot).unwrap().state_hash(),
+                cpu_states[slot].state_hash()
+            );
+        }
+    }
+}
+
 #[test]
 fn isolated_lane_estimate_is_conservative_against_measured_h100_arms() {
     for (scale, observed_mib) in [

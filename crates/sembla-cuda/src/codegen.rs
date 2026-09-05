@@ -275,6 +275,8 @@ pub struct GeneratedCuda {
     pub source: String,
     pub source_sha256: String,
     pub transition_kernels: Vec<String>,
+    /// Sorted global tables actually targeted by at least one contest.
+    pub(crate) resource_tables: Vec<usize>,
     /// Global table index supplying the result length of each generated
     /// group aggregate, in generated aggregate order.
     pub aggregate_group_tables: Vec<usize>,
@@ -1466,7 +1468,7 @@ impl<'a> Generator<'a> {
         self.emit_aggregate_kernel(&mut out)?;
         let transition_kernels = self.emit_transition_kernels(&mut out)?;
         self.emit_validation_status_kernels(&mut out);
-        self.emit_resolve_kernel(&mut out)?;
+        let resource_tables = self.emit_resolve_kernel(&mut out)?;
         self.emit_apply_kernel(&mut out)?;
         self.emit_output_kernel(&mut out)?;
         self.emit_observation_kernel(&mut out)?;
@@ -1568,6 +1570,7 @@ impl<'a> Generator<'a> {
             source: out,
             source_sha256,
             transition_kernels,
+            resource_tables,
             aggregate_group_tables,
             state_aggregate_indices,
             schedule_aggregate_indices,
@@ -1860,18 +1863,15 @@ impl<'a> Generator<'a> {
             writeln!(out, "    for (unsigned long long row = worker; row < row_counts[{table}]; row += (unsigned long long)gridDim.x * blockDim.x) {{\n      int selected = {selected};\n      if (selected) {{ unsigned long long group = 0ULL;").unwrap();
             for (key_index, key) in view.keys.iter().enumerate() {
                 let global_axis = axis_offset + key_index;
-                let (attr_index, value) = match *key {
+                let value = match *key {
                     GroupedObservationKeySpec::Enum { attr_index, .. }
                     | GroupedObservationKeySpec::Ref { attr_index, .. } => {
                         let attr = &self.model.model().boxes[view.box_index].tables
                             [view.table_index]
                             .attrs[attr_index];
-                        (
-                            attr_index,
-                            format!(
-                                "(long long)({})",
-                                self.render_attr(rows, &attr.name, "state", "row")?.0
-                            ),
+                        format!(
+                            "(long long)({})",
+                            self.render_attr(rows, &attr.name, "state", "row")?.0
                         )
                     }
                     GroupedObservationKeySpec::BandedInt {
@@ -1880,16 +1880,12 @@ impl<'a> Generator<'a> {
                         let attr = &self.model.model().boxes[view.box_index].tables
                             [view.table_index]
                             .attrs[attr_index];
-                        (
-                            attr_index,
-                            format!(
-                                "sembla_div_euclid_i64_u64((long long)({}), {width}ULL)",
-                                self.render_attr(rows, &attr.name, "state", "row")?.0
-                            ),
+                        format!(
+                            "sembla_div_euclid_i64_u64((long long)({}), {width}ULL)",
+                            self.render_attr(rows, &attr.name, "state", "row")?.0
                         )
                     }
                 };
-                let _ = attr_index;
                 writeln!(out, "        {{ long long key = {value}; unsigned long long coordinate = (unsigned long long)(key - axis_mins[{global_axis}]); group = group * axis_cardinalities[{global_axis}] + coordinate; }}").unwrap();
             }
             out.push_str(
@@ -2042,7 +2038,8 @@ impl<'a> Generator<'a> {
         out.push_str("\nextern \"C\" __global__ void sembla_mark_effect_active(const unsigned char* wins, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned int rule_id, unsigned int* effect_active) {\n  unsigned long long row = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x;\n  if (row >= candidate_count) return;\n  if (wins[candidate_begin + row] != 0U) atomicOr(effect_active + rule_id, 1U);\n}\n");
     }
 
-    fn emit_resolve_kernel(&self, out: &mut String) -> Result<(), CudaError> {
+    fn emit_resolve_kernel(&self, out: &mut String) -> Result<Vec<usize>, CudaError> {
+        let mut resource_tables = Vec::new();
         out.push_str("\nextern \"C\" __global__ void sembla_validate_claim_compatibility(const unsigned char* state, const unsigned long long* column_offsets, const unsigned long long* row_counts, const unsigned char* inputs, const unsigned long long* input_offsets, const unsigned long long* input_counts, const unsigned char* params, const unsigned char* aggs, const unsigned long long* agg_offsets, const unsigned long long* candidate_offsets, const unsigned char* enabled, unsigned int box_index, unsigned long long* status) {\n  if (blockIdx.x != 0 || threadIdx.x != 0 || status[0] != 0ULL) return;\n  unsigned char local_error = 0; unsigned char* error = &local_error;\n");
 
         // Claim expressions are evaluated eagerly by the ordered transition
@@ -2200,12 +2197,15 @@ impl<'a> Generator<'a> {
                 };
                 let target_table = self.table_index(validated.box_index, &target_name)?;
                 let target_global = self.global_table(validated.box_index, target_table);
+                resource_tables.push(target_global);
                 writeln!(out, "      {{ unsigned long long instance = claim_instance_offsets[{}] + row * {}ULL + {claim_index}ULL; unsigned long long resource = instance_resources[instance]; if (winner_rules[resource] != {}U || winner_entities[resource] != (unsigned int)row) {{ wins[self_candidate] = 0U; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }} }}", validated.rule_id, transition.contests.len(), validated.rule_word).unwrap();
             }
             out.push_str("    }\n");
         }
         out.push_str("  }\n}\n");
-        Ok(())
+        resource_tables.sort_unstable();
+        resource_tables.dedup();
+        Ok(resource_tables)
     }
 
     fn claim_key(
