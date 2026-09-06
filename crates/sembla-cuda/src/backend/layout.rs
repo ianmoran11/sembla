@@ -277,13 +277,15 @@ pub(super) fn build_layout(
     state_len = state_len.max(1);
     input_len = input_len.max(1);
 
-    // A resource segment is addressed directly by (global table, row). This
-    // prefix layout is deterministic and gives the flat claim-instance list a
-    // stable grouping without a scheduling-dependent sort.
+    // Keep global-table addressing, but reserve winner slots only for contest
+    // targets. Uncontested tables never index the winner buffers.
     let mut resource_offsets = Vec::with_capacity(row_counts.len());
     let mut resource_count = 0_usize;
-    for rows in &row_counts {
+    for (table, rows) in row_counts.iter().enumerate() {
         resource_offsets.push(resource_count as u64);
+        if !generated.resource_tables.contains(&table) {
+            continue;
+        }
         let rows = usize::try_from(*rows)
             .map_err(|_| CudaError::InvalidInput("resource row count exceeds usize".to_owned()))?;
         resource_count = resource_count

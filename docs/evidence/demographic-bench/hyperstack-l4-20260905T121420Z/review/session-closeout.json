@@ -1,0 +1,16 @@
+{
+  "recorded_utc": "2026-09-05T13:35:38+00:00",
+  "collector_exit_code": 0,
+  "terraform_paid_resources_remaining": 0,
+  "provider_verification": "provider-verification.json",
+  "watchdog_disarmed": true,
+  "collector_and_watchdog_guard_processes_exited": true,
+  "temporary_tailscale_key_revoked_or_absent": true,
+  "temporary_github_deploy_key_revoked_or_absent": true,
+  "temporary_ssh_host_key_directory_removed": true,
+  "temporary_console_password_keychain_item_deleted_and_absence_verified": true,
+  "paid_session_launchctl_values_cleared": true,
+  "saved_paid_plan_removed": true,
+  "local_terraform_configuration_restored": true,
+  "sensitive_terraform_state_mode": "0600"
+}

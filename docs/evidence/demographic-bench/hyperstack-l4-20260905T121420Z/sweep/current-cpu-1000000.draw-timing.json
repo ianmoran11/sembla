@@ -1,0 +1,89 @@
+{
+  "schema": "sembla-external-sweep-timing-v1",
+  "method": "3 ms polling for completed draw_N.csv files",
+  "whole_sweep_wall_time_ms": 150753.625322,
+  "draw_zero_including_setup_wall_time_ms": 7751.751781,
+  "median_later_draw_wall_time_ms": 7485.609287000014,
+  "draw_timings": [
+    {
+      "k": 0,
+      "wall_time_ms": 7751.751781
+    },
+    {
+      "k": 1,
+      "wall_time_ms": 7587.611634
+    },
+    {
+      "k": 2,
+      "wall_time_ms": 7901.936731000002
+    },
+    {
+      "k": 3,
+      "wall_time_ms": 7395.673734
+    },
+    {
+      "k": 4,
+      "wall_time_ms": 7495.221084000001
+    },
+    {
+      "k": 5,
+      "wall_time_ms": 7668.647213999997
+    },
+    {
+      "k": 6,
+      "wall_time_ms": 7861.029203999999
+    },
+    {
+      "k": 7,
+      "wall_time_ms": 7374.798121
+    },
+    {
+      "k": 8,
+      "wall_time_ms": 7333.5377489999955
+    },
+    {
+      "k": 9,
+      "wall_time_ms": 7485.609287000014
+    },
+    {
+      "k": 10,
+      "wall_time_ms": 7740.164311
+    },
+    {
+      "k": 11,
+      "wall_time_ms": 7463.9497069999925
+    },
+    {
+      "k": 12,
+      "wall_time_ms": 7310.766334
+    },
+    {
+      "k": 13,
+      "wall_time_ms": 7340.168481999994
+    },
+    {
+      "k": 14,
+      "wall_time_ms": 7269.422454
+    },
+    {
+      "k": 15,
+      "wall_time_ms": 7765.425244000013
+    },
+    {
+      "k": 16,
+      "wall_time_ms": 7577.6824789999955
+    },
+    {
+      "k": 17,
+      "wall_time_ms": 7509.949016999992
+    },
+    {
+      "k": 18,
+      "wall_time_ms": 7477.786622999993
+    },
+    {
+      "k": 19,
+      "wall_time_ms": 7315.721083000011
+    }
+  ]
+}

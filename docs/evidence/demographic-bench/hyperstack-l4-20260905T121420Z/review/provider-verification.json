@@ -1,0 +1,11 @@
+{
+  "verified_utc": "2026-09-05T13:34:49+00:00",
+  "http_status": 200,
+  "response_instances_list_validated": true,
+  "session_vm_ids_checked": [
+    "1025775"
+  ],
+  "session_vms_remaining": 0,
+  "project_vms_remaining": 0,
+  "other_vms_count": 0
+}

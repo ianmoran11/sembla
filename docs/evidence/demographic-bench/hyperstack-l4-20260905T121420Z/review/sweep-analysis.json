@@ -1,0 +1,82 @@
+{
+  "1000000": {
+    "comparisons": {
+      "cpu_before_after": 103,
+      "cuda_before_after": 103,
+      "baseline_cpu_cuda": 103,
+      "current_cpu_cuda": 103
+    },
+    "measurements": {
+      "baseline_cpu": {
+        "wall_seconds": 152.62,
+        "peak_rss_kib": 1545384,
+        "whole_sweep_ms": 152591.998162,
+        "first_draw_ms": 7827.508085,
+        "median_later_draw_ms": 7592.008845
+      },
+      "current_cpu": {
+        "wall_seconds": 150.78,
+        "peak_rss_kib": 1562920,
+        "whole_sweep_ms": 150753.625322,
+        "first_draw_ms": 7751.751781,
+        "median_later_draw_ms": 7485.609287000014
+      },
+      "cpu_later_paired_ratio_median": 0.9874583512494556,
+      "baseline_cuda": {
+        "wall_seconds": 4.17,
+        "peak_rss_kib": 430892,
+        "whole_sweep_ms": 4147.718971,
+        "first_draw_ms": 1428.843388,
+        "median_later_draw_ms": 133.968844
+      },
+      "current_cuda": {
+        "wall_seconds": 3.99,
+        "peak_rss_kib": 431044,
+        "whole_sweep_ms": 3962.531031,
+        "first_draw_ms": 1328.380381,
+        "median_later_draw_ms": 129.06093099999998
+      },
+      "cuda_later_paired_ratio_median": 0.9575925527116208
+    }
+  },
+  "10000000": {
+    "comparisons": {
+      "cpu_before_after": 103,
+      "cuda_before_after": 103,
+      "baseline_cpu_cuda": 103,
+      "current_cpu_cuda": 103
+    },
+    "measurements": {
+      "baseline_cpu": {
+        "wall_seconds": 1737.86,
+        "peak_rss_kib": 3814140,
+        "whole_sweep_ms": 1737828.794316,
+        "first_draw_ms": 84364.376926,
+        "median_later_draw_ms": 87223.98990599997
+      },
+      "current_cpu": {
+        "wall_seconds": 1757.91,
+        "peak_rss_kib": 3824548,
+        "whole_sweep_ms": 1757889.195891,
+        "first_draw_ms": 85301.241366,
+        "median_later_draw_ms": 87295.67757599999
+      },
+      "cpu_later_paired_ratio_median": 1.0037738955325561,
+      "baseline_cuda": {
+        "wall_seconds": 26.52,
+        "peak_rss_kib": 2571284,
+        "whole_sweep_ms": 26500.990037,
+        "first_draw_ms": 6051.141667,
+        "median_later_draw_ms": 1050.2374170000003
+      },
+      "current_cuda": {
+        "wall_seconds": 25.35,
+        "peak_rss_kib": 2571328,
+        "whole_sweep_ms": 25323.987712,
+        "first_draw_ms": 6001.345706,
+        "median_later_draw_ms": 1014.7986740000015
+      },
+      "cuda_later_paired_ratio_median": 0.9686487596410002
+    }
+  }
+}
