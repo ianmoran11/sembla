@@ -77,7 +77,10 @@ fn optimized_reductions_match_cpu_for_group_sizes_and_fused_resets() {
             for tick in 0..3 {
                 let actual = backend.run_tick_observed_reused().unwrap();
                 let batch = fused.run_tick_observed_reused_fused().unwrap();
-                for (slot, result) in batch.into_iter().enumerate() {
+                let states = fused.ensure_fused_observed_states().unwrap();
+                assert_eq!(batch.len(), width);
+                assert_eq!(states.len(), width);
+                for (slot, (result, state)) in batch.into_iter().zip(states).enumerate() {
                     let expected = sembla_cpu::run_tick_with_features(
                         &model,
                         &mut cpu[slot],
@@ -88,14 +91,16 @@ fn optimized_reductions_match_cpu_for_group_sizes_and_fused_resets() {
                     )
                     .unwrap();
                     let (_, fired, deferred, views) = result.unwrap();
+                    let state = state.unwrap().unwrap();
                     assert_eq!(fired, expected.fired_per_box);
                     assert_eq!(deferred, expected.deferred_per_resource_table);
                     let views = views.unwrap();
                     assert_eq!(views.views, expected.views);
                     assert_eq!(views.grouped_views, expected.grouped_views);
                     assert_eq!(
-                        fused.fused_observed_state(slot).unwrap().state_hash(),
-                        cpu[slot].state_hash()
+                        state.state_hash(),
+                        cpu[slot].state_hash(),
+                        "rows={rows} bands={bands} width={width} tick={tick} slot={slot}"
                     );
                     if slot == 0 {
                         assert_eq!(actual.1, fired);
