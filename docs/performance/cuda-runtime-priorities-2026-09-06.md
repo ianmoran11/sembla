@@ -1,9 +1,10 @@
 # CUDA runtime priorities — 2026-09-06
 
-The three priority changes are implemented and pass local checks. A local
-one-tick CPU benchmark confirms lower input-preparation time and memory.
-CUDA correctness, kernel timing, and whole-sweep performance remain pending a
-new approved H100 session; local CPU gains are not CUDA speedup estimates.
+The three priority changes reduce median whole CUDA sweep time by **4.9% at 1M**
+and **7.7% at 10M** on the tested H100. Correctness and Compute Sanitizer checks
+pass. Most of the benefit is loading and construction, with little change to
+steady draw time. The 1M CPU control slowed on the AMD host; that limitation
+remains unresolved and is detailed below.
 
 ## Changes
 
@@ -25,8 +26,8 @@ new approved H100 session; local CPU gains are not CUDA speedup estimates.
   write-preparation, and output validation. They return immediately on success;
   on error their existing grid-stride loops still scan every row and recover
   the same ordered status payload. Empty-table scalar checks and explicit test
-  geometry overrides remain supported. Error-path latency may increase and
-  needs hardware measurement alongside the successful path.
+  geometry overrides remain supported. Error recovery is verified on hardware;
+  its latency has not been measured separately.
 - **Compact deferred flags.** Flags cover candidate × contested table, using
   a sorted compact index, while reported counts retain global table order.
   Repeated claims share one table flag. The demographic 10M buffer falls from
@@ -37,6 +38,55 @@ new approved H100 session; local CPU gains are not CUDA speedup estimates.
 Public CUDA reference generation, fixtures, canonical bytes, hash domains,
 Cargo.lock, and backend boundaries are unchanged. Execution-source hashes
 continue to identify the actual optimized translation unit.
+
+## H100 measurement
+
+H100 PCIe, driver 570.195.03, 28-vCPU AMD EPYC 9554 host, CUDA-enabled release
+binaries. Baseline: `d93c8a301f1fc6e0e44ec6ed06504c5b45ff363e`; measured candidate:
+`107a686cebbcc4b002aa90b34cbdfb4448405860`. Production runtime code is unchanged
+from the implementation commit below. Each sweep has 20 independent draws of
+24 ticks with grouped observations. Both arms are warmed, then three alternating
+pairs are measured. Medians exclude the warmup pair.
+
+| Slots | Whole command before → after | Reduction | Peak host RSS before → after |
+|---|---:|---:|---:|
+| 1M | 3.622 → 3.444 s | 4.9% | 420.99 → 406.82 MiB |
+| 10M | 23.669 → 21.851 s | 7.7% | 2510.98 → 2468.50 MiB |
+
+All six measured pairs improve, but the 10M pair reductions range from 2.2% to
+8.4%. These are three pairs on one spot host, not a universal speedup estimate.
+Typical later draws change from 104.61 → 103.91 ms at 1M and 913.90 → 909.92 ms
+at 10M. At 10M, median constructor time falls from 2.530 → 2.266 s; time outside
+construction and timed draws falls from 2.796 → 1.381 s. That latter interval
+also includes publication and other command work, so it is not an isolated
+input-phase timer. Its reduction is consistent with the loading changes.
+Separate phase medians should not be added as if they describe one run.
+
+The device flags shrink by 200 MB per 10M worker, and the temporary upload copy
+is eliminated, but peak host RSS falls by only 42.47 MiB in these sweeps. These
+allocation reductions should not be reported as an equal reduction in total
+peak memory. The Nsight trace confirms 32-block recovery passes. No ablation
+isolates each change's performance contribution.
+
+All scientific trees, pair exports, grouped sidecars and hashes match. The
+full differential corpus and four hardware tests pass under Compute Sanitizer
+with zero errors. The frozen §L4 gate is MET at 6.321× relative to CPU on its
+separate no-grouped workload. All 3,162 remote checksum entries verify. The VM
+and SSH rule were destroyed, provider reconciliation is empty, and disposable
+credentials were removed. The rate-based session estimate is US$1.99.
+
+[Raw results, independent verification and closeout](../evidence/demographic-bench/hyperstack-l4-20260906T203715Z/review/README.md).
+
+### CPU control limitation
+
+The AMD host's 1M CPU sweeps slowed in both collections: 54.79 → 63.04 s (+15.1%)
+and 58.04 → 65.60 s (+13.0%). The 10M pair was 715.47 → 716.38 s (+0.1%). CPU
+execution code is identical, but input allocation changed; the cause is not
+established. These controls do **not** demonstrate CPU neutrality or a CPU
+throughput gain. A follow-up M2 Pro test, using the exact same 1M input and five
+24-tick draws, gave 10.853 → 10.770 s across three warmed pairs with exact
+outputs. It did not reproduce the AMD-host slowdown, which remains the next
+CPU investigation before claiming this path improves both backends.
 
 ## Local measurement
 
@@ -70,7 +120,7 @@ measure the new CUDA upload path, GPU flags, or diagnostic launch geometry.
 `./scripts/check-rust.sh` (serial test execution) and
 `./scripts/check-determinism.sh` pass. The later input-snapshot regression and
 final all-feature clippy check also pass. CUDA-feature library tests report
-41 passed, four hardware tests ignored. Existing negative initializer cases
+42 passed, four hardware tests ignored after the diagnostic harness fix. Existing negative initializer cases
 now compare borrowed and consuming errors; the new snapshot test replaces a
 file after identity loading and verifies decoding still uses those exact bytes.
 
@@ -80,7 +130,7 @@ full-grid launch and checking rollback. Its CPU oracle passes locally.
 The sparse multi-table conflict test checks compact allocation lengths and
 fused widths 2 → 1 → 2 across resets, with exact CPU report/state comparison.
 
-With `BENCH_CORPUS=1 BENCH_PROFILE=1 BENCH_SWEEP=1`, the collector will run the
+With `BENCH_CORPUS=1 BENCH_PROFILE=1 BENCH_SWEEP=1`, the collector ran the
 full differential corpus, a bounded Compute Sanitizer memcheck of CUDA library
 tests, grouped/no-grouped profiles, adjacent CPU/CUDA sweeps, and the unchanged
 frozen gate. Modern baselines additionally receive three alternating CUDA
@@ -89,7 +139,31 @@ before deleting either the input state or original build checkout. Each
 repeat tree and exported pair file must match its primary arm and its partner.
 
 The repeat-loop smoke test passes and rejects a corrupted output; all 12
-collector flag tests and shell parsing pass. Hardware results must precede any
-claim about further CUDA throughput. Fresh paid-plan approval and the usual
-watchdog, artifact verification, destruction and provider reconciliation remain
-required by the infrastructure runbook.
+collector flag tests and shell parsing pass. The corrected GPU collection, artifact verification and teardown are now
+complete. A changing local `.DS_Store` caused a final metadata checksum failure
+after successful transfer and destruction; the collector now excludes Finder
+metadata from local manifests. Both actual checksum generators and all 12
+collector flag tests pass, and the final evidence manifests verify.
+
+## Diagnostic harness correction during GPU validation
+
+The initial collection exposed a pre-existing test-selection bug: the diagnostic
+parent launched its child with a test name missing the `backend::` module
+prefix. Rust's test runner returned success after selecting zero tests. That
+initial reported pass did not establish diagnostic correctness, including the
+new large-row recovery coverage. The collection was stopped during the 10M CPU
+baseline, and its incomplete evidence is retained separately.
+
+Commit `107a686cebbcc4b002aa90b34cbdfb4448405860` derives the complete test path
+from the module, adds a regression that asks the actual test runner to list the
+selected test, and makes the corpus reject successful logs with no diagnostic
+case results. This changes the test harness only; production runtime code is
+identical to `fc01302e3db9f8aa2f874ccf4f38514c1d85b8a7`.
+
+The full protocol was restarted on the same H100 with the original destruction
+deadline retained. Both the regular diagnostic log and Compute Sanitizer log
+now contain all 20 case/geometry results and all four large-row recovery results.
+The complete corpus passes, including nine CLI hardware tests; all four CUDA
+library hardware tests pass under memcheck with zero reported errors. The
+corrected host library reports 42 passing tests and four hardware tests ignored.
+`./scripts/check-rust.sh` passes again after the harness correction.
