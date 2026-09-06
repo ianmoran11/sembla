@@ -78,9 +78,15 @@ fn optimized_reductions_match_cpu_for_group_sizes_and_fused_resets() {
                 let actual = backend.run_tick_observed_reused().unwrap();
                 let batch = fused.run_tick_observed_reused_fused().unwrap();
                 for (slot, result) in batch.into_iter().enumerate() {
-                    let expected =
-                        sembla_cpu::run_tick(&model, &mut cpu[slot], &params, seeds[slot], tick)
-                            .unwrap();
+                    let expected = sembla_cpu::run_tick_with_features(
+                        &model,
+                        &mut cpu[slot],
+                        &params,
+                        seeds[slot],
+                        tick,
+                        &features,
+                    )
+                    .unwrap();
                     let (_, fired, deferred, views) = result.unwrap();
                     assert_eq!(fired, expected.fired_per_box);
                     assert_eq!(deferred, expected.deferred_per_resource_table);
