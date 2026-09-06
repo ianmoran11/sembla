@@ -1,0 +1,39 @@
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+    Finished `release` profile [optimized] target(s) in 3.67s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+
+running 1 test
+recovery_beyond_grid=claim-key-overflow first_error=65530 rows=65539
+recovery_beyond_grid=transition-guard-overflow first_error=65530 rows=65539
+recovery_beyond_grid=effect-int-overflow first_error=65530 rows=65539
+recovery_beyond_grid=output-expression-overflow first_error=65530 rows=65539
+diagnostic_case=claim-key-overflow geometry=0x0 status=[10, 2, 0, 0]
+diagnostic_case=claim-key-overflow geometry=1x1 status=[10, 2, 0, 0]
+diagnostic_case=claim-key-overflow geometry=1x32 status=[10, 2, 0, 0]
+diagnostic_case=claim-key-overflow geometry=3x4 status=[10, 2, 0, 0]
+diagnostic_case=claim-key-overflow geometry=4x128 status=[10, 2, 0, 0]
+diagnostic_case=transition-guard-overflow geometry=0x0 status=[3, 2, 0, 0]
+diagnostic_case=transition-guard-overflow geometry=1x1 status=[3, 2, 0, 0]
+diagnostic_case=transition-guard-overflow geometry=1x32 status=[3, 2, 0, 0]
+diagnostic_case=transition-guard-overflow geometry=3x4 status=[3, 2, 0, 0]
+diagnostic_case=transition-guard-overflow geometry=4x128 status=[3, 2, 0, 0]
+diagnostic_case=effect-int-overflow geometry=0x0 status=[5, 2, 0, 0]
+diagnostic_case=effect-int-overflow geometry=1x1 status=[5, 2, 0, 0]
+diagnostic_case=effect-int-overflow geometry=1x32 status=[5, 2, 0, 0]
+diagnostic_case=effect-int-overflow geometry=3x4 status=[5, 2, 0, 0]
+diagnostic_case=effect-int-overflow geometry=4x128 status=[5, 2, 0, 0]
+diagnostic_case=output-expression-overflow geometry=0x0 status=[9, 1, 0, 0]
+diagnostic_case=output-expression-overflow geometry=1x1 status=[9, 1, 0, 0]
+diagnostic_case=output-expression-overflow geometry=1x32 status=[9, 1, 0, 0]
+diagnostic_case=output-expression-overflow geometry=3x4 status=[9, 1, 0, 0]
+diagnostic_case=output-expression-overflow geometry=4x128 status=[9, 1, 0, 0]
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 6.93s
+
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 7.01s
+
