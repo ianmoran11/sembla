@@ -700,8 +700,6 @@ impl CudaBackend {
         let phase_started = Instant::now();
         let host_state = StateStore::new(model, initial_tables.clone())
             .map_err(|error| CudaError::InvalidInput(error.to_string()))?;
-        let retained_model = model.clone();
-        let pristine_host_tables = initial_tables.clone();
         let host_state_validation = phase_started.elapsed();
 
         let phase_started = Instant::now();
@@ -1064,6 +1062,11 @@ impl CudaBackend {
             None
         };
         let device_allocation_and_upload = phase_started.elapsed();
+        // Keep retained copies after temporary upload buffers to bound peak RSS.
+        let phase_started = Instant::now();
+        let retained_model = model.clone();
+        let pristine_host_tables = initial_tables.clone();
+        let host_state_validation = host_state_validation + phase_started.elapsed();
         let construction_timing = CudaConstructionTiming {
             total: construction_started.elapsed(),
             availability,
