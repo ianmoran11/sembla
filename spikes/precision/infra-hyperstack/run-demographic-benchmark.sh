@@ -133,7 +133,8 @@ focused_finalize_checksums() {
 import hashlib, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 lines = []
-for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
+# Finder metadata can change while the local evidence is being verified.
+for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name not in {"SHA256SUMS", ".DS_Store"}):
     lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(root).as_posix()}")
 (root / "SHA256SUMS").write_text("\n".join(lines) + "\n")
 PY
@@ -2650,7 +2651,8 @@ python3 - "$ARTIFACT_DIR" <<'PY'
 import hashlib, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 lines = []
-for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "SHA256SUMS"):
+# Finder metadata can change while the local evidence is being verified.
+for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name not in {"SHA256SUMS", ".DS_Store"}):
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     lines.append(f"{digest}  {path.relative_to(root).as_posix()}")
 (root / "SHA256SUMS").write_text("\n".join(lines) + "\n")
