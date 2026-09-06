@@ -924,6 +924,21 @@ fn execution_generation_preserves_reference_and_marks_checked_rules() {
     assert!(fused.source.contains("fired_counts +="));
     assert!(fused.source.contains("effect_active +="));
 
+    // CUDA dynamic shared declarations have translation-unit linkage, even
+    // when spelled inside distinct kernels. Names must keep the same type.
+    for source in [&execution.source, &fused.source] {
+        let mut shared = std::collections::BTreeMap::new();
+        for line in source.lines() {
+            if let Some(declaration) = line.trim().strip_prefix("extern __shared__ ") {
+                let (typed_name, _) = declaration.split_once("[]").unwrap();
+                let (ty, name) = typed_name.rsplit_once(' ').unwrap();
+                if let Some(previous) = shared.insert(name, ty) {
+                    assert_eq!(previous, ty, "incompatible shared declaration {name}");
+                }
+            }
+        }
+    }
+
     let mut checked = model.model().clone();
     let rule = &mut checked.boxes[0].transitions[0];
     rule.guard = Expr::Eq {

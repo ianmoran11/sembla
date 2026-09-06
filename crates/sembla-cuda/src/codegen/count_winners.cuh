@@ -5,15 +5,15 @@ extern "C" __global__ void sembla_count_fired(const unsigned char* wins, const u
   unsigned long long local = 0ULL;
   for (unsigned long long candidate = begin + worker; candidate < end; candidate += (unsigned long long)gridDim.x * blockDim.x)
     local += wins[candidate] != 0U;
-  extern __shared__ unsigned long long partials[];
-  partials[threadIdx.x] = local;
+  extern __shared__ unsigned long long fired_partials[];
+  fired_partials[threadIdx.x] = local;
   __syncthreads();
   for (unsigned int stride = blockDim.x / 2U; stride != 0U; stride /= 2U) {
-    if (threadIdx.x < stride) partials[threadIdx.x] += partials[threadIdx.x + stride];
+    if (threadIdx.x < stride) fired_partials[threadIdx.x] += fired_partials[threadIdx.x + stride];
     __syncthreads();
   }
-  if (threadIdx.x == 0U && partials[0] != 0ULL) {
-    atomicAdd(fired_counts + rule, partials[0]);
+  if (threadIdx.x == 0U && fired_partials[0] != 0ULL) {
+    atomicAdd(fired_counts + rule, fired_partials[0]);
     atomicOr(effect_active + rule, 1U);
   }
 }

@@ -1117,6 +1117,71 @@ if [[ "${BENCH_CUDA_READBACK_DIAGNOSTIC:-0}" == "1" ]]; then
   echo '=== focused CUDA readback/contended-kernel diagnostic complete ==='
 fi
 
+# --- optional CPU/CUDA differential corpus -------------------------------------
+# Nothing ran this before 2026-07-28. `crates/sembla-cuda/scripts/run-differential-corpus.sh`
+# has existed for some time and prds-device-observation/0002 added the grouped
+# demographic configuration to it, but no collector ever invoked it, so the
+# corpus was only ever run by hand -- which is why several PRDs still carry
+# "CPU/CUDA differential equality" as hardware-pending with no automation behind
+# it. It costs minutes against the gate's hours, so it runs before the gate.
+#
+# This is the correctness precondition for everything else in the session: the
+# gate below times the CUDA arm, and a fast wrong answer is worth nothing.
+# SEMBLA_REQUIRE_CUDA=1 turns the script's "no GPU, skip cleanly" behaviour into
+# a hard failure -- on a GPU host a skip means something is broken, not absent.
+if [[ "${BENCH_CORPUS:-0}" == "1" ]]; then
+  echo '=== CPU/CUDA differential corpus ==='
+  CORPUS_DIR="$OUT_ROOT/differential-corpus"
+  mkdir -p "$CORPUS_DIR"
+  # `timeout` and `tee`, both learned on 2026-07-28 (DECISIONS.md §L12).
+  #
+  # The corpus deadlocked on a GPU kernel and ran for 2h31m before anyone
+  # noticed, because of two independent mistakes in the first version of this
+  # stage. It redirected to run.log instead of tee-ing, so `tail -1 ~/bench.log`
+  # -- the only progress the collector shows -- froze on the stage header and a
+  # hang looked exactly like a long compile. And it had no timeout, so the
+  # ceiling was the collector's 12-hour poll. A deadlock that costs 23 seconds
+  # to reproduce cost 2.5 hours of GPU time.
+  #
+  # The corpus took 23s on 2026-07-19, so the default below is roughly 75x the
+  # known-good duration. It bounds a hang; it does not constrain a healthy run.
+  set +e
+  (
+    cd "$SPIKE_DIR"
+    # The script refuses to run against a dirty tree, deliberately: differential
+    # evidence is only meaningful for an exact commit. Record what it saw.
+    git rev-parse HEAD > "$CORPUS_DIR/commit.txt"
+    git status --porcelain > "$CORPUS_DIR/worktree-status.txt"
+    SEMBLA_REQUIRE_CUDA=1 SEMBLA_CUDA_EVIDENCE_DIR="$CORPUS_DIR" \
+      timeout --kill-after=60 "${BENCH_CORPUS_TIMEOUT_SECONDS:-1800}" \
+      bash crates/sembla-cuda/scripts/run-differential-corpus.sh
+  ) 2>&1 | tee "$CORPUS_DIR/run.log"
+  corpus_rc=${PIPESTATUS[0]}
+  set -e
+  printf '%s\n' "$corpus_rc" > "$CORPUS_DIR/exit-code.txt"
+  if (( corpus_rc == 124 || corpus_rc == 137 )); then
+    echo "=== DIFFERENTIAL CORPUS TIMED OUT after ${BENCH_CORPUS_TIMEOUT_SECONDS:-1800}s ===" >&2
+    echo 'This is a hang, not slowness: the corpus completed in 23s on 2026-07-19.' >&2
+    echo 'A GPU-side deadlock is the likeliest cause; see DECISIONS.md §L12 for the' >&2
+    echo 'one already found, which passes at launch geometry 1x1 and hangs at 1x32.' >&2
+    tail -40 "$CORPUS_DIR/run.log" >&2 || true
+    echo "Full log: $CORPUS_DIR/run.log" >&2
+    exit 7
+  fi
+  if (( corpus_rc == 0 )); then
+    echo '=== differential corpus PASSED ==='
+  else
+    # Loud, and it stops the session here. Timing an arm that disagrees with the
+    # CPU oracle would produce numbers that look like evidence and are not; that
+    # is a worse outcome than no numbers, because it is harder to notice later.
+    echo "=== DIFFERENTIAL CORPUS FAILED (rc=$corpus_rc) ===" >&2
+    tail -40 "$CORPUS_DIR/run.log" >&2 || true
+    echo 'Refusing to run the frozen gate: CUDA disagrees with the CPU oracle.' >&2
+    echo "Full log: $CORPUS_DIR/run.log" >&2
+    exit 6
+  fi
+fi
+
 # --- optional phase-attribution profile ---------------------------------------
 # Runs BEFORE the frozen gate, deliberately: it finishes in minutes where the
 # gate takes hours, so its result is readable in ~bench.log early and the
@@ -1301,71 +1366,6 @@ PY
 
   rm -f "$PROFILE_STATE" "$PROFILE_STATE.model.json"
   echo '=== phase-attribution profile complete ==='
-fi
-
-# --- optional CPU/CUDA differential corpus -------------------------------------
-# Nothing ran this before 2026-07-28. `crates/sembla-cuda/scripts/run-differential-corpus.sh`
-# has existed for some time and prds-device-observation/0002 added the grouped
-# demographic configuration to it, but no collector ever invoked it, so the
-# corpus was only ever run by hand -- which is why several PRDs still carry
-# "CPU/CUDA differential equality" as hardware-pending with no automation behind
-# it. It costs minutes against the gate's hours, so it runs before the gate.
-#
-# This is the correctness precondition for everything else in the session: the
-# gate below times the CUDA arm, and a fast wrong answer is worth nothing.
-# SEMBLA_REQUIRE_CUDA=1 turns the script's "no GPU, skip cleanly" behaviour into
-# a hard failure -- on a GPU host a skip means something is broken, not absent.
-if [[ "${BENCH_CORPUS:-0}" == "1" ]]; then
-  echo '=== CPU/CUDA differential corpus ==='
-  CORPUS_DIR="$OUT_ROOT/differential-corpus"
-  mkdir -p "$CORPUS_DIR"
-  # `timeout` and `tee`, both learned on 2026-07-28 (DECISIONS.md §L12).
-  #
-  # The corpus deadlocked on a GPU kernel and ran for 2h31m before anyone
-  # noticed, because of two independent mistakes in the first version of this
-  # stage. It redirected to run.log instead of tee-ing, so `tail -1 ~/bench.log`
-  # -- the only progress the collector shows -- froze on the stage header and a
-  # hang looked exactly like a long compile. And it had no timeout, so the
-  # ceiling was the collector's 12-hour poll. A deadlock that costs 23 seconds
-  # to reproduce cost 2.5 hours of GPU time.
-  #
-  # The corpus took 23s on 2026-07-19, so the default below is roughly 75x the
-  # known-good duration. It bounds a hang; it does not constrain a healthy run.
-  set +e
-  (
-    cd "$SPIKE_DIR"
-    # The script refuses to run against a dirty tree, deliberately: differential
-    # evidence is only meaningful for an exact commit. Record what it saw.
-    git rev-parse HEAD > "$CORPUS_DIR/commit.txt"
-    git status --porcelain > "$CORPUS_DIR/worktree-status.txt"
-    SEMBLA_REQUIRE_CUDA=1 SEMBLA_CUDA_EVIDENCE_DIR="$CORPUS_DIR" \
-      timeout --kill-after=60 "${BENCH_CORPUS_TIMEOUT_SECONDS:-1800}" \
-      bash crates/sembla-cuda/scripts/run-differential-corpus.sh
-  ) 2>&1 | tee "$CORPUS_DIR/run.log"
-  corpus_rc=${PIPESTATUS[0]}
-  set -e
-  printf '%s\n' "$corpus_rc" > "$CORPUS_DIR/exit-code.txt"
-  if (( corpus_rc == 124 || corpus_rc == 137 )); then
-    echo "=== DIFFERENTIAL CORPUS TIMED OUT after ${BENCH_CORPUS_TIMEOUT_SECONDS:-1800}s ===" >&2
-    echo 'This is a hang, not slowness: the corpus completed in 23s on 2026-07-19.' >&2
-    echo 'A GPU-side deadlock is the likeliest cause; see DECISIONS.md §L12 for the' >&2
-    echo 'one already found, which passes at launch geometry 1x1 and hangs at 1x32.' >&2
-    tail -40 "$CORPUS_DIR/run.log" >&2 || true
-    echo "Full log: $CORPUS_DIR/run.log" >&2
-    exit 7
-  fi
-  if (( corpus_rc == 0 )); then
-    echo '=== differential corpus PASSED ==='
-  else
-    # Loud, and it stops the session here. Timing an arm that disagrees with the
-    # CPU oracle would produce numbers that look like evidence and are not; that
-    # is a worse outcome than no numbers, because it is harder to notice later.
-    echo "=== DIFFERENTIAL CORPUS FAILED (rc=$corpus_rc) ===" >&2
-    tail -40 "$CORPUS_DIR/run.log" >&2 || true
-    echo 'Refusing to run the frozen gate: CUDA disagrees with the CPU oracle.' >&2
-    echo "Full log: $CORPUS_DIR/run.log" >&2
-    exit 6
-  fi
 fi
 
 # --- optional concurrent CUDA sweep-draw spike -------------------------------
