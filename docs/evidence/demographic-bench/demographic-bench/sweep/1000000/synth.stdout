@@ -1,0 +1,1 @@
+slots=1000000 areas=4 state=/home/ubuntu/demographic-bench/sweep/1000000/initial.state companion_model=/home/ubuntu/demographic-bench/sweep/1000000/initial.state.model.json
