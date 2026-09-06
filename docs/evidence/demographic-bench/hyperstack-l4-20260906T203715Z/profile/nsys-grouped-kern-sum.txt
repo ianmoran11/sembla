@@ -1,0 +1,41 @@
+Generating SQLite file profile-grouped-cuda.sqlite from profile-grouped-cuda.nsys-rep
+Processing [profile-grouped-cuda.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+
+ ** CUDA GPU Kernel Summary (cuda_gpu_kern_sum):
+
+ Time (%)  Total Time (ns)  Instances  Avg (ns)  Med (ns)  Min (ns)  Max (ns)  StdDev (ns)                 Name                
+ --------  ---------------  ---------  --------  --------  --------  --------  -----------  -----------------------------------
+     13.3          1157355         80   14466.9    1760.0      1728     91233      23456.3  sembla_prepare_effects             
+     11.7          1019017         38   26816.2   25024.0     19072     38816       7148.0  sembla_observe_view                
+      9.5           830758         20   41537.9   41456.0     41089     42880        518.3  sembla_count_fired                 
+      9.3           810024          2  405012.0  405012.0    401412    408612       5091.2  sembla_resolve_conflicts           
+      8.3           723272          2  361636.0  361636.0    361124    362148        724.1  sembla_build_claim_instances       
+      7.7           665638          2  332819.0  332819.0    331171    334467       2330.6  sembla_apply_effects               
+      4.8           415236          2  207618.0  207618.0    207586    207650         45.3  sembla_reduce_claim_entities       
+      4.2           365604          2  182802.0  182802.0    182786    182818         22.6  sembla_reduce_claim_rules          
+      4.2           361828          2  180914.0  180914.0    180866    180962         67.9  sembla_count_deferred              
+      3.9           338082          2  169041.0  169041.0    168929    169153        158.4  sembla_reduce_claim_keys           
+      2.5           214018          2  107009.0  107009.0    106881    107137        181.0  sembla_init_effect_owners          
+      2.5           213251          6   35541.8   26592.5     23585     56704      16160.4  sembla_observe_grouped_view        
+      1.7           150786          2   75393.0   75393.0     75329     75457         90.5  sembla_transition_00000006         
+      1.7           149794          2   74897.0   74897.0     74657     75137        339.4  sembla_transition_00000007         
+      1.7           147680          2   73840.0   73840.0     73248     74432        837.2  sembla_transition_00000005         
+      1.7           145538          2   72769.0   72769.0     72577     72961        271.5  sembla_transition_00000000         
+      1.6           143552          8   17944.0    1984.0      1728     66208      29671.6  sembla_validate_effects            
+      1.6           143170          4   35792.5   35793.0     35392     36192        326.9  sembla_bound_grouped_view          
+      1.6           137632          2   68816.0   68816.0     68800     68832         22.6  sembla_transition_00000008         
+      1.5           127202          2   63601.0   63601.0     63521     63681        113.1  sembla_transition_00000009         
+      1.0            82658          2   41329.0   41329.0     41185     41473        203.6  sembla_transition_00000002         
+      0.9            77472          2   38736.0   38736.0     30528     46944      11607.9  sembla_transition_00000001         
+      0.9            76832          2   38416.0   38416.0     38112     38720        429.9  sembla_init_conflict_winners       
+      0.8            71552          2   35776.0   35776.0     35424     36128        497.8  sembla_transition_00000003         
+      0.8            67490          2   33745.0   33745.0     33569     33921        248.9  sembla_transition_00000004         
+      0.4            36416         22    1655.3    1728.0      1504      1760        103.2  sembla_commit_validation_status    
+      0.1            10016          6    1669.3    1680.0      1472      1824        161.2  sembla_init_grouped_histogram      
+      0.0             3456          2    1728.0    1728.0      1664      1792         90.5  sembla_reset_status                
+      0.0             3296          2    1648.0    1648.0      1568      1728        113.1  sembla_init_validation_scratch     
+      0.0             3264          2    1632.0    1632.0      1632      1632          0.0  sembla_init_observations           
+      0.0             3040          2    1520.0    1520.0      1504      1536         22.6  sembla_init_grouped_extrema        
+      0.0             2976          2    1488.0    1488.0      1472      1504         22.6  sembla_init_control_counts         
+      0.0             2528          2    1264.0    1264.0      1152      1376        158.4  sembla_validate_claim_compatibility
+

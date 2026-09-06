@@ -1,0 +1,79 @@
+{
+  "exact_cpu_cuda_comparisons": [
+    "profile-cpu.csv == profile-cuda.csv",
+    "profile-cpu.csv.summaries.csv == profile-cuda.csv.summaries.csv",
+    "profile-cpu.stdout == profile-cuda.stdout",
+    "profile-grouped-cpu.csv == profile-grouped-cuda.csv",
+    "profile-grouped-cpu.csv.summaries.csv == profile-grouped-cuda.csv.summaries.csv",
+    "profile-grouped-cpu.stdout == profile-grouped-cuda.stdout",
+    "profile-grouped-cpu.grouped.population_cells.csv == profile-grouped-cuda.grouped.population_cells.csv",
+    "profile-grouped-cpu.grouped.deaths_cells.csv == profile-grouped-cuda.grouped.deaths_cells.csv",
+    "profile-grouped-cpu.grouped.vacancy_cells.csv == profile-grouped-cuda.grouped.vacancy_cells.csv"
+  ],
+  "recovery_geometry_trace": [
+    {
+      "mode": "cuda",
+      "kernel": "sembla_prepare_effects",
+      "grid_x": 32,
+      "block_x": 1024,
+      "launches": 60,
+      "average_microseconds": 1.7728333333333333
+    },
+    {
+      "mode": "cuda",
+      "kernel": "sembla_prepare_effects",
+      "grid_x": 4883,
+      "block_x": 1024,
+      "launches": 20,
+      "average_microseconds": 52.560550000000006
+    },
+    {
+      "mode": "cuda",
+      "kernel": "sembla_validate_effects",
+      "grid_x": 32,
+      "block_x": 1024,
+      "launches": 6,
+      "average_microseconds": 1.9093333333333333
+    },
+    {
+      "mode": "cuda",
+      "kernel": "sembla_validate_effects",
+      "grid_x": 4883,
+      "block_x": 1024,
+      "launches": 2,
+      "average_microseconds": 65.8885
+    },
+    {
+      "mode": "grouped-cuda",
+      "kernel": "sembla_prepare_effects",
+      "grid_x": 32,
+      "block_x": 1024,
+      "launches": 60,
+      "average_microseconds": 1.7765333333333333
+    },
+    {
+      "mode": "grouped-cuda",
+      "kernel": "sembla_prepare_effects",
+      "grid_x": 4883,
+      "block_x": 1024,
+      "launches": 20,
+      "average_microseconds": 52.53815
+    },
+    {
+      "mode": "grouped-cuda",
+      "kernel": "sembla_validate_effects",
+      "grid_x": 32,
+      "block_x": 1024,
+      "launches": 6,
+      "average_microseconds": 1.92
+    },
+    {
+      "mode": "grouped-cuda",
+      "kernel": "sembla_validate_effects",
+      "grid_x": 4883,
+      "block_x": 1024,
+      "launches": 2,
+      "average_microseconds": 66.016
+    }
+  ]
+}

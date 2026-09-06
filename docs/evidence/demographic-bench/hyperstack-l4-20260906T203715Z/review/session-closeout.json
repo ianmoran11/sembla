@@ -1,0 +1,18 @@
+{
+  "instance_id": 1028318,
+  "profile": "n3-H100x1-spot",
+  "gpu": "NVIDIA H100 PCIe",
+  "quoted_total_hourly_usd": 2.00672043,
+  "apply_requested_utc": "2026-09-06T20:17:34+00:00",
+  "provider_empty_verified_utc": "2026-09-06T21:17:07+00:00",
+  "request_to_empty_seconds": 3573.0,
+  "request_to_empty_cost_estimate_usd": 1.9916700267750003,
+  "cost_note": "Rate-based estimate from apply request through verified provider absence, not a provider invoice; creation latency is included.",
+  "disposable_session_credentials_cleaned": true,
+  "generated_console_password_keychain_item_deleted_and_absence_verified": true,
+  "baseline_commit": "d93c8a301f1fc6e0e44ec6ed06504c5b45ff363e",
+  "candidate_commit": "107a686cebbcc4b002aa90b34cbdfb4448405860",
+  "runtime_implementation_commit": "fc01302e3db9f8aa2f874ccf4f38514c1d85b8a7",
+  "watchdog_deadline_local": "2026-09-07 10:12:56 Australia/Sydney",
+  "watchdog_deadline_extended": false
+}

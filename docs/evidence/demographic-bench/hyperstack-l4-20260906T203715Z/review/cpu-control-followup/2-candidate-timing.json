@@ -1,0 +1,53 @@
+{
+  "schema": "sembla-sweep-timing-v3",
+  "backend": "cpu",
+  "draws": 5,
+  "ticks_per_draw": 24,
+  "setup_wall_time_ms": 18.77925,
+  "draw_zero_including_setup_wall_time_ms": 2078.733667,
+  "final_state_buffer_accounting": {
+    "mode": "packed-pageable",
+    "requested_lane_count": 1,
+    "retained_lane_count": 1,
+    "requested_pinned_bytes_per_lane": 0,
+    "requested_cacheable_staging_bytes_per_lane": 0,
+    "requested_pinned_bytes": 0,
+    "effective_pinned_bytes": 0,
+    "requested_cacheable_staging_bytes": 0,
+    "effective_cacheable_staging_bytes": 0,
+    "requested_buffer_set_count": 0,
+    "buffer_set_count": 0,
+    "requested_underlying_pinned_allocation_count": 0,
+    "underlying_pinned_allocation_count": 0
+  },
+  "draw_timings": [
+    {
+      "k": 0,
+      "wall_time_ms": 2059.954417,
+      "final_state": null
+    },
+    {
+      "k": 1,
+      "wall_time_ms": 2062.413083,
+      "final_state": null
+    },
+    {
+      "k": 2,
+      "wall_time_ms": 2092.9884159999997,
+      "final_state": null
+    },
+    {
+      "k": 3,
+      "wall_time_ms": 2048.609041,
+      "final_state": null
+    },
+    {
+      "k": 4,
+      "wall_time_ms": 2055.9461250000004,
+      "final_state": null
+    }
+  ],
+  "whole_sweep_wall_time_ms": 10749.405791000001,
+  "repository_commit": "107a686cebbcc4b002aa90b34cbdfb4448405860",
+  "binary_sha256": "a4dfe46f235df2e2c0430e2ee7a402a4f0271916bbc44a25751ddf7071c7fe3c"
+}

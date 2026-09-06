@@ -1,0 +1,10 @@
+{
+  "baseline": {
+    "whole_ms": 10852.504958005738,
+    "draw_total_ms": 10373.205707000001
+  },
+  "candidate": {
+    "whole_ms": 10770.067958990694,
+    "draw_total_ms": 10319.911082
+  }
+}
