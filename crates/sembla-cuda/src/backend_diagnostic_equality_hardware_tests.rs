@@ -11,6 +11,27 @@ mod cases {
 const CHILD_ENV: &str = "SEMBLA_CUDA_DIAGNOSTIC_CHILD";
 const DEADLINE: std::time::Duration = std::time::Duration::from_secs(120);
 
+fn diagnostic_test_name() -> String {
+    let (_, module) = module_path!().split_once("::").unwrap();
+    format!("{module}::negative_corpus_matches_cpu_status_under_four_geometries")
+}
+
+#[test]
+fn diagnostic_child_filter_selects_hardware_test() {
+    let name = diagnostic_test_name();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--list", "--exact", "--ignored", &name])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let tests: Vec<_> = stdout
+        .lines()
+        .filter(|line| line.ends_with(": test"))
+        .collect();
+    assert_eq!(tests, [format!("{name}: test")]);
+}
+
 fn run_negative_corpus() {
     assert_eq!(cases::FAILING_ROWS, [2, 5, 7]);
     check_recovery_beyond_grid();
@@ -75,8 +96,7 @@ fn negative_corpus_matches_cpu_status_under_four_geometries() {
     // becomes a bounded test failure. A thread-level timeout cannot recover
     // a process whose CUDA context is blocked in stream synchronization.
     let executable = std::env::current_exe().expect("locate current lib test binary");
-    let test_name =
-        "diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries";
+    let test_name = diagnostic_test_name();
     let mut child = std::process::Command::new(executable)
         .arg("--exact")
         .arg(test_name)

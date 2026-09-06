@@ -75,6 +75,10 @@ cargo test --locked --release -p sembla-cuda --features cuda --lib \
   negative_corpus_matches_cpu_status_under_four_geometries -- --ignored --nocapture \
   2>&1 | tee "$out/diagnostic-corpus.log"
 status=${PIPESTATUS[0]}
+if [[ $status -eq 0 ]] && ! grep -q '^diagnostic_case=' "$out/diagnostic-corpus.log"; then
+  echo 'Diagnostic test produced no case results; refusing an empty-test success' >&2
+  status=1
+fi
 if [[ $status -eq 0 ]]; then
   cargo test --locked --release -p sembla-cuda --features cuda --lib \
     sparse_resource_reports_match_cpu_across_ticks_and_reset -- --ignored --nocapture \
