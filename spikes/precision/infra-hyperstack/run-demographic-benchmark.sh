@@ -1183,21 +1183,31 @@ PY
   # per view per tick on stderr, carrying key_space_size, occupied_groups and
   # emitted_groups. Those stderr files are the §J14.2 evidence for 0002's
   # key-space criterion, so they are collected, not discarded.
+  # New binaries expose command-wide timing in addition to tick timing. Keep
+  # collection compatible with older benchmark commits lacking that option.
+  cli_usage="$("$BIN" 2>&1 || true)"
   for backend in cuda cpu; do
+    lifecycle_args=()
+    if [[ "$cli_usage" == *--lifecycle-timing-json* ]]; then
+      lifecycle_args=(--lifecycle-timing-json "$PROFILE_DIR/lifecycle-$backend.json")
+    fi
     "$BIN" run "$WORK/profile-no-grouped.json" \
       --seed "$SEED" --population "$PROFILE_STATE" --backend "$backend" \
       --ticks "$PROFILE_TICKS" \
-      --timing-json "$PROFILE_DIR/timing-$backend.json" \
+      --timing-json "$PROFILE_DIR/timing-$backend.json" "${lifecycle_args[@]}" \
       --out "$PROFILE_DIR/profile-$backend.csv" \
       > "$PROFILE_DIR/profile-$backend.stdout" 2> "$PROFILE_DIR/profile-$backend.stderr"
 
     # A grouped CUDA failure must not lose the no-grouped tables already
     # written: those satisfy 0001's criteria on their own, and an abort here
     # would throw away a result that cost the same GPU hour to produce.
+    if [[ "$cli_usage" == *--lifecycle-timing-json* ]]; then
+      lifecycle_args=(--lifecycle-timing-json "$PROFILE_DIR/lifecycle-grouped-$backend.json")
+    fi
     if "$BIN" run "$WORK/profile-grouped.json" \
       --seed "$SEED" --population "$PROFILE_STATE" --backend "$backend" \
       --ticks "$PROFILE_TICKS" --enable grouped-observations \
-      --timing-json "$PROFILE_DIR/timing-grouped-$backend.json" \
+      --timing-json "$PROFILE_DIR/timing-grouped-$backend.json" "${lifecycle_args[@]}" \
       --out "$PROFILE_DIR/profile-grouped-$backend.csv" \
       > "$PROFILE_DIR/profile-grouped-$backend.stdout" \
       2> "$PROFILE_DIR/profile-grouped-$backend.stderr"; then
@@ -1274,6 +1284,17 @@ PY
       nsys stats --report cuda_api_sum      profile-cuda.nsys-rep > nsys-api-sum.txt 2>&1
       rm -f profile-cuda.nsys-rep nsys-run.csv
     ) || echo 'nsys profiling failed; timing JSON is unaffected' >&2
+    (
+      cd "$PROFILE_DIR"
+      nsys profile --trace=cuda --force-overwrite=true -o profile-grouped-cuda \
+        "$BIN" run "$WORK/profile-grouped.json" \
+        --seed "$SEED" --population "$PROFILE_STATE" --backend cuda \
+        --ticks "$PROFILE_TICKS" --enable grouped-observations --out nsys-grouped-run.csv \
+        > nsys-grouped-run.stdout 2> nsys-grouped-run.stderr
+      nsys stats --force-export=true --report cuda_gpu_kern_sum \
+        profile-grouped-cuda.nsys-rep > nsys-grouped-kern-sum.txt 2>&1
+      rm -f profile-grouped-cuda.nsys-rep nsys-grouped-run.csv
+    ) || echo 'grouped nsys profiling failed; timing JSON is unaffected' >&2
   else
     echo 'nsys not found; skipping kernel-level detail' > "$PROFILE_DIR/nsys-missing.txt"
   fi

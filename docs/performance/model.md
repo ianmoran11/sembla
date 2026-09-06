@@ -7,16 +7,31 @@ when a measurement changes it.
 This is a reference, not a plan. Plans live in PRD folders; verdicts live in
 `DECISIONS.md`.
 
+The [2026-09-05 CUDA review](cuda-runtime-review-2026-09-05.md) removes winner
+storage and deferred-count scans for uncontested tables. A same-H100 comparison
+measured the grouped 20-draw sweep at 4.17 → 3.99 s for 1M slots and
+26.52 → 25.35 s for 10M slots, with one adjacent before/after pair per scale.
+At 10M slots, winner allocation falls by 160,000,064 bytes per worker. The report
+separates these results from the older profiles and identifies the next targets.
+
+The [2026-09-06 CUDA follow-up](cuda-runtime-followup-2026-09-06.md) combines
+winner counting with activity detection, skips provably empty validation work,
+reduces grouped atomics within blocks, and adds process-local PTX reuse plus
+construction/lifecycle attribution. Local checks pass; GPU correctness and
+before/after performance measurements remain pending. No further speedup is
+claimed from this implementation yet.
+
 ## The short version
 
-- The **GPU is not the constraint** and has not been since 2026-07-26. Kernels
-  are 0.56% of CUDA wall time.
-- The **host evaluator** is what limits both backends. Work there sped up CUDA
+- The current H100 profile supports targeted CUDA work: the September 5
+  contest-target change reduced whole-sweep time by 4.3–4.4% in one pair per
+  scale. The historical 0.56% kernel share below predates device observations
+  and is not the current CUDA phase split.
+- Host evaluator work previously sped up CUDA
   by 5.4× and CPU by 3.3× without a line of GPU code changing, and carried the
   §L4 gate from a 2.56× miss to a 4.207× pass (`DECISIONS.md` §L8).
-- Roughly **20× more** is available on the host, measured, from three changes.
-- After those, the system becomes **RNG-bound**, not memory-bound. That changes
-  which floor applies.
+- The older 20× host opportunity and RNG-bound projection describe the CPU
+  experiments below; they are not a forecast for the current CUDA backend.
 - CUDA sweeps now hash packed pageable final-state bytes directly. The focused
   H100 gate measured this 15.2% faster at workers 1 and 7.3% faster at workers
   4 than reconstructing a host `StateStore` first (`DECISIONS.md` §L14).

@@ -195,6 +195,7 @@ pub(crate) fn diff_backends(options: DiffOptions) -> Result<(), String> {
             dt: options.dt,
             params: options.params.clone(),
             timing_json: None,
+            lifecycle_timing_json: None,
             backend: BackendSelection::Cpu,
             enabled_features: options.enabled_features.clone(),
         };

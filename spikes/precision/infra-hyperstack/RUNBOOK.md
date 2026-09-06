@@ -496,6 +496,16 @@ Read in this order when it finishes:
 | `profile/timing-grouped-cuda.json` | did `state_transfer` + `state_reconstruct` collapse? |
 | `profile/timing-cuda.json` | the same for the comparable no-grouped case |
 | `profile/profile-grouped-cuda.stderr` | per-view key-space, occupied and emitted group counts |
+| `profile/lifecycle-cuda.json` | command preparation, construction/execution, and publication costs; CUDA construction is broken down separately |
+| `profile/lifecycle-grouped-cuda.json` | the same command-wide timings with grouped observations |
+| `profile/nsys-grouped-kern-sum.txt` | grouped extrema and histogram kernel costs |
+
+The lifecycle files are additive diagnostics, collected only when the binary
+supports `--lifecycle-timing-json`; their absence on an older baseline is
+expected. Construction timers include NVRTC cache-hit status. A process-local
+PTX cache helps repeated backend construction, not the first compilation in a
+fresh command. Keep these intervals separate from the existing tick timing
+schema and whole-process sweep measurements.
 
 If only the no-grouped table improves, `0002` delivered nothing for the driver
 model: eligibility is all-or-nothing per run, so a model with any ineligible
