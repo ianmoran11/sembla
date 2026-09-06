@@ -1,0 +1,97 @@
+=== building one sembla-cli binary with CUDA ===
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+   Compiling sembla-cli v0.3.0 (/home/ubuntu/sembla/crates/sembla-cli)
+    Finished `release` profile [optimized] target(s) in 7.29s
+=== CPU/CUDA differential corpus ===
+commit=e05261ee1428dec77d9e53da004df2614ad186f6
+utc=2026-09-06T06-01-25Z
+driver=570.195.03
+gpu=NVIDIA H100 PCIe
+correctness_hardware=any CUDA-capable NVIDIA GPU
+performance_hardware=verified full-rate FP64 required
+   Compiling sembla-cuda v0.3.0 (/home/ubuntu/sembla/crates/sembla-cuda)
+    Finished `release` profile [optimized] target(s) in 3.60s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.10s
+
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+test backend::sweep_capacity_tests::sparse_resource_reports_match_cpu_across_ticks_and_reset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 1.06s
+
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+cuda_device_grouped_observation tick=0 box="world" view="population_cells" key_space_size=0 occupied_groups=0 emitted_groups=0
+thread 'backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets' panicked at crates/sembla-cuda/src/backend_optimization_hardware_tests.rs:83:30:
+called `Result::unwrap()` on an `Err` value: Evaluation("grouped_views require enabled feature 'grouped-observations'")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets ... FAILED
+
+failures:
+
+failures:
+    backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.95s
+
+error: test failed, to rerun pass `-p sembla-cuda --lib`
+834784ce950a34a2e5e6012f829fcf6db7e824aff3c272a96415ae76ee9a50d6  provenance.txt
+ddd2418d25365e0c1f4aa34be88794d34c1d54a326380c92f85b7e31b2983061  diagnostic-corpus.log
+CUDA differential corpus failed; evidence: /home/ubuntu/demographic-bench/differential-corpus
+=== DIFFERENTIAL CORPUS FAILED (rc=101) ===
+
+running 1 test
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.10s
+
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+test backend::sweep_capacity_tests::sparse_resource_reports_match_cpu_across_ticks_and_reset ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 1.06s
+
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+cuda_device_grouped_observation tick=0 box="world" view="population_cells" key_space_size=0 occupied_groups=0 emitted_groups=0
+thread 'backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets' panicked at crates/sembla-cuda/src/backend_optimization_hardware_tests.rs:83:30:
+called `Result::unwrap()` on an `Err` value: Evaluation("grouped_views require enabled feature 'grouped-observations'")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets ... FAILED
+
+failures:
+
+failures:
+    backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.95s
+
+error: test failed, to rerun pass `-p sembla-cuda --lib`
+834784ce950a34a2e5e6012f829fcf6db7e824aff3c272a96415ae76ee9a50d6  provenance.txt
+ddd2418d25365e0c1f4aa34be88794d34c1d54a326380c92f85b7e31b2983061  diagnostic-corpus.log
+CUDA differential corpus failed; evidence: /home/ubuntu/demographic-bench/differential-corpus
+Refusing to run the frozen gate: CUDA disagrees with the CPU oracle.
+Full log: /home/ubuntu/demographic-bench/differential-corpus/run.log

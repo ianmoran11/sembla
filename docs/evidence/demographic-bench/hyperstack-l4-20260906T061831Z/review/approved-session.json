@@ -1,0 +1,21 @@
+{
+  "approved_plan_sha256": "d31daa319f10900294d2e488045bbc645d332be04e3ff226e4ae33e754d4cb05",
+  "vm_id": 1027164,
+  "vm_name": "sembla-precision-a01c3e0ad3b3",
+  "profile": {
+    "provider": "hyperstack",
+    "environment": "default-CANADA-1",
+    "region": "CANADA-1",
+    "flavor": "n3-H100x1",
+    "expected_gpu": "H100",
+    "expected_gpu_count": 1,
+    "expected_hourly_price_usd": 2.50672043,
+    "max_hourly_price_usd": 2.51
+  },
+  "baseline_commit": "697307b55bb83a08dbc49e362d4c812088360be2",
+  "measured_candidate_commit": "f84bb05b4d7d3c9fb4d6ce829570569ab42ac408",
+  "bootstrap_ref": "7c4e03886b6232c8d99c47bef80b08420f3a0df3",
+  "cpu_runtime_ir_fixtures_examples_lockfile_unchanged_between_versions": true,
+  "watchdog_deadline_utc": "2026-09-06T09:49:37Z",
+  "final_memory_corrected_candidate_commit": "d584369a7b2c850997073ae70dfdda937774885d"
+}

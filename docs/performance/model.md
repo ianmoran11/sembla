@@ -15,11 +15,13 @@ At 10M slots, winner allocation falls by 160,000,064 bytes per worker. The repor
 separates these results from the older profiles and identifies the next targets.
 
 The [2026-09-06 CUDA follow-up](cuda-runtime-followup-2026-09-06.md) combines
-winner counting with activity detection, skips provably empty validation work,
-reduces grouped atomics within blocks, and adds process-local PTX reuse plus
-construction/lifecycle attribution. Local checks pass; GPU correctness and
-before/after performance measurements remain pending. No further speedup is
-claimed from this implementation yet.
+winner counting with activity detection, skips empty validation work, reduces
+grouped atomics and adds PTX reuse plus lifecycle attribution. Initial H100
+20-draw sweep pairs show 20.4% less wall time at 1M slots and 8.3% at 10M, with
+complete output parity and the frozen gate passing. The final construction
+copy-order correction passes local checks; an optional repeat failed before
+measuring its time or peak memory. The report separates these limits from the
+measured kernel changes; no repeated or general speedup is claimed.
 
 ## The short version
 

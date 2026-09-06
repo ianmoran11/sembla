@@ -796,13 +796,20 @@ perturbation aborts the stage.
 
 Interpret whole-sweep wall time as the headline. Compare draw 0 with the median
 later draw in both arms to verify that setup moves from every baseline draw to
-draw zero only. Because the baseline binary predates `--timing-json`, one Python
+draw zero only. To support baselines that predate `--timing-json`, one Python
 wrapper observes each completed `draw_N.csv` at 3 ms intervals for **all four
 arms** and writes `{baseline,current}-{cpu,cuda}-<scale>.draw-timing.json`. This
 keeps before/after timing boundaries identical, does not alter the baseline
 binary, and does not infer draw boundaries from an average. Native current
 `*-native-timing.json` remains useful for separating setup from draw execution
 but is not compared directly with the external baseline timings.
+
+For additional native-timing repeats, retain each binary's original build
+checkout until every timing report is written. The CLI resolves repository
+identity through its compiled `CARGO_MANIFEST_DIR`; preserving only the binary
+after this stage removes its baseline worktree makes `--timing-json` fail.
+Collect and checksum partial diagnostic files before resuming teardown after
+an added measurement fails. A bounded teardown guard must remain active.
 
 ## Evidence push: collect through GitHub, not SSH
 

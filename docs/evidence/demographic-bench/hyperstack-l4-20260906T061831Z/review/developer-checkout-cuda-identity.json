@@ -1,0 +1,12 @@
+{
+  "commit": "d584369a7b2c850997073ae70dfdda937774885d",
+  "compared_file_count": 112,
+  "roots": [
+    "crates/sembla-cuda",
+    "crates/sembla-cli",
+    "spikes/precision/infra-hyperstack/run-demographic-benchmark.sh"
+  ],
+  "all_working_files_byte_identical": true,
+  "includes_new_files_untracked_in_developer_checkout": true,
+  "runbook_has_subsequent_documentation_only_changes": true
+}

@@ -1,0 +1,17 @@
+   Compiling sembla-cli v0.3.0 (/home/ubuntu/sembla/crates/sembla-cli)
+    Finished `release` profile [optimized] target(s) in 1.11s
+     Running tests/gpu_differential.rs (target/release/deps/gpu_differential-f8b433bbf7a696d9)
+
+running 9 tests
+test ineligible_views_take_state_download_differential_fallback ... ok
+test eligible_views_take_device_observation_differential_path ... ok
+test grouped_demographic_configuration_uses_device_histograms_differentially ... ok
+test cuda_manifest_verify_and_level_a_bytes_round_trip ... ok
+test lockstep_nonblocking_stream_sweep_matches_sequential_cuda ... ok
+test supported_free_stream_sweep_is_draw_independent_and_publishes_in_k_order ... ok
+test fused_grid_y_sweep_matches_sequential_cuda_with_partial_tail ... ok
+test differential_corpus_passes ... ok
+test supported_composition_plan_differential_corpus_passes ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 25.19s
+

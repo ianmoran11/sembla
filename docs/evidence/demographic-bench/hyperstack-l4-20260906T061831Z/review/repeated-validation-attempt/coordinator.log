@@ -1,0 +1,11 @@
+2026-09-06T07:32:11.877305+00:00 Protocol uploaded; waiting for the final ageing gate replicate
+2026-09-06T07:33:20.738092+00:00 Collector paused; independent guard will resume it within 15 minutes
+2026-09-06T07:36:31.625130+00:00 Collector resumed for primary transfer and automatic VM teardown
+Traceback (most recent call last):
+  File "/tmp/cuda-throughput-repeat-coordinator.py", line 50, in <module>
+    subprocess.run([SSH, 'timeout --kill-after=30 840 python3 ~/cuda-throughput-warm-repeats.py'], stdout=output, stderr=subprocess.STDOUT, check=True, timeout=880)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/tmp/cuda-throughput-ssh', 'timeout --kill-after=30 840 python3 ~/cuda-throughput-warm-repeats.py']' returned non-zero exit status 1.

@@ -1,12 +1,71 @@
 # CUDA runtime follow-up — 2026-09-06
 
-Status: implemented and locally checked. The new execution kernels have not yet
-run on CUDA hardware. GPU differential checks, same-host before/after sweeps,
-and the frozen performance gate remain required before a performance verdict.
+Implemented and checked locally. The first H100 candidate passes the full GPU
+corpus, complete output comparisons, and the frozen performance gate. Its
+whole-process grouped sweep time falls **20.4% at 1M slots** and **8.3% at 10M**.
+These are single adjacent pairs, not repeated speedup estimates.
 
-The comparison baseline is `697307b` (the already measured contest-target
-optimization). Separate CPU runtime changes in the developer checkout must be
-excluded from the CUDA benchmark candidate so its CPU oracle is unchanged.
+The final code also restores the original order of a retained state copy after
+the first measurements exposed higher peak memory. Local checks pass for this
+correction. An optional repeated comparison failed during its first baseline
+warmup, so **the final correction's peak memory and whole-process performance
+were not remeasured**. No repeated result is claimed. The VM was destroyed,
+provider reconciliation found zero VMs, and temporary credentials were removed.
+
+## Measured comparison
+
+The baseline is `697307b55bb83a08dbc49e362d4c812088360be2`, which already includes
+the previously measured contest-target optimization. The primary measured
+candidate is `f84bb05b4d7d3c9fb4d6ce829570569ab42ac408`. The final memory-order
+correction is `d584369a7b2c850997073ae70dfdda937774885d`; it changes construction
+copy order and timing attribution, with no generated-kernel or execution change.
+CPU, runtime, IR, fixtures, examples, and Cargo.lock are unchanged between the
+baseline and both candidates. Earlier CPU work in the developer checkout is
+preserved and excluded from this comparison.
+
+Both arms use one H100 PCIe, the same input bytes, 24 ticks, 20 draws, seed 9009,
+independent noise and grouped observations. Each same-backend baseline/candidate
+pair ran consecutively. Whole-process intervals include setup and finalization.
+
+| Slots | Baseline CUDA | Measured candidate CUDA | Wall-time reduction | Baseline CPU | Candidate CPU |
+|---|---:|---:|---:|---:|---:|
+| 1M | 4.57 s | 3.64 s | 20.4% | 153.58 s | 160.95 s |
+| 10M | 25.16 s | 23.06 s | 8.3% | 1768.76 s | 1755.76 s |
+
+Later-draw CUDA medians are 130.530 → 109.557 ms at 1M (16.1% less), and
+1016.132 → 905.973 ms at 10M (10.8% less). These use the existing 3 ms polling
+of published draw files, not CUDA events. Draws also have distinct seeds.
+At 1M, first-draw/setup time falls 1892.225 → 1362.415 ms and accounts for over
+half the whole saving. The candidate was profiled before the baseline's first
+GPU sweep, so startup/driver warmup can bias this initial pair. The unchanged
+CPU arms vary by +4.8% at 1M and −0.7% at 10M.
+
+The earlier 15–25% overall estimate was optimistic for the 10M workload. The
+measurements establish a useful gain for these commands, with limited confidence
+about its size across fresh sessions or other workloads. Cache reuse and the
+exclusive-effect shortcut below do not benefit this retained demographic worker.
+
+All **103 files per sweep tree** match before/after for each backend at both
+scales. CPU/CUDA comparisons normalize only the established `backend_identity`
+manifest field; same-backend comparisons are byte-exact. Exported pairs match,
+and the intentionally corrupted grouped sidecar is rejected.
+
+The unchanged 10M/24-tick no-grouped gate reports CUDA 6.20/6.28/6.22 s and CPU
+50.12/49.64/50.99 s. Its median CPU/CUDA ratio is **8.058×**, passing the 3×
+threshold. Results, summaries and execution hashes match across all six runs.
+This is a backend comparison at the primary candidate, not its gain over baseline.
+
+Evidence:
+
+- [Primary artifacts](../evidence/demographic-bench/hyperstack-l4-20260906T061831Z/README.md)
+- [Independent sweep analysis](../evidence/demographic-bench/hyperstack-l4-20260906T061831Z/review/sweep-analysis.json)
+- [Verification log](../evidence/demographic-bench/hyperstack-l4-20260906T061831Z/review/verification.log)
+- [Incomplete repeat attempt and limits](../evidence/demographic-bench/hyperstack-l4-20260906T061831Z/review/repeated-validation-attempt/README.md)
+
+The remote primary snapshot is commit
+`02ab404eec35f1204571ae2520453f0c12e916fc` on
+`evidence/hyperstack-20260906T073508Z`. Local review/closeout records are additive;
+`SHA256SUMS.remote` remains unchanged.
 
 ## Changes
 
@@ -54,58 +113,94 @@ cover exactly that variant, including fused rewriting. Observation generation
 and CLI tick-timing serialization move into focused modules. No new dependencies,
 model contracts, canonical bytes, or scientific fixtures are introduced.
 
-## Evidence and limits
+The hardware test also exposed a pre-existing fused-slot alignment defect:
+when a mixed-type packed state ended between eight-byte boundaries, later slots
+misaligned typed loads. State, input, and aggregate byte arenas now round each
+slot stride up to eight bytes with checked arithmetic. Logical lengths and
+canonical state hashes remain unchanged. The regression exercises empty,
+one-row, and non-block-multiple populations and changes fused widths 2 → 1 → 2.
+The final test reports zero Compute Sanitizer errors.
 
-The retained September 5 H100 no-grouped profile has 336 launches and 10.620 ms
-of summed kernel durations. Validation/preparation account for 26.41% and 210
-launches; fired counting plus activity detection account for 14.22% and 40
-launches. Those shares explain where to investigate, not a prediction of
-whole-command savings. The grouped tick loop takes 14.662 ms versus 10.831 ms
-without groups; a new grouped Nsight trace is needed to separate extrema and
-histogram costs.
+## Profile attribution and memory correction
 
-In the retained 10M/20-draw native sweep timing, the whole interval is 25.291 s,
-with 19.977 s summed draw bodies. Final downloads total 5.014 s and CPU hashes
-5.259 s. The 5.314 s outside draw bodies cannot all be attributed to NVRTC.
-The new lifecycle report is intended to resolve that attribution before larger
-startup or finalization changes. Existing rejected pinned-buffer and serial
-device-hash experiments are not reopened by this patch.
+The primary 5M/two-tick no-grouped trace has **216 launches**, versus 336 in the
+retained September 5 profile at the comparison baseline: 120 launches removed
+(35.7%). Separate effect-activity scans and empty transition validators are
+absent. Summed kernel time is 9.148 ms; the unprofiled tick-loop timer is 9.496 ms.
+The grouped tick loop is 10.201 ms, with grouped extrema taking 0.143 ms across
+four launches and grouped histograms 0.213 ms across six launches in its trace.
+Effect preparation still runs 80 launches: this model shares its destinations
+and does not qualify for the exclusive-effect shortcut.
 
-The earlier 15–25% overall estimate remains speculative. These optimizations
-overlap and depend on the workload; the PTX cache and exclusive-effect shortcut
-do not apply to every demographic command. Only controlled wall-time results
-can establish the combined gain.
+The older no-grouped/grouped tick loops are 10.831/14.662 ms, but were collected
+on a different H100 session. Those profile durations explain the mechanism;
+the adjacent sweep pairs above provide the controlled wall-time comparison.
 
-Reference artifacts:
+The primary grouped lifecycle report covers 3442.489 ms after option parsing:
+1187.418 ms input/model preparation, 2063.299 ms backend construction/execution/
+materialization, and 191.772 ms hashing/export/publication. CUDA construction
+accounts for 1695.389 ms, including 461.290 ms host state validation/copies,
+579.500 ms NVRTC (cache miss), 134.244 ms packing and 199.555 ms allocation/upload.
+Compilation is about 17% of this short command, not all of startup. These timers
+cover a different size and boundary from the 20-draw sweeps.
 
-- [No-grouped kernel summary](../evidence/demographic-bench/hyperstack-l4-20260905T121420Z/profile/nsys-kern-sum.txt)
-- [Grouped tick timing](../evidence/demographic-bench/hyperstack-l4-20260905T121420Z/profile/timing-grouped-cuda.json)
-- [10M native sweep timing](../evidence/demographic-bench/hyperstack-l4-20260905T121420Z/sweep/10000000/current-cuda-native-timing.json)
-- [Previous measured review](cuda-runtime-review-2026-09-05.md)
+The initial 10M sweep's peak RSS rises from 2,571,240 to 2,996,452 KiB. Inspection
+found that collecting construction timing had moved the pristine-state clone
+ahead of the temporary packed upload copy. The final `d584369` correction restores
+the baseline order, allowing those allocations to avoid overlapping, and adds
+the late copy's measured duration to the same host-state phase. It introduces
+no additional retained buffer. Its actual peak RSS remains unconfirmed because
+the attempted repeated run did not reach the final candidate's measurements.
 
-## Validation
+The repeat protocol preserved the baseline executable after the original
+collector removed its build worktree. Native sweep timing resolves that compiled
+worktree path to obtain repository identity, so the missing checkout makes it
+fail. This diagnosis follows from the retained protocol and CLI source; the
+baseline's per-command stderr was not retrieved before automatic teardown.
+The corrected candidate's build and hardware-corpus subprocesses returned zero
+before the script entered that first baseline warmup, but their remote logs were
+also not transferred. The retained hardware corpus is therefore the primary
+`f84bb05` evidence, and no warmed performance or memory result is accepted.
+A future repeat must retain the build checkouts and collect partial diagnostics
+before resuming teardown.
 
-Local checks passed:
+## Validation and closeout
 
-- `./scripts/check-rust.sh` (architecture, source budgets, formatting, both
-  Clippy configurations, workspace tests, dependency and lock policies).
-- `./scripts/check-determinism.sh`.
-- `cargo test --locked -p sembla-cuda --lib --features cuda`: 40 passed,
-  four hardware tests ignored.
-- Collector flag regression tests: 12 passed; changed shell scripts parse.
-- Generated reference fixture comparison and the new lifecycle output/parity
-  and alias-protection integration test.
+The final clean candidate passes `./scripts/check-rust.sh`,
+`./scripts/check-determinism.sh`, and CUDA-feature library tests (40 passed,
+four hardware tests ignored locally). The developer checkout also passes the
+full Rust checks with `RUST_TEST_THREADS=1` and determinism. One earlier parallel
+run hit a temporary-directory collision in an unchanged state-artifact test;
+the serial rerun passed. No unrelated test or fixture was changed.
 
-The new ignored hardware test compares CPU reports and state hashes for empty,
-one-row, and 1,027-row populations, negative band values, small/shared and
-large/global histograms, rules with no effects, resets, and fused widths
-2 → 1 → 2. The differential collector invokes it alongside the existing
-negative/error-ordering, rollback, resource, and fused tests.
+The primary H100 corpus passes negative/error-ordering, rollback, resource and
+fused checks. The new reduction test covers empty, one-row and 1,027-row inputs,
+negative bands, 408-bin shared and 4,152-bin global histograms, no-effect fired
+counts, resets and fused widths 2 → 1 → 2. Its retained Compute Sanitizer run
+reports zero errors. Grouped and no-grouped profile outputs also match CPU.
+Collector flag tests (12 cases), shell parsing, reference-generation fixtures,
+lifecycle output/alias checks and `git diff --check` pass.
 
-The GPU plan should run the full differential corpus first, then grouped and
-no-grouped 5M/2-tick profiles with lifecycle and Nsight artifacts, controlled
-1M/10M grouped 20-draw baseline/candidate sweeps, and the unchanged three-run
-10M/24-tick gate. Verify scientific outputs across both versions and both
-backends before interpreting time differences. The collector adds diagnostics
-without changing the frozen gate protocol. Paid provisioning requires approval
-of the exact saved plan under the infrastructure README.
+Reproduce primary checksum/output verification after local review files are
+included:
+
+```sh
+evidence=docs/evidence/demographic-bench/hyperstack-l4-20260906T061831Z
+python3 "$evidence/review/verify.py" "$evidence"
+```
+
+The approved session followed the [runbook](../../spikes/precision/infra-hyperstack/RUNBOOK.md)
+and [provisioning instructions](../../spikes/precision/infra-hyperstack/README.md),
+using one CANADA-1 H100 at $2.506720430/hour including its public IP and an armed
+four-hour destruction watchdog. The full primary corpus preceded profiles,
+adjacent 1M/10M sweeps and the frozen gate. Initial failed NVRTC/test attempts
+are retained separately and supply no accepted performance result.
+
+The collector retrieved and verified the primary archive, destroyed both paid
+resources, and verified empty Terraform state. At 07:38:58 UTC,
+[provider verification](../evidence/demographic-bench/hyperstack-l4-20260906T061831Z/review/provider-verification.json)
+returned HTTP 200 with zero VMs. The watchdog was disarmed, disposable credentials
+were cleaned, the generated console-password item was deleted, and the original
+non-creating Terraform configuration was restored. The session cost is roughly
+**$4.50**, an elapsed-time estimate rather than an invoice. See the
+[closeout record](../evidence/demographic-bench/hyperstack-l4-20260906T061831Z/review/session-closeout.json).

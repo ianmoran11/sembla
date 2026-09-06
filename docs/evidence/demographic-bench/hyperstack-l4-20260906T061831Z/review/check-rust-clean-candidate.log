@@ -1,0 +1,811 @@
+Rust architecture checks passed: 10 allowed workspace edges, 41 core source files
+Backend Rust context report (production src only)
+
+crate              files  code lines     tokens  max file
+sembla-ir              8        2585      15550       928
+sembla-runtime        16        3192      22172      1051
+sembla-cpu             7        5239      36842      2382
+sembla-cuda           13        7461      50602      2463
+sembla-cli            21        8269      53535      1338
+TOTAL                 65       26746     178701         -
+
+Highest decision complexity:
+   39   430 lines  crates/sembla-cli/src/sweep.rs:26 sweep_file_result_with_runtime
+   36   218 lines  crates/sembla-cli/src/sweep/concurrency.rs:635 run_fused_sweep_spike
+   33   248 lines  crates/sembla-cli/src/run.rs:98 run_file_result
+   31   150 lines  crates/sembla-cli/src/shared.rs:227 initializers_from_population
+   29   125 lines  crates/sembla-cli/src/sweep/timing.rs:137 aggregate_final_state_buffer_accounting
+
+Longest functions:
+   512 lines  complexity  11  crates/sembla-cuda/src/backend.rs:675 new_with_stream_mode
+   430 lines  complexity  39  crates/sembla-cli/src/sweep.rs:26 sweep_file_result_with_runtime
+   360 lines  complexity  16  crates/sembla-cuda/src/backend/tick.rs:156 schedule_resolve_and_validate_boxes
+   297 lines  complexity  28  crates/sembla-cli/src/sweep/concurrency.rs:313 run_bounded_concurrent_sweep
+   284 lines  complexity  22  crates/sembla-cli/src/verify.rs:57 verify_run_result
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.58s
+    Checking sembla-cuda v0.3.0 (/private/tmp/sembla-cuda-throughput-20260906/crates/sembla-cuda)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.42s
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.41s
+     Running unittests src/main.rs (target/debug/deps/sembla-c7cf7afd24762fd1)
+
+running 37 tests
+test manifest::tests::numeric_population_hash_uses_canonical_decimal_and_newline ... ok
+test manifest::tests::canonical_json_is_compact_sorted_and_has_one_newline ... ok
+test manifest::tests::linked_plan_identity_tuple_copies_validated_provenance ... ok
+test manifest::tests::reader_rejects_partial_backend_identity_tuple_by_name ... ok
+test manifest::tests::integer_parameter_type_survives_manifest_round_trip ... ok
+test manifest::tests::reader_rejects_partial_cuda_backend_identity ... ok
+test manifest::tests::reader_rejects_invalid_state_artifact_tuple_values ... ok
+test manifest::tests::reader_rejects_partial_observation_hash_tuples ... ok
+test manifest::tests::reader_rejects_plan_linkage_shape_mismatches ... ok
+test tests::backend_and_differential_run_options_are_strict ... ok
+test manifest::tests::reader_rejects_partial_theta_source_tuple_by_name ... ok
+test atomic_write::tests::publication_replaces_whole_files_without_leaving_temporary_paths ... ok
+test tests::device_generic_enum_counts_preserve_legacy_csv_bytes ... ok
+test manifest::tests::reader_rejects_unknown_schema_major ... ok
+test tests::fused_publication_stops_at_the_lowest_failed_k ... ok
+test tests::bounded_scheduler_reports_lowest_k_and_stops_higher_publication ... ok
+test tests::generated_csv_headers_are_escaped ... ok
+test manifest::tests::real_parameter_bits_survive_manifest_round_trip ... ok
+test tests::invalid_usage_is_nonzero ... ok
+test tests::per_tick_hash_comparison_checks_lengths_before_elements ... ok
+test atomic_write::tests::concurrent_publications_never_share_a_temporary_path ... ok
+test tests::per_tick_hash_comparison_detects_the_first_divergent_tick ... ok
+test tests::per_tick_hash_comparison_rejects_absent_sequences ... ok
+test tests::pinned_accounting_allows_a_retained_lane_with_no_assigned_draw ... ok
+test tests::per_tick_hash_mode_type_enforces_absence ... ok
+test tests::plan_fixture_corpus_is_the_exact_sorted_top_level_and_linked_set ... ok
+test tests::generic_csv_is_ordered_deterministic_and_conservative ... ok
+test tests::version_matches_library_versions ... ok
+test manifest::tests::reader_rejects_partial_plan_and_linked_source_tuples ... ok
+test manifest::tests::reader_rejects_partial_state_artifact_tuples ... ok
+test tests::concurrent_scheduler_constructs_exactly_one_retained_backend_per_lane ... ok
+test tests::cuda_sweep_final_state_default_is_packed_pageable ... ok
+test tests::packed_pinned_injected_allocation_failure_has_no_fallback_or_publication ... ok
+test tests::packed_readback_modes_are_ordered_reused_and_scientifically_identical ... ok
+test tests::plan_run_is_bitwise_deterministic_twice_in_process ... ok
+test tests::supported_draw_workers_local_conformance_is_byte_stable_and_ordered ... ok
+test tests::sweep_constructs_one_backend_for_multiple_draws ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s
+
+     Running tests/arithmetic_int.rs (target/debug/deps/arithmetic_int-45fdd8280f4f820e)
+
+running 1 test
+test lean_exported_increment_model_runs_and_records_int_theta_override ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/australian_population.rs (target/debug/deps/australian_population-23f56ba3afa12853)
+
+running 17 tests
+test generated_full_and_tenth_artifacts_match_hashes_and_enforce_rows ... ignored, explicit full/tenth artifact regeneration and Rust row-enforcement evidence
+test generated_model_has_frozen_schema_parameter_and_transition_counts ... ok
+test model_defaults_match_2010_params_and_direct_hazards_remain_symbolic ... ok
+test all_eight_invariant_groups_hold_over_every_golden_tick ... ok
+test companion_and_hash_are_frozen_cross_language_evidence ... ok
+test companion_and_executable_plan_pass_the_public_validate_command ... ok
+test python_artifact_loads_exactly_through_the_rust_model ... ok
+test committed_baseline_chain_evidence_is_complete_and_hash_bound ... ok
+test annual_chain_capacity_guard_uses_strict_threshold_and_zero_margins ... ok
+test one_tick_stock_flow_and_closed_slot_accounting_hold_exactly ... ok
+test isolated_interstate_moves_conserve_state_counts_and_preserve_identity ... ok
+test activated_entrants_clear_then_exit_to_retired_without_reuse ... ok
+test per_slot_golden_trajectory_preserves_identity_and_retirement_every_tick ... ok
+test twenty_four_tick_golden_reproduces_all_committed_outputs ... ok
+test annual_parameter_files_are_accepted_by_public_run_and_sweep_paths ... ok
+test annual_chain_driver_is_bitwise_reproducible_and_rejects_saturation has been running for over 60 seconds
+test uncalibrated_2010_fidelity_uses_predeclared_multiseed_spread has been running for over 60 seconds
+test annual_chain_driver_is_bitwise_reproducible_and_rejects_saturation ... ok
+test uncalibrated_2010_fidelity_uses_predeclared_multiseed_spread ... ok
+
+test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 73.01s
+
+     Running tests/backend_selection.rs (target/debug/deps/backend_selection-f1ce4d4ca4bf5406)
+
+running 2 tests
+test unavailable_cuda_request_is_nonzero_and_never_falls_back ... ok
+results_sha256=0865e1f6507b6d7e38dcb1acb65f6d875ab7a4c13d14ab7c788fb35b73434db3 final_state_sha256=f145c4969e5c451f2095148fb1407e6c7276616fddbe3c435a3295570452ad17 observation_sha256=2c0664afac18f766ff9366681be3f5bc1e309f78889484d6152722b78c7a88bf
+results_sha256=0865e1f6507b6d7e38dcb1acb65f6d875ab7a4c13d14ab7c788fb35b73434db3 final_state_sha256=f145c4969e5c451f2095148fb1407e6c7276616fddbe3c435a3295570452ad17 observation_sha256=2c0664afac18f766ff9366681be3f5bc1e309f78889484d6152722b78c7a88bf
+test default_backend_is_cpu_and_manifest_tuple_is_exact ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/bundle.rs (target/debug/deps/bundle-814e7cfbc5d7ba61)
+
+running 3 tests
+test checked_and_moved_bundles_verify_in_deterministic_order ... ok
+test plan_copied_out_of_bundle_runs_without_source_or_manifest ... ok
+test every_bundle_corruption_names_the_failing_record ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/canonical_models.rs (target/debug/deps/canonical_models-e88bf09076005534)
+
+running 1 test
+test canonical_models_validate_run_deterministically_and_conserve_rows ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/chained_runs.rs (target/debug/deps/chained_runs-288ce6a20066a856)
+
+running 6 tests
+test export_without_results_works_and_other_commands_reject_the_run_only_flag ... ok
+test export_supports_plan_envelopes_and_numeric_legacy_manifests_remain_tuple_free ... ok
+test chained_manifest_records_each_windows_theta_and_accepts_verify_run ... ok
+test chained_windows_are_honestly_not_a_continuous_run ... ok
+test export_is_pure_deterministic_and_refuses_to_overwrite ... ok
+test chain_hash_identity_and_each_window_are_bitwise_reproducible ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/compare.rs (target/debug/deps/compare-b3e7ab16eb930ef3)
+
+running 4 tests
+test mixed_legacy_and_plan_compare_rejects_before_creating_output ... ok
+test shared_population_is_exactly_crn_paired_across_different_linked_plans ... ok
+test counterfactual_demo_plan_parameter_compare_matches_golden_and_is_deterministic ... ok
+test wired_policy_parameter_diverges_after_exactly_two_wire_ticks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/composition_showcase.rs (target/debug/deps/composition_showcase-8f7112c659ccc065)
+
+running 1 test
+test showcase_bundles_verify_and_runs_are_replayable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/contest.rs (target/debug/deps/contest-250887bab8f2f38c)
+
+running 3 tests
+test removing_surface_claims_exposes_the_runtime_double_write_defense ... ok
+test deferred_losers_reach_the_existing_saturation_report ... ok
+test lean_surface_competing_exits_are_reproducible_and_single_cause ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/demographic_slots.rs (target/debug/deps/demographic_slots-8f19f7cab0159826)
+
+running 18 tests
+test arrival_age_stratum_appears_in_population_cells ... ok
+test full_six_flow_stock_identity_holds_at_every_tick ... ok
+test competing_exits_and_slot_accounting_are_closed ... ok
+test grouped_population_death_and_vacancy_cells_match_scalar_views ... ok
+test regenerate_demographic_calibration_goldens ... ignored, calibration regeneration is explicit and must not run during normal checks
+test regenerate_demographic_chain_goldens ... ignored, chain golden regeneration is explicit and must not run during normal checks
+test regenerate_demographic_goldens ... ignored, golden regeneration is explicit and must not run during normal checks
+test regenerate_demographic_state_fixture ... ignored, fixture regeneration is explicit and must not run during normal checks
+test marker_totals_cross_check_summaries ... ok
+test no_present_slot_has_an_invalid_age ... ok
+test slot_reuse_strictly_increases_generation ... ok
+test one_tick_entry_lockout_is_measured ... ok
+test canonical_model_plan_and_state_fixtures_are_exact ... ok
+test internal_balance_residual_is_visible_and_documented ... ok
+test overseas_capacity_exhaustion_is_visible_and_deterministic ... ok
+test golden_run_reproduces_bitwise_twice ... ok
+test demographic_model_chains_two_deterministic_migration_windows ... ok
+test calibration_sweep_pairs_and_crn_compare_match_goldens ... ok
+
+test result: ok. 14 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/execution_timing.rs (target/debug/deps/execution_timing-81b753cb7aaac49c)
+
+running 3 tests
+test timing_json_rejects_direct_symlink_and_hard_link_output_aliases ... ok
+test timing_enabled_without_output_preserves_plain_stdout ... ok
+test timing_json_is_inert_and_reports_reconciled_cpu_phases ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/gpu_differential.rs (target/debug/deps/gpu_differential-ba87abd92efea6f0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/grouped_observations.rs (target/debug/deps/grouped_observations-22624c42edf5c286)
+
+running 4 tests
+test grouped_plan_fixture_is_canonical_and_bidirectionally_gated ... ok
+test grouped_observation_is_a_deterministic_sink_and_records_hashes ... ok
+test verify_run_replays_manifest_features_and_grouped_hashes ... ok
+test flags_plan_artifacts_cuda_and_sweep_are_gated ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/lifecycle_timing.rs (target/debug/deps/lifecycle_timing-85326a7460e056e9)
+
+running 1 test
+test lifecycle_report_reconciles_without_changing_results_or_overwriting_inputs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/observation.rs (target/debug/deps/observation-8536c66acf4fd1b9)
+
+running 4 tests
+test cli_source_has_no_model_named_observation_branch ... ok
+test summaries_match_hand_computed_peak_and_earliest_tick ... ok
+test views_free_sweep_is_deterministic ... ok
+test migrated_sir_and_sweep_preserve_legacy_while_policy_reports_every_rule ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/plan_run.rs (target/debug/deps/plan_run-6ee4eeb37adfa6c5)
+
+running 7 tests
+test legacy_run_manifest_matches_the_pre_prd_byte_baseline ... ok
+test sibling_insertion_preserves_every_shared_output_trace ... ok
+test exposure_aliases_add_no_ping_pong_delay ... ok
+test plan_run_matches_frozen_golden_and_is_byte_deterministic ... ok
+test linked_product_preserves_population_views_firings_and_deferred_trace ... ok
+test nested_plan_runs_match_checked_csv_and_hash_goldens ... ok
+test linked_epidemic_policy_run_pins_both_wire_delays_and_golden ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/run.rs (target/debug/deps/run-daa43b3e143338ba)
+
+running 8 tests
+test run_two_state_prints_deterministic_per_rule_counts ... ok
+test run_multi_box_reports_counts_per_box ... ok
+test compare_rejects_ambiguous_shapes_and_duplicate_flags ... ok
+test parameter_override_errors_name_the_parameter ... ok
+test run_rejects_missing_duplicate_and_malformed_flags_with_usage_exit ... ok
+test model_compare_is_byte_deterministic_and_baseline_columns_match_standalone ... ok
+test parameter_compare_is_deterministic_and_lower_beta_lowers_final_attack_rate ... ok
+test hundred_thousand_cli_pipeline_is_deterministic_across_fresh_processes ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/run_manifest.rs (target/debug/deps/run_manifest-c01768c9bfd4d2c9)
+
+running 4 tests
+test verify_run_reports_tampered_seed_and_partial_backend_tuple ... ok
+test linked_and_direct_plan_manifests_preserve_end_to_end_provenance ... ok
+test verify_run_round_trips_sir_generic_and_one_sweep_draw ... ok
+test run_sweep_and_compare_manifests_are_byte_deterministic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/state_artifact.rs (target/debug/deps/state_artifact-f941ec3af28251cc)
+
+running 8 tests
+test state_hash_prints_frozen_one_line_record ... ok
+test diff_backends_loads_state_before_gpu_dispatch ... ok
+test unknown_population_magic_names_both_supported_formats ... ok
+test legacy_sembla_pop_still_routes_to_the_frozen_loader ... ok
+test plan_envelope_accepts_a_declaration_ordered_state_artifact ... ok
+test legacy_model_state_run_is_byte_deterministic_and_matches_golden ... ok
+test state_artifacts_dispatch_through_sweep_and_verify_run ... ok
+test state_artifacts_dispatch_through_compare ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/sweep.rs (target/debug/deps/sweep-64b8ad28170d1c77)
+
+running 21 tests
+test final_state_selector_scope_and_retired_variables_fail_before_output ... ok
+test legacy_sweep_outputs_and_manifest_match_pre_prd3_goldens ... ok
+test linked_plan_sweep_matches_checked_goldens ... ok
+test identical_theta_is_crn_paired_and_independent_noise_is_distinct ... ok
+test pairs_export_accepts_theta_file_warns_for_crn_and_rejects_missing_summaries ... ok
+test plan_sweep_manifests_carry_complete_origin_specific_tuples ... ok
+test linked_plan_sweep_is_bitwise_deterministic ... ok
+test plan_sweep_theta_file_accepts_known_parameters_and_rejects_unknown_names ... ok
+test sweep_rejects_zero_draws ... ok
+test plan_sweep_noise_modes_preserve_theta_and_split_simulation_shocks ... ok
+test linked_plan_pairs_export_matches_golden_warns_and_rejects_summary_free_plan ... ok
+test theta_file_reports_missing_unknown_and_draw_conflict ... ok
+test pairs_export_is_deterministic_canonical_and_matches_theta_and_summaries ... ok
+test prior_manifest_theta_round_trips_through_theta_file ... ok
+test sweep_concurrency_spike_rejects_invalid_or_unbudgeted_worker_counts ... ok
+test supported_draw_workers_parse_validate_and_fail_before_scientific_output ... ok
+test sweep_is_reproducible_seed_sensitive_pinnable_and_uses_crn ... ok
+test sweep_timing_json_is_opt_in_and_does_not_change_outputs ... ok
+test independent_noise_is_k_stable_and_preserves_prior_theta ... ok
+test retained_draw_matches_fresh_backend_for_contests_and_grouped_under_both_noise_modes ... ok
+test twenty_draw_hundred_thousand_person_summary_has_monotone_bands ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.32s
+
+     Running tests/synth_state.rs (target/debug/deps/synth_state-ec6cdd6a914d6170)
+
+running 4 tests
+test synth_state_rejects_models_without_the_documented_demographic_roles ... ok
+test synth_state_accepts_a_plan_and_emits_a_legacy_companion ... ok
+test benchmark_variants_are_exact_canonical_subtractions ... ok
+test synth_state_is_deterministic_valid_and_loadable_at_10k ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/validate.rs (target/debug/deps/validate-a5fa93182e953926)
+
+running 11 tests
+test validate_subcommand_accepts_the_golden_fixture ... ok
+test plan_hash_prints_the_two_frozen_records ... ok
+test validate_rejects_noncanonical_plan_bytes ... ok
+test validate_accepts_legacy_two_box_and_canonical_plan ... ok
+test run_accepts_plan_envelopes_on_cpu_and_reaches_cuda_backend_without_dt ... ok
+test diff_ir_compares_validated_canonical_models ... ok
+test diff_backends_accepts_plans_rejects_plan_dt_and_checks_corpus_exclusivity ... ok
+test every_top_level_plan_fixture_is_valid_and_canonical ... ok
+test validate_subcommand_rejects_every_invalid_fixture ... ok
+test sir_plan_run_matches_the_checked_csv_golden_bitwise ... ok
+test every_linked_plan_is_valid_canonical_and_pins_its_source_hash ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (target/debug/deps/sembla_cpu-bd24fdd9772deabe)
+
+running 21 tests
+test config::tests::explicit_configuration_is_normalized_and_reusable ... ok
+test eval::tests::cache_budget_derives_hand_checked_tiles_for_three_model_shapes ... ok
+test eval::tests::work_threshold_tracks_the_threading_spike_crossover ... ok
+test eval::tests::fixed_row_tiles_depend_only_on_row_index_and_tile_size ... ok
+test executor::parallel_tests::degenerate_uncontested_transition_skips_clock_but_contested_transition_does_not ... ok
+test eval::tests::input_enum_equality_accepts_literal_on_the_left ... ok
+test eval::tests::tiled_expression_footprints_follow_evaluator_liveness_not_node_width ... ok
+test executor::parallel_tests::racing_clock_fast_paths_cannot_hide_entity_id_overflow ... ok
+test executor::parallel_tests::racing_clock_filter_rejects_below_lo_and_admits_boundary_envelope ... ok
+test executor::double_write_bitmap_tests::scratch_reuses_storage_and_sizes_only_written_columns ... ok
+test executor::parallel_tests::tiled_real_view_reduction_keeps_canonical_row_order ... ok
+test executor::parallel_tests::wrong_typed_parameter_environment_matches_fallback_across_workers_and_tiles ... ok
+test executor::parallel_tests::threshold_falls_back_and_only_tick_orchestration_can_spawn ... ok
+test executor::parallel_tests::benchmark_shapes_derive_hand_checked_tiles_and_work_decisions ... ok
+test tests::version_matches_package_version ... ok
+test eval::tests::real_aggregate_reduction_stays_bit_identical_and_sequential ... ok
+test eval::tests::real_arithmetic_chain_is_bit_identical_across_workers_and_tile_sizes ... ok
+test executor::parallel_tests::tick_report_is_identical_across_workers_and_tiles ... ok
+test executor::parallel_tests::real_chain_racing_clock_and_key_are_bit_identical_across_workers_and_tiles ... ok
+test executor::parallel_tests::numeric_view_sum_and_effect_state_are_bit_identical_across_workers_and_tiles ... ok
+test executor::parallel_tests::guarded_racing_clock_preserves_firing_set_bits_and_contested_winner ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/composition.rs (target/debug/deps/composition-a1d55c1135a21e7a)
+
+running 4 tests
+test output_failure_rolls_back_state_and_inputs_and_store_is_reusable ... ok
+test tick_zero_inputs_are_empty_and_delivery_has_exactly_one_tick_delay ... ok
+test moving_the_box_boundary_preserves_every_table_bitwise ... ok
+test composed_feedback_is_hash_and_report_deterministic_for_fifty_ticks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/effect_gather.rs (target/debug/deps/effect_gather-71905e885242cbc1)
+
+running 2 tests
+test effects_use_gathered_winner_rows_with_full_column_fallbacks ... ok
+test gather_eligibility_reuses_the_conservative_row_infallible_predicate ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval.rs (target/debug/deps/eval-3cf86750814f09ca)
+
+running 7 tests
+test sum_uses_sequential_row_order_and_is_repeatable ... ok
+test aggregate_and_input_effect_expressions_require_full_column_fallback ... ok
+test gathered_effect_values_match_full_columns_bitwise_for_every_effect_type ... ok
+test cache_distinguishes_ieee_structure_and_uses_explicit_tick_scopes ... ok
+test identical_aggregates_build_one_accumulator ... ok
+test every_expression_form_and_parameter_resolution_are_evaluated ... ok
+test group_by_count_matches_naive_quadratic_lumping_reference ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_column_resolution.rs (target/debug/deps/eval_column_resolution-edf4dcc490b8f6e8)
+
+running 3 tests
+test all_false_aggregate_filters_do_not_resolve_the_target_reference_column ... ok
+test zero_row_typed_column_reads_remain_lazy ... ok
+test typed_snapshot_accessors_do_not_regress_into_evaluator_row_loops ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/eval_numeric_coercion.rs (target/debug/deps/eval_numeric_coercion-e45c142e829513e1)
+
+running 1 test
+test owned_real_numeric_coercion_moves_its_buffer_without_cloning ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/executor.rs (target/debug/deps/executor-a2b93aa0f0f83386)
+
+running 14 tests
+test equivalent_enum_key_domains_compare_across_tables_and_attributes ... ok
+test double_write_precedes_deferred_destination_error ... ok
+test multi_claim_candidate_must_win_every_resource ... ok
+test integer_key_orders_fifo_regardless_of_race_time ... ok
+test later_effect_evaluation_error_precedes_earlier_destination_error ... ok
+test deferred_destination_error_keeps_its_original_message_and_discards_writes ... ok
+test non_winner_integer_overflow_still_fails_on_the_full_column_path ... ok
+test equal_key_tie_uses_rule_then_entity_id ... ok
+test race_time_microcase_matches_coordinate_rng ... ok
+test saturation_is_structured_and_uses_resource_firings ... ok
+test triple_write_reports_the_first_two_transitions_and_leaves_state_reusable ... ok
+test write_buffer_error_precedes_deferred_destination_error ... ok
+test fifty_ticks_are_report_and_state_hash_deterministic ... ok
+test analytic_hazard_and_survival_curve_match_binomial_bounds ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/observation.rs (target/debug/deps/observation-9304aac85027827c)
+
+running 6 tests
+test device_observation_eligibility_rejects_aggregate_and_input_expressions ... ok
+test device_observation_eligibility_accepts_only_count_and_int_extrema ... ok
+test device_observation_eligibility_is_conservative_for_host_ordered_reductions ... ok
+test grouped_views_extend_the_same_conservative_model_gate ... ok
+test views_reduce_committed_rows_and_summaries_keep_earliest_argmax ... ok
+test observation_is_a_bitwise_sink_for_state_and_scheduling ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/plan_identity.rs (target/debug/deps/plan_identity-0582a4b360e5d363)
+
+running 1 test
+test sibling_insertion_preserves_shared_stochastic_trace_via_plan_words ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sir.rs (target/debug/deps/sir-2f488e7c27e673f0)
+
+running 5 tests
+test million_agent_ten_tick_performance_floor ... ignored, release-only 1M-agent regression tripwire; run with --release --ignored --nocapture
+test million_person_lumping_builds_each_group_accumulator_once ... ok
+test policy_feedback::policy_restricts_lowers_peak_has_hysteresis_and_exact_one_tick_feedback_delay ... ok
+test epidemic_sanity_and_zero_beta ... ok
+test hundred_thousand_end_to_end_run_contract_is_deterministic ... ok
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.83s
+
+     Running tests/write_column_resolution.rs (target/debug/deps/write_column_resolution-c75102489291f11e)
+
+running 3 tests
+test pending_writes_keep_compact_deferred_identity_without_owned_strings ... ok
+test double_write_detection_uses_a_reused_bitmap_without_hashing_or_sorting ... ok
+test write_application_does_not_regress_to_per_write_name_resolution ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/sembla_cuda-e15f20aacc876e90)
+
+running 30 tests
+test availability::tests::missing_driver_and_toolkit_are_distinct ... ok
+test availability::tests::no_device_has_the_frozen_diagnostic_and_never_falls_back ... ok
+test backend_stub::tests::feature_off_request_fails_explicitly ... ok
+test codegen::tests::cuda_f64_order_key_exactly_matches_rust_total_cmp ... ok
+test codegen::tests::generated_unsigned_band_formula_matches_host_euclidean_division ... ok
+test codegen::tests::frozen_demographic_model_has_fifty_million_claim_instances ... ok
+test codegen::tests::grouped_histogram_omits_empty_groups_and_matches_btree_order_exactly ... ok
+test codegen::tests::grouped_layout_uses_exact_banded_extrema_and_fails_past_the_limit ... ok
+test codegen::tests::host_ineligible_route_executes_download_and_device_route_does_not ... ok
+test codegen::tests::grouped_codegen_collects_boundable_axes_and_emits_dense_histogram_kernels ... ok
+test codegen::tests::contested_source_checks_claims_once_and_uses_candidate_parallel_argmin ... ok
+test codegen::tests::hostile_model_name_is_represented_by_ascii_digest_only ... ok
+test codegen::tests::input_integer_ordering_promotes_both_operands_to_f64 ... ok
+test codegen::tests::incompatible_claims_are_checked_serially_before_parallel_argmin ... ok
+test codegen::tests::generation_is_deterministic_and_has_one_kernel_per_transition ... ok
+test codegen::tests::prefix_reduction_is_lexicographic_not_component_wise ... ok
+test codegen::tests::grouped_only_models_emit_legacy_enum_counts_without_state_download ... ok
+test codegen::tests::minimum_integer_literal_remains_signed_and_generation_is_deterministic ... ok
+test codegen::tests::nested_output_aggregate_is_collected_before_ordered_output ... ok
+test codegen::tests::shared_aggregate_is_staged_for_schedule_and_output ... ok
+test codegen::tests::execution_generation_preserves_reference_and_marks_checked_rules ... ok
+test codegen::tests::generated_sources_contain_no_scalar_final_state_sha_kernel ... ok
+test codegen::tests::segmented_argmin_has_no_cross_table_row_scan_and_prefixes_every_pass ... ok
+test codegen::tests::device_observation_codegen_is_all_or_nothing ... ok
+test codegen::tests::stable_rule_words_key_philox_and_conflict_ordering_while_ordinals_index ... ok
+test codegen::tests::policy_source_contains_prospective_output_and_parallel_result_stages ... ok
+test codegen::tests::transition_candidates_skip_hazard_and_rng_when_the_guard_is_false ... ok
+test codegen::tests::unwired_output_aggregates_are_not_collected ... ok
+test codegen::tests::sir_simulation_source_matches_checked_in_golden ... ok
+test codegen::tests::dump_is_content_addressed_and_repeatable ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/absence.rs (target/debug/deps/absence-3e33218d4251dfa1)
+
+running 2 tests
+test requesting_cuda_without_a_device_has_the_frozen_diagnostic ... ok
+test feature_off_constructor_never_substitutes_the_cpu_oracle ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/codegen_fused_batch.rs (target/debug/deps/codegen_fused_batch-44af90dad0920515)
+
+running 5 tests
+test ordinary_generation_remains_free_of_the_fused_abi ... ok
+test fused_transition_uses_per_slot_seed_without_changing_philox_draw_coordinate ... ok
+test fused_source_adds_one_grid_y_slot_contract_to_every_simulation_kernel ... ok
+test every_non_metadata_kernel_pointer_is_explicitly_shared_or_draw_major ... ok
+test fused_source_rebases_representative_mutable_families_but_not_layout_metadata ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/codegen_validation_parallelism.rs (target/debug/deps/codegen_validation_parallelism-ddf0268ad786b827)
+
+running 15 tests
+test diagnostic_corpus_reduction_matches_each_frozen_status_identity ... ok
+test empty_launch_commits_nothing ... ok
+test reduction_keeps_code_paired_with_candidate_and_branch ... ok
+test reduction_matches_serial_under_simulated_launch_geometries ... ok
+test effect_liveness_uses_the_parallel_activity_prepass ... ok
+test ordered_output_fold_stays_on_one_worker ... ok
+test commit_publishes_candidate_before_code_and_scratch_is_initialised ... ok
+test generated_validation_argmin_contains_no_mutex_or_retry_loop ... ok
+test effect_preparation_is_grid_strided_and_candidate_errors_are_not_rechecked ... ok
+test reduction_preserves_scan_precedence_over_candidate_magnitude ... ok
+test parallel_validation_kernels_report_only_through_the_reduction ... ok
+test reduction_reports_minimum_candidate_within_the_first_failing_scan ... ok
+test parallel_validation_kernels_drop_the_single_thread_guard_and_grid_stride ... ok
+test serial_status_kernels_keep_the_single_thread_guard ... ok
+test every_single_worker_bulk_loop_is_an_explicit_named_exception ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/control_count_reduction.rs (target/debug/deps/control_count_reduction-00222eabed94dbb6)
+
+running 3 tests
+test timed_and_untimed_paths_share_compact_readback_and_report_conversion ... ok
+test tick_path_downloads_only_compact_counts_and_reuses_resident_offsets ... ok
+test generated_control_counts_use_resident_segmented_and_strided_reductions ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/corpus_membership.rs (target/debug/deps/corpus_membership-122d60ce85c347fb)
+
+running 3 tests
+test demographic_corpus_member_is_no_grouped_and_exercises_the_coverage_gap ... ok
+test grouped_demographic_configuration_is_in_the_gpu_differential_corpus ... ok
+test differential_runner_lists_the_demographic_corpus_contract ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/diagnostic_equality.rs (target/debug/deps/diagnostic_equality-80239e1108ba0bc7)
+
+running 2 tests
+test negative_corpus_has_known_nonzero_multiple_failures ... ok
+test cpu_oracle_rejects_every_case_at_the_expected_first_row ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gpu_oracle.rs (target/debug/deps/gpu_oracle-41cf7f82f6d826d7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gpu_philox.rs (target/debug/deps/gpu_philox-fa405beac6874ff9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gpu_semantics.rs (target/debug/deps/gpu_semantics-1aa17035ef988c82)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/host_state_reuse.rs (target/debug/deps/host_state_reuse-3ec5e1ee44470566)
+
+running 7 tests
+test cuda_cli_uses_the_reused_state_path_and_moves_the_state_only_at_run_end ... ok
+test cuda_backend_retains_and_refreshes_one_host_state_store ... ok
+test lockstep_spike_uses_nonblocking_streams_without_changing_the_default ... ok
+test host_ineligible_view_forces_state_download_while_device_views_skip_it ... ok
+test free_stream_spike_uses_nonblocking_streams_without_tick_barriers ... ok
+test fused_spike_uses_one_module_stream_and_grid_y_launch_path ... ok
+test final_state_diagnostic_reuses_one_hash_and_retains_synchronized_pinned_buffers ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/sembla_ir-7cd265736f3471b5)
+
+running 2 tests
+test canonical_json::tests::serde_json_objects_are_btree_sorted ... ok
+test tests::version_matches_package_version ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/golden.rs (target/debug/deps/golden-e5ebfeca2042a755)
+
+running 7 tests
+test observation_reduce_wire_names_are_frozen ... ok
+test omitted_observation_fields_default_to_empty ... ok
+test observation_fixture_is_canonical_golden_json ... ok
+test valid_fixture_is_canonical_golden_json ... ok
+test canonical_serialization_is_idempotent ... ok
+test invalid_fixtures_report_the_offending_path ... ok
+test every_valid_example_validates_and_is_canonical ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/grouped_validation.rs (target/debug/deps/grouped_validation-bb7ab1e2f455b97d)
+
+running 3 tests
+test grouped_view_requires_one_to_four_keys ... ok
+test grouped_model_requires_explicit_feature ... ok
+test grouped_keys_and_filters_are_strictly_validated ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/number_vectors.rs (target/debug/deps/number_vectors-7670ef9b444f1f0f)
+
+running 1 test
+test serde_f64_spelling_matches_the_shared_number_vectors ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/plan_golden.rs (target/debug/deps/plan_golden-0dc862088beb46e9)
+
+running 5 tests
+test regenerate ... ignored, explicit contract regeneration only
+test regenerate_plus_sibling ... ignored, explicit PRD 0004 sibling-fixture regeneration only
+test sir_plan_semantic_hash_matches_lean ... ok
+test sibling_plan_is_canonical_and_preserves_shared_rule_words ... ok
+test two_box_plan_is_canonical_valid_and_hash_pinned ... ok
+
+test result: ok. 3 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/plan_validation.rs (target/debug/deps/plan_validation-06850dfe04487aa8)
+
+running 10 tests
+test slug_validation_is_ascii_and_strict ... ok
+test mailbox_identity_uses_the_frozen_format ... ok
+test rust_rule_words_match_the_cross_language_fixture ... ok
+test reserved_and_duplicate_rule_words_are_rejected_directly ... ok
+test linked_rejects_direct_stable_synthesized_wire_occurrences ... ok
+test direct_stable_rejects_declared_linked_wire_occurrences ... ok
+test legacy_model_rule_words_equal_dense_ordinals ... ok
+test linked_provenance_fields_are_frozen ... ok
+test dispatch_uses_schema_version_presence ... ok
+test every_negative_plan_has_its_specific_error ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/validation.rs (target/debug/deps/validation-cca5d34b2ae8c403)
+
+running 21 tests
+test duplicate_summary_name_is_rejected ... ok
+test duplicate_resource_claim_is_rejected_with_its_path ... ok
+test count_view_with_value_is_rejected ... ok
+test aggregate_supports_the_infect_group_by_pattern ... ok
+test duplicate_view_name_is_rejected ... ok
+test claim_for_a_different_ref_does_not_cover_the_write ... ok
+test nested_aggregate_in_input_row_expression_is_rejected ... ok
+test int_parameter_priors_are_rejected_at_the_declaration_path ... ok
+test duplicate_wire_destinations_are_rejected_at_the_second_wire ... ok
+test non_bool_view_filter_is_rejected ... ok
+test non_count_view_without_value_is_rejected ... ok
+test non_numeric_view_value_is_rejected ... ok
+test observation_names_are_not_transition_attributes ... ok
+test ref_write_with_a_matching_claim_is_valid ... ok
+test ref_write_without_a_matching_claim_is_rejected ... ok
+test rule_ids_follow_global_declaration_order ... ok
+test summary_missing_box_is_rejected ... ok
+test summary_missing_view_is_rejected ... ok
+test view_unknown_filter_attribute_is_rejected ... ok
+test view_unknown_table_is_rejected ... ok
+test view_unknown_value_attribute_is_rejected ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/sembla_runtime-62eab5c2ada09676)
+
+running 9 tests
+test rng::tests::mantissa_conversion_excludes_both_endpoints ... ok
+test rng::tests::split_exponential_transform_is_bit_identical ... ok
+test state::resolved_write_tests::resolved_writes_preserve_row_enum_and_ref_validation ... ok
+test tests::version_matches_package_version ... ok
+test state::resolved_write_tests::draw_reset_restores_both_buffers_and_empty_inputs_without_reallocation ... ok
+test state::resolved_write_tests::draw_reset_validation_is_constructor_equivalent_and_atomic ... ok
+test state::resolved_write_tests::backend_refresh_retains_current_and_next_column_allocations ... ok
+test population::tests::generation_is_exact_and_seeded ... ok
+test population::tests::binary_round_trip_and_corruption_errors ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/prior.rs (target/debug/deps/prior-bc0fca6477e9f40e)
+
+running 3 tests
+test sampler_mapping_is_bitwise_frozen ... ok
+test reserved_namespace_and_draw_index_are_sweep_length_independent ... ok
+test hundred_thousand_draws_match_family_moments ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/rng.rs (target/debug/deps/rng-d7af04d24661e32f)
+
+running 5 tests
+test philox4x32_10_matches_random123_known_answers ... ok
+test sweep_replica_seed_namespace_and_composition_are_frozen ... ok
+test public_draws_are_pure_and_coordinate_changes_do_not_collide ... ok
+test uniform_samples_are_open_and_well_distributed ... ok
+test exponential_samples_have_the_expected_mean_and_zero_rate_never_fires ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/state.rs (target/debug/deps/state-a3a4eee7829ebd5b)
+
+running 8 tests
+test backend_refresh_rejects_and_preserves_a_prepared_write_buffer ... ok
+test initializes_two_state_and_reports_enum_and_ref_rows ... ok
+test backend_refresh_rejects_store_shape_changes ... ok
+test write_time_enum_and_ref_bounds_name_the_cell ... ok
+test every_physical_cell_encoding_affects_the_hash ... ok
+test writes_are_invisible_until_commit_and_populations_remain_fixed ... ok
+test backend_refresh_matches_constructor_validation_diagnostics ... ok
+test canonical_hash_is_golden_deterministic_and_cell_sensitive ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/state_artifact.rs (target/debug/deps/state_artifact-b09e964f1e8d4b3e)
+
+running 28 tests
+test noncanonical_header_fixture_has_specific_error ... ok
+test missing_table_fixture_has_specific_error ... ok
+test refs_fixture_has_frozen_prefix_and_canonical_header ... ok
+test regenerate_state_fixtures ... ignored, explicit state-fixture regeneration only
+test enum_range_fixture_has_specific_error ... ok
+test ref_range_fixture_has_specific_error ... ok
+test extra_table_fixture_has_specific_error ... ok
+test missing_column_fixture_has_specific_error ... ok
+test create_new_writer_refuses_to_replace_a_chain_link ... ok
+test state_hash_has_frozen_domain_and_exact_byte_payload ... ok
+test trailing_bytes_fixture_has_specific_error ... ok
+test truncated_blob_fixture_has_specific_error ... ok
+test type_mismatch_fixture_has_specific_error ... ok
+test reader_checks_later_target_row_count_before_source_ref_values ... ok
+test row_count_fixture_has_specific_error ... ok
+test round_trip_and_repeated_writes_are_byte_identical ... ok
+test writer_rejects_invalid_initializer_values_without_repair ... ok
+test variant_count_fixture_has_specific_error ... ok
+test writer_checks_later_target_row_count_before_source_ref_values ... ok
+test wrong_schema_fixture_has_specific_error ... ok
+test wrong_magic_fixture_has_specific_error ... ok
+test invalid_fixtures_match_deterministic_regeneration_bytes ... ok
+test sniff_magic_distinguishes_state_legacy_and_unknown ... ok
+test writer_uses_model_order_even_when_inputs_are_permuted ... ok
+test valid_fixtures_are_generated_bytes_and_load_exactly ... ok
+test declaration_order_extra_column_and_ref_target_are_enforced ... ok
+test strict_header_shape_errors_are_distinct_and_deterministic ... ok
+test mutated_header_corpus_is_total_and_deterministic ... ok
+
+test result: ok. 27 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/transcendental_guard.rs (target/debug/deps/transcendental_guard-c372fa5c9031aca3)
+
+running 2 tests
+test scanner_detects_every_forbidden_method ... ok
+test result_sources_use_only_documented_platform_transcendentals ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+   Doc-tests sembla_cpu
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sembla_cuda
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sembla_ir
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sembla_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Rust architecture, formatting, lint, tests, dependency policy, and lock checks passed

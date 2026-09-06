@@ -1,0 +1,20 @@
+{
+  "closed_utc": "2026-09-06T07:42:09.522154+00:00",
+  "vm_id": 1027164,
+  "provider_http_status": 200,
+  "provider_account_vm_count": 0,
+  "terraform_paid_resource_count": 0,
+  "watchdog_disarmed": true,
+  "collector_completed_and_destroyed_vm": true,
+  "temporary_session_credentials_cleaned": true,
+  "generated_console_keychain_item_deleted": true,
+  "original_tfvars_restored": true,
+  "approved_hourly_rate_usd": 2.50672043,
+  "approximate_billed_interval_utc": [
+    "2026-09-06T05:49:00Z",
+    "2026-09-06T07:37:00Z"
+  ],
+  "approximate_cost_usd": 4.51,
+  "cost_is_estimate_not_invoice": true,
+  "optional_repeated_validation": "failed before a timed pair; no result accepted"
+}

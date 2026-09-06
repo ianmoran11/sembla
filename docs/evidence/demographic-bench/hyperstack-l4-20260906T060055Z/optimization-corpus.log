@@ -1,0 +1,18 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running unittests src/lib.rs (target/release/deps/sembla_cuda-6b75d9e03b236814)
+
+running 1 test
+cuda_device_grouped_observation tick=0 box="world" view="population_cells" key_space_size=0 occupied_groups=0 emitted_groups=0
+thread 'backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets' panicked at crates/sembla-cuda/src/backend_optimization_hardware_tests.rs:83:30:
+called `Result::unwrap()` on an `Err` value: Evaluation("grouped_views require enabled feature 'grouped-observations'")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets ... FAILED
+
+failures:
+
+failures:
+    backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.95s
+
+error: test failed, to rerun pass `-p sembla-cuda --lib`

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/ubuntu/cuda-throughput-warm-repeats.py", line 159, in <module>
+    run(arm, 'warmup-'+arm, 1)
+  File "/home/ubuntu/cuda-throughput-warm-repeats.py", line 151, in run
+    subprocess.run(['/usr/bin/time', '-f', '{"wall_seconds":%e,"peak_rss_kib":%M}', '-o', str(directory/(label+'.resource.json')), *command], stdout=out, stderr=err, env=environment, check=True)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/bin/time', '-f', '{"wall_seconds":%e,"peak_rss_kib":%M}', '-o', '/home/ubuntu/cuda-throughput-warm-repeats/1000000/warmup-baseline.resource.json', '/home/ubuntu/cuda-throughput-baseline-sembla', 'sweep', '/home/ubuntu/cuda-throughput-warm-repeats/1000000/initial.state.model.json', '--population', '/home/ubuntu/cuda-throughput-warm-repeats/1000000/initial.state', '--seed', '9009', '--draws', '1', '--ticks', '24', '--noise', 'independent', '--backend', 'cuda', '--enable', 'grouped-observations', '--export-pairs', '/home/ubuntu/cuda-throughput-warm-repeats/1000000/warmup-baseline.pairs.csv', '--timing-json', '/home/ubuntu/cuda-throughput-warm-repeats/1000000/warmup-baseline.native-timing.json', '--out', '/home/ubuntu/cuda-throughput-warm-repeats/1000000/warmup-baseline']' returned non-zero exit status 1.

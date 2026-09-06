@@ -1,0 +1,26 @@
+{
+  "backend": "cuda",
+  "backend_execution_ms": 340.668829,
+  "cuda_construction_ms": {
+    "availability": 190.826392,
+    "code_generation": 0.304558,
+    "context_and_identity": 123.957519,
+    "device_allocation_and_upload": 215.371005,
+    "function_lookup": 0.38623999999999997,
+    "host_state_validation": 459.776615,
+    "layout_and_pack": 135.710554,
+    "module_and_stream": 1.048888,
+    "nvrtc_compile_or_cache_lookup": 551.048537,
+    "other": 0.001144,
+    "total": 1678.4314519999998
+  },
+  "nvrtc_cache_hit": false,
+  "phases_ms": {
+    "backend_construction_execution_and_materialization": 2042.988615,
+    "hashing_export_and_publication": 189.020106,
+    "input_and_model_preparation": 1193.0572909999999
+  },
+  "schema": "sembla-run-lifecycle-timing-v1",
+  "scope": "command after option parsing, excluding lifecycle report write",
+  "total_ms": 3425.066012
+}

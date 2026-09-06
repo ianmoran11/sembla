@@ -1,0 +1,1 @@
+determinism checks passed: run results/summaries/manifest and sweep outputs/manifest are byte-identical
