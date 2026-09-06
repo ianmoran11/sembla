@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::io::{BufWriter, Write as _};
+use std::io::{BufWriter, Read as _, Write as _};
 use std::path::{Path, PathBuf};
 
 use sembla_ir::{domain_digest, to_canonical_string, AttrType, HashRecordV1, ValidatedModel};
@@ -534,11 +534,51 @@ fn read_bytes(bytes: &[u8]) -> Result<StateArtifact, StateArtifactError> {
 }
 
 /// Validates an artifact as an exact initializer for `model` and returns
-/// declaration-ordered loader inputs.
+/// declaration-ordered loader inputs, retaining the artifact's columns.
 pub fn to_table_inits(
     artifact: &StateArtifact,
     model: &ValidatedModel,
 ) -> Result<Vec<TableInit>, StateArtifactError> {
+    validate_initializer(artifact, model)?;
+    Ok(initializers(artifact.clone()))
+}
+
+/// Validates and consumes an artifact without copying its column buffers.
+pub fn into_table_inits(
+    artifact: StateArtifact,
+    model: &ValidatedModel,
+) -> Result<Vec<TableInit>, StateArtifactError> {
+    validate_initializer(&artifact, model)?;
+    Ok(initializers(artifact))
+}
+
+fn initializers(artifact: StateArtifact) -> Vec<TableInit> {
+    artifact
+        .header
+        .tables
+        .into_iter()
+        .zip(artifact.columns)
+        .map(|(table, data)| {
+            let columns = table
+                .columns
+                .into_iter()
+                .zip(data)
+                .map(|(column, data)| ColumnInit::new(column.name, data))
+                .collect();
+            TableInit::new(
+                table.box_name,
+                table.table,
+                table.row_count as usize,
+                columns,
+            )
+        })
+        .collect()
+}
+
+fn validate_initializer(
+    artifact: &StateArtifact,
+    model: &ValidatedModel,
+) -> Result<(), StateArtifactError> {
     let model_tables: Vec<_> = model
         .model()
         .boxes
@@ -611,7 +651,6 @@ pub fn to_table_inits(
         artifact_row_counts.insert((entry.box_name.clone(), entry.table.clone()), row_count);
     }
 
-    let mut result = Vec::with_capacity(model_tables.len());
     for (table_index, ((model_box, table), entry)) in
         model_tables.iter().zip(&artifact.header.tables).enumerate()
     {
@@ -636,7 +675,6 @@ pub fn to_table_inits(
             }
         }
 
-        let mut columns = Vec::with_capacity(table.attrs.len());
         for (position, ((attr, column), data)) in table
             .attrs
             .iter()
@@ -667,45 +705,57 @@ pub fn to_table_inits(
                 row_count,
                 ref_target_rows,
             )?;
-            columns.push(ColumnInit::new(attr.name.clone(), data.clone()));
         }
-        result.push(TableInit::new(
-            model_box.name.clone(),
-            table.name.clone(),
-            row_count,
-            columns,
-        ));
     }
-    Ok(result)
+    Ok(())
 }
 
 /// Identifies legacy and generic state files without extension-based routing.
 pub fn sniff_magic(path: impl AsRef<Path>) -> Result<StateKind, StateArtifactError> {
-    let bytes = fs::read(path.as_ref()).map_err(|error| io_error(path.as_ref(), error))?;
+    let file = fs::File::open(path.as_ref()).map_err(|error| io_error(path.as_ref(), error))?;
+    let mut prefix = Vec::with_capacity(STATE_MAGIC.len());
+    file.take(STATE_MAGIC.len() as u64)
+        .read_to_end(&mut prefix)
+        .map_err(|error| io_error(path.as_ref(), error))?;
+    Ok(sniff_magic_bytes(&prefix))
+}
+
+/// Identifies the frozen artifact magic from an already loaded byte slice.
+pub fn sniff_magic_bytes(bytes: &[u8]) -> StateKind {
     if bytes.starts_with(POPULATION_MAGIC) {
-        Ok(StateKind::SemblaPop)
+        StateKind::SemblaPop
     } else if bytes.starts_with(STATE_MAGIC) {
-        Ok(StateKind::SemblaState)
+        StateKind::SemblaState
     } else {
-        Ok(StateKind::Unknown)
+        StateKind::Unknown
     }
 }
 
 /// Returns the frozen domain-separated hash record for exact artifact bytes.
 pub fn state_artifact_hash(path: impl AsRef<Path>) -> Result<HashRecordV1, StateArtifactError> {
     let bytes = fs::read(path.as_ref()).map_err(|error| io_error(path.as_ref(), error))?;
-    read_bytes(&bytes)?;
-    let digest = domain_digest(STATE_ARTIFACT_HASH_DOMAIN, &bytes);
+    read_bytes_with_hash(&bytes).map(|(_, hash)| hash)
+}
+
+/// Decodes once and hashes the exact canonical input bytes.
+pub fn read_bytes_with_hash(
+    bytes: &[u8],
+) -> Result<(StateArtifact, HashRecordV1), StateArtifactError> {
+    let artifact = read_bytes(bytes)?;
+    let digest = domain_digest(STATE_ARTIFACT_HASH_DOMAIN, bytes);
     let mut digest_hex = String::with_capacity(digest.len() * 2);
     for byte in digest {
         use fmt::Write as _;
         write!(&mut digest_hex, "{byte:02x}").expect("writing to String cannot fail");
     }
-    Ok(HashRecordV1 {
-        algorithm: "sha256".to_owned(),
-        domain: STATE_ARTIFACT_HASH_DOMAIN.to_owned(),
-        digest: digest_hex,
-    })
+    Ok((
+        artifact,
+        HashRecordV1 {
+            algorithm: "sha256".to_owned(),
+            domain: STATE_ARTIFACT_HASH_DOMAIN.to_owned(),
+            digest: digest_hex,
+        },
+    ))
 }
 
 fn io_error(path: &Path, error: std::io::Error) -> StateArtifactError {

@@ -804,6 +804,14 @@ binary, and does not infer draw boundaries from an average. Native current
 `*-native-timing.json` remains useful for separating setup from draw execution
 but is not compared directly with the external baseline timings.
 
+When the baseline supports native timing, the sweep stage also warms both CUDA
+binaries at each scale and records three further pairs in `sweep/<scale>/repeats/`.
+Pair order alternates; repeat zero is warmup and must be excluded from speedup
+statistics. Every arm has a five-minute TERM deadline and ten-second KILL bound.
+Each complete output tree and exported pairs must match its primary arm and
+its before/after partner. Native reports and process peak RSS are retained.
+These repeats run before either the state or baseline build checkout is removed.
+
 For additional native-timing repeats, retain each binary's original build
 checkout until every timing report is written. The CLI resolves repository
 identity through its compiled `CARGO_MANIFEST_DIR`; preserving only the binary

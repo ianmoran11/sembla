@@ -2,25 +2,25 @@
   "version": 1,
   "metric": "scripts/report-rust-context.py lexical production-source metric",
   "policy": "Limits are ratchets. Lower them after reductions; raise them only with an explicit context-budget justification.",
-  "adjustment_justification": "CPU runtime cleanup and the follow-up buffer, grouping, and aggregate-cache changes remove 869 production tokens and lower its largest file from 2,382 to 2,245 formatted code lines, so the total and CPU ratchets decrease accordingly. Existing limits for other crates, functions, and decision complexity are preserved. The CUDA throughput follow-up adds 1,414 production tokens beyond the prior total budget for execution-specific reductions, validation eligibility metadata, a one-entry PTX cache, and command lifecycle timing. The frozen public source generator remains unchanged. Observation generation and tick timing were split into focused modules; CUDA and CLI file-size ratchets and the largest-function ratchet decrease. Existing CPU changes and its ratchets are preserved. Hardware validation exposed unaligned fused byte arenas at odd row counts. Checked eight-byte padding adds 39 tokens while preserving logical lengths and canonical hashes. Restore the original late retained-state copy order after profiling exposed an extra full-state overlap with temporary upload buffers. Timing that copy separately adds 20 tokens and three constructor lines.",
+  "adjustment_justification": "CPU runtime cleanup and the follow-up buffer, grouping, and aggregate-cache changes remove 869 production tokens and lower its largest file from 2,382 to 2,245 formatted code lines, so the total and CPU ratchets decrease accordingly. Existing limits for other crates, functions, and decision complexity are preserved. The CUDA throughput follow-up adds 1,414 production tokens beyond the prior total budget for execution-specific reductions, validation eligibility metadata, a one-entry PTX cache, and command lifecycle timing. The frozen public source generator remains unchanged. Observation generation and tick timing were split into focused modules; CUDA and CLI file-size ratchets and the largest-function ratchet decrease. Existing CPU changes and its ratchets are preserved. Hardware validation exposed unaligned fused byte arenas at odd row counts. Checked eight-byte padding adds 39 tokens while preserving logical lengths and canonical hashes. Restore the original late retained-state copy order after profiling exposed an extra full-state overlap with temporary upload buffers. Timing that copy separately adds 20 tokens and three constructor lines. The next CUDA priorities add 572 production tokens for decoding and hashing one retained input buffer, a consuming validated initializer API, capped diagnostic recovery grids, and compact contested-table flags with matching capacity accounting. Constructor growth is five lines for avoiding the single-slot upload copy; CUDA source growth is ten lines for compact target mapping. The reference generator bytes, CPU/IR budgets, and decision-complexity limit are unchanged.",
   "limits": {
-    "total_tokens": 177852,
-    "max_file_code_lines": 2463,
-    "max_function_lines": 515,
+    "total_tokens": 178424,
+    "max_file_code_lines": 2473,
+    "max_function_lines": 520,
     "max_function_complexity": 39
   },
   "crate_token_limits": {
     "sembla-ir": 15550,
-    "sembla-runtime": 22172,
+    "sembla-runtime": 22402,
     "sembla-cpu": 35973,
-    "sembla-cuda": 50622,
-    "sembla-cli": 53535
+    "sembla-cuda": 50785,
+    "sembla-cli": 53714
   },
   "crate_file_line_limits": {
     "sembla-ir": 928,
     "sembla-runtime": 1051,
     "sembla-cpu": 2245,
-    "sembla-cuda": 2463,
-    "sembla-cli": 1338
+    "sembla-cuda": 2473,
+    "sembla-cli": 1339
   }
 }

@@ -397,19 +397,41 @@ pub(crate) fn initialized_tables(
             state_hash: None,
         });
     }
-    match sniff_magic(population_spec).map_err(|error| error.to_string())? {
+    let bytes =
+        std::fs::read(population_spec).map_err(|error| format!("{population_spec}: {error}"))?;
+    initialized_tables_from_bytes(model, population_spec, &bytes)
+}
+
+pub(crate) fn initialized_tables_from_population(
+    model: &sembla_ir::ValidatedModel,
+    population_spec: &str,
+    bytes: Option<Vec<u8>>,
+) -> Result<InitializedTables, String> {
+    match bytes {
+        Some(bytes) => initialized_tables_from_bytes(model, population_spec, &bytes),
+        None => initialized_tables(model, population_spec),
+    }
+}
+
+fn initialized_tables_from_bytes(
+    model: &sembla_ir::ValidatedModel,
+    population_spec: &str,
+    bytes: &[u8],
+) -> Result<InitializedTables, String> {
+    use sembla_runtime::state_artifact::{
+        into_table_inits, read_bytes_with_hash, sniff_magic_bytes,
+    };
+    match sniff_magic_bytes(bytes) {
         StateKind::SemblaPop => Ok(InitializedTables {
             tables: initializers_from_population(
                 model,
-                &SyntheticPopulation::read(population_spec).map_err(|error| error.to_string())?,
+                &SyntheticPopulation::decode(bytes).map_err(|error| format!("{population_spec}: {error}"))?,
             )?,
             state_hash: None,
         }),
         StateKind::SemblaState => {
-            let artifact = read_state_artifact(population_spec).map_err(|error| error.to_string())?;
-            let tables = to_table_inits(&artifact, model).map_err(|error| error.to_string())?;
-            let state_hash =
-                state_artifact_hash(population_spec).map_err(|error| error.to_string())?;
+            let (artifact, state_hash) = read_bytes_with_hash(bytes).map_err(|error| error.to_string())?;
+            let tables = into_table_inits(artifact, model).map_err(|error| error.to_string())?;
             Ok(InitializedTables {
                 tables,
                 state_hash: Some(state_hash),

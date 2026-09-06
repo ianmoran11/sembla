@@ -75,8 +75,8 @@ pub(crate) fn sweep_file_result_with_runtime<R: SweepRuntime>(
         ));
     }
 
-    let (population_source, population_sha256) =
-        manifest::population_identity(&options.population)?;
+    let (population_source, population_sha256, population_bytes) =
+        manifest::read_population(&options.population)?;
     let mut run_manifest = manifest::RunManifest::new(
         manifest::ManifestKind::Sweep,
         options.seed,
@@ -114,7 +114,8 @@ pub(crate) fn sweep_file_result_with_runtime<R: SweepRuntime>(
         Some(params_path) => read_param_overrides(&model, params_path)?,
         None => Vec::new(),
     };
-    let initialized = initialized_tables(&model, &options.population)?;
+    let initialized =
+        initialized_tables_from_population(&model, &options.population, population_bytes)?;
     run_manifest.initial_state = initialized.state_hash.map(state_artifact_tuple);
     let initial_tables = initialized.tables;
     // Construction values are placeholders only: draw zero also follows the

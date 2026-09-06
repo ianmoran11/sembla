@@ -797,9 +797,12 @@ impl CudaBackend {
         let arena_len =
             |per_slot: usize, label: &str| checked_arena_len(per_slot, slot_count, label);
         arena_len(state_bytes.len(), "state bytes")?;
-        let state = stream
-            .memcpy_stod(&state_bytes.repeat(slot_count))
-            .map_err(driver_error)?;
+        let state = if slot_count == 1 {
+            stream.memcpy_stod(&state_bytes)
+        } else {
+            stream.memcpy_stod(&state_bytes.repeat(slot_count))
+        }
+        .map_err(driver_error)?;
         let next_state = stream.clone_dtod(&state).map_err(driver_error)?;
         let pristine_state = stream.clone_dtod(&state).map_err(driver_error)?;
         let column_offsets = stream
@@ -877,9 +880,11 @@ impl CudaBackend {
         let wins = stream
             .alloc_zeros::<u8>(arena_len(candidate_len, "candidate wins")?)
             .map_err(driver_error)?;
-        let deferred_len = candidate_len
-            .checked_mul(layout.row_counts.len().max(1))
-            .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?;
+        let deferred_len = layout
+            .candidate_count
+            .checked_mul(generated.resource_tables.len())
+            .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?
+            .max(1);
         let deferred = stream
             .alloc_zeros::<u8>(arena_len(deferred_len, "deferred metadata")?)
             .map_err(driver_error)?;

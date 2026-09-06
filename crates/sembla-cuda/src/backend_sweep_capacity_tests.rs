@@ -136,6 +136,7 @@ fn sparse_resource_reports_match_cpu_across_ticks_and_reset() {
     let params = ParamEnv::defaults(&model);
     let mut backend =
         CudaBackend::new(&model, initial.clone(), &params, 9009, HashMode::FinalOnly).unwrap();
+    assert_eq!(backend.deferred.len(), 8 * 4);
     for seed in [9009, 19] {
         backend.reset_draw(&params, seed).unwrap();
         let mut cpu = StateStore::new(&model, initial.clone()).unwrap();
@@ -161,23 +162,29 @@ fn sparse_resource_reports_match_cpu_across_ticks_and_reset() {
         HashMode::FinalOnly,
     )
     .unwrap();
-    fused
-        .reset_fused_batch(&[params.clone(), params.clone()], &seeds)
-        .unwrap();
-    let mut cpu_states = seeds.map(|_| StateStore::new(&model, initial.clone()).unwrap());
-    for tick in 0..3 {
-        let observed = fused.run_tick_observed_reused_fused().unwrap();
-        for (slot, observation) in observed.into_iter().enumerate() {
-            let expected =
-                sembla_cpu::run_tick(&model, &mut cpu_states[slot], &params, seeds[slot], tick)
-                    .unwrap();
-            let (_, fired, deferred, _) = observation.unwrap();
-            assert_eq!(fired, expected.fired_per_box);
-            assert_eq!(deferred, expected.deferred_per_resource_table);
-            assert_eq!(
-                fused.fused_observed_state(slot).unwrap().state_hash(),
-                cpu_states[slot].state_hash()
-            );
+    assert_eq!(fused.deferred.len(), 2 * 8 * 4);
+    for width in [2, 1, 2] {
+        fused
+            .reset_fused_batch(&vec![params.clone(); width], &seeds[..width])
+            .unwrap();
+        let mut cpu_states = seeds[..width]
+            .iter()
+            .map(|_| StateStore::new(&model, initial.clone()).unwrap())
+            .collect::<Vec<_>>();
+        for tick in 0..3 {
+            let observed = fused.run_tick_observed_reused_fused().unwrap();
+            for (slot, observation) in observed.into_iter().enumerate() {
+                let expected =
+                    sembla_cpu::run_tick(&model, &mut cpu_states[slot], &params, seeds[slot], tick)
+                        .unwrap();
+                let (_, fired, deferred, _) = observation.unwrap();
+                assert_eq!(fired, expected.fired_per_box);
+                assert_eq!(deferred, expected.deferred_per_resource_table);
+                assert_eq!(
+                    fused.fused_observed_state(slot).unwrap().state_hash(),
+                    cpu_states[slot].state_hash()
+                );
+            }
         }
     }
 }

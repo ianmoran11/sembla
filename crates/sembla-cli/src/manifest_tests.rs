@@ -399,3 +399,36 @@ fn reader_rejects_unknown_schema_major() {
     assert!(error.contains("manifest"), "{error}");
     let _ = std::fs::remove_file(path);
 }
+
+#[test]
+fn loaded_population_identity_and_initializers_use_the_same_snapshot() {
+    use sha2::{Digest, Sha256};
+    let path = temp_file("population-snapshot");
+    let bytes = include_bytes!("../../../fixtures/state/refs_small.state");
+    std::fs::write(&path, bytes).unwrap();
+    let spec = path.to_str().unwrap();
+    let (source, sha256, loaded) = super::read_population(spec).unwrap();
+    assert_eq!(
+        source,
+        PopulationSource::File(path.file_name().unwrap().to_str().unwrap().to_owned())
+    );
+    assert_eq!(sha256, super::hex(&Sha256::digest(bytes)));
+    // A later path change cannot make the executed input differ from its identity.
+    std::fs::write(&path, b"replaced after identity read").unwrap();
+    let model = sembla_ir::validate(
+        sembla_ir::parse_json(include_str!(
+            "../../../fixtures/state/models/refs_small.json"
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let initialized =
+        crate::shared::initialized_tables_from_population(&model, spec, loaded).unwrap();
+    let (artifact, hash) = sembla_runtime::state_artifact::read_bytes_with_hash(bytes).unwrap();
+    assert_eq!(initialized.state_hash, Some(hash));
+    assert_eq!(
+        initialized.tables,
+        sembla_runtime::state_artifact::into_table_inits(artifact, &model).unwrap()
+    );
+    std::fs::remove_file(path).unwrap();
+}

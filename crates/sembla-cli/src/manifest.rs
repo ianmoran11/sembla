@@ -549,11 +549,20 @@ pub fn canonical_ir_hash(model: &sembla_ir::ValidatedModel) -> Result<String, St
 }
 
 pub fn population_identity(spec: &str) -> Result<(PopulationSource, String), String> {
+    let (source, sha256, _) = read_population(spec)?;
+    Ok((source, sha256))
+}
+
+/// Returns identity and the exact bytes it describes for subsequent decoding.
+pub(crate) fn read_population(
+    spec: &str,
+) -> Result<(PopulationSource, String, Option<Vec<u8>>), String> {
     if let Ok(value) = spec.parse::<u64>() {
         let canonical = format!("{value}\n");
         return Ok((
             PopulationSource::Numeric(value),
             hex(&Sha256::digest(canonical.as_bytes())),
+            None,
         ));
     }
     let path = Path::new(spec);
@@ -564,7 +573,8 @@ pub fn population_identity(spec: &str) -> Result<(PopulationSource, String), Str
     let bytes = std::fs::read(path).map_err(|error| format!("{spec}: {error}"))?;
     Ok((
         PopulationSource::File(basename.to_owned()),
-        hex(&Sha256::digest(bytes)),
+        hex(&Sha256::digest(&bytes)),
+        Some(bytes),
     ))
 }
 

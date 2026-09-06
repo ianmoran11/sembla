@@ -526,9 +526,11 @@ fn isolated_lane_device_buffer_bytes(
     add(candidates, 8, "candidate times")?;
     add(candidates, 1, "candidate wins")?;
     add(
-        candidates
-            .checked_mul(layout.row_counts.len().max(1))
-            .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?,
+        layout
+            .candidate_count
+            .checked_mul(generated.resource_tables.len())
+            .ok_or_else(|| CudaError::InvalidInput("deferred metadata size overflow".to_owned()))?
+            .max(1),
         1,
         "deferred metadata",
     )?;

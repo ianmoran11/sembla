@@ -7,7 +7,7 @@ use super::{
 };
 
 impl CudaBackend {
-    fn validation_launch_config(&self, rows: u32, one: LaunchConfig) -> LaunchConfig {
+    fn validation_launch_config(&self, rows: u32, phase: u64, one: LaunchConfig) -> LaunchConfig {
         if rows == 0 {
             return one;
         }
@@ -15,7 +15,14 @@ impl CudaBackend {
         if let Some(geometry) = self.validation_launch_override {
             return geometry.config();
         }
-        LaunchConfig::for_num_elems(rows)
+        let mut config = LaunchConfig::for_num_elems(rows);
+        // Recovery passes return at entry on success. Their grid-stride loops
+        // still visit every row on error, without scheduling a full-size grid
+        // for the overwhelmingly common successful path.
+        if phase != 0 {
+            config.grid_dim.0 = config.grid_dim.0.min(32);
+        }
+        config
     }
 
     fn conflict_launch_config(&self, elements: u32, one: LaunchConfig) -> LaunchConfig {
@@ -181,8 +188,9 @@ impl CudaBackend {
                 // one worker when the table is empty, so zero rows keeps a
                 // single-thread launch instead of a zero-block one.
                 if self.generated.transition_validation[*index] {
-                    let validation_config = self.validation_launch_config(rows, one);
                     for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
+                        let validation_config =
+                            self.validation_launch_config(rows, validation_phase, one);
                         {
                             let mut args = fused_launch_builder(
                                 &self.stream,
@@ -308,7 +316,7 @@ impl CudaBackend {
                     )
                 })?;
                 let candidate_config = self.conflict_launch_config(candidate_launch_count, one);
-                let resource_table_count = self.layout.row_counts.len() as u64;
+                let resource_table_count = self.generated.resource_tables.len() as u64;
 
                 if claim_instance_count != 0 {
                     let instance_launch_count =
@@ -475,8 +483,9 @@ impl CudaBackend {
                 args.launch_generated(control_count_launch_config(u64::from(rows)))
                     .map_err(driver_error)?;
             }
-            let effects_config = self.validation_launch_config(effects_rows, one);
             for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
+                let effects_config =
+                    self.validation_launch_config(effects_rows, validation_phase, one);
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -557,6 +566,7 @@ impl CudaBackend {
                 VALIDATION_REDUCTION_PASSES
             };
             for validation_phase in 0..passes {
+                let config = self.validation_launch_config(rows, validation_phase, one);
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -580,8 +590,7 @@ impl CudaBackend {
                         .arg(&rule_id)
                         .arg(&mut self.status)
                         .arg(&validation_phase);
-                    args.launch_generated(LaunchConfig::for_num_elems(rows))
-                        .map_err(driver_error)?;
+                    args.launch_generated(config).map_err(driver_error)?;
                 }
             }
             if !exclusive {
@@ -699,8 +708,9 @@ impl CudaBackend {
                 })?;
                 output_rows = output_rows.max(rows);
             }
-            let output_config = self.validation_launch_config(output_rows, one);
             for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
+                let output_config =
+                    self.validation_launch_config(output_rows, validation_phase, one);
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -800,7 +810,7 @@ impl CudaBackend {
         // These diagnostics are consumed only by the host report. Reduce them
         // while the raw control buffers remain device-resident; the terminal
         // status readback below orders all three kernels before compact D2H.
-        let table_count = u64::try_from(self.layout.row_counts.len())
+        let table_count = u64::try_from(self.generated.resource_tables.len())
             .map_err(|_| CudaError::InvalidInput("table count exceeds u64".to_owned()))?;
         let candidate_count = u64::try_from(self.layout.candidate_count)
             .map_err(|_| CudaError::InvalidInput("candidate count exceeds u64".to_owned()))?;
@@ -808,7 +818,8 @@ impl CudaBackend {
             let config = control_count_launch_config(candidate_count);
             // Other table counts retain the zero written by initialization:
             // no contest can set a deferred flag for those tables.
-            for &table in &self.generated.resource_tables {
+            for (deferred_table, &table) in self.generated.resource_tables.iter().enumerate() {
+                let deferred_table = deferred_table as u64;
                 let table = table as u64;
                 let mut args = fused_launch_builder(
                     &self.stream,
@@ -818,6 +829,7 @@ impl CudaBackend {
                 args.arg(&self.deferred)
                     .arg(&candidate_count)
                     .arg(&table_count)
+                    .arg(&deferred_table)
                     .arg(&table)
                     .arg(&mut self.deferred_counts);
                 args.launch_generated(config).map_err(driver_error)?;

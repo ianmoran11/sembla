@@ -1922,6 +1922,41 @@ PY
       negative_checked=true
     fi
 
+    # Keep original build checkouts alive for native timing's repository lookup.
+    # Warm both CUDA arms, then alternate pair order to expose drift. Older
+    # baselines retain the original external-timing comparison above.
+    baseline_usage="$("$BASELINE_BIN" 2>&1 || true)"
+    if [[ "$baseline_usage" == *--timing-json* ]]; then
+      repeats_dir="$scale_dir/repeats"
+      mkdir -p "$repeats_dir"
+      for repeat in 0 1 2 3; do
+        repeat_arms=(baseline current)
+        if (( repeat % 2 == 0 )); then repeat_arms=(current baseline); fi
+        for arm in "${repeat_arms[@]}"; do
+          arm_bin="$BIN"
+          if [[ "$arm" == baseline ]]; then arm_bin="$BASELINE_BIN"; fi
+          label="$sweep_scale/repeats/$repeat-$arm"
+          repeat_out="$repeats_dir/$repeat-$arm"
+          echo "CUDA repeat scale=$sweep_scale repeat=$repeat arm=$arm (0 is warmup)"
+          sweep_stamp "$label"
+          sweep_measure_observed "$label" "$repeat_out" 20 \
+            timeout --signal=TERM --kill-after=10s 300s \
+            "$arm_bin" sweep "$sweep_model" \
+            --population "$sweep_state" --seed "$SEED" --draws 20 --ticks 24 \
+            --noise independent --backend cuda --enable grouped-observations \
+            --export-pairs "$repeat_out-pairs.csv" \
+            --timing-json "$repeat_out-native-timing.json" --out "$repeat_out"
+          diff -qr "$scale_dir/$arm-cuda" "$repeat_out" > "$repeat_out-parity.txt"
+          cmp "$scale_dir/$arm-cuda-pairs.csv" "$repeat_out-pairs.csv"
+        done
+        diff -qr "$repeats_dir/$repeat-baseline" "$repeats_dir/$repeat-current" \
+          > "$repeats_dir/$repeat-before-after-parity.txt"
+        cmp "$repeats_dir/$repeat-baseline-pairs.csv" "$repeats_dir/$repeat-current-pairs.csv"
+      done
+    else
+      echo 'Baseline lacks native timing; warmed CUDA repeats unavailable.'
+    fi
+
     # The synthesized state must live until every arm at this scale has used it,
     # but it must not reach the evidence bundle. At 10M it is 458 MB, which is
     # both larger than the entire rest of the bundle and over GitHub's 100 MB

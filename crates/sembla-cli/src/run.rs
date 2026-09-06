@@ -173,9 +173,10 @@ pub(crate) fn run_file_result(path: &str, options: RunOptions) -> Result<(), Str
         }
     }
     lifecycle::check_path(path, &options, &model)?;
-    let (population_source, population_sha256) =
-        manifest::population_identity(&options.population)?;
-    let initialized = initialized_tables(&model, &options.population)?;
+    let (population_source, population_sha256, population_bytes) =
+        manifest::read_population(&options.population)?;
+    let initialized =
+        initialized_tables_from_population(&model, &options.population, population_bytes)?;
     let initial_state = initialized.state_hash.map(state_artifact_tuple);
     let initial = initialized.tables;
     let params = resolve_params(&model, options.params.as_deref())?;

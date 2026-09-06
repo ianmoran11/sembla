@@ -136,7 +136,8 @@ impl SyntheticPopulation {
             .map_err(|error| PopulationError::new(format!("{}: {error}", path.as_ref().display())))
     }
 
-    fn decode(bytes: &[u8]) -> Result<Self, PopulationError> {
+    /// Decodes and validates an already loaded version 1 `SEMBLA_POP` artifact.
+    pub fn decode(bytes: &[u8]) -> Result<Self, PopulationError> {
         if bytes.len() < 32 || &bytes[..12] != MAGIC {
             return Err(PopulationError::new(
                 "invalid SEMBLA_POP magic or truncated header",

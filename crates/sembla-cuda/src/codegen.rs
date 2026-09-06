@@ -1894,6 +1894,10 @@ impl<'a> Generator<'a> {
                 let Ty::Ref(left_target) = left_ty else {
                     return Err(codegen("claim resource is not Ref"));
                 };
+                resource_tables.push(self.global_table(
+                    left.box_index,
+                    self.table_index(left.box_index, &left_target)?,
+                ));
                 for (right_transition_position, right) in transitions
                     .iter()
                     .enumerate()
@@ -2004,6 +2008,8 @@ impl<'a> Generator<'a> {
         out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_keys(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, unsigned long long* winner_keys) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL) atomicMin(winner_keys + resource, instance_keys[instance]); }\n}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_rules(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned long long* winner_keys, unsigned int* winner_rules) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource]) atomicMin(winner_rules + resource, instance_rules[instance]); }\n}\n");
         out.push_str("\nextern \"C\" __global__ void sembla_reduce_claim_entities(unsigned long long instance_begin, unsigned long long instance_count, const unsigned long long* instance_resources, const unsigned long long* instance_keys, const unsigned int* instance_rules, const unsigned int* instance_entities, const unsigned long long* winner_keys, const unsigned int* winner_rules, unsigned int* winner_entities) {\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local < instance_count; local += stride) { unsigned long long instance = instance_begin + local; unsigned long long resource = instance_resources[instance]; if (resource != 0xffffffffffffffffULL && instance_keys[instance] == winner_keys[resource] && instance_rules[instance] == winner_rules[resource]) atomicMin(winner_entities + resource, instance_entities[instance]); }\n}\n");
+        resource_tables.sort_unstable();
+        resource_tables.dedup();
         out.push_str("\nextern \"C\" __global__ void sembla_resolve_conflicts(const unsigned long long* row_counts, const unsigned long long* candidate_offsets, const unsigned long long* claim_instance_offsets, unsigned long long candidate_begin, unsigned long long candidate_count, unsigned long long resource_table_count, const unsigned char* enabled, const unsigned long long* instance_resources, const unsigned int* winner_rules, const unsigned int* winner_entities, unsigned char* wins, unsigned char* deferred, const unsigned long long* status) {\n  if (status[0] != 0ULL) return;\n  unsigned long long stride = (unsigned long long)gridDim.x * blockDim.x;\n  for (unsigned long long local_candidate = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; local_candidate < candidate_count; local_candidate += stride) {\n    unsigned long long self_candidate = candidate_begin + local_candidate;\n    for (unsigned long long table = 0; table < resource_table_count; ++table) deferred[self_candidate * resource_table_count + table] = 0U;\n    wins[self_candidate] = enabled[self_candidate];\n    if (!enabled[self_candidate]) continue;\n");
         for validated in self.model.transitions() {
             let transition = &self.model.model().boxes[validated.box_index].transitions
@@ -2028,14 +2034,18 @@ impl<'a> Generator<'a> {
                 };
                 let target_table = self.table_index(validated.box_index, &target_name)?;
                 let target_global = self.global_table(validated.box_index, target_table);
-                resource_tables.push(target_global);
-                writeln!(out, "      {{ unsigned long long instance = claim_instance_offsets[{}] + row * {}ULL + {claim_index}ULL; unsigned long long resource = instance_resources[instance]; if (winner_rules[resource] != {}U || winner_entities[resource] != (unsigned int)row) {{ wins[self_candidate] = 0U; deferred[self_candidate * resource_table_count + {target_global}ULL] = 1U; }} }}", validated.rule_id, transition.contests.len(), validated.rule_word).unwrap();
+                let deferred_table = if self.execution {
+                    resource_tables
+                        .binary_search(&target_global)
+                        .expect("contest target collected")
+                } else {
+                    target_global
+                };
+                writeln!(out, "      {{ unsigned long long instance = claim_instance_offsets[{}] + row * {}ULL + {claim_index}ULL; unsigned long long resource = instance_resources[instance]; if (winner_rules[resource] != {}U || winner_entities[resource] != (unsigned int)row) {{ wins[self_candidate] = 0U; deferred[self_candidate * resource_table_count + {deferred_table}ULL] = 1U; }} }}", validated.rule_id, transition.contests.len(), validated.rule_word).unwrap();
             }
             out.push_str("    }\n");
         }
         out.push_str("  }\n}\n");
-        resource_tables.sort_unstable();
-        resource_tables.dedup();
         Ok(resource_tables)
     }
 

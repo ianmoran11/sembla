@@ -4,8 +4,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sembla_runtime::state::{ColumnData, ColumnInit, TableInit};
 use sembla_runtime::state_artifact::{
-    read, sniff_magic, state_artifact_hash, to_table_inits, write, write_new, StateArtifactError,
-    StateKind, STATE_ARTIFACT_HASH_DOMAIN, STATE_MAGIC,
+    into_table_inits, read, read_bytes_with_hash, sniff_magic, state_artifact_hash, to_table_inits,
+    write, write_new, StateArtifactError, StateKind, STATE_ARTIFACT_HASH_DOMAIN, STATE_MAGIC,
 };
 
 fn repository_path(relative: impl AsRef<Path>) -> PathBuf {
@@ -252,7 +252,12 @@ fn invalid_path(name: &str) -> PathBuf {
 
 fn model_error(name: &str) -> StateArtifactError {
     let artifact = read(invalid_path(name)).unwrap();
-    to_table_inits(&artifact, &refs_model()).unwrap_err()
+    let error = to_table_inits(&artifact, &refs_model()).unwrap_err();
+    assert_eq!(
+        into_table_inits(artifact, &refs_model()).unwrap_err(),
+        error
+    );
+    error
 }
 
 fn read_bytes_error(label: &str, bytes: &[u8]) -> StateArtifactError {
@@ -260,6 +265,7 @@ fn read_bytes_error(label: &str, bytes: &[u8]) -> StateArtifactError {
     let path = temp.join("invalid.state");
     std::fs::write(&path, bytes).unwrap();
     let error = read(&path).unwrap_err();
+    assert_eq!(read_bytes_with_hash(bytes).unwrap_err(), error);
     std::fs::remove_dir_all(temp).unwrap();
     error
 }
@@ -270,6 +276,10 @@ fn table_init_error(label: &str, parts: &Parts) -> StateArtifactError {
     std::fs::write(&path, assemble(parts)).unwrap();
     let artifact = read(&path).unwrap();
     let error = to_table_inits(&artifact, &refs_model()).unwrap_err();
+    assert_eq!(
+        into_table_inits(artifact, &refs_model()).unwrap_err(),
+        error
+    );
     std::fs::remove_dir_all(temp).unwrap();
     error
 }
@@ -284,6 +294,7 @@ fn table_init_error_for_bytes(
     std::fs::write(&path, bytes).unwrap();
     let artifact = read(&path).unwrap();
     let error = to_table_inits(&artifact, model).unwrap_err();
+    assert_eq!(into_table_inits(artifact, model).unwrap_err(), error);
     std::fs::remove_dir_all(temp).unwrap();
     error
 }
@@ -738,5 +749,23 @@ fn regenerate_state_fixtures() {
     .unwrap();
     for (name, bytes) in invalid_fixture_bytes() {
         std::fs::write(root.join("invalid").join(name), bytes).unwrap();
+    }
+}
+
+#[test]
+fn loaded_bytes_preserve_initializer_and_exact_artifact_hash() {
+    let path = repository_path("fixtures/state/refs_small.state");
+    let bytes = std::fs::read(&path).unwrap();
+    let (artifact, hash) = read_bytes_with_hash(&bytes).unwrap();
+    assert_eq!(hash, state_artifact_hash(&path).unwrap());
+    assert_eq!(
+        into_table_inits(artifact, &refs_model()).unwrap(),
+        refs_tables()
+    );
+    for length in 0..STATE_MAGIC.len() {
+        assert_eq!(
+            sembla_runtime::state_artifact::sniff_magic_bytes(&bytes[..length]),
+            StateKind::Unknown
+        );
     }
 }

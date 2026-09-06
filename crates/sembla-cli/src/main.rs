@@ -13,8 +13,8 @@ use sembla_runtime::population::SyntheticPopulation;
 use sembla_runtime::prior::sample_parameters_for_draw;
 use sembla_runtime::rng::derive_sweep_replica_seed;
 use sembla_runtime::state_artifact::{
-    committed_table_inits, read as read_state_artifact, sniff_magic, state_artifact_hash,
-    to_table_inits, write_new as write_new_state_artifact, StateKind, STATE_ARTIFACT_SCHEMA,
+    committed_table_inits, state_artifact_hash, write_new as write_new_state_artifact, StateKind,
+    STATE_ARTIFACT_SCHEMA,
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
