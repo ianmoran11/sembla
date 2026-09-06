@@ -87,7 +87,7 @@ fn lockstep_spike_uses_nonblocking_streams_without_changing_the_default() {
 fn fused_spike_uses_one_module_stream_and_grid_y_launch_path() {
     let backend = CUDA_BACKEND;
     assert!(backend.contains("pub fn new_fused_batch("));
-    assert!(backend.contains("generate_fused_batch(model)?"));
+    assert!(backend.contains("generate_execution(model, fused_capacity.is_some())?"));
     assert!(backend.contains("context.default_stream()"));
     assert!(backend.contains("config.grid_dim.1 = self.grid_y;"));
     assert!(backend.contains(".arg(&batch.strides)"));

@@ -5,7 +5,6 @@ use cudarc::driver::{
     CudaContext, CudaEvent, CudaFunction, CudaSlice, CudaStream, DeviceRepr, DriverError,
     LaunchArgs, LaunchConfig, PinnedHostSlice, PushKernelArg, ValidAsZeroBits,
 };
-use cudarc::nvrtc::{compile_ptx_with_opts, CompileOptions};
 use sembla_ir::{AttrType, ParamValue, ValidatedModel};
 use sembla_runtime::core::{
     ColumnData, DeviceObservationEligibility, GroupedViewValue, InputTable, ObservationValue,
@@ -14,13 +13,34 @@ use sembla_runtime::core::{
 use sha2::{Digest, Sha256};
 
 use crate::codegen::{
-    decode_grouped_histogram, generate_fused_batch, grouped_observation_layout,
-    host_observation_fallback, FusedBuffer, GroupedObservationAxisLayout, GroupedObservationLayout,
-    FUSED_BUFFER_COUNT, GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
+    decode_grouped_histogram, grouped_observation_layout, host_observation_fallback, FusedBuffer,
+    GroupedObservationAxisLayout, GroupedObservationLayout, FUSED_BUFFER_COUNT,
+    GROUPED_OBSERVATION_KEY_SPACE_LIMIT,
 };
 use crate::types::{CudaDeviceIdentity, CudaRunResult, CudaTickObservation, HashMode};
 use crate::{generate, CudaAvailability, CudaError, GeneratedCuda, PhiloxCoordinate};
 
+fn create_context() -> Result<(std::sync::Arc<CudaContext>, CudaDeviceIdentity), CudaError> {
+    let context = CudaContext::new(0).map_err(|error| CudaError::Driver(error.to_string()))?;
+    let gpu_model = context
+        .name()
+        .map_err(|error| CudaError::Driver(error.to_string()))?;
+    let mut driver_version = 0_i32;
+    let driver_result =
+        unsafe { cudarc::driver::sys::cuDriverGetVersion(&mut driver_version as *mut i32) };
+    if driver_result != cudarc::driver::sys::CUresult::CUDA_SUCCESS {
+        return Err(CudaError::Driver(format!(
+            "cuDriverGetVersion failed with {driver_result:?}"
+        )));
+    }
+    let device_identity = CudaDeviceIdentity {
+        gpu_model,
+        driver_version: format_cuda_driver_version(driver_version),
+    };
+    Ok((context, device_identity))
+}
+
+mod compile;
 mod final_state;
 mod layout;
 mod observation;
@@ -305,6 +325,45 @@ pub struct CudaFusedBatchMetadata {
     pub generated_source_sha256: String,
 }
 
+/// Host-observed construction costs for one CUDA backend.
+///
+/// These intervals are deliberately measured around the existing production
+/// path rather than a benchmark-only constructor. `other` contains the small
+/// gaps between named phases, and makes the fields reconcile exactly to
+/// `total` without pretending that timer reads are free.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CudaConstructionTiming {
+    pub total: Duration,
+    pub availability: Duration,
+    pub host_state_validation: Duration,
+    pub code_generation: Duration,
+    pub context_and_identity: Duration,
+    pub nvrtc_compile: Duration,
+    pub nvrtc_cache_hit: bool,
+    pub module_and_stream: Duration,
+    pub function_lookup: Duration,
+    pub layout_and_pack: Duration,
+    pub device_allocation_and_upload: Duration,
+    pub other: Duration,
+}
+
+impl CudaConstructionTiming {
+    fn reconcile(mut self) -> Self {
+        let attributed = self.availability
+            + self.host_state_validation
+            + self.code_generation
+            + self.context_and_identity
+            + self.nvrtc_compile
+            + self.module_and_stream
+            + self.function_lookup
+            + self.layout_and_pack
+            + self.device_allocation_and_upload;
+        self.other = self.total.checked_sub(attributed).unwrap_or_default();
+        self
+    }
+}
+
 struct FusedLaunchArgs<'a> {
     inner: LaunchArgs<'a>,
     grid_y: u32,
@@ -443,7 +502,6 @@ pub struct CudaBackend {
     philox_vectors_kernel: CudaFunction,
     init_validation_scratch: CudaFunction,
     commit_validation_status: CudaFunction,
-    mark_effect_active: CudaFunction,
     state: CudaSlice<u8>,
     next_state: CudaSlice<u8>,
     pristine_state: CudaSlice<u8>,
@@ -494,6 +552,7 @@ pub struct CudaBackend {
     next_tick: u32,
     hash_mode: HashMode,
     device_identity: CudaDeviceIdentity,
+    construction_timing: CudaConstructionTiming,
     host_state_current: bool,
     fused_batch: Option<FusedBatchMeta>,
     // No public setter exists. The hardware unit test uses this private seam
@@ -622,6 +681,8 @@ impl CudaBackend {
         nonblocking_stream: bool,
         fused_capacity: Option<usize>,
     ) -> Result<Self, CudaError> {
+        let construction_started = Instant::now();
+        let phase_started = Instant::now();
         let driver_library = unsafe { cudarc::driver::sys::is_culib_present() };
         if !driver_library {
             return Err(CudaError::DriverMissing);
@@ -633,50 +694,34 @@ impl CudaBackend {
             device_count: usize::try_from(device_count).unwrap_or(0),
             nvrtc_library,
         })?;
+        let availability = phase_started.elapsed();
 
-        // Reuse the oracle's constructor for the exact schema/range checks and
-        // retain its buffers for every subsequent host readback.
+        // Validate schema/ranges and retain host buffers for later readback.
+        let phase_started = Instant::now();
         let host_state = StateStore::new(model, initial_tables.clone())
             .map_err(|error| CudaError::InvalidInput(error.to_string()))?;
+        let host_state_validation = phase_started.elapsed();
 
-        let generated = if fused_capacity.is_some() {
-            generate_fused_batch(model)?
-        } else {
-            generate(model)?
-        };
+        let phase_started = Instant::now();
+        let generated = crate::codegen::generate_execution(model, fused_capacity.is_some())?;
         let dump_path = generated.dump_if_requested()?;
-        let context = CudaContext::new(0).map_err(|error| CudaError::Driver(error.to_string()))?;
-        let gpu_model = context
-            .name()
-            .map_err(|error| CudaError::Driver(error.to_string()))?;
-        let mut driver_version = 0_i32;
-        let driver_result =
-            unsafe { cudarc::driver::sys::cuDriverGetVersion(&mut driver_version as *mut i32) };
-        if driver_result != cudarc::driver::sys::CUresult::CUDA_SUCCESS {
-            return Err(CudaError::Driver(format!(
-                "cuDriverGetVersion failed with {driver_result:?}"
-            )));
-        }
-        let device_identity = CudaDeviceIdentity {
-            gpu_model,
-            driver_version: format_cuda_driver_version(driver_version),
-        };
-        let options = CompileOptions {
-            ftz: Some(false),
-            prec_div: Some(true),
-            prec_sqrt: Some(true),
-            fmad: Some(false),
-            options: vec!["--std=c++14".to_owned()],
-            name: Some(format!("sembla-{}.cu", generated.source_sha256)),
-            ..Default::default()
-        };
-        let ptx = compile_ptx_with_opts(&generated.source, options).map_err(|error| {
-            let dump = dump_path
-                .as_ref()
-                .map(|path| format!("; generated source: {}", path.display()))
-                .unwrap_or_default();
-            CudaError::Compilation(format!("{error}{dump}"))
-        })?;
+        let code_generation = phase_started.elapsed();
+
+        let phase_started = Instant::now();
+        let (context, device_identity) = create_context()?;
+        let context_and_identity = phase_started.elapsed();
+        let phase_started = Instant::now();
+        let (ptx, nvrtc_cache_hit) = compile::compile(&generated.source, &generated.source_sha256)
+            .map_err(|error| {
+                let dump = dump_path
+                    .as_ref()
+                    .map(|path| format!("; generated source: {}", path.display()))
+                    .unwrap_or_default();
+                CudaError::Compilation(format!("{error}{dump}"))
+            })?;
+        let nvrtc_compile = phase_started.elapsed();
+
+        let phase_started = Instant::now();
         let module = context
             .load_module(ptx)
             .map_err(|error| CudaError::Driver(error.to_string()))?;
@@ -687,7 +732,9 @@ impl CudaBackend {
         } else {
             context.default_stream()
         };
+        let module_and_stream = phase_started.elapsed();
 
+        let phase_started = Instant::now();
         let transition_functions = generated
             .transition_kernels
             .iter()
@@ -737,11 +784,15 @@ impl CudaBackend {
         let philox_vectors_kernel = load("sembla_philox_vectors")?;
         let init_validation_scratch = load("sembla_init_validation_scratch")?;
         let commit_validation_status = load("sembla_commit_validation_status")?;
-        let mark_effect_active = load("sembla_mark_effect_active")?;
+        let function_lookup = phase_started.elapsed();
 
+        let phase_started = Instant::now();
         let layout = build_layout(model, &initial_tables, &generated)?;
         let state_bytes = pack_initial_state(model, &initial_tables, &layout)?;
         let params_bytes = pack_params(model, params)?;
+        let layout_and_pack = phase_started.elapsed();
+
+        let phase_started = Instant::now();
         let slot_count = fused_capacity.unwrap_or(1);
         let arena_len =
             |per_slot: usize, label: &str| checked_arena_len(per_slot, slot_count, label);
@@ -1010,11 +1061,32 @@ impl CudaBackend {
         } else {
             None
         };
+        let device_allocation_and_upload = phase_started.elapsed();
+        // Keep retained copies after temporary upload buffers to bound peak RSS.
+        let phase_started = Instant::now();
+        let retained_model = model.clone();
+        let pristine_host_tables = initial_tables.clone();
+        let host_state_validation = host_state_validation + phase_started.elapsed();
+        let construction_timing = CudaConstructionTiming {
+            total: construction_started.elapsed(),
+            availability,
+            host_state_validation,
+            code_generation,
+            context_and_identity,
+            nvrtc_compile,
+            nvrtc_cache_hit,
+            module_and_stream,
+            function_lookup,
+            layout_and_pack,
+            device_allocation_and_upload,
+            other: Duration::ZERO,
+        }
+        .reconcile();
 
         Ok(Self {
-            model: model.clone(),
+            model: retained_model,
             host_state,
-            pristine_host_tables: initial_tables.clone(),
+            pristine_host_tables,
             host_tables: initial_tables,
             generated,
             layout,
@@ -1056,7 +1128,6 @@ impl CudaBackend {
             philox_vectors_kernel,
             init_validation_scratch,
             commit_validation_status,
-            mark_effect_active,
             state,
             next_state,
             pristine_state,
@@ -1107,6 +1178,7 @@ impl CudaBackend {
             next_tick: 0,
             hash_mode,
             device_identity,
+            construction_timing,
             host_state_current: true,
             fused_batch,
             #[cfg(test)]
@@ -1122,6 +1194,11 @@ impl CudaBackend {
 
     pub fn device_identity(&self) -> &CudaDeviceIdentity {
         &self.device_identity
+    }
+
+    #[doc(hidden)]
+    pub fn construction_timing(&self) -> CudaConstructionTiming {
+        self.construction_timing
     }
 
     /// Restores every draw-mutable buffer in place and explicitly installs the
@@ -1303,7 +1380,7 @@ impl CudaBackend {
                 contexts: 1,
                 modules: 1,
                 streams: 1,
-                nvrtc_compiles: 1,
+                nvrtc_compiles: usize::from(!self.construction_timing.nvrtc_cache_hit),
                 generated_source_sha256: self.generated.source_sha256.clone(),
             })
     }
@@ -1780,3 +1857,7 @@ mod sweep_capacity_tests;
 #[cfg(test)]
 #[path = "backend_conflict_geometry_hardware_tests.rs"]
 mod conflict_geometry_hardware;
+
+#[cfg(test)]
+#[path = "backend_optimization_hardware_tests.rs"]
+mod optimization_hardware_tests;

@@ -712,6 +712,48 @@ fn identical_aggregates_build_one_accumulator() {
 }
 
 #[test]
+fn nested_aggregate_builds_preserve_the_outer_cache_entry() {
+    let model = validated_model(3, 2);
+    let store = state(
+        &model,
+        vec![1.0, 2.0, 4.0],
+        vec![1, 2, 3],
+        vec![0, 1, 1],
+        vec![0, 1, 0],
+        2,
+    );
+    let inner = count_infected_by_employer();
+    let outer = Expr::Agg {
+        op: AggOp::Sum {
+            value: boxed(self_attr("age")),
+        },
+        table: "Person".into(),
+        on: AggJoin {
+            fk_attr: "employer".into(),
+            self_fk_attr: "employer".into(),
+        },
+        filter: boxed(Expr::Gt {
+            lhs: boxed(inner.clone()),
+            rhs: boxed(Expr::Int { value: 0 }),
+        }),
+    };
+    let params = ParamEnv::defaults(&model);
+    let snapshot = store.snapshot();
+    let mut cache = AggCache::new(&model, &snapshot, &params);
+    for _ in 0..3 {
+        assert_eq!(
+            evaluate(&outer, &model, &store, &params, &mut cache),
+            ValueColumn::Int(vec![4, 2, 4])
+        );
+        assert_eq!(
+            evaluate(&inner, &model, &store, &params, &mut cache),
+            ValueColumn::Int(vec![1, 1, 1])
+        );
+        assert_eq!(cache.build_count(), 2);
+    }
+}
+
+#[test]
 fn cache_distinguishes_ieee_structure_and_uses_explicit_tick_scopes() {
     let model = validated_model(3, 2);
     let mut store = state(

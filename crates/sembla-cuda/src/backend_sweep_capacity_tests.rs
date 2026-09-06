@@ -358,28 +358,39 @@ fn cacheable_staging_allocation_is_fallible_and_zero_safe() {
 fn canonical_packed_hash_matches_materialized_v1_mixed_layout() {
     let source = r#"{"name":"hash_mixed","dt":1.0,"params":[],"boxes":[{"name":"world","tables":[{"name":"Target","size_hint":2,"attrs":[]},{"name":"Row","size_hint":2,"attrs":[{"name":"real","ty":{"kind":"real"}},{"name":"int","ty":{"kind":"int"}},{"name":"kind","ty":{"kind":"enum","variants":["a","b"]}},{"name":"target","ty":{"kind":"ref","table":"Target"}}]}],"transitions":[],"inputs":[],"outputs":[],"views":[]}],"wires":[],"summaries":[]}"#;
     let model = sembla_ir::validate(sembla_ir::parse_json(source).unwrap()).unwrap();
-    let tables = vec![
-        TableInit::new("world", "Target", 2, Vec::new()),
-        TableInit::new(
-            "world",
-            "Row",
-            2,
-            vec![
-                ColumnInit::new("real", ColumnData::Real(vec![1.25, -3.5])),
-                ColumnInit::new("int", ColumnData::Int(vec![4, -9])),
-                ColumnInit::new("kind", ColumnData::Enum(vec![0, 1])),
-                ColumnInit::new("target", ColumnData::Ref(vec![1, 0])),
-            ],
-        ),
-    ];
-    let generated = generate(&model).unwrap();
-    let layout = build_layout(&model, &tables, &generated).unwrap();
-    let packed_state = pack_initial_state(&model, &tables, &layout).unwrap();
-    let materialized = StateStore::new(&model, tables).unwrap();
-    assert_eq!(
-        hash_state(&model, &layout, &packed_state, &[0], &[0]),
-        materialized.state_hash()
-    );
+    for rows in [0, 1, 2] {
+        let tables = vec![
+            TableInit::new("world", "Target", 2, Vec::new()),
+            TableInit::new(
+                "world",
+                "Row",
+                rows,
+                vec![
+                    ColumnInit::new("real", ColumnData::Real([1.25, -3.5][..rows].to_vec())),
+                    ColumnInit::new("int", ColumnData::Int([4, -9][..rows].to_vec())),
+                    ColumnInit::new("kind", ColumnData::Enum([0, 1][..rows].to_vec())),
+                    ColumnInit::new("target", ColumnData::Ref([1, 0][..rows].to_vec())),
+                ],
+            ),
+        ];
+        let generated = generate(&model).unwrap();
+        let layout = build_layout(&model, &tables, &generated).unwrap();
+        let packed_state = pack_initial_state(&model, &tables, &layout).unwrap();
+        assert_eq!(layout.state_len % 8, 0);
+        assert_eq!(layout.input_len % 8, 0);
+        assert_eq!(layout.aggregate_len % 8, 0);
+        assert!(layout.state_logical_len <= layout.state_len);
+        for slot in 0..3 {
+            for offset in &layout.column_offsets {
+                assert_eq!((slot * layout.state_len + *offset as usize) % 8, 0);
+            }
+        }
+        let materialized = StateStore::new(&model, tables).unwrap();
+        assert_eq!(
+            hash_state(&model, &layout, &packed_state, &[0], &[0]),
+            materialized.state_hash()
+        );
+    }
 }
 
 #[test]

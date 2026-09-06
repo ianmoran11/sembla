@@ -73,6 +73,21 @@ impl CudaBackend {
                 .arg(&rule_count);
             args.launch_generated(one).map_err(driver_error)?;
         }
+        let rule_count = self.layout.candidate_offsets.len() as u64;
+        let table_count = self.layout.row_counts.len() as u64;
+        {
+            let mut args = fused_launch_builder(
+                &self.stream,
+                &self.init_control_counts,
+                self.fused_batch.as_ref(),
+            );
+            args.arg(&mut self.fired_counts)
+                .arg(&rule_count)
+                .arg(&mut self.deferred_counts)
+                .arg(&table_count);
+            args.launch_generated(control_count_launch_config(rule_count.max(table_count)))
+                .map_err(driver_error)?;
+        }
         // Build all tick-start aggregates without committing errors. Each
         // aggregate leaves a device error fact which the ordered validators
         // surface only when the CPU evaluator would first reach that node.
@@ -165,39 +180,41 @@ impl CudaBackend {
                 // Scalar input/aggregate checks inside the kernel still need
                 // one worker when the table is empty, so zero rows keeps a
                 // single-thread launch instead of a zero-block one.
-                let validation_config = self.validation_launch_config(rows, one);
-                for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
-                    {
-                        let mut args = fused_launch_builder(
-                            &self.stream,
-                            &self.validate_transition,
-                            self.fused_batch.as_ref(),
-                        );
-                        args.arg(&self.state)
-                            .arg(&self.column_offsets)
-                            .arg(&self.row_counts)
-                            .arg(&self.inputs)
-                            .arg(&self.input_offsets)
-                            .arg(&self.input_counts)
-                            .arg(&self.params)
-                            .arg(&self.aggregates)
-                            .arg(&self.aggregate_facts)
-                            .arg(&self.aggregate_offsets)
-                            .arg(&self.candidate_offsets)
-                            .arg(&rule_id)
-                            .arg(&mut self.status)
-                            .arg(&validation_phase);
-                        args.launch_generated(validation_config)
-                            .map_err(driver_error)?;
+                if self.generated.transition_validation[*index] {
+                    let validation_config = self.validation_launch_config(rows, one);
+                    for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
+                        {
+                            let mut args = fused_launch_builder(
+                                &self.stream,
+                                &self.validate_transition,
+                                self.fused_batch.as_ref(),
+                            );
+                            args.arg(&self.state)
+                                .arg(&self.column_offsets)
+                                .arg(&self.row_counts)
+                                .arg(&self.inputs)
+                                .arg(&self.input_offsets)
+                                .arg(&self.input_counts)
+                                .arg(&self.params)
+                                .arg(&self.aggregates)
+                                .arg(&self.aggregate_facts)
+                                .arg(&self.aggregate_offsets)
+                                .arg(&self.candidate_offsets)
+                                .arg(&rule_id)
+                                .arg(&mut self.status)
+                                .arg(&validation_phase);
+                            args.launch_generated(validation_config)
+                                .map_err(driver_error)?;
+                        }
                     }
+                    commit_validation_reduction(
+                        &self.stream,
+                        &self.commit_validation_status,
+                        &mut self.status,
+                        one,
+                        self.fused_batch.as_ref(),
+                    )?;
                 }
-                commit_validation_reduction(
-                    &self.stream,
-                    &self.commit_validation_status,
-                    &mut self.status,
-                    one,
-                    self.fused_batch.as_ref(),
-                )?;
 
                 if rows == 0 {
                     continue;
@@ -421,14 +438,10 @@ impl CudaBackend {
                     .map_err(driver_error)?;
             }
 
-            // Reduce each effect-bearing rule's winners into a stable
-            // per-rule activity flag before the parallel effects validator
-            // reads it. This preserves the serial any_winner scan without an
-            // O(rows) rescan per worker.
+            // Count each rule once, before validation consumes its activity
+            // flag. The same reduction supplies the final host report.
             let mut effects_rows = 0_u32;
             for (_, transition) in &transition_positions {
-                let model_transition = &self.model.model().boxes[transition.box_index].transitions
-                    [transition.transition_index];
                 let table_index = transition.table_index;
                 let global_table = global_table(&self.model, transition.box_index, table_index);
                 let rows = u32::try_from(self.layout.row_counts[global_table]).map_err(|_| {
@@ -438,26 +451,28 @@ impl CudaBackend {
                     ))
                 })?;
                 effects_rows = effects_rows.max(rows);
-                if model_transition.effects.is_empty() || rows == 0 {
+                if rows == 0 {
                     continue;
                 }
                 let rule_index = usize::try_from(transition.rule_id).map_err(|_| {
                     CudaError::InvalidInput("rule id exceeds host index width".to_owned())
                 })?;
-                let candidate_begin = self.layout.candidate_offsets[rule_index];
-                let rule_id = transition.rule_id;
-                let candidate_count = u64::from(rows);
+                let candidate_count = self.layout.candidate_count as u64;
+                let rule_count = self.layout.candidate_offsets.len() as u64;
+                let rule = rule_index as u64;
                 let mut args = fused_launch_builder(
                     &self.stream,
-                    &self.mark_effect_active,
+                    &self.count_fired,
                     self.fused_batch.as_ref(),
                 );
                 args.arg(&self.wins)
-                    .arg(&candidate_begin)
+                    .arg(&self.candidate_offsets)
                     .arg(&candidate_count)
-                    .arg(&rule_id)
+                    .arg(&rule_count)
+                    .arg(&rule)
+                    .arg(&mut self.fired_counts)
                     .arg(&mut self.effect_active);
-                args.launch_generated(LaunchConfig::for_num_elems(rows))
+                args.launch_generated(control_count_launch_config(u64::from(rows)))
                     .map_err(driver_error)?;
             }
             let effects_config = self.validation_launch_config(effects_rows, one);
@@ -535,7 +550,13 @@ impl CudaBackend {
                 continue;
             }
             let rule_id = transition.rule_id;
-            for validation_phase in 0..VALIDATION_REDUCTION_PASSES {
+            let exclusive = self.generated.exclusive_effect_writes[rule_id as usize];
+            let passes = if exclusive {
+                1
+            } else {
+                VALIDATION_REDUCTION_PASSES
+            };
+            for validation_phase in 0..passes {
                 {
                     let mut args = fused_launch_builder(
                         &self.stream,
@@ -563,13 +584,15 @@ impl CudaBackend {
                         .map_err(driver_error)?;
                 }
             }
-            commit_validation_reduction(
-                &self.stream,
-                &self.commit_validation_status,
-                &mut self.status,
-                one,
-                self.fused_batch.as_ref(),
-            )?;
+            if !exclusive {
+                commit_validation_reduction(
+                    &self.stream,
+                    &self.commit_validation_status,
+                    &mut self.status,
+                    one,
+                    self.fused_batch.as_ref(),
+                )?;
+            }
         }
         if self.layout.owner_count != 0 {
             let launch_count = owner_launch_count;
@@ -777,49 +800,10 @@ impl CudaBackend {
         // These diagnostics are consumed only by the host report. Reduce them
         // while the raw control buffers remain device-resident; the terminal
         // status readback below orders all three kernels before compact D2H.
-        let rule_count = u64::try_from(self.layout.candidate_offsets.len())
-            .map_err(|_| CudaError::InvalidInput("rule count exceeds u64".to_owned()))?;
         let table_count = u64::try_from(self.layout.row_counts.len())
             .map_err(|_| CudaError::InvalidInput("table count exceeds u64".to_owned()))?;
         let candidate_count = u64::try_from(self.layout.candidate_count)
             .map_err(|_| CudaError::InvalidInput("candidate count exceeds u64".to_owned()))?;
-        {
-            let mut args = fused_launch_builder(
-                &self.stream,
-                &self.init_control_counts,
-                self.fused_batch.as_ref(),
-            );
-            args.arg(&mut self.fired_counts)
-                .arg(&rule_count)
-                .arg(&mut self.deferred_counts)
-                .arg(&table_count);
-            args.launch_generated(control_count_launch_config(rule_count.max(table_count)))
-                .map_err(driver_error)?;
-        }
-        for rule_index in 0..self.layout.candidate_offsets.len() {
-            let begin = self.layout.candidate_offsets[rule_index];
-            let end = self
-                .layout
-                .candidate_offsets
-                .get(rule_index + 1)
-                .copied()
-                .unwrap_or(candidate_count);
-            if begin == end {
-                continue;
-            }
-            let rule = u64::try_from(rule_index)
-                .map_err(|_| CudaError::InvalidInput("rule index exceeds u64".to_owned()))?;
-            let mut args =
-                fused_launch_builder(&self.stream, &self.count_fired, self.fused_batch.as_ref());
-            args.arg(&self.wins)
-                .arg(&self.candidate_offsets)
-                .arg(&candidate_count)
-                .arg(&rule_count)
-                .arg(&rule)
-                .arg(&mut self.fired_counts);
-            args.launch_generated(control_count_launch_config(end - begin))
-                .map_err(driver_error)?;
-        }
         if candidate_count != 0 {
             let config = control_count_launch_config(candidate_count);
             // Other table counts retain the zero written by initialization:

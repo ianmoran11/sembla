@@ -19,9 +19,17 @@ pub(super) fn stage_box(
         .collect();
     let mut cache = AggCache::new(model, snapshot, params);
     let mut candidates = Vec::new();
+    let mut candidate_ranges = Vec::with_capacity(transitions.len());
     for validated in &transitions {
+        let start = candidates.len();
         if let Some(result) = tiled_candidates[validated.transition_index].take() {
-            candidates.extend(result?);
+            let prepared = result?;
+            if candidates.is_empty() {
+                candidates = prepared;
+            } else {
+                candidates.extend(prepared);
+            }
+            candidate_ranges.push(start..candidates.len());
             continue;
         }
         let transition = &model_box.transitions[validated.transition_index];
@@ -81,11 +89,8 @@ pub(super) fn stage_box(
                 });
             }
             candidates.push(Candidate {
-                rule_id: validated.rule_id,
                 rule_word: validated.rule_word,
-                table_index,
                 entity_id: firing.entity_id,
-                row,
                 claims,
             });
             Ok(())
@@ -111,27 +116,26 @@ pub(super) fn stage_box(
             };
             push_candidate(row, firing)?;
         }
+        candidate_ranges.push(start..candidates.len());
     }
     let resolution = resolve_claims(&candidates, model_box.tables.len(), model_box)?;
     let mut destinations = Vec::new();
     let mut pending = Vec::new();
-    for validated in &transitions {
+    let mut fired = Vec::with_capacity(transitions.len());
+    for (validated, range) in transitions.iter().zip(candidate_ranges) {
         let transition = &model_box.transitions[validated.transition_index];
-        let winner_indices: Vec<usize> = candidates
-            .iter()
-            .enumerate()
-            .filter(|(index, candidate)| {
-                candidate.rule_id == validated.rule_id && resolution.fires[*index]
-            })
-            .map(|(index, _)| index)
+        let winner_rows: Vec<usize> = range
+            .filter(|index| resolution.fires[*index])
+            .map(|index| candidates[index].entity_id as usize)
             .collect();
-        if winner_indices.is_empty() {
+        debug_assert!(winner_rows.windows(2).all(|pair| pair[0] < pair[1]));
+        fired.push((validated.rule_id, winner_rows.len()));
+        if winner_rows.is_empty() {
             continue;
         }
         let table = EvalTable::new(model, &model_box.name, &transition.table)?;
-        let table_index = candidates[winner_indices[0]].table_index;
+        let table_index = validated.table_index;
         let schema = &model_box.tables[table_index];
-        let mut winner_rows = None;
         let mut effect_columns = Vec::with_capacity(transition.effects.len());
         for effect in &transition.effects {
             let Effect::SetAttr { attr, value } = effect;
@@ -146,16 +150,7 @@ pub(super) fn stage_box(
                 _ => table.with_expected_attr(attr)?,
             };
             let gather = expr_is_gather_eligible(value, effect_table)?;
-            let rows = gather.then(|| {
-                winner_rows.get_or_insert_with(|| {
-                    let rows = winner_indices
-                        .iter()
-                        .map(|index| candidates[*index].row)
-                        .collect::<Vec<_>>();
-                    debug_assert!(rows.windows(2).all(|pair| pair[0] < pair[1]));
-                    rows
-                })
-            });
+            let rows = gather.then_some(winner_rows.as_slice());
             let (values, gathered) = match (&destination.ty, rows) {
                 (AttrType::Ref { .. }, Some(rows)) => (
                     PendingColumn::Ref(
@@ -218,34 +213,17 @@ pub(super) fn stage_box(
                 gathered,
             });
         }
-        for (winner_offset, candidate_index) in winner_indices.into_iter().enumerate() {
-            let candidate = &candidates[candidate_index];
+        pending.reserve(winner_rows.len().saturating_mul(effect_columns.len()));
+        for (winner_offset, row) in winner_rows.into_iter().enumerate() {
             for effect in &effect_columns {
-                let value_index = if effect.gathered {
-                    winner_offset
-                } else {
-                    candidate.row
-                };
+                let value_index = if effect.gathered { winner_offset } else { row };
                 pending.push(PendingWrite {
                     destination_index: effect.destination_index,
-                    row: candidate.row,
+                    row,
                     value: effect.values.at(value_index)?,
-                    rule_id: candidate.rule_id,
+                    rule_id: validated.rule_id,
                 });
             }
-        }
-    }
-    let mut fired = transitions
-        .iter()
-        .map(|transition| (transition.rule_id, 0))
-        .collect::<Vec<_>>();
-    for (candidate, fire) in candidates.iter().zip(&resolution.fires) {
-        if *fire {
-            let entry = fired
-                .iter_mut()
-                .find(|(rule_id, _)| *rule_id == candidate.rule_id)
-                .expect("candidate has validated transition");
-            entry.1 += 1;
         }
     }
     Ok(BoxOutcome {
@@ -324,7 +302,18 @@ fn resolve_claims(
     });
 
     let mut won_all = vec![true; candidates.len()];
-    let mut deferred_table = vec![vec![false; table_count]; candidates.len()];
+    let mut deferred = vec![0; table_count];
+    let mut fired_per_resource_table = vec![0; table_count];
+    if instances.is_empty() {
+        return Ok(Resolution {
+            fires: won_all,
+            deferred,
+            fired_per_resource_table,
+        });
+    }
+    // Instances are grouped by table first, so each candidate needs only the
+    // last table on which it lost to count multiple losses there once.
+    let mut last_deferred_table = vec![usize::MAX; candidates.len()];
     let mut start = 0;
     while start < instances.len() {
         let first = instances[start];
@@ -350,25 +339,22 @@ fn resolve_claims(
         for instance in &instances[start..end] {
             if instance.candidate_index != winner_candidate {
                 won_all[instance.candidate_index] = false;
-                deferred_table[instance.candidate_index][first_claim.table_index] = true;
+                let last_table = &mut last_deferred_table[instance.candidate_index];
+                if *last_table != first_claim.table_index {
+                    *last_table = first_claim.table_index;
+                    deferred[first_claim.table_index] += 1;
+                }
             }
         }
         start = end;
     }
 
-    let mut deferred = vec![0; table_count];
-    let mut fired_per_resource_table = vec![0; table_count];
+    let mut last_fired_candidate = vec![usize::MAX; table_count];
     for (candidate_index, candidate) in candidates.iter().enumerate() {
-        for (table_index, lost) in deferred_table[candidate_index].iter().enumerate() {
-            if *lost {
-                deferred[table_index] += 1;
-            }
-        }
         if won_all[candidate_index] {
-            let mut counted = vec![false; table_count];
             for claim in &candidate.claims {
-                if !counted[claim.table_index] {
-                    counted[claim.table_index] = true;
+                if last_fired_candidate[claim.table_index] != candidate_index {
+                    last_fired_candidate[claim.table_index] = candidate_index;
                     fired_per_resource_table[claim.table_index] += 1;
                 }
             }
@@ -554,3 +540,7 @@ fn transition_name(model: &ValidatedModel, rule_id: u32) -> &str {
         .expect("pending write has a validated transition");
     &model.model().boxes[validated.box_index].transitions[validated.transition_index].name
 }
+
+#[cfg(test)]
+#[path = "../executor_claim_tests.rs"]
+mod tests;

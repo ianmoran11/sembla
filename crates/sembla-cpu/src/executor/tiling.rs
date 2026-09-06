@@ -443,11 +443,8 @@ fn evaluate_tile_task(
                         });
                     }
                     candidates.push(Candidate {
-                        rule_id: plan.rule_id,
                         rule_word: plan.rule_word,
-                        table_index: plan.table_index,
                         entity_id: firing.entity_id,
-                        row,
                         claims,
                     });
                 }

@@ -7,16 +7,47 @@ when a measurement changes it.
 This is a reference, not a plan. Plans live in PRD folders; verdicts live in
 `DECISIONS.md`.
 
+The [2026-09-05 CUDA review](cuda-runtime-review-2026-09-05.md) removes winner
+storage and deferred-count scans for uncontested tables. A same-H100 comparison
+measured the grouped 20-draw sweep at 4.17 → 3.99 s for 1M slots and
+26.52 → 25.35 s for 10M slots, with one adjacent before/after pair per scale.
+At 10M slots, winner allocation falls by 160,000,064 bytes per worker. The report
+separates these results from the older profiles and identifies the next targets.
+
+The [2026-09-06 CUDA follow-up](cuda-runtime-followup-2026-09-06.md) combines
+winner counting with activity detection, skips empty validation work, reduces
+grouped atomics and adds PTX reuse plus lifecycle attribution. Initial H100
+20-draw sweep pairs show 20.4% less wall time at 1M slots and 8.3% at 10M, with
+complete output parity and the frozen gate passing. The final construction
+copy-order correction passes local checks; an optional repeat failed before
+measuring its time or peak memory. The report separates these limits from the
+measured kernel changes; no repeated or general speedup is claimed.
+
+The [2026-09-05 CPU follow-up](cpu-runtime-followup-2026-09-05.md) measures
+further buffer, grouping, and aggregate-cache improvements on an M2 Pro.
+Against the first review's changed executable, the 1M/24-tick demographic case
+falls from 2.36s to 1.93s without grouped output and from 3.62s to 2.47s with it
+(fastest of five runs, default ten workers). The report covers medians,
+single-worker results, output equality, the memory cost of one million distinct
+groups, and the remaining opportunities identified in the final profile.
+
+The [first 2026-09-05 CPU runtime review](cpu-runtime-review-2026-09-05.md) measures
+the preceding serial-bookkeeping cleanup: the 1M/24-tick demographic
+case falls from 3.74s to 2.16s without grouped output, and from 7.40s to 3.45s
+with grouped output (fastest of five runs, default ten workers). SIR is unchanged;
+the report includes medians, single-worker results, and output equality checks.
+
 ## The short version
 
-- The **GPU is not the constraint** and has not been since 2026-07-26. Kernels
-  are 0.56% of CUDA wall time.
-- The **host evaluator** is what limits both backends. Work there sped up CUDA
+- The current H100 profile supports targeted CUDA work: the September 5
+  contest-target change reduced whole-sweep time by 4.3–4.4% in one pair per
+  scale. The historical 0.56% kernel share below predates device observations
+  and is not the current CUDA phase split.
+- Host evaluator work previously sped up CUDA
   by 5.4× and CPU by 3.3× without a line of GPU code changing, and carried the
   §L4 gate from a 2.56× miss to a 4.207× pass (`DECISIONS.md` §L8).
-- Roughly **20× more** is available on the host, measured, from three changes.
-- After those, the system becomes **RNG-bound**, not memory-bound. That changes
-  which floor applies.
+- The older 20× host opportunity and RNG-bound projection describe the CPU
+  experiments below; they are not a forecast for the current CUDA backend.
 - CUDA sweeps now hash packed pageable final-state bytes directly. The focused
   H100 gate measured this 15.2% faster at workers 1 and 7.3% faster at workers
   4 than reconstructing a host `StateStore` first (`DECISIONS.md` §L14).

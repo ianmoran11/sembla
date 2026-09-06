@@ -906,3 +906,55 @@ fn dump_is_content_addressed_and_repeatable() {
     assert_eq!(std::fs::read_to_string(first).unwrap(), generated.source);
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn execution_generation_preserves_reference_and_marks_checked_rules() {
+    let model = grouped_model();
+    let reference = generate(&model).unwrap();
+    let execution = super::generate_execution(&model, false).unwrap();
+    assert_eq!(execution, super::generate_execution(&model, false).unwrap());
+    assert_ne!(execution.source_sha256, reference.source_sha256);
+    assert_eq!(execution.transition_validation, [false]);
+    assert_eq!(execution.exclusive_effect_writes, [true]);
+    assert!(execution.source.contains("shared_counts"));
+    assert!(execution
+        .source
+        .contains("atomicOr(effect_active + rule, 1U)"));
+    let fused = super::generate_execution(&model, true).unwrap();
+    assert!(fused.source.contains("fired_counts +="));
+    assert!(fused.source.contains("effect_active +="));
+
+    // CUDA dynamic shared declarations have translation-unit linkage, even
+    // when spelled inside distinct kernels. Names must keep the same type.
+    for source in [&execution.source, &fused.source] {
+        let mut shared = std::collections::BTreeMap::new();
+        for line in source.lines() {
+            if let Some(declaration) = line.trim().strip_prefix("extern __shared__ ") {
+                let (typed_name, _) = declaration.split_once("[]").unwrap();
+                let (ty, name) = typed_name.rsplit_once(' ').unwrap();
+                if let Some(previous) = shared.insert(name, ty) {
+                    assert_eq!(previous, ty, "incompatible shared declaration {name}");
+                }
+            }
+        }
+    }
+
+    let mut checked = model.model().clone();
+    let rule = &mut checked.boxes[0].transitions[0];
+    rule.guard = Expr::Eq {
+        lhs: Box::new(Expr::Add {
+            lhs: Box::new(Expr::SelfAttr {
+                name: "age_months".to_owned(),
+            }),
+            rhs: Box::new(Expr::Int { value: i64::MAX }),
+        }),
+        rhs: Box::new(Expr::Int { value: 0 }),
+    };
+    rule.effects.push(rule.effects[0].clone());
+    let features =
+        sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+    let checked = sembla_ir::validate_with_features(checked, &features).unwrap();
+    let generated = super::generate_execution(&checked, false).unwrap();
+    assert_eq!(generated.transition_validation, [true]);
+    assert_eq!(generated.exclusive_effect_writes, [false]);
+}

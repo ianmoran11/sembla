@@ -19,35 +19,6 @@ pub(crate) use crate::config::{
 };
 use std::borrow::Cow;
 
-/// Legacy whole-column maps are deliberately serial. PRD 0001 moved the only
-/// execution parallel region above expression evaluation, where a complete row
-/// tile carries every eligible transition expression and racing clock.
-#[inline]
-pub(crate) fn element_wise_parallel_enabled(_row_count: usize) -> bool {
-    false
-}
-
-#[inline]
-pub(crate) fn element_wise_map<T, F>(row_count: usize, map: F) -> Vec<T>
-where
-    F: Fn(usize) -> T,
-{
-    (0..row_count).map(map).collect()
-}
-
-#[inline]
-pub(crate) fn element_wise_map_with_initializer<T, I, F>(
-    row_count: usize,
-    _initialize: I,
-    map: F,
-) -> Vec<T>
-where
-    I: Fn() -> T,
-    F: Fn(usize) -> T,
-{
-    (0..row_count).map(map).collect()
-}
-
 use sembla_ir::{
     AggJoin, AggOp, Aggregate, Attr, AttrType, Expr, ParamType, ParamValue, Table, ValidatedModel,
 };
@@ -221,13 +192,20 @@ struct AggregateKey {
     filter: Expr,
 }
 
-impl PartialEq for AggregateKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.box_name == other.box_name
-            && self.table == other.table
-            && self.on == other.on
-            && agg_op_structural_eq(&self.op, &other.op)
-            && expr_structural_eq(&self.filter, &other.filter)
+impl AggregateKey {
+    fn matches(
+        &self,
+        box_name: &str,
+        table: &str,
+        op: &AggOp,
+        on: &AggJoin,
+        filter: &Expr,
+    ) -> bool {
+        self.box_name == box_name
+            && self.table == table
+            && self.on == *on
+            && agg_op_structural_eq(&self.op, op)
+            && expr_structural_eq(&self.filter, filter)
     }
 }
 
@@ -1492,27 +1470,17 @@ fn eval_expr(
             let (InternalColumn::Bool(lhs), InternalColumn::Bool(rhs)) = (lhs, rhs) else {
                 return Err(EvalError::new("boolean operands did not evaluate to Bool"));
             };
-            let row_count = lhs.len().min(rhs.len());
-            let values = if element_wise_parallel_enabled(row_count) {
-                element_wise_map(row_count, |row| {
+            let values = lhs
+                .into_iter()
+                .zip(rhs)
+                .map(|(lhs, rhs)| {
                     if matches!(expr, Expr::And { .. }) {
-                        lhs[row] && rhs[row]
+                        lhs && rhs
                     } else {
-                        lhs[row] || rhs[row]
+                        lhs || rhs
                     }
                 })
-            } else {
-                lhs.into_iter()
-                    .zip(rhs)
-                    .map(|(lhs, rhs)| {
-                        if matches!(expr, Expr::And { .. }) {
-                            lhs && rhs
-                        } else {
-                            lhs || rhs
-                        }
-                    })
-                    .collect()
-            };
+                .collect();
             Ok(InternalColumn::Bool(values))
         }
         Expr::Not { expr } => {
@@ -1520,11 +1488,7 @@ fn eval_expr(
             let InternalColumn::Bool(values) = values else {
                 return Err(EvalError::new("Not operand did not evaluate to Bool"));
             };
-            let values = if element_wise_parallel_enabled(values.len()) {
-                element_wise_map(values.len(), |row| !values[row])
-            } else {
-                values.into_iter().map(|value| !value).collect()
-            };
+            let values = values.into_iter().map(|value| !value).collect();
             Ok(InternalColumn::Bool(values))
         }
         Expr::EnumIs { attr, variant } => {
@@ -1545,7 +1509,7 @@ fn eval_expr(
             }
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), attr)?;
             let enum_values = column.enum_values()?;
-            let values = element_wise_map(row_count, |row| enum_values[row] == variant);
+            let values = enum_values.iter().map(|value| *value == variant).collect();
             Ok(InternalColumn::Bool(values))
         }
         Expr::Input { port, agg } => {
@@ -1841,33 +1805,25 @@ fn eval_self_attr(
         AttrType::Real => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.real_values()?;
-            Ok(InternalColumn::Real(element_wise_map(row_count, |row| {
-                values[row]
-            })))
+            Ok(InternalColumn::Real(values.to_vec()))
         }
         AttrType::Int if row_count == 0 => Ok(InternalColumn::Int(Vec::new())),
         AttrType::Int => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.int_values()?;
-            Ok(InternalColumn::Int(element_wise_map(row_count, |row| {
-                values[row]
-            })))
+            Ok(InternalColumn::Int(values.to_vec()))
         }
         AttrType::Enum { .. } if row_count == 0 => Ok(InternalColumn::Enum(Vec::new())),
         AttrType::Enum { .. } => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.enum_values()?;
-            Ok(InternalColumn::Enum(element_wise_map(row_count, |row| {
-                values[row]
-            })))
+            Ok(InternalColumn::Enum(values.to_vec()))
         }
         AttrType::Ref { .. } if row_count == 0 => Ok(InternalColumn::Ref(Vec::new())),
         AttrType::Ref { .. } => {
             let column = snapshot.resolve_column(table.box_name(), table.table_name(), name)?;
             let values = column.ref_values()?;
-            Ok(InternalColumn::Ref(element_wise_map(row_count, |row| {
-                values[row]
-            })))
+            Ok(InternalColumn::Ref(values.to_vec()))
         }
     }
 }
@@ -1899,66 +1855,35 @@ fn eval_arithmetic(
     {
         let lhs = numeric_as_real(lhs)?;
         let rhs = numeric_as_real(rhs)?;
-        let row_count = lhs.len().min(rhs.len());
-        let values = if element_wise_parallel_enabled(row_count) {
-            element_wise_map(row_count, |row| match operation {
-                Arithmetic::Add => lhs[row] + rhs[row],
-                Arithmetic::Sub => lhs[row] - rhs[row],
-                Arithmetic::Mul => lhs[row] * rhs[row],
-                Arithmetic::Div => lhs[row] / rhs[row],
+        let values = lhs
+            .into_iter()
+            .zip(rhs)
+            .map(|(lhs, rhs)| match operation {
+                Arithmetic::Add => lhs + rhs,
+                Arithmetic::Sub => lhs - rhs,
+                Arithmetic::Mul => lhs * rhs,
+                Arithmetic::Div => lhs / rhs,
             })
-        } else {
-            lhs.into_iter()
-                .zip(rhs)
-                .map(|(lhs, rhs)| match operation {
-                    Arithmetic::Add => lhs + rhs,
-                    Arithmetic::Sub => lhs - rhs,
-                    Arithmetic::Mul => lhs * rhs,
-                    Arithmetic::Div => lhs / rhs,
-                })
-                .collect()
-        };
+            .collect();
         return Ok(InternalColumn::Real(values));
     }
     let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (lhs, rhs) else {
         return Err(EvalError::new("arithmetic operands are not numeric"));
     };
-    let row_count = lhs.len().min(rhs.len());
-    let values = if element_wise_parallel_enabled(row_count) {
-        element_wise_map_with_initializer(
-            row_count,
-            || Ok(0_i64),
-            |row| {
-                let value = match operation {
-                    Arithmetic::Add => lhs[row].checked_add(rhs[row]),
-                    Arithmetic::Sub => lhs[row].checked_sub(rhs[row]),
-                    Arithmetic::Mul => lhs[row].checked_mul(rhs[row]),
-                    Arithmetic::Div => unreachable!("division promotes to Real"),
-                };
-                value.ok_or_else(|| {
-                    EvalError::new(format!("integer arithmetic overflow at row {row}"))
-                })
-            },
-        )
+    let values = lhs
         .into_iter()
-        .collect::<Result<Vec<_>, _>>()?
-    } else {
-        lhs.into_iter()
-            .zip(rhs)
-            .enumerate()
-            .map(|(row, (lhs, rhs))| {
-                let value = match operation {
-                    Arithmetic::Add => lhs.checked_add(rhs),
-                    Arithmetic::Sub => lhs.checked_sub(rhs),
-                    Arithmetic::Mul => lhs.checked_mul(rhs),
-                    Arithmetic::Div => unreachable!("division promotes to Real"),
-                };
-                value.ok_or_else(|| {
-                    EvalError::new(format!("integer arithmetic overflow at row {row}"))
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?
-    };
+        .zip(rhs)
+        .enumerate()
+        .map(|(row, (lhs, rhs))| {
+            let value = match operation {
+                Arithmetic::Add => lhs.checked_add(rhs),
+                Arithmetic::Sub => lhs.checked_sub(rhs),
+                Arithmetic::Mul => lhs.checked_mul(rhs),
+                Arithmetic::Div => unreachable!("division promotes to Real"),
+            };
+            value.ok_or_else(|| EvalError::new(format!("integer arithmetic overflow at row {row}")))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(InternalColumn::Int(values))
 }
 
@@ -2001,74 +1926,37 @@ fn eval_equality(
         (lhs, rhs)
     };
     let equal = equal_columns(lhs, rhs)?;
-    let values = if element_wise_parallel_enabled(equal.len()) {
-        element_wise_map(
-            equal.len(),
-            |row| {
-                if negate {
-                    !equal[row]
-                } else {
-                    equal[row]
-                }
-            },
-        )
-    } else {
-        equal
-            .into_iter()
-            .map(|value| if negate { !value } else { value })
-            .collect()
-    };
+    let values = equal
+        .into_iter()
+        .map(|value| if negate { !value } else { value })
+        .collect();
     Ok(InternalColumn::Bool(values))
 }
 
 fn equal_columns(lhs: InternalColumn, rhs: InternalColumn) -> Result<Vec<bool>, EvalError> {
     if let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (&lhs, &rhs) {
-        let row_count = lhs.len().min(rhs.len());
-        return Ok(if element_wise_parallel_enabled(row_count) {
-            element_wise_map(row_count, |row| lhs[row] == rhs[row])
-        } else {
-            lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect()
-        });
+        return Ok(lhs.iter().zip(rhs).map(|(lhs, rhs)| lhs == rhs).collect());
     }
     if matches!(lhs, InternalColumn::Real(_) | InternalColumn::Int(_))
         && matches!(rhs, InternalColumn::Real(_) | InternalColumn::Int(_))
     {
         let lhs = numeric_as_real(lhs)?;
         let rhs = numeric_as_real(rhs)?;
-        let row_count = lhs.len().min(rhs.len());
-        return Ok(if element_wise_parallel_enabled(row_count) {
-            element_wise_map(row_count, |row| lhs[row] == rhs[row])
-        } else {
-            lhs.into_iter()
-                .zip(rhs)
-                .map(|(lhs, rhs)| lhs == rhs)
-                .collect()
-        });
+        return Ok(lhs
+            .into_iter()
+            .zip(rhs)
+            .map(|(lhs, rhs)| lhs == rhs)
+            .collect());
     }
     let values = match (lhs, rhs) {
         (InternalColumn::Bool(lhs), InternalColumn::Bool(rhs)) => {
-            let row_count = lhs.len().min(rhs.len());
-            if element_wise_parallel_enabled(row_count) {
-                element_wise_map(row_count, |row| lhs[row] == rhs[row])
-            } else {
-                lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
-            }
+            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
         }
         (InternalColumn::Enum(lhs), InternalColumn::Enum(rhs)) => {
-            let row_count = lhs.len().min(rhs.len());
-            if element_wise_parallel_enabled(row_count) {
-                element_wise_map(row_count, |row| lhs[row] == rhs[row])
-            } else {
-                lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
-            }
+            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
         }
         (InternalColumn::Ref(lhs), InternalColumn::Ref(rhs)) => {
-            let row_count = lhs.len().min(rhs.len());
-            if element_wise_parallel_enabled(row_count) {
-                element_wise_map(row_count, |row| lhs[row] == rhs[row])
-            } else {
-                lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
-            }
+            lhs.iter().zip(&rhs).map(|(lhs, rhs)| lhs == rhs).collect()
         }
         _ => return Err(EvalError::new("equality operands have incompatible types")),
     };
@@ -2097,39 +1985,8 @@ fn eval_ordering(
     let lhs = eval_expr(lhs, table, row_attrs, snapshot, params, cache, None)?;
     let rhs = eval_expr(rhs, table, row_attrs, snapshot, params, cache, None)?;
     if let (InternalColumn::Int(lhs), InternalColumn::Int(rhs)) = (&lhs, &rhs) {
-        let row_count = lhs.len().min(rhs.len());
-        let values = if element_wise_parallel_enabled(row_count) {
-            element_wise_map(row_count, |row| match operation {
-                Ordering::Lt => lhs[row] < rhs[row],
-                Ordering::Le => lhs[row] <= rhs[row],
-                Ordering::Gt => lhs[row] > rhs[row],
-                Ordering::Ge => lhs[row] >= rhs[row],
-            })
-        } else {
-            lhs.iter()
-                .zip(rhs)
-                .map(|(lhs, rhs)| match operation {
-                    Ordering::Lt => lhs < rhs,
-                    Ordering::Le => lhs <= rhs,
-                    Ordering::Gt => lhs > rhs,
-                    Ordering::Ge => lhs >= rhs,
-                })
-                .collect()
-        };
-        return Ok(InternalColumn::Bool(values));
-    }
-    let lhs = numeric_as_real(lhs)?;
-    let rhs = numeric_as_real(rhs)?;
-    let row_count = lhs.len().min(rhs.len());
-    let values = if element_wise_parallel_enabled(row_count) {
-        element_wise_map(row_count, |row| match operation {
-            Ordering::Lt => lhs[row] < rhs[row],
-            Ordering::Le => lhs[row] <= rhs[row],
-            Ordering::Gt => lhs[row] > rhs[row],
-            Ordering::Ge => lhs[row] >= rhs[row],
-        })
-    } else {
-        lhs.into_iter()
+        let values = lhs
+            .iter()
             .zip(rhs)
             .map(|(lhs, rhs)| match operation {
                 Ordering::Lt => lhs < rhs,
@@ -2137,17 +1994,27 @@ fn eval_ordering(
                 Ordering::Gt => lhs > rhs,
                 Ordering::Ge => lhs >= rhs,
             })
-            .collect()
-    };
+            .collect();
+        return Ok(InternalColumn::Bool(values));
+    }
+    let lhs = numeric_as_real(lhs)?;
+    let rhs = numeric_as_real(rhs)?;
+    let values = lhs
+        .into_iter()
+        .zip(rhs)
+        .map(|(lhs, rhs)| match operation {
+            Ordering::Lt => lhs < rhs,
+            Ordering::Le => lhs <= rhs,
+            Ordering::Gt => lhs > rhs,
+            Ordering::Ge => lhs >= rhs,
+        })
+        .collect();
     Ok(InternalColumn::Bool(values))
 }
 
 fn numeric_as_real(column: InternalColumn) -> Result<Vec<f64>, EvalError> {
     match column {
         InternalColumn::Real(values) => Ok(values),
-        InternalColumn::Int(values) if element_wise_parallel_enabled(values.len()) => {
-            Ok(element_wise_map(values.len(), |row| values[row] as f64))
-        }
         InternalColumn::Int(values) => Ok(values.into_iter().map(|value| value as f64).collect()),
         _ => Err(EvalError::new(
             "numeric expression did not evaluate to Real or Int",
@@ -2166,38 +2033,38 @@ fn eval_aggregate(
     params: &ParamEnv,
     cache: &mut AggCache<'_, '_>,
 ) -> Result<InternalColumn, EvalError> {
-    let key = AggregateKey {
-        box_name: query.box_name().to_owned(),
-        table: target_name.to_owned(),
-        op: op.clone(),
-        on: on.clone(),
-        filter: filter.clone(),
-    };
-    let accumulator = if let Some(entry) = cache.entries.iter().find(|entry| entry.key == key) {
-        entry.values.clone()
+    let index = if let Some(index) = cache.entries.iter().position(|entry| {
+        entry
+            .key
+            .matches(query.box_name(), target_name, op, on, filter)
+    }) {
+        index
     } else {
         let values = build_aggregate(op, target_name, on, filter, query, snapshot, params, cache)?;
         cache.entries.push(CacheEntry {
-            key,
-            values: values.clone(),
+            key: AggregateKey {
+                box_name: query.box_name().to_owned(),
+                table: target_name.to_owned(),
+                op: op.clone(),
+                on: on.clone(),
+                filter: filter.clone(),
+            },
+            values,
         });
         cache.build_count += 1;
-        values
+        cache.entries.len() - 1
     };
 
     let query_rows = snapshot.row_count(query.box_name(), query.table_name())?;
-    match accumulator {
+    let references: &[u32] = if query_rows == 0 {
+        &[]
+    } else {
+        let column =
+            snapshot.resolve_column(query.box_name(), query.table_name(), &on.self_fk_attr)?;
+        column.ref_values()?
+    };
+    match &cache.entries[index].values {
         Accumulator::Int(groups) => {
-            let references: &[u32] = if query_rows == 0 {
-                &[]
-            } else {
-                let column = snapshot.resolve_column(
-                    query.box_name(),
-                    query.table_name(),
-                    &on.self_fk_attr,
-                )?;
-                column.ref_values()?
-            };
             let mut values = Vec::with_capacity(query_rows);
             for reference in references {
                 let group = *reference as usize;
@@ -2210,16 +2077,6 @@ fn eval_aggregate(
             Ok(InternalColumn::Int(values))
         }
         Accumulator::Real(groups) => {
-            let references: &[u32] = if query_rows == 0 {
-                &[]
-            } else {
-                let column = snapshot.resolve_column(
-                    query.box_name(),
-                    query.table_name(),
-                    &on.self_fk_attr,
-                )?;
-                column.ref_values()?
-            };
             let mut values = Vec::with_capacity(query_rows);
             for reference in references {
                 let group = *reference as usize;

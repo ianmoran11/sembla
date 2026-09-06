@@ -220,3 +220,174 @@ fn observation_is_a_bitwise_sink_for_state_and_scheduling() {
     assert!(disabled.view_counts.iter().all(|count| *count == 0));
     assert!(extended.view_counts.iter().all(|count| *count == 4));
 }
+#[test]
+fn grouped_keys_preserve_numeric_order_bands_and_repeated_counts() {
+    let mut raw = eligibility_model("", r#"{"name":"cells","table":"Person","keys":[{"attr":"group"},{"attr":"n","band_width":10}],"filter":null}"#).model().clone();
+    raw.boxes[0].tables[1].attrs.push(sembla_ir::Attr {
+        name: "kind".into(),
+        ty: sembla_ir::AttrType::Enum {
+            variants: vec!["A".into(), "B".into()],
+        },
+    });
+    raw.boxes[0].grouped_views[0].keys.insert(
+        1,
+        sembla_ir::GroupKey {
+            attr: "kind".into(),
+            band_width: None,
+        },
+    );
+    let mut negative = raw.boxes[0].grouped_views[0].clone();
+    negative.name = "negative".into();
+    negative.filter = Some(Box::new(sembla_ir::Expr::Lt {
+        lhs: Box::new(sembla_ir::Expr::SelfAttr { name: "n".into() }),
+        rhs: Box::new(sembla_ir::Expr::Int { value: 0 }),
+    }));
+    raw.boxes[0].grouped_views.push(negative);
+    let features =
+        sembla_ir::FeatureSet::from([sembla_ir::GROUPED_OBSERVATIONS_FEATURE.to_owned()]);
+    let model = sembla_ir::validate_with_features(raw, &features).unwrap();
+    let state = StateStore::new(
+        &model,
+        vec![
+            TableInit::new("world", "Group", 2, vec![]),
+            TableInit::new(
+                "world",
+                "Person",
+                8,
+                vec![
+                    ColumnInit::new("group", ColumnData::Ref(vec![1, 0, 0, 1, 1, 0, 1, 0])),
+                    ColumnInit::new("kind", ColumnData::Enum(vec![1, 0, 0, 1, 0, 1, 0, 0])),
+                    ColumnInit::new(
+                        "n",
+                        ColumnData::Int(vec![-11, -10, -1, 0, 10, i64::MIN, i64::MAX, -10]),
+                    ),
+                    ColumnInit::new("x", ColumnData::Real(vec![0.0; 8])),
+                ],
+            ),
+        ],
+    )
+    .unwrap();
+    let observations =
+        executor::observe_grouped_views(&model, &state, &ParamEnv::defaults(&model)).unwrap();
+    let actual = observations
+        .iter()
+        .map(|view| (view.name.as_str(), view.keys.clone(), view.count))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        actual,
+        vec![
+            ("cells", vec![0, 0, -1], 3),
+            ("cells", vec![0, 1, i128::from(i64::MIN).div_euclid(10)], 1),
+            ("cells", vec![1, 0, 1], 1),
+            ("cells", vec![1, 0, i128::from(i64::MAX).div_euclid(10)], 1),
+            ("cells", vec![1, 1, -2], 1),
+            ("cells", vec![1, 1, 0], 1),
+            ("negative", vec![0, 0, -1], 3),
+            (
+                "negative",
+                vec![0, 1, i128::from(i64::MIN).div_euclid(10)],
+                1
+            ),
+            ("negative", vec![1, 1, -2], 1),
+        ]
+    );
+}
+
+#[test]
+fn grouped_keys_are_resolved_only_for_selected_rows() {
+    for (rows, filter) in [
+        (0, "null"),
+        (3, r#"{"kind":"bool","value":false}"#),
+        (3, "null"),
+    ] {
+        let model = eligibility_model(
+            "",
+            &format!(
+                r#"{{"name":"cells","table":"Person","keys":[{{"attr":"n","band_width":10}}],"filter":{filter}}}"#
+            ),
+        );
+        let mut raw = model.model().clone();
+        raw.boxes[0].grouped_views.clear();
+        raw.boxes[0].tables[1].attrs[1].ty = sembla_ir::AttrType::Real;
+        let state_model = sembla_ir::validate(raw).unwrap();
+        let state = StateStore::new(
+            &state_model,
+            vec![
+                TableInit::new("world", "Group", 1, vec![]),
+                TableInit::new(
+                    "world",
+                    "Person",
+                    rows,
+                    vec![
+                        ColumnInit::new("group", ColumnData::Ref(vec![0; rows])),
+                        ColumnInit::new("n", ColumnData::Real(vec![0.0; rows])),
+                        ColumnInit::new("x", ColumnData::Real(vec![0.0; rows])),
+                    ],
+                ),
+            ],
+        )
+        .unwrap();
+        let result = executor::observe_grouped_views(&model, &state, &ParamEnv::defaults(&model));
+        if rows == 0 || filter != "null" {
+            assert_eq!(result.unwrap(), vec![]);
+        } else {
+            let expected = executor::TickError::from(
+                state.snapshot().int("world", "Person", "n", 0).unwrap_err(),
+            );
+            assert_eq!(result.unwrap_err(), expected);
+        }
+    }
+}
+
+#[test]
+fn grouped_bands_support_the_full_unsigned_width_range() {
+    let inputs = vec![i64::MIN, -1, 0, i64::MAX];
+    for (width, expected) in [
+        (
+            1,
+            vec![
+                (i128::from(i64::MIN), 1),
+                (-1, 1),
+                (0, 1),
+                (i128::from(i64::MAX), 1),
+            ],
+        ),
+        (i64::MAX as u64, vec![(-2, 1), (-1, 1), (0, 1), (1, 1)]),
+        (1_u64 << 63, vec![(-1, 2), (0, 2)]),
+        (u64::MAX, vec![(-1, 2), (0, 2)]),
+    ] {
+        let model = eligibility_model(
+            "",
+            &format!(
+                r#"{{"name":"bands","table":"Person","keys":[{{"attr":"n","band_width":{width}}}],"filter":null}}"#
+            ),
+        );
+        let state = StateStore::new(
+            &model,
+            vec![
+                TableInit::new("world", "Group", 1, vec![]),
+                TableInit::new(
+                    "world",
+                    "Person",
+                    inputs.len(),
+                    vec![
+                        ColumnInit::new("group", ColumnData::Ref(vec![0; inputs.len()])),
+                        ColumnInit::new("n", ColumnData::Int(inputs.clone())),
+                        ColumnInit::new("x", ColumnData::Real(vec![0.0; inputs.len()])),
+                    ],
+                ),
+            ],
+        )
+        .unwrap();
+        // Fresh maps have independent hash seeds; output must remain sorted.
+        for _ in 0..3 {
+            let actual =
+                executor::observe_grouped_views(&model, &state, &ParamEnv::defaults(&model))
+                    .unwrap()
+                    .into_iter()
+                    .map(|bucket| (bucket.keys[0], bucket.count))
+                    .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "width {width}");
+        }
+    }
+}

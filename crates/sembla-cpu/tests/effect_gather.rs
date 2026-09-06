@@ -20,15 +20,15 @@ fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
 fn effects_use_gathered_winner_rows_with_full_column_fallbacks() {
     let staging = section(
         EXECUTOR_SOURCE,
-        "let mut winner_rows = None",
-        "\n    let mut fired = transitions",
+        "let mut effect_columns = Vec::with_capacity(transition.effects.len());",
+        "\n    Ok(BoxOutcome {",
     );
     assert!(staging.contains("eval_gather("));
     assert!(staging.contains("eval_typed_ref_gather("));
     assert!(staging.contains("eval_column("));
     assert!(staging.contains("eval_typed_ref_column("));
     assert!(staging.contains("winner_offset"));
-    assert!(staging.contains("candidate.row"));
+    assert!(staging.contains("winner_rows.as_slice()"));
 }
 
 #[test]

@@ -236,3 +236,75 @@ fn output_failure_rolls_back_state_and_inputs_and_store_is_reusable() {
         Some(&ColumnData::Int(vec![0]))
     );
 }
+
+#[test]
+fn box_local_writes_preserve_identity_and_check_all_duplicates_before_applying() {
+    let base = load(
+        r#"{
+        "name":"box_writes","dt":1.0,"params":[],"boxes":[{
+            "name":"template","tables":[{"name":"Row","size_hint":2,
+                "attrs":[{"name":"marker","ty":{"kind":"int"}}]}],
+            "transitions":[{"name":"write","table":"Row",
+                "guard":{"kind":"bool","value":true},
+                "hazard":{"kind":"real","value":1e300},
+                "effects":[{"kind":"set_attr","attr":"marker","value":{"kind":"int","value":7}}],
+                "contests":[]}],"inputs":[],"outputs":[],"views":[]
+        }],"wires":[],"summaries":[]
+    }"#,
+    );
+    for (duplicate_first, duplicate_second, wrong_first_type) in [
+        (false, false, false),
+        (false, true, false),
+        (true, true, false),
+        (false, true, true),
+    ] {
+        let mut raw = base.model().clone();
+        raw.boxes = [("z_first", duplicate_first), ("a_second", duplicate_second)]
+            .into_iter()
+            .map(|(name, duplicate)| {
+                let mut model_box = base.model().boxes[0].clone();
+                model_box.name = name.into();
+                if duplicate {
+                    let mut transition = model_box.transitions[0].clone();
+                    transition.name = "duplicate".into();
+                    model_box.transitions.push(transition);
+                }
+                model_box
+            })
+            .collect();
+        let model = validate(raw.clone()).unwrap();
+        if wrong_first_type {
+            raw.boxes[0].tables[0].attrs[0].ty = AttrType::Real;
+            raw.boxes[0].transitions[0].effects = vec![sembla_ir::Effect::SetAttr {
+                attr: "marker".into(),
+                value: sembla_ir::Expr::Real { value: 7.0 },
+            }];
+        }
+        let mut state = zero_state(&validate(raw).unwrap());
+        let before = state.state_hash();
+        let result = run_tick(&model, &mut state, &ParamEnv::defaults(&model), 9, 0);
+        if duplicate_first || duplicate_second {
+            let sembla_cpu::TickError::DoubleWrite { box_name, row, .. } = result.unwrap_err()
+            else {
+                panic!("duplicate checks must precede all write-buffer type errors");
+            };
+            assert_eq!(
+                &*box_name,
+                if duplicate_first {
+                    "z_first"
+                } else {
+                    "a_second"
+                }
+            );
+            assert_eq!(row, 0);
+            assert_eq!(state.state_hash(), before);
+        } else {
+            assert_eq!(result.unwrap().fired, vec![(0, 2), (1, 2)]);
+            for name in ["z_first", "a_second"] {
+                for row in 0..2 {
+                    assert_eq!(state.snapshot().int(name, "Row", "marker", row), Ok(7));
+                }
+            }
+        }
+    }
+}

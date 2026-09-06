@@ -372,7 +372,7 @@ fn tiled_race_fingerprint(
     state: &StateStore,
     workers: usize,
     tile_rows: usize,
-) -> Vec<(u32, u32, usize, u32, usize, u32, u64)> {
+) -> Vec<(u32, u32, usize, u32, u64)> {
     with_test_tick_tiles(workers, tile_rows, 0, || {
         let params = ParamEnv::defaults(model);
         let snapshot = state.snapshot();
@@ -389,9 +389,7 @@ fn tiled_race_fingerprint(
                     panic!("test claim must retain its race time");
                 };
                 (
-                    candidate.rule_id,
                     candidate.rule_word,
-                    candidate.row,
                     candidate.entity_id,
                     claim.table_index,
                     claim.resource_row,
@@ -423,7 +421,11 @@ fn tiled_key_fingerprint(
                 let OrderingValue::Real(key) = claim.ordering else {
                     panic!("test claim must retain its Real key");
                 };
-                (candidate.row, claim.resource_row, key.to_bits())
+                (
+                    candidate.entity_id as usize,
+                    claim.resource_row,
+                    key.to_bits(),
+                )
             })
             .collect()
     })

@@ -82,6 +82,12 @@ if [[ $status -eq 0 ]]; then
   status=${PIPESTATUS[0]}
 fi
 if [[ $status -eq 0 ]]; then
+  cargo test --locked --release -p sembla-cuda --features cuda --lib \
+    optimized_reductions_match_cpu_for_group_sizes_and_fused_resets -- --ignored --nocapture \
+    2>&1 | tee "$out/optimization-corpus.log"
+  status=${PIPESTATUS[0]}
+fi
+if [[ $status -eq 0 ]]; then
   cargo run --locked --release -p sembla-cli --features cuda -- diff-backends \
     fixtures/demographic/benchmark/demographic_slots.no-grouped.json \
     --population 1000 --seed 7 --ticks 20 \

@@ -1,7 +1,7 @@
 //! Deterministic, snapshot-isolated synchronous box composition.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use sembla_ir::{
     AggOp, AttrType, ClaimOrdering, Effect, Expr, FeatureSet, OutputBuilder, SummaryReduce,
@@ -206,13 +206,9 @@ fn candidate_race_time(
 
 #[derive(Clone, Debug)]
 struct Candidate {
-    /// Dense ordinal retained for transition lookup, reports, and diagnostics.
-    rule_id: u32,
     /// Stable runtime identity used only for Philox and conflict tie-breaks.
     rule_word: u32,
-    table_index: usize,
     entity_id: u32,
-    row: usize,
     claims: Vec<CandidateClaim>,
 }
 
@@ -670,39 +666,37 @@ fn execute_tick_state(
         )?);
     }
 
-    let mut destinations = Vec::new();
-    let mut pending = Vec::new();
-    for outcome in &mut box_outcomes {
-        let destination_base = destinations.len();
-        destinations.append(&mut outcome.destinations);
-        pending.extend(
-            std::mem::take(&mut outcome.pending)
-                .into_iter()
-                .map(|mut write| {
-                    write.destination_index += destination_base;
-                    write
-                }),
-        );
+    // Destinations are box-local. Check every box before applying any writes;
+    // declaration order also preserves the first duplicated cell diagnostic.
+    for outcome in &box_outcomes {
+        detect_double_writes(&outcome.pending, &outcome.destinations, model)?;
     }
-    detect_double_writes(&pending, &destinations, model)?;
     let apply_result = {
         let mut writes = state.write_buffer()?;
-        pending.iter().try_for_each(|write| {
-            let destination = destinations[write.destination_index]
-                .resolution
-                .as_ref()
-                .copied()
-                .map_err(Clone::clone)?;
-            match &write.value {
-                PendingValue::Real(value) => {
-                    writes.set_resolved_real(destination, write.row, *value)
-                }
-                PendingValue::Int(value) => writes.set_resolved_int(destination, write.row, *value),
-                PendingValue::Enum(value) => {
-                    writes.set_resolved_enum(destination, write.row, *value)
-                }
-                PendingValue::Ref(value) => writes.set_resolved_ref(destination, write.row, *value),
-            }
+        box_outcomes.iter_mut().try_for_each(|outcome| {
+            std::mem::take(&mut outcome.pending)
+                .into_iter()
+                .try_for_each(|write| {
+                    let destination = outcome.destinations[write.destination_index]
+                        .resolution
+                        .as_ref()
+                        .copied()
+                        .map_err(Clone::clone)?;
+                    match &write.value {
+                        PendingValue::Real(value) => {
+                            writes.set_resolved_real(destination, write.row, *value)
+                        }
+                        PendingValue::Int(value) => {
+                            writes.set_resolved_int(destination, write.row, *value)
+                        }
+                        PendingValue::Enum(value) => {
+                            writes.set_resolved_enum(destination, write.row, *value)
+                        }
+                        PendingValue::Ref(value) => {
+                            writes.set_resolved_ref(destination, write.row, *value)
+                        }
+                    }
+                })
         })
     };
     if let Err(error) = apply_result {
@@ -872,6 +866,27 @@ fn observe_views_configured(
     Ok(observations)
 }
 
+enum GroupedKeyColumn<'a> {
+    Enum(&'a [u16]),
+    Ref(&'a [u32]),
+    IntBand(&'a [i64], u64),
+}
+
+impl GroupedKeyColumn<'_> {
+    fn at(&self, row: usize) -> i64 {
+        match self {
+            Self::Enum(values) => i64::from(values[row]),
+            Self::Ref(values) => i64::from(values[row]),
+            Self::IntBand(values, width) => match i64::try_from(*width) {
+                Ok(width) => values[row].div_euclid(width),
+                // A positive width larger than i64::MAX spans every
+                // nonnegative Int; all negative Ints belong to band -1.
+                Err(_) => -i64::from(values[row] < 0),
+            },
+        }
+    }
+}
+
 /// Evaluates grouped count views from committed state without execution feedback.
 pub fn observe_grouped_views(
     model: &ValidatedModel,
@@ -892,53 +907,60 @@ pub fn observe_grouped_views(
             let row_count = snapshot.row_count(&model_box.name, &view.table)?;
             let selected = match &view.filter {
                 Some(filter) => match eval_column(filter, table, &snapshot, params, &mut cache)? {
-                    ValueColumn::Bool(values) => values,
+                    ValueColumn::Bool(values) => Some(values),
                     other => return Err(runtime_type("grouped view filter", &other)),
                 },
-                None => vec![true; row_count],
+                None => None,
             };
-            let mut buckets: BTreeMap<Vec<i128>, usize> = BTreeMap::new();
-            for (row, selected) in selected.into_iter().enumerate() {
-                if !selected {
-                    continue;
-                }
-                let mut tuple = Vec::with_capacity(view.keys.len());
-                for key in &view.keys {
+            let mut rows =
+                (0..row_count).filter(|row| selected.as_ref().map_or(true, |mask| mask[*row]));
+            let Some(first_row) = rows.next() else {
+                continue;
+            };
+            // Resolve keys only when a row is selected, preserving diagnostics
+            // for empty tables and filters that exclude every row.
+            let columns = view
+                .keys
+                .iter()
+                .map(|key| {
                     let attr = table_decl
                         .attrs
                         .iter()
                         .find(|attr| attr.name == key.attr)
                         .expect("validated grouped key disappeared");
-                    let value = match (&attr.ty, key.band_width) {
-                        (AttrType::Enum { .. }, None) => i128::from(snapshot.enum_index(
-                            &model_box.name,
-                            &view.table,
-                            &key.attr,
-                            row,
-                        )?),
-                        (AttrType::Ref { .. }, None) => i128::from(snapshot.reference(
-                            &model_box.name,
-                            &view.table,
-                            &key.attr,
-                            row,
-                        )?),
-                        (AttrType::Int, Some(width)) => i128::from(snapshot.int(
-                            &model_box.name,
-                            &view.table,
-                            &key.attr,
-                            row,
-                        )?)
-                        .div_euclid(i128::from(width)),
+                    let column =
+                        snapshot.resolve_column(&model_box.name, &view.table, &key.attr)?;
+                    Ok(match (&attr.ty, key.band_width) {
+                        (AttrType::Enum { .. }, None) => {
+                            GroupedKeyColumn::Enum(column.enum_values()?)
+                        }
+                        (AttrType::Ref { .. }, None) => GroupedKeyColumn::Ref(column.ref_values()?),
+                        (AttrType::Int, Some(width)) => {
+                            GroupedKeyColumn::IntBand(column.int_values()?, width)
+                        }
                         _ => unreachable!("validated grouped key type disappeared"),
-                    };
-                    tuple.push(value);
+                    })
+                })
+                .collect::<Result<Vec<_>, StateError>>()?;
+            let mut buckets: HashMap<Vec<i64>, usize> = HashMap::new();
+            let mut tuple = Vec::with_capacity(columns.len());
+            for row in std::iter::once(first_row).chain(rows) {
+                tuple.clear();
+                tuple.extend(columns.iter().map(|column| column.at(row)));
+                if let Some(count) = buckets.get_mut(tuple.as_slice()) {
+                    *count += 1;
+                } else {
+                    buckets.insert(tuple.clone(), 1);
                 }
-                *buckets.entry(tuple).or_default() += 1;
             }
+            // Counts are exact integers; hash iteration never determines
+            // publication order. Only the distinct keys need sorting.
+            let mut buckets = buckets.into_iter().collect::<Vec<_>>();
+            buckets.sort_unstable_by(|(lhs, _), (rhs, _)| lhs.cmp(rhs));
             observations.extend(buckets.into_iter().map(|(keys, count)| GroupedViewValue {
                 box_name: model_box.name.clone(),
                 name: view.name.clone(),
-                keys,
+                keys: keys.into_iter().map(i128::from).collect(),
                 count,
             }));
         }

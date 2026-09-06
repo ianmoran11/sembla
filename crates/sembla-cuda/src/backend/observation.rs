@@ -533,6 +533,7 @@ impl CudaBackend {
             })?;
             let mut config = LaunchConfig::for_num_elems(rows);
             config.grid_dim.0 = config.grid_dim.0.min(1024);
+            config.shared_mem_bytes = config.block_dim.0 * 16;
             let mut bound = fused_launch_builder(
                 &self.stream,
                 &self.bound_grouped_view,
@@ -714,6 +715,7 @@ impl CudaBackend {
             .map_err(|_| CudaError::InvalidInput(index_error.to_owned()))?;
         let mut config = LaunchConfig::for_num_elems(rows);
         config.grid_dim.0 = config.grid_dim.0.min(1024);
+        config.shared_mem_bytes = key_space.min(2048) * 8;
         let mut observe = fused_launch_builder(
             &self.stream,
             &self.observe_grouped_view,

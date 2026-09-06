@@ -2,25 +2,25 @@
   "version": 1,
   "metric": "scripts/report-rust-context.py lexical production-source metric",
   "policy": "Limits are ratchets. Lower them after reductions; raise them only with an explicit context-budget justification.",
-  "adjustment_justification": "Validated lookup indices now live in the schema-of-record IR and explicit per-executor tuning now lives in sembla-cpu. Sweep finalization cuts the largest coordinator from 555/47 lines/complexity to 430/39, the serde rewrite removes the custom parser, and generated CUDA launches have one reviewed unsafe boundary. Collision-safe atomic publication plus compiler-derived explicit imports add 301 tokens over the preceding stage, but the imports remove hidden namespace coupling across every CUDA module and sweep finalization and are architecture-enforced. The backend remains 1,672 tokens below the original 178,920-token ratchet; function, complexity, file, and IR limits remain lowered.",
+  "adjustment_justification": "CPU runtime cleanup and the follow-up buffer, grouping, and aggregate-cache changes remove 869 production tokens and lower its largest file from 2,382 to 2,245 formatted code lines, so the total and CPU ratchets decrease accordingly. Existing limits for other crates, functions, and decision complexity are preserved. The CUDA throughput follow-up adds 1,414 production tokens beyond the prior total budget for execution-specific reductions, validation eligibility metadata, a one-entry PTX cache, and command lifecycle timing. The frozen public source generator remains unchanged. Observation generation and tick timing were split into focused modules; CUDA and CLI file-size ratchets and the largest-function ratchet decrease. Existing CPU changes and its ratchets are preserved. Hardware validation exposed unaligned fused byte arenas at odd row counts. Checked eight-byte padding adds 39 tokens while preserving logical lengths and canonical hashes. Restore the original late retained-state copy order after profiling exposed an extra full-state overlap with temporary upload buffers. Timing that copy separately adds 20 tokens and three constructor lines.",
   "limits": {
-    "total_tokens": 177248,
-    "max_file_code_lines": 2631,
-    "max_function_lines": 523,
+    "total_tokens": 177852,
+    "max_file_code_lines": 2463,
+    "max_function_lines": 515,
     "max_function_complexity": 39
   },
   "crate_token_limits": {
     "sembla-ir": 15550,
     "sembla-runtime": 22172,
-    "sembla-cpu": 36842,
-    "sembla-cuda": 50064,
-    "sembla-cli": 52620
+    "sembla-cpu": 35973,
+    "sembla-cuda": 50622,
+    "sembla-cli": 53535
   },
   "crate_file_line_limits": {
     "sembla-ir": 928,
     "sembla-runtime": 1051,
-    "sembla-cpu": 2382,
-    "sembla-cuda": 2631,
-    "sembla-cli": 1540
+    "sembla-cpu": 2245,
+    "sembla-cuda": 2463,
+    "sembla-cli": 1338
   }
 }
