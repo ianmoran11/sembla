@@ -1,0 +1,12 @@
+name,value
+final_population,797079
+maximum_invalid_age_count,0
+births_total,3048
+deaths_total,3945
+overseas_arrivals_total,1030
+overseas_departures_total,1628
+internal_arrivals_total,524
+internal_departures_total,1950
+minimum_vacant_birth_slots,116952
+final_max_generation,1
+locked_out_total,4602

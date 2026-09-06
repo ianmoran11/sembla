@@ -120,6 +120,19 @@ if [[ $status -eq 0 ]]; then
     2>&1 | tee "$out/plan-corpus.log"
   status=${PIPESTATUS[0]}
 fi
+if [[ $status -eq 0 && "${SEMBLA_CUDA_MEMCHECK:-0}" == "1" ]]; then
+  if command -v compute-sanitizer >/dev/null && command -v timeout >/dev/null; then
+    timeout --signal=TERM --kill-after=10s 300s \
+      compute-sanitizer --tool memcheck --target-processes all --error-exitcode 99 \
+      cargo test --locked --release -p sembla-cuda --features cuda --lib \
+        -- --ignored --nocapture --test-threads=1 \
+      2>&1 | tee "$out/memcheck.log"
+    status=${PIPESTATUS[0]}
+  else
+    echo 'Requested memcheck requires compute-sanitizer and timeout' >&2
+    status=1
+  fi
+fi
 set -e
 if [[ $status -eq 0 && "${SEMBLA_RUN_FULL_RATE:-0}" == "1" ]]; then
   population="$out/full-rate-26m-population.bin"
@@ -143,6 +156,9 @@ if [[ $status -eq 0 && "${SEMBLA_RUN_FULL_RATE:-0}" == "1" ]]; then
   rm -f "$population"
 fi
 evidence_files=(provenance.txt)
+for log in resource-corpus.log optimization-corpus.log memcheck.log; do
+  [[ ! -f "$out/$log" ]] || evidence_files+=("$log")
+done
 [[ -f "$out/diagnostic-corpus.log" ]] && evidence_files+=(diagnostic-corpus.log)
 [[ -f "$out/tests.log" ]] && evidence_files+=(tests.log)
 [[ -f "$out/demographic-corpus.log" ]] && evidence_files+=(demographic-corpus.log)

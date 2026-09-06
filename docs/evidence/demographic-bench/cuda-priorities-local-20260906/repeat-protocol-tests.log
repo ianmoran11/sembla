@@ -1,0 +1,2 @@
+corrupted_sidecar=False arms_run=8 exit_code=0: PASS
+corrupted_sidecar=True arms_run=4 exit_code=1: PASS

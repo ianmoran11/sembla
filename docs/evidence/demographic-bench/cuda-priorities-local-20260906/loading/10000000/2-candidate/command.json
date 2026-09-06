@@ -1,0 +1,19 @@
+[
+  "/tmp/sembla-cuda-priorities-20260906/candidate/target/release/sembla",
+  "run",
+  "/tmp/sembla-cuda-priorities-20260906/local-loading-one-tick/10000000/initial.state.model.json",
+  "--population",
+  "/tmp/sembla-cuda-priorities-20260906/local-loading-one-tick/10000000/initial.state",
+  "--seed",
+  "9009",
+  "--ticks",
+  "1",
+  "--backend",
+  "cpu",
+  "--enable",
+  "grouped-observations",
+  "--out",
+  "/tmp/sembla-cuda-priorities-20260906/local-loading-one-tick/10000000/2-candidate/outputs/results.csv",
+  "--lifecycle-timing-json",
+  "/tmp/sembla-cuda-priorities-20260906/local-loading-one-tick/10000000/2-candidate/lifecycle.json"
+]

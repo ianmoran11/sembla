@@ -1,0 +1,13 @@
+{
+  "backend": "cpu",
+  "backend_execution_ms": 867.009416,
+  "cuda_construction_ms": null,
+  "phases_ms": {
+    "backend_construction_execution_and_materialization": 992.464,
+    "hashing_export_and_publication": 1316.916333,
+    "input_and_model_preparation": 3093.9582090000004
+  },
+  "schema": "sembla-run-lifecycle-timing-v1",
+  "scope": "command after option parsing, excluding lifecycle report write",
+  "total_ms": 5403.338542
+}

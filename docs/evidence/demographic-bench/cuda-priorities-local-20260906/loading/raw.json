@@ -1,0 +1,306 @@
+[
+  {
+    "scale": 1000000,
+    "repeat": 0,
+    "warmup": true,
+    "arm": "candidate",
+    "whole_process_ms": 555.025082998327,
+    "peak_rss_bytes": 302432256,
+    "backend": "cpu",
+    "backend_execution_ms": 83.13333300000001,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 96.2195,
+      "hashing_export_and_publication": 174.248833,
+      "input_and_model_preparation": 272.175
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 542.643333
+  },
+  {
+    "scale": 1000000,
+    "repeat": 0,
+    "warmup": true,
+    "arm": "baseline",
+    "whole_process_ms": 1090.9963750018505,
+    "peak_rss_bytes": 352174080,
+    "backend": "cpu",
+    "backend_execution_ms": 81.36375,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 97.897375,
+      "hashing_export_and_publication": 157.176792,
+      "input_and_model_preparation": 320.660042
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 575.7342090000001
+  },
+  {
+    "scale": 1000000,
+    "repeat": 1,
+    "warmup": false,
+    "arm": "baseline",
+    "whole_process_ms": 570.446957994136,
+    "peak_rss_bytes": 323272704,
+    "backend": "cpu",
+    "backend_execution_ms": 86.961917,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 99.40570799999999,
+      "hashing_export_and_publication": 156.091167,
+      "input_and_model_preparation": 301.554583
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 557.051458
+  },
+  {
+    "scale": 1000000,
+    "repeat": 1,
+    "warmup": false,
+    "arm": "candidate",
+    "whole_process_ms": 538.7330829980783,
+    "peak_rss_bytes": 341065728,
+    "backend": "cpu",
+    "backend_execution_ms": 94.6285,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 106.368375,
+      "hashing_export_and_publication": 148.011125,
+      "input_and_model_preparation": 272.07225
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 526.45175
+  },
+  {
+    "scale": 1000000,
+    "repeat": 2,
+    "warmup": false,
+    "arm": "candidate",
+    "whole_process_ms": 535.3379169973778,
+    "peak_rss_bytes": 328335360,
+    "backend": "cpu",
+    "backend_execution_ms": 86.48104199999999,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 100.720917,
+      "hashing_export_and_publication": 149.284541,
+      "input_and_model_preparation": 271.12712500000004
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 521.132583
+  },
+  {
+    "scale": 1000000,
+    "repeat": 2,
+    "warmup": false,
+    "arm": "baseline",
+    "whole_process_ms": 570.0310839893064,
+    "peak_rss_bytes": 345292800,
+    "backend": "cpu",
+    "backend_execution_ms": 84.5925,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 99.15866700000001,
+      "hashing_export_and_publication": 151.771833,
+      "input_and_model_preparation": 305.336208
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 556.266708
+  },
+  {
+    "scale": 1000000,
+    "repeat": 3,
+    "warmup": false,
+    "arm": "baseline",
+    "whole_process_ms": 558.9507919939933,
+    "peak_rss_bytes": 338509824,
+    "backend": "cpu",
+    "backend_execution_ms": 79.118917,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 91.253917,
+      "hashing_export_and_publication": 146.681833,
+      "input_and_model_preparation": 304.45074999999997
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 542.3865
+  },
+  {
+    "scale": 1000000,
+    "repeat": 3,
+    "warmup": false,
+    "arm": "candidate",
+    "whole_process_ms": 532.6383339997847,
+    "peak_rss_bytes": 318439424,
+    "backend": "cpu",
+    "backend_execution_ms": 85.72862500000001,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 98.213,
+      "hashing_export_and_publication": 149.769375,
+      "input_and_model_preparation": 273.011375
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 520.99375
+  },
+  {
+    "scale": 10000000,
+    "repeat": 0,
+    "warmup": true,
+    "arm": "candidate",
+    "whole_process_ms": 5450.470750001841,
+    "peak_rss_bytes": 1730297856,
+    "backend": "cpu",
+    "backend_execution_ms": 955.319583,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1139.526167,
+      "hashing_export_and_publication": 1403.097625,
+      "input_and_model_preparation": 2877.64525
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5420.269042
+  },
+  {
+    "scale": 10000000,
+    "repeat": 0,
+    "warmup": true,
+    "arm": "baseline",
+    "whole_process_ms": 5441.853374999482,
+    "peak_rss_bytes": 1923203072,
+    "backend": "cpu",
+    "backend_execution_ms": 867.009416,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 992.464,
+      "hashing_export_and_publication": 1316.916333,
+      "input_and_model_preparation": 3093.9582090000004
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5403.338542
+  },
+  {
+    "scale": 10000000,
+    "repeat": 1,
+    "warmup": false,
+    "arm": "baseline",
+    "whole_process_ms": 5704.234374992666,
+    "peak_rss_bytes": 1798488064,
+    "backend": "cpu",
+    "backend_execution_ms": 912.065,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1047.6454589999998,
+      "hashing_export_and_publication": 1470.49175,
+      "input_and_model_preparation": 3147.9039580000003
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5666.041167
+  },
+  {
+    "scale": 10000000,
+    "repeat": 1,
+    "warmup": false,
+    "arm": "candidate",
+    "whole_process_ms": 5427.688042007503,
+    "peak_rss_bytes": 1818886144,
+    "backend": "cpu",
+    "backend_execution_ms": 936.678666,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1158.36175,
+      "hashing_export_and_publication": 1349.7062500000002,
+      "input_and_model_preparation": 2884.590166
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5392.658166
+  },
+  {
+    "scale": 10000000,
+    "repeat": 2,
+    "warmup": false,
+    "arm": "candidate",
+    "whole_process_ms": 5218.076958000893,
+    "peak_rss_bytes": 1641922560,
+    "backend": "cpu",
+    "backend_execution_ms": 945.8149999999999,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1092.589792,
+      "hashing_export_and_publication": 1329.258583,
+      "input_and_model_preparation": 2766.253542
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5188.101917
+  },
+  {
+    "scale": 10000000,
+    "repeat": 2,
+    "warmup": false,
+    "arm": "baseline",
+    "whole_process_ms": 5618.489166998188,
+    "peak_rss_bytes": 1822932992,
+    "backend": "cpu",
+    "backend_execution_ms": 913.929375,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1079.9812499999998,
+      "hashing_export_and_publication": 1339.154833,
+      "input_and_model_preparation": 3165.437709
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5584.573792
+  },
+  {
+    "scale": 10000000,
+    "repeat": 3,
+    "warmup": false,
+    "arm": "baseline",
+    "whole_process_ms": 5548.76479099039,
+    "peak_rss_bytes": 1720418304,
+    "backend": "cpu",
+    "backend_execution_ms": 894.4947090000001,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1036.280958,
+      "hashing_export_and_publication": 1338.304042,
+      "input_and_model_preparation": 3139.320042
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5513.905042
+  },
+  {
+    "scale": 10000000,
+    "repeat": 3,
+    "warmup": false,
+    "arm": "candidate",
+    "whole_process_ms": 5165.053707998595,
+    "peak_rss_bytes": 1552203776,
+    "backend": "cpu",
+    "backend_execution_ms": 953.469084,
+    "cuda_construction_ms": null,
+    "phases_ms": {
+      "backend_construction_execution_and_materialization": 1107.4822920000001,
+      "hashing_export_and_publication": 1323.661875,
+      "input_and_model_preparation": 2704.822792
+    },
+    "schema": "sembla-run-lifecycle-timing-v1",
+    "scope": "command after option parsing, excluding lifecycle report write",
+    "total_ms": 5135.966959
+  }
+]

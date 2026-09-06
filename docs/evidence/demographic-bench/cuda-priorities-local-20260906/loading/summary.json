@@ -1,0 +1,50 @@
+{
+  "platform": "macOS-15.5-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M2 Pro",
+  "baseline": "d93c8a301f1fc6e0e44ec6ed06504c5b45ff363e",
+  "candidate": "fc01302e3db9f8aa2f874ccf4f38514c1d85b8a7",
+  "protocol": "CPU run, one tick, grouped observations, warmup excluded, three alternating measured pairs per scale. This measures host loading, not CUDA execution.",
+  "all_output_trees_byte_identical": true,
+  "scales": {
+    "1000000": {
+      "baseline": {
+        "whole_process_ms": 570.0310839893064,
+        "peak_rss_bytes": 338509824,
+        "phases_ms": {
+          "backend_construction_execution_and_materialization": 99.15866700000001,
+          "hashing_export_and_publication": 151.771833,
+          "input_and_model_preparation": 304.45074999999997
+        }
+      },
+      "candidate": {
+        "whole_process_ms": 535.3379169973778,
+        "peak_rss_bytes": 328335360,
+        "phases_ms": {
+          "backend_construction_execution_and_materialization": 100.720917,
+          "hashing_export_and_publication": 149.284541,
+          "input_and_model_preparation": 272.07225
+        }
+      }
+    },
+    "10000000": {
+      "baseline": {
+        "whole_process_ms": 5618.489166998188,
+        "peak_rss_bytes": 1798488064,
+        "phases_ms": {
+          "backend_construction_execution_and_materialization": 1047.6454589999998,
+          "hashing_export_and_publication": 1339.154833,
+          "input_and_model_preparation": 3147.9039580000003
+        }
+      },
+      "candidate": {
+        "whole_process_ms": 5218.076958000893,
+        "peak_rss_bytes": 1641922560,
+        "phases_ms": {
+          "backend_construction_execution_and_materialization": 1107.4822920000001,
+          "hashing_export_and_publication": 1329.258583,
+          "input_and_model_preparation": 2766.253542
+        }
+      }
+    }
+  }
+}

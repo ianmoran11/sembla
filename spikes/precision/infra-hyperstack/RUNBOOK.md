@@ -804,6 +804,11 @@ binary, and does not infer draw boundaries from an average. Native current
 `*-native-timing.json` remains useful for separating setup from draw execution
 but is not compared directly with the external baseline timings.
 
+With `BENCH_CORPUS=1 BENCH_SWEEP=1`, the corpus also runs the ignored CUDA
+library tests under Compute Sanitizer memcheck, including compact resource
+flags, fused widths and diagnostic recovery. This has a five-minute TERM
+deadline and ten-second KILL bound; missing tooling fails the requested stage.
+
 When the baseline supports native timing, the sweep stage also warms both CUDA
 binaries at each scale and records three further pairs in `sweep/<scale>/repeats/`.
 Pair order alternates; repeat zero is warmup and must be excluded from speedup

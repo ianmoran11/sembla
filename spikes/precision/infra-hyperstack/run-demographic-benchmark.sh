@@ -1153,6 +1153,7 @@ if [[ "${BENCH_CORPUS:-0}" == "1" ]]; then
     git rev-parse HEAD > "$CORPUS_DIR/commit.txt"
     git status --porcelain > "$CORPUS_DIR/worktree-status.txt"
     SEMBLA_REQUIRE_CUDA=1 SEMBLA_CUDA_EVIDENCE_DIR="$CORPUS_DIR" \
+      SEMBLA_CUDA_MEMCHECK="${BENCH_SWEEP:-0}" \
       timeout --kill-after=60 "${BENCH_CORPUS_TIMEOUT_SECONDS:-1800}" \
       bash crates/sembla-cuda/scripts/run-differential-corpus.sh
   ) 2>&1 | tee "$CORPUS_DIR/run.log"

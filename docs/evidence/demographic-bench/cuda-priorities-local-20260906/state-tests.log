@@ -1,0 +1,37 @@
+   Compiling sembla-runtime v0.3.0 (/Users/ian/projects/sembla/crates/sembla-runtime)
+    Finished `test` profile [optimized + debuginfo] target(s) in 5.27s
+     Running tests/state_artifact.rs (target/debug/deps/state_artifact-b09e964f1e8d4b3e)
+
+running 29 tests
+test loaded_bytes_preserve_initializer_and_exact_artifact_hash ... ok
+test extra_table_fixture_has_specific_error ... ok
+test create_new_writer_refuses_to_replace_a_chain_link ... ok
+test refs_fixture_has_frozen_prefix_and_canonical_header ... ok
+test regenerate_state_fixtures ... ignored, explicit state-fixture regeneration only
+test noncanonical_header_fixture_has_specific_error ... ok
+test missing_table_fixture_has_specific_error ... ok
+test ref_range_fixture_has_specific_error ... ok
+test enum_range_fixture_has_specific_error ... ok
+test missing_column_fixture_has_specific_error ... ok
+test row_count_fixture_has_specific_error ... ok
+test state_hash_has_frozen_domain_and_exact_byte_payload ... ok
+test round_trip_and_repeated_writes_are_byte_identical ... ok
+test reader_checks_later_target_row_count_before_source_ref_values ... ok
+test sniff_magic_distinguishes_state_legacy_and_unknown ... ok
+test declaration_order_extra_column_and_ref_target_are_enforced ... ok
+test writer_checks_later_target_row_count_before_source_ref_values ... ok
+test truncated_blob_fixture_has_specific_error ... ok
+test trailing_bytes_fixture_has_specific_error ... ok
+test valid_fixtures_are_generated_bytes_and_load_exactly ... ok
+test wrong_magic_fixture_has_specific_error ... ok
+test wrong_schema_fixture_has_specific_error ... ok
+test invalid_fixtures_match_deterministic_regeneration_bytes ... ok
+test type_mismatch_fixture_has_specific_error ... ok
+test variant_count_fixture_has_specific_error ... ok
+test writer_rejects_invalid_initializer_values_without_repair ... ok
+test writer_uses_model_order_even_when_inputs_are_permuted ... ok
+test strict_header_shape_errors_are_distinct_and_deterministic ... ok
+test mutated_header_corpus_is_total_and_deterministic ... ok
+
+test result: ok. 28 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.57s
+

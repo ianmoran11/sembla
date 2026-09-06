@@ -1,0 +1,9 @@
+   Compiling sembla-cli v0.3.0 (/Users/ian/projects/sembla/crates/sembla-cli)
+    Finished `test` profile [optimized + debuginfo] target(s) in 4.46s
+     Running unittests src/main.rs (target/debug/deps/sembla-c7cf7afd24762fd1)
+
+running 1 test
+test manifest::tests::loaded_population_identity_and_initializers_use_the_same_snapshot ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.00s
+

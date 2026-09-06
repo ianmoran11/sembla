@@ -1,0 +1,53 @@
+   Compiling sembla-cuda v0.3.0 (/Users/ian/projects/sembla/crates/sembla-cuda)
+    Finished `test` profile [optimized + debuginfo] target(s) in 2.95s
+     Running unittests src/lib.rs (target/debug/deps/sembla_cuda-c9c134a646b6de06)
+
+running 45 tests
+test backend::conflict_geometry_hardware::segmented_argmin_winner_matches_cpu_under_three_geometries ... ignored, requires a CUDA GPU; exercises explicit conflict launch geometries
+test availability::tests::missing_driver_and_toolkit_are_distinct ... ok
+test backend::compile::tests::cache_reuses_only_matching_source_and_does_not_cache_failures ... ok
+test availability::tests::no_device_has_the_frozen_diagnostic_and_never_falls_back ... ok
+test backend::diagnostic_equality_hardware::negative_corpus_matches_cpu_status_under_four_geometries ... ignored, requires a CUDA GPU; run crates/sembla-cuda/scripts/run-differential-corpus.sh
+test backend::optimization_hardware_tests::optimized_reductions_match_cpu_for_group_sizes_and_fused_resets ... ignored, requires CUDA hardware
+test backend::probe_tests::production_device_probe_maps_cuda_no_device ... ok
+test backend::sweep_capacity_tests::cacheable_staging_allocation_is_fallible_and_zero_safe ... ok
+test backend::control_reports_tests::synthetic_counts_preserve_single_box_names_and_empty_domains ... ok
+test backend::control_reports_tests::synthetic_counts_preserve_report_shape_order_and_qualification ... ok
+test backend::sweep_capacity_tests::sparse_resource_reports_match_cpu_across_ticks_and_reset ... ignored, requires a CUDA GPU; compares packed contest targets and deferred reports
+test backend::sweep_capacity_tests::canonical_packed_hash_matches_materialized_v2_inputs_and_negative_control ... ok
+test codegen::tests::cuda_f64_order_key_exactly_matches_rust_total_cmp ... ok
+test backend::sweep_capacity_tests::canonical_packed_hash_matches_materialized_v1_mixed_layout ... ok
+test codegen::tests::contested_source_checks_claims_once_and_uses_candidate_parallel_argmin ... ok
+test backend::sweep_capacity_tests::resource_layout_packs_distinct_contest_targets_across_boxes ... ok
+test codegen::tests::generated_unsigned_band_formula_matches_host_euclidean_division ... ok
+test codegen::tests::generation_is_deterministic_and_has_one_kernel_per_transition ... ok
+test codegen::tests::generated_sources_contain_no_scalar_final_state_sha_kernel ... ok
+test codegen::tests::execution_generation_preserves_reference_and_marks_checked_rules ... ok
+test codegen::tests::frozen_demographic_model_has_fifty_million_claim_instances ... ok
+test codegen::tests::device_observation_codegen_is_all_or_nothing ... ok
+test backend::sweep_capacity_tests::packed_pinned_accounting_is_exact_per_lane_and_zero_aware ... ok
+test backend::sweep_capacity_tests::isolated_lane_estimate_is_conservative_against_measured_h100_arms ... ok
+test backend::sweep_capacity_tests::capacity_estimator_rejects_zero_workers ... ok
+test codegen::tests::grouped_histogram_omits_empty_groups_and_matches_btree_order_exactly ... ok
+test codegen::tests::grouped_codegen_collects_boundable_axes_and_emits_dense_histogram_kernels ... ok
+test codegen::tests::grouped_layout_uses_exact_banded_extrema_and_fails_past_the_limit ... ok
+test codegen::tests::host_ineligible_route_executes_download_and_device_route_does_not ... ok
+test codegen::tests::hostile_model_name_is_represented_by_ascii_digest_only ... ok
+test codegen::tests::prefix_reduction_is_lexicographic_not_component_wise ... ok
+test codegen::tests::grouped_only_models_emit_legacy_enum_counts_without_state_download ... ok
+test codegen::tests::minimum_integer_literal_remains_signed_and_generation_is_deterministic ... ok
+test codegen::tests::nested_output_aggregate_is_collected_before_ordered_output ... ok
+test codegen::tests::input_integer_ordering_promotes_both_operands_to_f64 ... ok
+test codegen::tests::incompatible_claims_are_checked_serially_before_parallel_argmin ... ok
+test codegen::tests::segmented_argmin_has_no_cross_table_row_scan_and_prefixes_every_pass ... ok
+test codegen::tests::shared_aggregate_is_staged_for_schedule_and_output ... ok
+test codegen::tests::unwired_output_aggregates_are_not_collected ... ok
+test codegen::tests::stable_rule_words_key_philox_and_conflict_ordering_while_ordinals_index ... ok
+test codegen::tests::sir_simulation_source_matches_checked_in_golden ... ok
+test codegen::tests::transition_candidates_skip_hazard_and_rng_when_the_guard_is_false ... ok
+test codegen::tests::dump_is_content_addressed_and_repeatable ... ok
+test codegen::tests::policy_source_contains_prospective_output_and_parallel_result_stages ... ok
+test backend::diagnostic_equality_hardware::large_recovery_inputs_match_cpu_error_and_rollback ... ok
+
+test result: ok. 41 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
