@@ -237,7 +237,7 @@ pub(super) fn build_layout(
             let initial = find_table(initial_tables, &model_box.name, &table.name)?;
             row_counts.push(initial.row_count as u64);
             for attr_index in 0..table.attrs.len() {
-                state_len = align8(state_len);
+                state_len = align8(state_len)?;
                 column_offsets.push(state_len as u64);
                 state_len = state_len
                     .checked_add(
@@ -261,7 +261,7 @@ pub(super) fn build_layout(
         for (port_index, port) in model_box.inputs.iter().enumerate() {
             ports.push((box_index, port_index));
             for field_index in 0..port.schema.len() {
-                input_len = align8(input_len);
+                input_len = align8(input_len)?;
                 input_offsets.push(input_len as u64);
                 // v0.1 outputs are one-row aggregate tables.
                 input_len = input_len
@@ -274,8 +274,9 @@ pub(super) fn build_layout(
     }
     let state_logical_len = state_len;
     let input_logical_len = input_len;
-    state_len = state_len.max(1);
-    input_len = input_len.max(1);
+    // Every repeated draw slot must preserve alignment of its typed columns.
+    state_len = align8(state_len.max(1))?;
+    input_len = align8(input_len.max(1))?;
 
     // Keep global-table addressing, but reserve winner slots only for contest
     // targets. Uncontested tables never index the winner buffers.
@@ -323,7 +324,7 @@ pub(super) fn build_layout(
     let mut aggregate_max_groups = 0_usize;
     for table in &generated.aggregate_group_tables {
         aggregate_max_groups = aggregate_max_groups.max(row_counts[*table] as usize);
-        aggregate_len = align8(aggregate_len);
+        aggregate_len = align8(aggregate_len)?;
         aggregate_offsets.push(aggregate_len as u64);
         aggregate_len = aggregate_len
             .checked_add(
@@ -350,7 +351,7 @@ pub(super) fn build_layout(
         claim_instance_offsets,
         claim_instance_count,
         aggregate_offsets,
-        aggregate_len: aggregate_len.max(1),
+        aggregate_len: align8(aggregate_len.max(1))?,
         aggregate_max_groups,
         write_offsets,
         owner_count,
@@ -565,6 +566,9 @@ pub(super) fn type_size(ty: &AttrType) -> usize {
     }
 }
 
-pub(super) fn align8(value: usize) -> usize {
-    (value + 7) & !7
+fn align8(value: usize) -> Result<usize, CudaError> {
+    value
+        .checked_add(7)
+        .map(|value| value & !7)
+        .ok_or_else(|| CudaError::InvalidInput("aligned byte size overflow".to_owned()))
 }

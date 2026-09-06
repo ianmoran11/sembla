@@ -2,9 +2,9 @@
   "version": 1,
   "metric": "scripts/report-rust-context.py lexical production-source metric",
   "policy": "Limits are ratchets. Lower them after reductions; raise them only with an explicit context-budget justification.",
-  "adjustment_justification": "The CUDA throughput follow-up adds 1,414 production tokens for execution-specific reductions, validation eligibility metadata, a one-entry PTX cache, and command lifecycle timing. The frozen public source generator remains unchanged. Observation generation and tick timing were split into focused modules; CUDA and CLI file-size ratchets and the largest-function ratchet decrease. CPU, runtime, and IR budgets are unchanged; independent CPU edits are excluded from this benchmark candidate.",
+  "adjustment_justification": "The CUDA throughput follow-up adds 1,414 production tokens for execution-specific reductions, validation eligibility metadata, a one-entry PTX cache, and command lifecycle timing. The frozen public source generator remains unchanged. Observation generation and tick timing were split into focused modules; CUDA and CLI file-size ratchets and the largest-function ratchet decrease. CPU, runtime, and IR budgets are unchanged; independent CPU edits are excluded from this benchmark candidate. Hardware validation exposed unaligned fused byte arenas at odd row counts. Checked eight-byte padding adds 39 tokens while preserving logical lengths and canonical hashes.",
   "limits": {
-    "total_tokens": 178662,
+    "total_tokens": 178701,
     "max_file_code_lines": 2463,
     "max_function_lines": 512,
     "max_function_complexity": 39
@@ -13,7 +13,7 @@
     "sembla-ir": 15550,
     "sembla-runtime": 22172,
     "sembla-cpu": 36842,
-    "sembla-cuda": 50563,
+    "sembla-cuda": 50602,
     "sembla-cli": 53535
   },
   "crate_file_line_limits": {
